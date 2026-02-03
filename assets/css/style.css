@@ -159,7 +159,7 @@ img {
 
 .btn-primary {
   background: linear-gradient(135deg, var(--color-mint), var(--color-blue));
-  color: white;
+  color: black;
 }
 
 .btn-primary:hover {
