@@ -39,13 +39,14 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link active" href="#home">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#gaming">Gaming</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#cafe">Cafe</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#gaming">Gaming Rates</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#units">Units</a></li>
                     <li class="nav-item"><a class="nav-link" href="#events">Events</a></li>
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
                 </ul>
                 <div class="nav-cta ms-lg-3">
-                    <a href="#booking" class="btn btn-primary">Book a PC</a>
+                    <a href="#Login" class="btn btn-primary">Login</a>
+                    <a href="#Register" class="btn btn-primary">Register</a>
                 </div>
             </div>
         </div>
@@ -60,20 +61,20 @@
                 <div class="col-lg-7" data-aos="fade-right">
                     <div class="hero-content">
                         <h1 class="hero-title">YOUR ULTIMATE<br><span class="gradient-text">GAMING DESTINATION</span></h1>
-                        <p class="hero-subtitle">PLAY. EAT. COMPETE.</p>
+                        <p class="hero-subtitle">PLAY. ENJOY. COMPETE.</p>
                         <p class="hero-description">Your go spot for gaming fun! Dive into Xbox, PlayStation, and Nintendo Switch action in our cozy playful paradise.</p>
                         <div class="hero-buttons">
-                            <a href="#booking" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> Book a PC</a>
-                            <a href="#cafe" class="btn btn-secondary btn-lg"><i class="fas fa-coffee me-2"></i> View Menu</a>
+                            <a href="#booking" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> View Available Units</a>
+                            <a href="#pricing" class="btn btn-secondary btn-lg"><i class="fas fa-peso-sign me-2"></i> See Pricing Plans</a>
                         </div>
                         <div class="hero-stats mt-5">
                             <div class="stat-item">
-                                <h3 class="stat-number">1.5K</h3>
-                                <p class="stat-label">Followers</p>
+                                <h3 class="stat-number">100+</h3>
+                                <p class="stat-label">Games</p>
                             </div>
                             <div class="stat-item">
                                 <h3 class="stat-number">20+</h3>
-                                <p class="stat-label">Gaming PCs</p>
+                                <p class="stat-label">Gaming Units</p>
                             </div>
                             <div class="stat-item">
                                 <h3 class="stat-number">24/7</h3>
@@ -96,6 +97,7 @@
 
     <?php include 'sections/about.php'; ?>
     <?php include 'sections/services.php'; ?>
+    <?php include 'sections/units.php'; ?>
     <?php include 'sections/events.php'; ?>
     <?php include 'sections/contact.php'; ?>
     <?php include 'sections/footer.php'; ?>

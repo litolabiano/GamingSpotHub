@@ -18,15 +18,13 @@
                 <ul class="footer-links">
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About</a></li>
-                    <li><a href="#gaming">Gaming</a></li>
                     <li><a href="#cafe">Cafe</a></li>
                 </ul>
             </div>
             <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
                 <h5 class="footer-title">Services</h5>
                 <ul class="footer-links">
-                    <li><a href="#gaming">PC Gaming</a></li>
-                    <li><a href="#gaming">Console Gaming</a></li>
+                    <li><a href="#gaming">Gaming Rates</a></li>
                     <li><a href="#events">Tournaments</a></li>
                     <li><a href="#cafe">Cafe & Snacks</a></li>
                 </ul>
