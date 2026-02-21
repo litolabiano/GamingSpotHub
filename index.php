@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/includes/session_helper.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,34 +24,8 @@
 </head>
 <body>
     
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav">
-        <div class="container">
-            <a class="navbar-brand" href="#home">
-                <div class="logo-container">
-                    <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
-                    <span class="logo-text">GAMING HUB</span>
-                </div>
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link active" href="#home">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#gaming">Gaming Rates</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#units">Units</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#events">Events</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-                </ul>
-                <div class="nav-cta ms-lg-3">
-                    <a href="#Login" class="btn btn-primary">Login</a>
-                    <a href="#Register" class="btn btn-primary">Register</a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php include __DIR__ . '/includes/navbar.php'; ?>
+
 
     <!-- Hero Section -->
     <section id="home" class="hero-section">

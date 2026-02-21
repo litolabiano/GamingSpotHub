@@ -1,3 +1,8 @@
+<?php
+require_once __DIR__ . '/includes/session_helper.php';
+requireRole(['owner', 'shopkeeper']);
+$user = getCurrentUser();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,6 +58,11 @@
         <i class="fas fa-cog"></i>
         <span>Settings</span>
     </div>
+    <div style="flex:1;"></div>
+    <a href="index.php" class="nav-item" style="text-decoration:none; color:inherit; margin-top:auto; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;">
+        <i class="fas fa-arrow-left"></i>
+        <span>Back to Site</span>
+    </a>
 </div>
 
 <!-- Top Bar -->
@@ -67,10 +77,10 @@
             <span class="notification-badge">5</span>
         </div>
         <div class="user-profile">
-            <div class="user-avatar">AD</div>
+            <div class="user-avatar"><?= getUserInitials() ?></div>
             <div>
-                <div style="font-weight: 600; font-size: 14px;">Admin User</div>
-                <div style="font-size: 12px; color: #718096;">Super Admin</div>
+                <div style="font-weight: 600; font-size: 14px;"><?= htmlspecialchars($user['full_name']) ?></div>
+                <div style="font-size: 12px; color: #718096;"><?= getRoleBadge() ?></div>
             </div>
         </div>
     </div>

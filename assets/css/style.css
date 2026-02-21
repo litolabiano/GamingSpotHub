@@ -194,8 +194,7 @@ img {
   left: 0;
   width: 100%;
   height: 100%;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path fill="%2320c8a1" fill-opacity="0.05" d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25"/><path fill="%234ECDC4" fill-opacity="0.05" d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5"/><path fill="%234ECDC4" fill-opacity="0.05" d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z"/></svg>')
-    no-repeat center bottom;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path fill="%2320c8a1" fill-opacity="0.05" d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25"/><path fill="%234ECDC4" fill-opacity="0.05" d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5"/><path fill="%234ECDC4" fill-opacity="0.05" d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z"/></svg>') no-repeat center bottom;
   background-size: cover;
   pointer-events: none;
 }
@@ -222,13 +221,11 @@ img {
 }
 
 .gradient-text {
-  background: linear-gradient(
-    135deg,
-    var(--color-mint),
-    var(--color-purple),
-    var(--color-coral),
-    var(--color-blue)
-  );
+  background: linear-gradient(135deg,
+      var(--color-mint),
+      var(--color-purple),
+      var(--color-coral),
+      var(--color-blue));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -283,11 +280,9 @@ img {
   position: absolute;
   width: 150px;
   height: 150px;
-  background: linear-gradient(
-    135deg,
-    rgba(78, 205, 196, 0.1),
-    rgba(182, 126, 201, 0.1)
-  );
+  background: linear-gradient(135deg,
+      rgba(78, 205, 196, 0.1),
+      rgba(182, 126, 201, 0.1));
   backdrop-filter: blur(10px);
   border: 2px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -324,6 +319,7 @@ img {
 }
 
 @keyframes float {
+
   0%,
   100% {
     transform: translateY(0);
@@ -350,6 +346,7 @@ img {
 }
 
 @keyframes bounce {
+
   0%,
   20%,
   50%,
@@ -375,11 +372,9 @@ section {
 .section-tag {
   display: inline-block;
   padding: 0.5rem 1.5rem;
-  background: linear-gradient(
-    135deg,
-    rgba(78, 205, 196, 0.1),
-    rgba(182, 126, 201, 0.1)
-  );
+  background: linear-gradient(135deg,
+      rgba(78, 205, 196, 0.1),
+      rgba(182, 126, 201, 0.1));
   border: 1px solid var(--color-mint);
   border-radius: 50px;
   color: var(--color-mint);
@@ -403,11 +398,9 @@ section {
 
 /* Service Cards */
 .service-card {
-  background: linear-gradient(
-    135deg,
-    rgba(10, 33, 81, 0.8),
-    rgba(13, 17, 23, 0.8)
-  );
+  background: linear-gradient(135deg,
+      rgba(10, 33, 81, 0.8),
+      rgba(13, 17, 23, 0.8));
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -509,11 +502,9 @@ section {
 
 /* Contact Form */
 .contact-form-wrapper {
-  background: linear-gradient(
-    135deg,
-    rgba(10, 33, 81, 0.8),
-    rgba(13, 17, 23, 0.8)
-  );
+  background: linear-gradient(135deg,
+      rgba(10, 33, 81, 0.8),
+      rgba(13, 17, 23, 0.8));
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -703,11 +694,9 @@ section {
 }
 
 .unit-card {
-  background: linear-gradient(
-    135deg,
-    rgba(10, 33, 81, 0.8),
-    rgba(13, 17, 23, 0.8)
-  );
+  background: linear-gradient(135deg,
+      rgba(10, 33, 81, 0.8),
+      rgba(13, 17, 23, 0.8));
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -953,3 +942,211 @@ section {
     align-items: center;
   }
 }
+
+/* ===============================================
+   NAVBAR USER DROPDOWN (Logged-in state)
+   Scoped under #mainNav for specificity over Bootstrap
+   =============================================== */
+#mainNav .nav-user {
+  position: relative;
+}
+
+#mainNav .user-dropdown {
+  position: relative;
+}
+
+#mainNav .user-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
+  padding: 0.35rem 0.9rem 0.35rem 0.35rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #e8eaed;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+}
+
+#mainNav .user-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+#mainNav .user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #20c8a1, #5f85da) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #fff !important;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+#mainNav .user-avatar-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
+}
+
+#mainNav .user-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.25;
+}
+
+#mainNav .user-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e8eaed;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#mainNav .user-role-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #20c8a1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#mainNav .user-chevron {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.35);
+  transition: transform 0.3s ease;
+}
+
+#mainNav .user-dropdown.open .user-chevron {
+  transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+#mainNav .user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 260px;
+  background: rgba(10, 15, 30, 0.97) !important;
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px;
+  padding: 0.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.96);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 9999;
+  list-style: none;
+  margin: 0;
+  display: block;
+  float: none;
+}
+
+#mainNav .user-dropdown.open .user-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+#mainNav .dropdown-user-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+}
+
+#mainNav .dropdown-user-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #e8eaed !important;
+}
+
+#mainNav .dropdown-user-email {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4) !important;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#mainNav .dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0.35rem 0;
+  border: none;
+}
+
+#mainNav .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.65) !important;
+  text-decoration: none !important;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: transparent !important;
+}
+
+#mainNav .dropdown-item:hover,
+#mainNav .dropdown-item:focus {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #e8eaed !important;
+}
+
+#mainNav .dropdown-item i {
+  width: 18px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+#mainNav .dropdown-item-danger {
+  color: rgba(251, 86, 107, 0.75) !important;
+}
+
+#mainNav .dropdown-item-danger:hover {
+  background: rgba(251, 86, 107, 0.1) !important;
+  color: #fb566b !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 991px) {
+  #mainNav .user-dropdown-toggle .user-info {
+    display: none;
+  }
+
+  #mainNav .user-dropdown-toggle .user-chevron {
+    display: none;
+  }
+
+  #mainNav .user-dropdown-toggle {
+    padding: 0.25rem;
+    border-radius: 50%;
+    border: none;
+    background: none;
+  }
+
+  #mainNav .user-dropdown-menu {
+    right: -10px;
+  }
+}
+

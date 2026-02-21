@@ -23,21 +23,13 @@
                             <p>Latest hardware for smooth gaming experience</p>
                         </div>
                     </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-coffee"></i>
-                        </div>
-                        <div class="feature-content">
-                            <h4>Delicious Food & Drinks</h4>
-                            <p>Fuel your gaming sessions with our menu</p>
-                        </div>
-                    </div>
+
                     <div class="feature-item">
                         <div class="feature-icon">
                             <i class="fas fa-trophy"></i>
                         </div>
                         <div class="feature-content">
-                            <h4>Monthly Tournaments</h4>
+                            <h4> Tournaments</h4>
                             <p>Compete and win amazing prizes</p>
                         </div>
                     </div>
@@ -45,7 +37,41 @@
             </div>
             <div class="col-lg-6" data-aos="fade-left">
                 <div class="about-image">
-                    <img src="assets/images/about-gaming.jpg" alt="Gspot Gaming Hub Interior" class="img-fluid rounded shadow-lg">
+                    <div id="aboutCarousel" class="carousel slide" data-bs-ride="carousel">
+                        <!-- Indicators -->
+                        <div class="carousel-indicators">
+                            <button type="button" data-bs-target="#aboutCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+                            <button type="button" data-bs-target="#aboutCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+                            <button type="button" data-bs-target="#aboutCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+                            <button type="button" data-bs-target="#aboutCarousel" data-bs-slide-to="3" aria-label="Slide 4"></button>
+                        </div>
+                        
+                        <!-- Slides -->
+                        <div class="carousel-inner">
+                            <div class="carousel-item active">
+                                <img src="assets/images/1.png" alt="Gspot Gaming Hub Interior 1" class="d-block w-100 img-fluid rounded shadow-lg">
+                            </div>
+                            <div class="carousel-item">
+                                <img src="assets/images/2.png" alt="Gspot Gaming Hub Interior 2" class="d-block w-100 img-fluid rounded shadow-lg">
+                            </div>
+                            <div class="carousel-item">
+                                <img src="assets/images/3.png" alt="Gspot Gaming Hub Interior 3" class="d-block w-100 img-fluid rounded shadow-lg">
+                            </div>
+                            <div class="carousel-item">
+                                <img src="assets/images/4.png" alt="Gspot Gaming Hub Interior 4" class="d-block w-100 img-fluid rounded shadow-lg">
+                            </div>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <button class="carousel-control-prev" type="button" data-bs-target="#aboutCarousel" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Previous</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#aboutCarousel" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Next</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
