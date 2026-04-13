@@ -10,12 +10,12 @@ USE gamingspothub;
 -- Default password for all: "password123" (bcrypt hashed)
 -- ============================================================================
 
-INSERT INTO users (email, password_hash, full_name, phone, role, status) VALUES
-('owner@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Juan Dela Cruz', '09171234567', 'owner', 'active'),
-('shopkeeper@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Maria Santos', '09181234567', 'shopkeeper', 'active'),
-('carlos@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Carlos Reyes', '09191234567', 'customer', 'active'),
-('anna@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Anna Garcia', '09201234567', 'customer', 'active'),
-('mark@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mark Bautista', '09211234567', 'customer', 'active');
+INSERT INTO users (email, password_hash, full_name, phone, role, status, email_verified) VALUES
+('owner@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Juan Dela Cruz', '09171234567', 'owner', 'active', 1),
+('shopkeeper@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Maria Santos', '09181234567', 'shopkeeper', 'active', 1),
+('carlos@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Carlos Reyes', '09191234567', 'customer', 'active', 1),
+('anna@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Anna Garcia', '09201234567', 'customer', 'active', 1),
+('mark@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mark Bautista', '09211234567', 'customer', 'active', 1);
 
 
 -- ============================================================================

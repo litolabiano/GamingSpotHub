@@ -80,9 +80,6 @@ This section maps every element from the conceptual model to its corresponding d
 │ INPUT: Date, Unit Number,              │ gaming_sessions, consoles            │
 │   Start/End Time, Rental Mode          │                                      │
 │                                        │                                      │
-│ INPUT: Additional Requests             │ additional_requests                  │
-│   (extra hours, controllers)           │                                      │
-│                                        │                                      │
 │ INPUT: Payment Details                 │ transactions                         │
 │                                        │                                      │
 │ INPUT: Game Installation Requests      │ game_requests                        │
@@ -111,7 +108,6 @@ This section maps every element from the conceptual model to its corresponding d
 │                                        │                                      │
 │ PROCESS: Post Tournament Announcement  │ tournaments.announcement             │
 │                                        │                                      │
-│ PROCESS: Update Tournament Status      │ tournaments.status                   │
 ├────────────────────────────────────────┼──────────────────────────────────────┤
 │ OUTPUT / EVALUATION:                   │ reports, aggregated queries          │
 │   Reports, Sales, Usage Data           │                                      │
@@ -150,7 +146,6 @@ Purpose: PS5 and Xbox Series X units
   status          │ ENUM('available','in_use','maintenance')   │ Real-time status
   hourly_rate     │ DECIMAL(10,2)                              │ Rate in ₱
   created_at      │ DATETIME                                   │
-
 
 TABLE 3: gaming_sessions
 Purpose: Rental sessions with time tracking

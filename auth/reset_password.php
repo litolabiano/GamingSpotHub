@@ -64,8 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
 
         <div class="auth-brand-panel">
             <div class="brand-content">
-                <div class="brand-icon">🔑</div>
-                <h2 class="brand-title">Set a new <span class="highlight">password</span></h2>
+                <div class="auth-logo brand-icon">
+                        <a href="../index.php">
+                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
+                            <span class="logo-text">GAMING HUB</span>
+                        </a>
+                    </div>                <h2 class="brand-title">Set a new <span class="highlight">password</span></h2>
                 <p class="brand-description">Choose a strong password that you haven't used before to keep your account secure.</p>
                 <ul class="brand-features">
                     <li><i class="fas fa-check"></i> At least 8 characters</li>
@@ -78,13 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
         <div class="auth-form-panel">
             <div class="auth-container">
                 <div class="auth-card">
-                    <div class="auth-logo">
-                        <a href="../index.php">
-                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
-                            <span class="logo-text">GAMING HUB</span>
-                        </a>
-                    </div>
-
                     <?php if ($success): ?>
                         <div class="auth-result">
                             <div class="auth-result-icon success">

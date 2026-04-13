@@ -78,7 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Left Branding Panel -->
         <div class="auth-brand-panel">
             <div class="brand-content">
-                <div class="brand-icon">🎮</div>
+                <div class="auth-logo brand-icon">
+                        <a href="../index.php">
+                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
+                            <span class="logo-text">GAMING HUB</span>
+                        </a>
+                    </div>
                 <h2 class="brand-title">Welcome back to <span class="highlight">Good Spot</span></h2>
                 <p class="brand-description">Sign in to access your gaming sessions, track your history, and join upcoming tournaments.</p>
                 <ul class="brand-features">
@@ -94,12 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-form-panel">
             <div class="auth-container">
                 <div class="auth-card">
-                    <div class="auth-logo">
-                        <a href="../index.php">
-                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
-                            <span class="logo-text">GAMING HUB</span>
-                        </a>
-                    </div>
+
 
                     <h1 class="auth-title">Sign in to your account</h1>
                     <p class="auth-subtitle">Enter your credentials to continue</p>

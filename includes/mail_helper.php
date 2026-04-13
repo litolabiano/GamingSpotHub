@@ -38,7 +38,7 @@ function sendVerificationEmail($email, $fullName, $token) {
     try {
         $mail = createMailer();
         $mail->addAddress($email, $fullName);
-        $mail->Subject = '🎮 Verify Your Good Spot Gaming Hub Account';
+        $mail->Subject = 'Verify Your Good Spot Gaming Hub Account';
 
         $verifyUrl = SITE_URL . '/auth/verify.php?token=' . urlencode($token);
 
@@ -64,14 +64,17 @@ function sendVerificationEmail($email, $fullName, $token) {
             <div style="padding: 20px; background: #0d1117;">
                 <div class="container">
                     <div class="header">
-                        <h1>🎮 Good Spot Gaming Hub</h1>
+                        <div style="font-size: 28px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px;">
+                            <span style="color: #f1e1aa;">G</span><span style="color: #20c8a1;">s</span><span style="color: #b37bec;">p</span><span style="color: #fb566b;">o</span><span style="color: #5f85da;">t</span>
+                            <span style="color: #f1e1aa; font-size: 16px; font-weight: 700; letter-spacing: 3px; vertical-align: middle; margin-left: 6px;">GAMING HUB</span>
+                        </div>
                         <p>Email Verification</p>
                     </div>
                     <div class="body">
-                        <p>Hey <strong>' . htmlspecialchars($fullName) . '</strong>! 👋</p>
+                        <p>Hey <strong>' . htmlspecialchars($fullName) . '</strong>! </p>
                         <p>Welcome to Good Spot Gaming Hub! Please verify your email address to activate your account and start gaming.</p>
                         <div class="btn-wrap">
-                            <a href="' . $verifyUrl . '" class="btn">✅ Verify My Email</a>
+                            <a href="' . $verifyUrl . '" class="btn">Verify My Email</a>
                         </div>
                         <p style="font-size: 13px; color: #888;">This link expires in <strong>24 hours</strong>. If you didn\'t create an account, please ignore this email.</p>
                     </div>

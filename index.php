@@ -27,6 +27,24 @@
     <?php include __DIR__ . '/includes/navbar.php'; ?>
 
 
+    <?php
+    // --- Hero Stats: pull real counts from the database ---
+    require_once __DIR__ . '/includes/db_config.php';
+
+    $stat_games    = 0;
+    $stat_consoles = 0;
+    $stat_members  = 0;
+
+    $r = $conn->query("SELECT COUNT(*) AS cnt FROM games WHERE is_available = 1");
+    if ($r) $stat_games = (int) $r->fetch_assoc()['cnt'];
+
+    $r = $conn->query("SELECT COUNT(*) AS cnt FROM consoles");
+    if ($r) $stat_consoles = (int) $r->fetch_assoc()['cnt'];
+
+    $r = $conn->query("SELECT COUNT(*) AS cnt FROM users WHERE role = 'customer' AND status = 'active'");
+    if ($r) $stat_members = (int) $r->fetch_assoc()['cnt'];
+    ?>
+
     <!-- Hero Section -->
     <section id="home" class="hero-section">
         <div class="hero-overlay"></div>
@@ -44,16 +62,16 @@
                         </div>
                         <div class="hero-stats mt-5">
                             <div class="stat-item">
-                                <h3 class="stat-number">100+</h3>
+                                <h3 class="stat-number"><?= $stat_games ?>+</h3>
                                 <p class="stat-label">Games</p>
                             </div>
                             <div class="stat-item">
-                                <h3 class="stat-number">20+</h3>
+                                <h3 class="stat-number"><?= $stat_consoles ?>+</h3>
                                 <p class="stat-label">Gaming Units</p>
                             </div>
                             <div class="stat-item">
-                                <h3 class="stat-number">24/7</h3>
-                                <p class="stat-label">Open Hours</p>
+                                <h3 class="stat-number"><?= $stat_members ?>+</h3>
+                                <p class="stat-label">Members</p>
                             </div>
                         </div>
                     </div>

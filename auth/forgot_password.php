@@ -59,8 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Left Branding Panel -->
         <div class="auth-brand-panel">
             <div class="brand-content">
-                <div class="brand-icon">🔐</div>
-                <h2 class="brand-title">Forgot your <span class="highlight">password?</span></h2>
+                <div class="auth-logo brand-icon">
+                        <a href="../index.php">
+                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
+                            <span class="logo-text">GAMING HUB</span>
+                        </a>
+                    </div>                <h2 class="brand-title">Forgot your <span class="highlight">password?</span></h2>
                 <p class="brand-description">No worries! Enter the email address linked to your account, and we'll send you a secure link to reset your password.</p>
                 <ul class="brand-features">
                     <li><i class="fas fa-envelope"></i> Secure reset link via email</li>
@@ -74,13 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-form-panel">
             <div class="auth-container">
                 <div class="auth-card">
-                    <div class="auth-logo">
-                        <a href="../index.php">
-                            <span style="color:#f1e1aa">G</span><span style="color:#20c8a1">s</span><span style="color:#b37bec">p</span><span style="color:#fb566b">o</span><span style="color:#5f85da">t</span>
-                            <span class="logo-text">GAMING HUB</span>
-                        </a>
-                    </div>
-
                     <h1 class="auth-title">Reset your password</h1>
                     <p class="auth-subtitle">We'll email you a link to reset your password</p>
 
