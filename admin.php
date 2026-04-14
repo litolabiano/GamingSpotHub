@@ -659,6 +659,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
+<<<<<<< Updated upstream
+=======
+
+
+>>>>>>> Stashed changes
 <!-- ════ FINANCIAL ══════════════════════════════════════════════════════════ -->
 <div class="page" id="financial">
     <div class="stats-grid">
