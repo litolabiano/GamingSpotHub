@@ -72,8 +72,11 @@
                 <td><span class="badge pending"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></span></td>
                 <td><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
                 <td>
-                    <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']): ?>
-                        <span style="color:#f1e1aa;font-weight:600"><?= date('h:i A', strtotime($sess['start_time']) + ($sess['planned_minutes'] * 60)) ?></span>
+                    <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']):
+                        $bookedEndDt = new DateTime($sess['start_time'], new DateTimeZone('Asia/Manila'));
+                        $bookedEndDt->modify('+' . $sess['planned_minutes'] . ' minutes');
+                    ?>
+                        <span style="color:#f1e1aa;font-weight:600"><?= $bookedEndDt->format('h:i A') ?></span>
                     <?php else: ?>—<?php endif; ?>
                 </td>
                 <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>" data-planned="<?= $sess['planned_minutes'] ?? '' ?>">—</span></td>
@@ -83,7 +86,7 @@
                         '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                         '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                         '<?= $sess['rental_mode'] ?>',
-                        <?= strtotime($sess['start_time']) ?>,
+                        '<?= $sess['start_time'] ?>',
                         <?= (int)($sess['planned_minutes'] ?? 0) ?>,
                         <?= (float)($sess['upfront_paid'] ?? 0) ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay

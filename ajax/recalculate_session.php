@@ -94,9 +94,32 @@ if (!$upd->execute()) {
     exit;
 }
 
-// Also update the linked transaction amount if one exists
-$txn = $conn->prepare("UPDATE transactions SET amount = ? WHERE session_id = ? AND payment_status = 'completed'");
-$txn->bind_param('di', $total_cost, $session_id);
+// Sum all upfront/partial transactions BEFORE the last one — those must not be changed.
+$prevTxStmt = $conn->prepare(
+    "SELECT COALESCE(SUM(amount), 0) AS paid_before_last
+     FROM transactions
+     WHERE session_id = ? AND payment_status = 'completed'
+       AND transaction_id < (
+           SELECT MAX(transaction_id) FROM transactions
+           WHERE session_id = ? AND payment_status = 'completed'
+       )"
+);
+$prevTxStmt->bind_param('ii', $session_id, $session_id);
+$prevTxStmt->execute();
+$paidBeforeLast = (float)$prevTxStmt->get_result()->fetch_assoc()['paid_before_last'];
+
+// Last transaction = remaining due after recalculation
+$lastTxAmount = max(0, $total_cost - $paidBeforeLast);
+
+// Update only the LAST transaction to reflect the recalculated cost.
+// Upfront/partial rows before it are never touched.
+$txn = $conn->prepare(
+    "UPDATE transactions SET amount = ?
+     WHERE session_id = ? AND payment_status = 'completed'
+     ORDER BY transaction_id DESC
+     LIMIT 1"
+);
+$txn->bind_param('di', $lastTxAmount, $session_id);
 $txn->execute();
 
 echo json_encode([

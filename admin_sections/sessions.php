@@ -88,10 +88,83 @@
 </style>
 
 <div class="page" id="sessions">
+
+<?php if (!empty($pendingSessions)): ?>
+    <div class="card" style="border-left:3px solid #f1a83c;margin-bottom:20px;">
+        <div class="card-header" style="border-bottom:1px solid rgba(241,168,60,.2);">
+            <h3 class="card-title" style="color:#f1a83c;">
+                <i class="fas fa-clock" style="margin-right:8px;"></i>
+                Pending Payments
+                <span style="background:rgba(241,168,60,.2);color:#f1a83c;font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:8px;">
+                    <?= count($pendingSessions) ?>
+                </span>
+            </h3>
+            <span style="font-size:12px;color:#888;">Active sessions with partial upfront — balance due at session end</span>
+        </div>
+        <table class="data-table" id="pendingPaymentsTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Customer</th>
+                    <th>Console</th>
+                    <th>Mode</th>
+                    <th>Started</th>
+                    <th>Elapsed</th>
+                    <th>Paid So Far</th>
+                    <th>Balance Owed</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($pendingSessions as $ps):
+                $psStart   = strtotime($ps['start_time']);
+                $psElapsed = time() - $psStart;
+                $psH = floor($psElapsed / 3600);
+                $psM = floor(($psElapsed % 3600) / 60);
+                $psPaid = (float)$ps['paid_so_far'];
+                if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
+                    $psExpected = $ps['planned_minutes'] <= 30 ? 50.0 : (float)($ps['planned_minutes'] / 60 * 80);
+                    $psModeLabel = 'Hourly';
+                } else {
+                    $psExpected  = $unlimitedRateVal;
+                    $psModeLabel = 'Unlimited';
+                }
+                $psOwed = $psExpected - $psPaid;
+            ?>
+            <tr>
+                <td>#<?= $ps['session_id'] ?></td>
+                <td><?= htmlspecialchars($ps['customer_name']) ?></td>
+                <td><?= htmlspecialchars($ps['unit_number']) ?></td>
+                <td><?= $psModeLabel ?></td>
+                <td><?= date('h:i A', $psStart) ?></td>
+                <td>
+                    <span class="session-timer" data-start="<?= $ps['start_time'] ?>" style="color:#f1e1aa;font-family:monospace;">
+                        <?= ($psH ? $psH.'h ' : '') . str_pad($psM, 2, '0', STR_PAD_LEFT) . 'm' ?>
+                    </span>
+                </td>
+                <td style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
+                <td>
+                    <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);
+                                 padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">
+                        ₱<?= number_format($psOwed, 2) ?> due
+                    </span>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
+
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">All Sessions</h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
+                    style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#ccc;font-size:12px;">
+                    <i class="fas fa-sort-amount-down"></i> Default Sort
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
+            </div>
         </div>
         <table class="data-table" id="sessionsTable">
             <thead>
@@ -177,20 +250,58 @@
                 <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
                 <td>
                 <?php if ($sess['status'] === 'active'): ?>
-                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(
-                        <?= $sess['session_id'] ?>,
-                        '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
-                        '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
-                        '<?= $sess['rental_mode'] ?>',
-                        <?= $startTs ?>,
-                        <?= $bookedMinutes ?>,
-                        <?= (float)($sess['upfront_paid'] ?? 0) ?>,
-                        <?= (float)($settings['unlimited_rate'] ?? 300) ?>
-                    )">
-                        <i class="fas fa-stop"></i> End
-                    </button>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                        <button class="btn btn-danger btn-sm" title="End Session" onclick="openEndSessionModal(
+                            <?= $sess['session_id'] ?>,
+                            '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                            '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                            '<?= $sess['rental_mode'] ?>',
+                            '<?= $sess['start_time'] ?>',
+                            <?= $bookedMinutes ?>,
+                            <?= (float)($sess['upfront_paid'] ?? 0) ?>,
+                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>
+                        )">
+                            <i class="fas fa-stop"></i> End
+                        </button>
+                        <button class="btn btn-sm" title="Collect Payment"
+                            style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                            onclick="openPayModal(
+                                <?= $sess['session_id'] ?>,
+                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                                '<?= $sess['rental_mode'] ?>',
+                                '<?= $sess['start_time'] ?>',
+                                <?= $bookedMinutes ?>,
+                                <?= (float)($sess['upfront_paid'] ?? 0) ?>,
+                                <?= (float)($settings['unlimited_rate'] ?? 300) ?>
+                            )">
+                            <i class="fas fa-peso-sign"></i> Pay
+                        </button>
+                        <button class="btn btn-sm" title="Issue Refund"
+                            style="background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;"
+                            onclick="openRefundModal(
+                                <?= $sess['session_id'] ?>,
+                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                                <?= (float)($sess['upfront_paid'] ?? 0) ?>
+                            )">
+                            <i class="fas fa-undo-alt"></i> Refund
+                        </button>
+                        <button class="btn btn-sm" title="Extend Session"
+                            style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;"
+                            onclick="openExtendModal(
+                                <?= $sess['session_id'] ?>,
+                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                                <?= $bookedMinutes ?>
+                            )">
+                            <i class="fas fa-clock"></i> Extend
+                        </button>
+                    </div>
+
                 <?php else: ?>—<?php endif; ?>
                 </td>
+
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -257,7 +368,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(r => r.json())
                 .then(function (data) {
                     if (!data.success) {
-                        alert('Error: ' + data.message);
+                        showInlineToast('Could not update: ' + data.message, 'error');
                         display.innerHTML = origHtml;
                         return;
                     }
@@ -294,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     row.dataset.end = Math.floor(endDate.getTime() / 1000);
                 })
                 .catch(function () {
-                    alert('Network error — please try again.');
+                    showInlineToast('Network error — please check your connection and try again.', 'error');
                     display.innerHTML = origHtml;
                 });
         });
@@ -315,16 +426,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const DATA_KEYS    = ['id','customer','console','mode','booked','start','end','duration','cost','status'];
     const NUMERIC_COLS = new Set([0, 4, 5, 6, 7, 8, 9]);
 
-    const table   = document.getElementById('sessionsTable');
-    const tbody   = table.querySelector('tbody');
-    const headers = table.querySelectorAll('thead th[data-col]');
+    const table      = document.getElementById('sessionsTable');
+    const tbody      = table.querySelector('tbody');
+    const headers    = table.querySelectorAll('thead th[data-col]');
+    const resetBtn   = document.getElementById('resetSortBtn');
 
     let currentCol = null;
     let currentAsc = true;
 
     headers.forEach(function (th) {
         th.addEventListener('click', function () {
-            const col  = parseInt(th.dataset.col);
+            const col   = parseInt(th.dataset.col);
             const isAsc = (currentCol === col) ? !currentAsc : true;
             sortTable(col, isAsc);
             updateIcons(th, isAsc);
@@ -332,6 +444,29 @@ document.addEventListener('DOMContentLoaded', function () {
             currentAsc = isAsc;
         });
     });
+
+    /* ── Default sort: active sessions first, then newest start time first ── */
+    function applyDefaultSort() {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort(function (a, b) {
+            const aStatus = parseInt(a.dataset.status) || 0;  // 1 = active
+            const bStatus = parseInt(b.dataset.status) || 0;
+            if (bStatus !== aStatus) return bStatus - aStatus; // active (1) on top
+            // Secondary: newest start time first (descending)
+            const aStart = parseFloat(a.dataset.start) || 0;
+            const bStart = parseFloat(b.dataset.start) || 0;
+            return bStart - aStart;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+
+        // Clear all column sort indicators
+        headers.forEach(function (th) {
+            th.classList.remove('sort-asc', 'sort-desc');
+            th.querySelector('.sort-icon').innerHTML = '&#8597;';
+        });
+        currentCol = null;
+        currentAsc = true;
+    }
 
     function sortTable(col, asc) {
         const key   = DATA_KEYS[col];
@@ -359,5 +494,34 @@ document.addEventListener('DOMContentLoaded', function () {
         activeTh.classList.add(asc ? 'sort-asc' : 'sort-desc');
         activeTh.querySelector('.sort-icon').innerHTML = asc ? '&#8593;' : '&#8595;';
     }
+
+    // Apply default sort immediately on load
+    applyDefaultSort();
+
+    // Reset Sort button
+    resetBtn.addEventListener('click', function () {
+        applyDefaultSort();
+    });
 })();
+
+/* ── Inline toast helper (replaces browser alert) ── */
+function showInlineToast(msg, type) {
+    const existing = document.getElementById('sessionsInlineToast');
+    if (existing) existing.remove();
+
+    const colors = type === 'error'
+        ? { bg: 'rgba(251,86,107,.15)', border: 'rgba(251,86,107,.4)', color: '#fb566b', icon: 'fa-exclamation-circle' }
+        : { bg: 'rgba(32,200,161,.15)',  border: 'rgba(32,200,161,.4)',  color: '#20c8a1', icon: 'fa-check-circle' };
+
+    const el = document.createElement('div');
+    el.id = 'sessionsInlineToast';
+    el.style.cssText = `position:fixed;top:80px;right:20px;z-index:9999;
+        padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;
+        display:flex;align-items:center;gap:10px;max-width:400px;
+        background:${colors.bg};border:1px solid ${colors.border};color:${colors.color};
+        box-shadow:0 8px 32px rgba(0,0,0,.4);animation:slideInRight .3s ease;`;
+    el.innerHTML = `<i class="fas ${colors.icon}"></i> ${msg}`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4500);
+}
 </script>
