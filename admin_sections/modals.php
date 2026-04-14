@@ -102,7 +102,7 @@
                         </div>
                         <div class="form-group" style="margin-bottom:6px">
                             <label>Amount Tendered (₱)</label>
-                            <input type="number" id="startTendered" min="0" step="1" placeholder="e.g. 200"
+                            <input type="number" id="startTendered" name="start_amount_tendered" min="0" step="1" placeholder="e.g. 200"
                                    style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
                                    oninput="calcChange('startTendered','startChangeDisplay','startCostAmt')">
                         </div>
@@ -132,7 +132,7 @@
                     </div>
                     <div class="form-group" style="margin-bottom:6px">
                         <label>Amount Tendered (₱)</label>
-                        <input type="number" id="unlimTendered" min="0" step="1" placeholder="e.g. 400"
+                        <input type="number" id="unlimTendered" name="unlim_amount_tendered" min="0" step="1" placeholder="e.g. 400"
                                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
                                oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt')">
                     </div>

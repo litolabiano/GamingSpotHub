@@ -18,11 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id         = (int)($_POST['user_id'] ?? 0);
-        $console_id      = (int)($_POST['console_id'] ?? 0);
-        $rental_mode     = $_POST['rental_mode'] ?? '';
-        $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
+        $user_id              = (int)($_POST['user_id'] ?? 0);
+        $console_id           = (int)($_POST['console_id'] ?? 0);
+        $rental_mode          = $_POST['rental_mode'] ?? '';
+        $planned_minutes      = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
+        $collect_upfront      = isset($_POST['collect_upfront']);
+        // Each mode has its own distinct field name to avoid last-value collision
+        $amt_tendered = ($rental_mode === 'unlimited')
+            ? (float)($_POST['unlim_amount_tendered'] ?? 0)
+            : (float)($_POST['start_amount_tendered'] ?? 0);
 
         if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
@@ -31,31 +36,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Please select a duration for the hourly session.';
             $messageType = 'error';
         } else {
+            // Compute expected upfront cost (used for messaging & partial-payment record)
+            $upfront_cost = 0.0;
+            if ($rental_mode === 'unlimited') {
+                $upfront_cost = (float)(getSetting('unlimited_rate') ?? 300);
+            } elseif ($rental_mode === 'hourly' && $collect_upfront && $planned_minutes) {
+                $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
+            }
+
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
             if ($result['success']) {
                 if ($rental_mode === 'unlimited') {
-                    // Unlimited: always collect flat rate upfront
                     $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
-                    $upfront_cost = (float)(getSetting('unlimited_rate') ?? 300);
-                    recordTransaction($result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id']);
-                    $cost = number_format($upfront_cost, 2);
-                    $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
-                } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
-                    // Hourly: optional upfront payment
-                    $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
-                    recordTransaction($result['session_id'], $user_id, $upfront_cost, $start_payment_method, $user['user_id']);
-                    $cost = number_format($upfront_cost, 2);
-                    $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+                    // Record whatever was tendered (partial or full)
+                    $amt_to_record = ($amt_tendered > 0) ? min($amt_tendered, $upfront_cost) : $upfront_cost;
+                    recordTransaction($result['session_id'], $user_id, $amt_to_record, $unlimited_payment, $user['user_id']);
+                    $recorded = number_format($amt_to_record, 2);
+                    if ($amt_to_record < $upfront_cost) {
+                        $remaining = number_format($upfront_cost - $amt_to_record, 2);
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected via " . ucfirst($unlimited_payment) . " (partial). ₱{$remaining} remaining — collect at session end.";
+                    } else {
+                        $change  = $amt_tendered > $upfront_cost ? $amt_tendered - $upfront_cost : 0;
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+                        if ($change > 0) $message .= ' Change: ₱' . number_format($change, 2) . '.';
+                    }
+                    $messageType = 'success';
+
+                } elseif ($rental_mode === 'hourly' && $collect_upfront && $planned_minutes) {
+                    // Record whatever was tendered (partial or full)
+                    $amt_to_record = ($amt_tendered > 0) ? min($amt_tendered, $upfront_cost) : $upfront_cost;
+                    recordTransaction($result['session_id'], $user_id, $amt_to_record, $start_payment_method, $user['user_id']);
+                    $recorded = number_format($amt_to_record, 2);
+                    if ($amt_to_record < $upfront_cost) {
+                        $remaining = number_format($upfront_cost - $amt_to_record, 2);
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected via " . ucfirst($start_payment_method) . " (partial). ₱{$remaining} remaining — collect at session end.";
+                    } else {
+                        $change  = $amt_tendered > $upfront_cost ? $amt_tendered - $upfront_cost : 0;
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected upfront via " . ucfirst($start_payment_method) . ".";
+                        if ($change > 0) $message .= ' Change: ₱' . number_format($change, 2) . '.';
+                    }
+                    $messageType = 'success';
+
                 } else {
-                    $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+                    $message     = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+                    $messageType = 'success';
                 }
-                $messageType = 'success';
             } else {
-                $message = 'Could not start session: ' . $result['message'];
+                $message     = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
             }
         }
     }
+
 
     // END SESSION + RECORD OUTSTANDING BALANCE
     elseif ($action === 'end_session') {
@@ -498,18 +530,20 @@ function calcChange(tenderedId, displayId, costHolderId) {
 
     if (!paid) { disp.style.display = 'none'; return; }
 
-    const change = paid - due;
+    const diff = paid - due;
     disp.style.display = 'block';
-    if (change >= 0) {
+    if (diff >= 0) {
+        // Exact or over — show change
         disp.style.background = 'rgba(32,200,161,.15)';
         disp.style.border     = '1px solid rgba(32,200,161,.3)';
         disp.style.color      = '#20c8a1';
-        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${diff.toFixed(2)}</strong>`;
     } else {
-        disp.style.background = 'rgba(251,86,107,.15)';
-        disp.style.border     = '1px solid rgba(251,86,107,.3)';
-        disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient — short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
+        // Partial payment — accepted, balance collected at end
+        disp.style.background = 'rgba(241,168,60,.12)';
+        disp.style.border     = '1px solid rgba(241,168,60,.35)';
+        disp.style.color      = '#f1a83c';
+        disp.innerHTML        = `<i class="fas fa-clock"></i> Partial — <strong>₱${Math.abs(diff).toFixed(2)}</strong> remaining (collect at session end)`;
     }
 }
 
@@ -607,8 +641,9 @@ function _hourlyCost(duration, planned) {
 
 let _endModalTimer = null;   // holds the live-update interval
 
-function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid) {
+function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimRate) {
     upfrontPaid = upfrontPaid || 0;
+    unlimRate   = unlimRate   || 0;
     document.getElementById('endSessionId').value = sessionId;
 
     const panel       = document.getElementById('endCostPanel');
@@ -699,15 +734,31 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
         costEl.textContent    = '₱' + cost.toFixed(2);
 
         const remaining = Math.max(0, cost - upfrontPaid);
+        const isPartial = upfrontPaid > 0 && upfrontPaid < base;  // partial upfront vs full base
 
         if (remaining > 0) {
-            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`);
-            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Payment';
-            if (overtime > 0) {
-                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
-                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
+            // Build a clear sublabel
+            let sublabel;
+            if (overtime > 0 && upfrontPaid > 0) {
+                sublabel = `Session cost ₱${cost.toFixed(2)} (base ₱${base.toFixed(2)} + overtime) — Prepaid: ₱${upfrontPaid.toFixed(2)}`;
+            } else if (overtime > 0) {
+                sublabel = `Base ₱${base.toFixed(2)} + overtime. Total: ₱${cost.toFixed(2)}`;
             } else {
-                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>₱${remaining.toFixed(2)}</strong> now.`;
+                sublabel = `Session cost ₱${cost.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`;
+            }
+            setAmountDue(remaining, sublabel);
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Payment';
+
+            if (overtime > 0 && upfrontPaid > 0) {
+                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}) — partial payment ₱${upfrontPaid.toFixed(2)} recorded.<br>`
+                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: <strong>₱${remaining.toFixed(2)}</strong>.</span>`;
+            } else if (overtime > 0) {
+                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: <strong>₱${remaining.toFixed(2)}</strong>.</span>`;
+            } else {
+                // No overtime — remaining balance is from partial payment
+                noteEl.innerHTML = `<i class="fas fa-coins"></i> Partial payment recorded (₱${upfrontPaid.toFixed(2)} of ₱${cost.toFixed(2)}). `
+                                 + `Collect remaining <strong>₱${remaining.toFixed(2)}</strong> now.`;
             }
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
@@ -724,17 +775,29 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
         }
 
-    /* ── UNLIMITED: flat rate was fully prepaid ── */
+    /* ── UNLIMITED: flat rate — may have been partially paid ── */
     } else if (mode === 'unlimited') {
-        titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
-        panel.style.display       = 'block';
-        elapsedEl.textContent     = '—';
-        costEl.textContent        = 'Flat rate';
-        noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session — flat rate already collected at start.';
-        hideAmountDue();
-        payGroup.style.display    = 'none';
-        prepaidNote.style.display = 'block';
-        confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+        panel.style.display   = 'block';
+        elapsedEl.textContent = '—';
+        costEl.textContent    = unlimRate ? '₱' + unlimRate.toFixed(2) : 'Flat rate';
+
+        const unlimRemaining = unlimRate > 0 ? Math.max(0, unlimRate - upfrontPaid) : 0;
+        if (unlimRemaining > 0) {
+            setAmountDue(unlimRemaining, `Flat rate ₱${unlimRate.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+            titleEl.innerHTML         = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Remaining';
+            noteEl.innerHTML          = `<i class="fas fa-coins"></i> Partial payment recorded. Collect remaining <strong>₱${unlimRemaining.toFixed(2)}</strong> now.`;
+            payGroup.style.display    = 'block';
+            prepaidNote.style.display = 'none';
+            payLabel.textContent      = 'Payment Method';
+            confirmLbl.textContent    = `Confirm End & Collect ₱${unlimRemaining.toFixed(2)}`;
+        } else {
+            titleEl.innerHTML         = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+            noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session — flat rate already collected at start.';
+            hideAmountDue();
+            payGroup.style.display    = 'none';
+            prepaidNote.style.display = 'block';
+            confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+        }
 
     } else {
         panel.style.display = 'none';

@@ -184,7 +184,8 @@
                         '<?= $sess['rental_mode'] ?>',
                         <?= $startTs ?>,
                         <?= $bookedMinutes ?>,
-                        <?= (float)($sess['upfront_paid'] ?? 0) ?>
+                        <?= (float)($sess['upfront_paid'] ?? 0) ?>,
+                        <?= (float)($settings['unlimited_rate'] ?? 300) ?>
                     )">
                         <i class="fas fa-stop"></i> End
                     </button>
