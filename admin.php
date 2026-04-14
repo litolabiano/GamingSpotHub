@@ -18,15 +18,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id    = (int)($_POST['user_id'] ?? 0);
-        $console_id = (int)($_POST['console_id'] ?? 0);
-        $rental_mode = $_POST['rental_mode'] ?? '';
+        $user_id      = (int)($_POST['user_id'] ?? 0);
+        $console_id   = (int)($_POST['console_id'] ?? 0);
+        $rental_mode  = $_POST['rental_mode'] ?? '';
+        $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
 
         if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
             $messageType = 'error';
+        } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
+            $message = 'Please select a duration for the hourly session.';
+            $messageType = 'error';
         } else {
-            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id']);
+            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
             if ($result['success']) {
                 $message = 'Session started successfully! Session ID: #' . $result['session_id'];
                 $messageType = 'success';
@@ -68,41 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ADD GAME
-    elseif ($action === 'add_game') {
-        $game_name    = trim($_POST['game_name'] ?? '');
-        $console_type = $_POST['console_type'] ?? '';
-        $genre        = trim($_POST['genre'] ?? '');
-        $is_new       = isset($_POST['is_new_release']) ? 1 : 0;
-        $description  = trim($_POST['description'] ?? '');
 
-        if (!$game_name || !$console_type) {
-            $message = 'Game name and console type are required.';
-            $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare("INSERT INTO games (game_name, console_type, genre, is_new_release, description) VALUES (?,?,?,?,?)");
-            $stmt->bind_param("sssis", $game_name, $console_type, $genre, $is_new, $description);
-            if ($stmt->execute()) {
-                $message = "Game \"{$game_name}\" added to the library.";
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to add game.';
-                $messageType = 'error';
-            }
-        }
-    }
-
-    // REMOVE GAME
-    elseif ($action === 'remove_game') {
-        $game_id = (int)($_POST['game_id'] ?? 0);
-        if ($game_id) {
-            $stmt = $conn->prepare("UPDATE games SET is_available = 0 WHERE game_id = ?");
-            $stmt->bind_param("i", $game_id);
-            $stmt->execute();
-            $message = 'Game removed from library.';
-            $messageType = 'success';
-        }
-    }
 
     // UPDATE CONSOLE STATUS
     elseif ($action === 'update_console_status') {
@@ -164,8 +134,7 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// Games
-$allGames = $conn->query("SELECT * FROM games ORDER BY is_available DESC, added_date DESC")->fetch_all(MYSQLI_ASSOC);
+
 
 // Financial stats
 $finStmt = $conn->query(
@@ -188,13 +157,6 @@ $transSessions = $conn->query(
      ORDER BY t.transaction_date DESC LIMIT 30"
 )->fetch_all(MYSQLI_ASSOC);
 
-// Game requests
-$gameRequests = $conn->query(
-    "SELECT gr.*, u.full_name AS customer_name
-     FROM game_requests gr
-     JOIN users u ON gr.user_id = u.user_id
-     ORDER BY gr.created_at DESC LIMIT 20"
-)->fetch_all(MYSQLI_ASSOC);
 
 // Console usage (all time)
 $usageReport = getConsoleUsageReport('2020-01-01', $today);
@@ -304,14 +266,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .console-rate  { font-size:12px; color:#f1e1aa; margin-bottom:12px; }
         .console-actions { display:flex; gap:6px; flex-wrap:wrap; }
 
-        /* ── Game cards ───────────────────────────── */
-        .game-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
-        .game-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.12);
-            border-radius:12px; overflow:hidden; transition:.2s; }
-        .game-card:hover { border-color:rgba(32,200,161,.3); transform:translateY(-2px); }
-        .game-card-body { padding:14px; }
-        .game-title { font-weight:700; font-size:14px; margin-bottom:4px; color:#fff; }
-        .game-meta { font-size:12px; color:#888; }
+
 
         /* ── Badge ────────────────────────────────── */
         .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
@@ -361,15 +316,8 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <div class="nav-item" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
     </div>
-    <div class="nav-item" onclick="showPage('games', this)">
-        <i class="fas fa-gamepad"></i><span>Game Library</span>
-    </div>
-    <div class="nav-item" onclick="showPage('requests', this)">
-        <i class="fas fa-inbox"></i><span>Game Requests
-        <?php $pendingReqs = count(array_filter($gameRequests, fn($r) => $r['status'] === 'pending'));
-        if ($pendingReqs > 0): ?><span style="background:#fb566b;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px"><?= $pendingReqs ?></span><?php endif; ?>
-        </span>
-    </div>
+
+
     <div class="nav-item" onclick="showPage('financial', this)">
         <i class="fas fa-peso-sign"></i><span>Financial</span>
     </div>
@@ -408,10 +356,16 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <!-- ── Main Content ─────────────────────────────────────────────────────── -->
 <div class="main-content">
 
-<!-- ════ DASHBOARD ════════════════════════════════════════════════════════ -->
-<div class="page active" id="dashboard">
+<?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
+<?php include __DIR__ . '/admin_sections/consoles.php'; ?>
+<?php include __DIR__ . '/admin_sections/sessions.php'; ?>
+<?php include __DIR__ . '/admin_sections/financial.php'; ?>
+<?php include __DIR__ . '/admin_sections/reports.php'; ?>
+<?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
-    <div class="stats-grid">
+</div><!-- /.main-content -->
+
+<?php include __DIR__ . '/admin_sections/modals.php'; ?>
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
@@ -467,7 +421,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
             <div class="empty-state"><i class="fas fa-couch"></i>No active sessions right now</div>
         <?php else: ?>
         <table class="data-table">
-            <thead><tr><th>Session #</th><th>Customer</th><th>Console</th><th>Mode</th><th>Started</th><th>Elapsed</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Session #</th><th>Customer</th><th>Console</th><th>Mode</th><th>Started</th><th>Booked Until</th><th>Elapsed / Remaining</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($activeSessions as $sess): ?>
             <tr>
@@ -479,9 +433,14 @@ $typeCounts = array_column($typeUsage, 'cnt');
                     </span>
                     <?= htmlspecialchars($sess['unit_number']) ?>
                 </td>
-                <td><span class="badge pending"><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></span></td>
+                <td><span class="badge pending"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></span></td>
                 <td><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
-                <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>">—</span></td>
+                <td>
+                    <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']): ?>
+                        <span style="color:#f1e1aa;font-weight:600"><?= date('h:i A', strtotime($sess['start_time']) + ($sess['planned_minutes'] * 60)) ?></span>
+                    <?php else: ?>—<?php endif; ?>
+                </td>
+                <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>" data-planned="<?= $sess['planned_minutes'] ?? '' ?>">—</span></td>
                 <td>
                     <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['customer_name']) ?>', '<?= htmlspecialchars($sess['unit_number']) ?>')">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay
@@ -505,8 +464,8 @@ $typeCounts = array_column($typeUsage, 'cnt');
                 <td>#<?= $sess['session_id'] ?></td>
                 <td><?= htmlspecialchars($sess['customer_name']) ?></td>
                 <td><?= htmlspecialchars($sess['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></td>
-                <td><?= $sess['duration_minutes'] ? $sess['duration_minutes'].' min' : '—' ?></td>
+                <td><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></td>
+                <td><?= $sess['duration_minutes'] !== null ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'].' min' : '< 1 min') : '—' ?></td>
                 <td><?= $sess['total_cost'] ? '₱'.number_format($sess['total_cost'],2) : '—' ?></td>
                 <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
             </tr>
@@ -516,8 +475,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ════ CONSOLES ══════════════════════════════════════════════════════════ -->
-<div class="page" id="consoles">
+<?php include __DIR__ . '/admin_sections/consoles.php'; ?>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
             <span style="margin-right:16px;font-size:13px"><span class="status-dot available"></span><?= $availableCount ?> Available</span>
@@ -561,25 +519,31 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ════ SESSIONS ══════════════════════════════════════════════════════════ -->
-<div class="page" id="sessions">
+<?php include __DIR__ . '/admin_sections/sessions.php'; ?>
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">All Sessions</h3>
             <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
         </div>
         <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Start</th><th>End</th><th>Duration</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Booked</th><th>Start</th><th>End</th><th>Duration</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
             <?php foreach ($recentSessions as $sess): ?>
             <tr>
                 <td>#<?= $sess['session_id'] ?></td>
                 <td><?= htmlspecialchars($sess['customer_name']) ?></td>
                 <td><?= htmlspecialchars($sess['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></td>
+                <td><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></td>
+                <td>
+                    <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']):
+                        $ph = intdiv($sess['planned_minutes'], 60);
+                        $pm = $sess['planned_minutes'] % 60;
+                        echo $ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m";
+                    else: ?>—<?php endif; ?>
+                </td>
                 <td><?= date('M d h:i A', strtotime($sess['start_time'])) ?></td>
                 <td><?= $sess['end_time'] ? date('h:i A', strtotime($sess['end_time'])) : '<span style="color:#20c8a1">Live</span>' ?></td>
-                <td><?= $sess['duration_minutes'] ? $sess['duration_minutes'].' min' : '—' ?></td>
+                <td><?= $sess['duration_minutes'] !== null ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'].' min' : '< 1 min') : '—' ?></td>
                 <td><?= $sess['total_cost'] ? '₱'.number_format($sess['total_cost'],2) : '—' ?></td>
                 <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
                 <td>
@@ -596,71 +560,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ════ GAME LIBRARY ═══════════════════════════════════════════════════════ -->
-<div class="page" id="games">
-    <div class="card-header" style="margin-bottom:16px">
-        <h3 class="card-title">Game Library (<?= count(array_filter($allGames, fn($g) => $g['is_available'])) ?> active)</h3>
-        <button class="btn btn-primary btn-sm" onclick="openModal('addGame')"><i class="fas fa-plus"></i> Add Game</button>
-    </div>
-    <div class="game-grid">
-    <?php foreach ($allGames as $game): ?>
-        <div class="game-card" style="<?= !$game['is_available'] ? 'opacity:.45' : '' ?>">
-            <div class="game-card-body">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-                    <span class="badge <?= $game['is_new_release'] ? 'available' : 'completed' ?>" style="font-size:10px">
-                        <?= $game['is_new_release'] ? '🔥 NEW' : 'AVAILABLE' ?>
-                    </span>
-                    <span style="font-size:11px;color:#888"><?= htmlspecialchars($game['console_type']) ?></span>
-                </div>
-                <div class="game-title"><?= htmlspecialchars($game['game_name']) ?></div>
-                <div class="game-meta"><?= htmlspecialchars($game['genre'] ?? 'Unknown genre') ?></div>
-                <?php if ($game['description']): ?>
-                <div style="font-size:11px;color:#666;margin-top:6px;line-height:1.4"><?= htmlspecialchars(mb_substr($game['description'],0,60)).(strlen($game['description'])>60?'…':'') ?></div>
-                <?php endif; ?>
-                <?php if ($game['is_available']): ?>
-                <form method="POST" style="margin-top:12px" onsubmit="return confirm('Remove this game?')">
-                    <input type="hidden" name="action" value="remove_game">
-                    <input type="hidden" name="game_id" value="<?= $game['game_id'] ?>">
-                    <button type="submit" class="btn btn-danger btn-sm" style="width:100%"><i class="fas fa-times"></i> Remove</button>
-                </form>
-                <?php else: ?>
-                <div style="margin-top:12px;font-size:11px;color:#fb566b;text-align:center">Removed from library</div>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endforeach; ?>
-    </div>
-</div>
 
-<!-- ════ GAME REQUESTS ══════════════════════════════════════════════════════ -->
-<div class="page" id="requests">
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Customer Game Requests</h3></div>
-        <?php if (empty($gameRequests)): ?>
-            <div class="empty-state"><i class="fas fa-inbox"></i>No game requests yet</div>
-        <?php else: ?>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Game</th><th>Console</th><th>Message</th><th>Submitted</th><th>Status</th></tr></thead>
-            <tbody>
-            <?php foreach ($gameRequests as $req): ?>
-            <tr>
-                <td>#<?= $req['gr_id'] ?></td>
-                <td><?= htmlspecialchars($req['customer_name']) ?></td>
-                <td><?= htmlspecialchars($req['game_name']) ?></td>
-                <td><?= htmlspecialchars($req['console_type']) ?></td>
-                <td style="max-width:200px;font-size:12px;color:#888"><?= htmlspecialchars(mb_substr($req['message'] ?? '—', 0, 60)) ?></td>
-                <td><?= date('M d, Y', strtotime($req['created_at'])) ?></td>
-                <td><span class="badge <?= $req['status'] ?>"><?= ucfirst($req['status']) ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
-    </div>
-</div>
 
-<!-- ════ FINANCIAL ══════════════════════════════════════════════════════════ -->
-<div class="page" id="financial">
+
+
+<?php include __DIR__ . '/admin_sections/financial.php'; ?>
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
@@ -690,7 +594,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
                 <td>#<?= $t['transaction_id'] ?></td>
                 <td><?= htmlspecialchars($t['customer_name']) ?></td>
                 <td><?= htmlspecialchars($t['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$t['rental_mode'])) ?></td>
+                <td><?= match($t['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($t['rental_mode']) } ?></td>
                 <td style="color:#20c8a1;font-weight:700">₱<?= number_format($t['amount'],2) ?></td>
                 <td><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
                 <td><?= date('M d, Y h:i A', strtotime($t['transaction_date'])) ?></td>
@@ -702,8 +606,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ════ REPORTS ════════════════════════════════════════════════════════════ -->
-<div class="page" id="reports">
+<?php include __DIR__ . '/admin_sections/reports.php'; ?>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>
@@ -734,8 +637,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ════ SETTINGS ═══════════════════════════════════════════════════════════ -->
-<div class="page" id="settings">
+<?php include __DIR__ . '/admin_sections/settings.php'; ?>
     <form method="POST">
         <input type="hidden" name="action" value="save_settings">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
@@ -743,11 +645,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
                 <div class="card-header"><h3 class="card-title">Pricing</h3></div>
                 <div class="form-group">
                     <label>PS5 Hourly Rate (₱)</label>
-                    <input type="number" step="0.01" name="ps5_hourly_rate" value="<?= htmlspecialchars($settings['ps5_hourly_rate'] ?? '60') ?>">
+                    <input type="number" step="0.01" name="ps5_hourly_rate" value="<?= htmlspecialchars($settings['ps5_hourly_rate'] ?? '80') ?>">
                 </div>
                 <div class="form-group">
                     <label>Xbox Hourly Rate (₱)</label>
-                    <input type="number" step="0.01" name="xbox_hourly_rate" value="<?= htmlspecialchars($settings['xbox_hourly_rate'] ?? '60') ?>">
+                    <input type="number" step="0.01" name="xbox_hourly_rate" value="<?= htmlspecialchars($settings['xbox_hourly_rate'] ?? '80') ?>">
                 </div>
                 <div class="form-group">
                     <label>Unlimited (whole day) Rate (₱)</label>
@@ -790,7 +692,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
 </div><!-- /.main-content -->
 
-<!-- ════ MODALS ══════════════════════════════════════════════════════════════ -->
+<?php include __DIR__ . '/admin_sections/modals.php'; ?>
 
 <!-- Start Session Modal -->
 <div class="modal" id="startSessionModal">
@@ -799,8 +701,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
             <h3 class="modal-title"><i class="fas fa-play-circle" style="color:#20c8a1;margin-right:8px"></i>Start New Session</h3>
             <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="startSessionForm">
             <input type="hidden" name="action" value="start_session">
+            <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
             <div class="form-group">
                 <label>Customer *</label>
                 <select name="user_id" required>
@@ -822,13 +725,55 @@ $typeCounts = array_column($typeUsage, 'cnt');
                 </div>
                 <div class="form-group">
                     <label>Rental Mode *</label>
-                    <select name="rental_mode" required>
-                        <option value="hourly">Hourly (rounded up per hour)</option>
-                        <option value="open_time">Open Time (per minute)</option>
+                    <select name="rental_mode" id="rentalModeSelect" required onchange="onRentalModeChange()">
+                        <option value="hourly">Hourly (pre-booked)</option>
+                        <option value="open_time">Open Time (bracket pricing)</option>
                         <option value="unlimited">Unlimited (flat ₱<?= htmlspecialchars($settings['unlimited_rate'] ?? '300') ?>)</option>
                     </select>
                 </div>
             </div>
+
+            <!-- Duration picker — shown only for Hourly mode -->
+            <div class="form-group" id="durationPickerGroup">
+                <label>Duration *</label>
+                <select id="durationSelect" onchange="updateSessionPreview()">
+                    <option value="">— Select duration —</option>
+                    <option value="30">30 minutes — ₱50</option>
+                    <option value="60">1 hour — ₱80</option>
+                    <option value="90">1 hr 30 min — ₱120</option>
+                    <option value="120">2 hours — ₱160</option>
+                    <option value="150">2 hrs 30 min — ₱200</option>
+                    <option value="180">3 hours — ₱240</option>
+                    <option value="210">3 hrs 30 min — ₱280</option>
+                    <option value="240">4 hours — ₱320</option>
+                    <option value="270">4 hrs 30 min — ₱360</option>
+                    <option value="300">5 hours — ₱400</option>
+                    <option value="330">5 hrs 30 min — ₱440</option>
+                    <option value="360">6 hours — ₱480</option>
+                    <option value="390">6 hrs 30 min — ₱520</option>
+                    <option value="420">7 hours — ₱560</option>
+                    <option value="450">7 hrs 30 min — ₱600</option>
+                    <option value="480">8 hours — ₱640</option>
+                </select>
+            </div>
+
+            <!-- Preview card -->
+            <div id="sessionPreview" style="display:none;background:rgba(32,200,161,.08);border:1px solid rgba(32,200,161,.25);border-radius:10px;padding:16px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Scheduled End</div>
+                        <div id="previewEndTime" style="font-size:20px;font-weight:700;color:#20c8a1;">—</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Session Cost</div>
+                        <div id="previewCost" style="font-size:20px;font-weight:700;color:#f1e1aa;">—</div>
+                    </div>
+                </div>
+                <div id="previewOvertime" style="margin-top:10px;font-size:12px;color:#fb566b;display:none;">
+                    <i class="fas fa-exclamation-triangle"></i> Overtime charges apply after scheduled end time
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
                 <i class="fas fa-play"></i> Start Session
             </button>
@@ -864,49 +809,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- Add Game Modal -->
-<div class="modal" id="addGameModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title"><i class="fas fa-plus-circle" style="color:#20c8a1;margin-right:8px"></i>Add Game to Library</h3>
-            <button class="modal-close" onclick="closeModal('addGame')">&times;</button>
-        </div>
-        <form method="POST">
-            <input type="hidden" name="action" value="add_game">
-            <div class="form-group">
-                <label>Game Title *</label>
-                <input type="text" name="game_name" placeholder="e.g. EA Sports FC 25" required>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Platform *</label>
-                    <select name="console_type" required>
-                        <option value="PS5">PS5 Only</option>
-                        <option value="Xbox Series X">Xbox Series X Only</option>
-                        <option value="Both">Both Platforms</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Genre</label>
-                    <input type="text" name="genre" placeholder="e.g. Sports, FPS, RPG">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea name="description" placeholder="Short description..."></textarea>
-            </div>
-            <div class="form-group">
-                <div class="form-check">
-                    <input type="checkbox" name="is_new_release" id="isNewRelease">
-                    <label for="isNewRelease">🔥 Mark as New Release</label>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
-                <i class="fas fa-plus"></i> Add Game
-            </button>
-        </form>
-    </div>
-</div>
+
 
 <!-- ── JavaScript ────────────────────────────────────────────────────────── -->
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
@@ -919,9 +822,9 @@ function showPage(page, el) {
     if (el) el.classList.add('active');
     const titles = {
         dashboard: 'Dashboard', consoles: 'Console Management',
-        sessions: 'Session Management', games: 'Game Library',
-        requests: 'Game Requests', financial: 'Financial',
-        reports: 'Analytics & Reports', settings: 'Settings'
+        sessions: 'Session Management',
+        financial: 'Financial', reports: 'Analytics & Reports',
+        settings: 'Settings'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
@@ -942,7 +845,59 @@ function toggleSidebar() {
     mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
 }
 
+// ── Start Session Modal ─────────────────────────────────────────────────────
+function onRentalModeChange() {
+    const mode    = document.getElementById('rentalModeSelect').value;
+    const group   = document.getElementById('durationPickerGroup');
+    const preview = document.getElementById('sessionPreview');
+    if (mode === 'hourly') {
+        group.style.display = 'block';
+    } else {
+        group.style.display = 'none';
+        preview.style.display = 'none';
+        document.getElementById('plannedMinutesInput').value = '';
+        document.getElementById('durationSelect').value = '';
+    }
+}
+
+function updateSessionPreview() {
+    const minutes = parseInt(document.getElementById('durationSelect').value);
+    const input   = document.getElementById('plannedMinutesInput');
+    const preview = document.getElementById('sessionPreview');
+    if (!minutes) { preview.style.display = 'none'; input.value = ''; return; }
+
+    input.value = minutes;
+
+    // Estimated end time
+    const now    = new Date();
+    const endAt  = new Date(now.getTime() + minutes * 60000);
+    const endStr = endAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    // Base cost (mirrors PHP logic)
+    const cost = (minutes <= 30) ? 50 : (minutes / 60 * 80);
+
+    document.getElementById('previewEndTime').textContent = endStr;
+    document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
+    document.getElementById('previewOvertime').style.display = 'block';
+    preview.style.display = 'block';
+}
+
+// Form validation: require duration for hourly
+document.addEventListener('DOMContentLoaded', function () {
+    // Show duration picker by default (hourly is default selected)
+    onRentalModeChange();
+
+    document.getElementById('startSessionForm').addEventListener('submit', function (e) {
+        const mode = document.getElementById('rentalModeSelect').value;
+        if (mode === 'hourly' && !document.getElementById('durationSelect').value) {
+            e.preventDefault();
+            alert('Please select a duration for the hourly session.');
+        }
+    });
+});
+
 // ── Modals ──────────────────────────────────────────────────────────────────
+
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
 }
@@ -964,22 +919,45 @@ function openEndSessionModal(sessionId, customerName, unitNumber) {
 // ── Live Session Timers ─────────────────────────────────────────────────────
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 
+function pad(n) { return String(n).padStart(2, '0'); }
+
 function updateTimers() {
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
-        const start = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
-        const now   = new Date();
-        const elapsed = Math.floor((now - start) / 1000);
+        const start   = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
+        const planned = el.dataset.planned ? parseInt(el.dataset.planned) : null;
+        const now     = new Date();
+        const elapsed = Math.floor((now - start) / 1000); // seconds
 
+        // Stale session guard (>24h open — likely test/orphan data)
         if (elapsed > STALE_THRESHOLD) {
-            // Session is stale (>24h) — DB data likely from sample/test data
             el.classList.add('stale');
-            const days = Math.floor(elapsed / 86400);
-            el.textContent = `⚠️ ${days}d old — end session`;
+            el.textContent = `⚠️ ${Math.floor(elapsed / 86400)}d old — end session`;
+            return;
+        }
+
+        if (planned) {
+            // Hourly: show countdown; flip to overtime when past booked time
+            const remaining = (planned * 60) - elapsed;
+            if (remaining > 0) {
+                const h = Math.floor(remaining / 3600);
+                const m = Math.floor((remaining % 3600) / 60);
+                const s = remaining % 60;
+                el.style.color = '#20c8a1';
+                el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
+            } else {
+                const over = -remaining;
+                const m = Math.floor(over / 60);
+                const s = over % 60;
+                el.style.color = '#fb566b';
+                el.textContent = `+${pad(m)}:${pad(s)} OVERTIME`;
+            }
         } else {
+            // Open Time / Unlimited: show elapsed
             const h = Math.floor(elapsed / 3600);
             const m = Math.floor((elapsed % 3600) / 60);
             const s = elapsed % 60;
-            el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            el.style.color = '';
+            el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
         }
     });
 }

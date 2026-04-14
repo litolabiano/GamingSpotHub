@@ -69,7 +69,7 @@ function updateConsoleStatus($console_id, $status) {
  * Start a new gaming session.
  * Automatically marks the console as in_use.
  */
-function startSession($user_id, $console_id, $rental_mode, $created_by) {
+function startSession($user_id, $console_id, $rental_mode, $created_by, $planned_minutes = null) {
     global $conn;
 
     // Get the console's hourly rate
@@ -86,12 +86,12 @@ function startSession($user_id, $console_id, $rental_mode, $created_by) {
 
     $conn->begin_transaction();
     try {
-        // Create session
+        // Create session (planned_minutes stored for hourly pre-booking)
         $stmt = $conn->prepare(
-            "INSERT INTO gaming_sessions (user_id, console_id, rental_mode, hourly_rate, created_by)
-             VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO gaming_sessions (user_id, console_id, rental_mode, planned_minutes, hourly_rate, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("iisdi", $user_id, $console_id, $rental_mode, $rate, $created_by);
+        $stmt->bind_param("iisidi", $user_id, $console_id, $rental_mode, $planned_minutes, $rate, $created_by);
         $stmt->execute();
         $session_id = $conn->insert_id;
 
@@ -130,13 +130,13 @@ function endSession($session_id) {
     }
 
     $session = $result->fetch_assoc();
-    $end_time = date('Y-m-d H:i:s');
+    $end_time = date_create('now', new DateTimeZone('Asia/Manila'))->format('Y-m-d H:i:s');
     $start = new DateTime($session['start_time']);
     $end = new DateTime($end_time);
     $duration = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
 
     // Calculate cost based on rental mode
-    $total_cost = computeRentalFee($session['rental_mode'], $duration, $session['hourly_rate'], $session['unlimited_rate'] ?? 300);
+    $total_cost = computeRentalFee($session['rental_mode'], $duration, $session['hourly_rate'], $session['unlimited_rate'] ?? 300, $session['planned_minutes'] ?? null);
 
     // Add any approved additional request costs
     $stmt2 = $conn->prepare("SELECT COALESCE(SUM(extra_cost), 0) AS extras FROM additional_requests WHERE session_id = ? AND status = 'approved'");
@@ -167,22 +167,62 @@ function endSession($session_id) {
 }
 
 /**
- * Compute rental fee based on mode.
+ * Compute cost for a partial portion of an hour.
+ * Used for both Open Time billing and Hourly overtime calculation.
+ *
+ * Brackets: 1–4 min = ₱0 (grace), 5–19 min = ₱20,
+ *           20–34 min = ₱40, 35–49 min = ₱60, 50–59 min = ₱80.
  */
-function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimited_rate = 300) {
+function computePartialPeriodCost($minutes) {
+    if ($minutes <= 0)  return 0;
+    if ($minutes <= 4)  return 0;   // grace period
+    if ($minutes <= 19) return 20;
+    if ($minutes <= 34) return 40;
+    if ($minutes <= 49) return 60;
+    return 80; // 50–59 min = full hour charge
+}
+
+/**
+ * Compute cost for any number of minutes using the bracket system.
+ * Each full 60-min block = ₱80; remainder uses computePartialPeriodCost().
+ * Used for Open Time billing and Hourly overtime.
+ */
+function computeTimedCost($minutes) {
+    if ($minutes <= 0) return 0.0;
+    $full_hours = (int) floor($minutes / 60);
+    $remaining  = $minutes % 60;
+    return (float) ($full_hours * 80) + computePartialPeriodCost($remaining);
+}
+
+/**
+ * Compute rental fee based on mode.
+ *
+ * Hourly  – pre-booked duration; charge base cost + overtime brackets if over.
+ *           Base: 30 min = ₱50, each full hour = ₱80.
+ * Open Time – bracket billing from minute 1 (same bracket as overtime).
+ * Unlimited – flat rate.
+ */
+function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimited_rate = 300, $planned_minutes = null) {
     switch ($rental_mode) {
         case 'hourly':
-            // Charge per hour, round up partial hours
-            $hours = ceil($duration_minutes / 60);
-            return $hours * $hourly_rate;
+            if ($planned_minutes !== null && $planned_minutes > 0) {
+                // Base cost for pre-booked duration
+                $base_cost = ($planned_minutes <= 30)
+                    ? 50.0
+                    : (float) ($planned_minutes / 60 * 80);
+
+                // Overtime beyond booked time
+                $overtime = $duration_minutes - $planned_minutes;
+                if ($overtime <= 0) return $base_cost; // ended on time or early
+                return $base_cost + computeTimedCost($overtime);
+            }
+            // No pre-booking data: fall back to open-time bracket pricing
+            return computeTimedCost($duration_minutes);
 
         case 'open_time':
-            // Charge per minute (hourly rate / 60)
-            $rate_per_minute = $hourly_rate / 60;
-            return round($duration_minutes * $rate_per_minute, 2);
+            return computeTimedCost($duration_minutes);
 
         case 'unlimited':
-            // Flat rate for unlimited play
             return (float) $unlimited_rate;
 
         default:
