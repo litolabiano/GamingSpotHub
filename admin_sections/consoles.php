@@ -11,8 +11,19 @@
     <?php foreach ($allConsoles as $con): ?>
         <div class="console-card <?= $con['status'] ?>">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-                <span class="console-type-badge <?= $con['console_type'] === 'PS5' ? 'ps5' : 'xbox' ?>">
-                    <i class="fab fa-<?= $con['console_type'] === 'PS5' ? 'playstation' : 'xbox' ?>"></i>
+                <?php
+                    $badgeClass = match($con['console_type']) {
+                        'PS5'          => 'ps5',
+                        'PS4'          => 'ps4',
+                        default        => 'xbox',
+                    };
+                    $icon = match($con['console_type']) {
+                        'PS5', 'PS4'   => 'playstation',
+                        default        => 'xbox',
+                    };
+                ?>
+                <span class="console-type-badge <?= $badgeClass ?>">
+                    <i class="fab fa-<?= $icon ?>"></i>
                     <?= $con['console_type'] ?>
                 </span>
                 <span class="badge <?= $con['status'] ?>"><?= ucfirst(str_replace('_',' ',$con['status'])) ?></span>

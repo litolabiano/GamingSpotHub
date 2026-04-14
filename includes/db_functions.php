@@ -183,15 +183,38 @@ function computePartialPeriodCost($minutes) {
 }
 
 /**
- * Compute cost for any number of minutes using the bracket system.
- * Each full 60-min block = ₱80; remainder uses computePartialPeriodCost().
- * Used for Open Time billing and Hourly overtime.
+ * Compute cost for any duration using bracket billing with a
+ * FREE 30-MINUTE BONUS every 2 paid hours.
+ *
+ * Billing cycle = 150 min:
+ *   - First 120 min (2 hrs): billed at ₱80/hr with partial brackets
+ *   - Next  30 min (free): no charge
+ *   - Then repeat
+ *
+ * Examples: 2:00 = ₱160, 2:30 = ₱160, 2:45 = ₱180, 4:00 = ₱280
  */
 function computeTimedCost($minutes) {
-    if ($minutes <= 0) return 0.0;
-    $full_hours = (int) floor($minutes / 60);
-    $remaining  = $minutes % 60;
-    return (float) ($full_hours * 80) + computePartialPeriodCost($remaining);
+    $minutes = max(0, (int)$minutes);
+    if ($minutes === 0) return 0.0;
+
+    $cycleLength = 150;   // 120 min paid + 30 min free
+    $cycleCost   = 160;   // ₱160 per 2-hour paid block
+
+    $fullCycles = (int)floor($minutes / $cycleLength);
+    $cost       = $fullCycles * $cycleCost;
+    $remainder  = $minutes % $cycleLength;
+
+    if ($remainder > 120) {
+        // Within the free 30-min window — charge the full 2-hour block
+        $cost += $cycleCost;
+    } else {
+        // Within the paid window — apply hourly bracket billing
+        $fullHours  = (int)floor($remainder / 60);
+        $partialMin = $remainder % 60;
+        $cost      += $fullHours * 80 + computePartialPeriodCost($partialMin);
+    }
+
+    return (float)$cost;
 }
 
 /**
@@ -235,7 +258,8 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number
+    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number,
+                   COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
             FROM gaming_sessions gs
             JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id

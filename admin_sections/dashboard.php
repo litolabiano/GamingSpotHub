@@ -64,7 +64,7 @@
                 <td>#<?= $sess['session_id'] ?></td>
                 <td><?= htmlspecialchars($sess['customer_name']) ?></td>
                 <td>
-                    <span class="console-type-badge <?= strtolower(str_replace(' ','-',$sess['console_type'])) === 'ps5' ? 'ps5' : 'xbox' ?>">
+                    <span class="console-type-badge <?= $sess['console_type'] === 'PS5' ? 'ps5' : ($sess['console_type'] === 'PS4' ? 'ps4' : 'xbox') ?>">
                         <?= $sess['console_type'] ?>
                     </span>
                     <?= htmlspecialchars($sess['unit_number']) ?>
@@ -78,7 +78,14 @@
                 </td>
                 <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>" data-planned="<?= $sess['planned_minutes'] ?? '' ?>">—</span></td>
                 <td>
-                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['customer_name']) ?>', '<?= htmlspecialchars($sess['unit_number']) ?>')">
+                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(
+                        <?= $sess['session_id'] ?>,
+                        '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                        '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                        '<?= $sess['rental_mode'] ?>',
+                        <?= strtotime($sess['start_time']) ?>,
+                        <?= (int)($sess['planned_minutes'] ?? 0) ?>,
+                        <?= (float)($sess['upfront_paid'] ?? 0) ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay
                     </button>
                 </td>
