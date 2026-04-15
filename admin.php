@@ -53,19 +53,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
         $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
 
+        // Amount actually collected — if customer paid less, record only what they gave
+        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
+
         recordTransaction(
-            $result['session_id'], $user_id, $upfront_cost, $start_payment_method, $user['user_id'],
+            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
             $tendered,
             $shortfall,
             $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
         );
-        $cost = number_format($upfront_cost, 2);
-        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+        $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
+        $cost      = number_format($upfront_cost, 2);
+        if ($shortfall !== null && $shortfall > 0) {
+            $tendFmt  = number_format($tendered, 2);
+            $shortFmt = number_format($shortfall, 2);
+            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
+                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
+            $messageType = 'warning';
+        } else {
+            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+        }
 
     } else {
         $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
     }
-    $messageType = 'success';
+    if (!$messageType) $messageType = 'success';
 }else {
                 $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';

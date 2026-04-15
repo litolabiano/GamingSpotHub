@@ -86,7 +86,7 @@
                         '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                         '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                         '<?= $sess['rental_mode'] ?>',
-                        '<?= $sess['start_time'] ?>',
+                        <?= strtotime($sess['start_time']) ?>,
                         <?= (int)($sess['planned_minutes'] ?? 0) ?>,
                         <?= (float)($sess['upfront_paid'] ?? 0) ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay

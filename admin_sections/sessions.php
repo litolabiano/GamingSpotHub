@@ -388,7 +388,7 @@
                             '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                             '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                             '<?= $sess['rental_mode'] ?>',
-                            '<?= $sess['start_time'] ?>',
+                            <?= $startTs ?>,
                             <?= $bookedMinutes ?>,
                             <?= (float)($sess['upfront_paid'] ?? 0) ?>,
                             <?= (float)($settings['unlimited_rate'] ?? 300) ?>
@@ -402,7 +402,7 @@
                                 '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                                 '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                                 '<?= $sess['rental_mode'] ?>',
-                                '<?= $sess['start_time'] ?>',
+                                <?= $startTs ?>,
                                 <?= $bookedMinutes ?>,
                                 <?= (float)($sess['upfront_paid'] ?? 0) ?>,
                                 <?= (float)($settings['unlimited_rate'] ?? 300) ?>
