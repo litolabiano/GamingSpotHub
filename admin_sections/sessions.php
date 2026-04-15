@@ -1,4 +1,134 @@
 <!-- ════ SESSIONS ══════════════════════════════════════════════════════════ -->
+
+<!-- ── RESERVATIONS PANEL ──────────────────────────────────────────────── -->
+<div id="reservations-panel" class="card" style="margin-bottom:28px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <h2 class="card-title" style="margin:0;">
+                <i class="fas fa-calendar-check" style="color:#20c8a1;"></i> Reservations
+            </h2>
+            <?php if ($pendingResCount > 0): ?>
+            <span style="background:rgba(241,168,60,.2);color:#f1a83c;border:1px solid rgba(241,168,60,.35);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
+                <?= $pendingResCount ?> Pending
+            </span>
+            <?php endif; ?>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addReservation')">
+            <i class="fas fa-plus"></i> Add Reservation
+        </button>
+    </div>
+
+    <?php if (empty($upcomingReservations)): ?>
+    <div style="padding:40px;text-align:center;color:#555;">
+        <i class="fas fa-calendar-xmark" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+        No upcoming reservations for the next 14 days.
+    </div>
+    <?php else: ?>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,.08);">
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Date & Time</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Customer</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Console</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Mode</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Downpayment</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Status</th>
+                    <th style="padding:10px 14px;color:#888;font-weight:600;text-align:left;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($upcomingReservations as $r):
+                $isToday = ($r['reserved_date'] === date('Y-m-d'));
+                $statusColors = [
+                    'pending'   => ['bg'=>'rgba(241,168,60,.12)',  'text'=>'#f1a83c',  'border'=>'rgba(241,168,60,.3)'],
+                    'confirmed' => ['bg'=>'rgba(32,200,161,.12)',  'text'=>'#20c8a1',  'border'=>'rgba(32,200,161,.3)'],
+                ];
+                $sc = $statusColors[$r['status']] ?? ['bg'=>'rgba(100,100,100,.1)','text'=>'#888','border'=>'rgba(100,100,100,.2)'];
+            ?>
+            <tr style="border-bottom:1px solid rgba(255,255,255,.04);<?= $isToday ? 'background:rgba(32,200,161,.03);' : '' ?>">
+                <td style="padding:12px 14px;white-space:nowrap;">
+                    <?php if ($isToday): ?>
+                    <span style="color:#20c8a1;font-size:10px;font-weight:700;display:block;">TODAY</span>
+                    <?php endif; ?>
+                    <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
+                    <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
+                </td>
+                <td style="padding:12px 14px;">
+                    <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
+                    <?php if ($r['customer_phone']): ?>
+                    <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:12px 14px;">
+                    <?= htmlspecialchars($r['console_type']) ?>
+                    <?php if ($r['unit_number']): ?>
+                    <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:12px 14px;color:#aaa;">
+                    <?= match($r['rental_mode']) {
+                        'open_time' => 'Open Time',
+                        'unlimited' => 'Unlimited',
+                        default => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes']/60) . 'h)' : '')
+                    } ?>
+                </td>
+                <td style="padding:12px 14px;">
+                    <?php if ($r['downpayment_amount'] > 0): ?>
+                    <span style="color:#20c8a1;font-weight:700;">₱<?= number_format($r['downpayment_amount'], 2) ?></span>
+                    <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
+                    <?php else: ?>
+                    <span style="color:#555;">—</span>
+                    <?php endif; ?>
+                </td>
+                <td style="padding:12px 14px;">
+                    <span style="background:<?= $sc['bg'] ?>;color:<?= $sc['text'] ?>;border:1px solid <?= $sc['border'] ?>;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <?= ucfirst($r['status']) ?>
+                    </span>
+                </td>
+                <td style="padding:12px 14px;">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <?php if ($r['status'] === 'pending'): ?>
+                        <form method="POST" style="display:inline;" onsubmit="return confirm('Confirm this reservation?')">
+                            <input type="hidden" name="action" value="confirm_reservation">
+                            <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                            <button type="submit" class="btn btn-primary btn-sm" title="Confirm">
+                                <i class="fas fa-check"></i> Confirm
+                            </button>
+                        </form>
+                        <?php endif; ?>
+
+                        <?php if (in_array($r['status'], ['pending','confirmed'])): ?>
+                        <button class="btn btn-success btn-sm"
+                                onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
+                                title="Convert to Session">
+                            <i class="fas fa-play"></i> Start
+                        </button>
+                        <form method="POST" style="display:inline;" onsubmit="return confirm('Mark as no-show?')">
+                            <input type="hidden" name="action" value="noshow_reservation">
+                            <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                            <button type="submit" class="btn btn-secondary btn-sm" title="No-show">
+                                <i class="fas fa-ghost"></i>
+                            </button>
+                        </form>
+                        <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this reservation?')">
+                            <input type="hidden" name="action" value="cancel_reservation">
+                            <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Cancel">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    </div>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+
 <style>
 /* ── Sortable table headers ─────────────────────────────────────────── */
 #sessionsTable thead th {
@@ -250,8 +380,10 @@
                 <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
                 <td>
                 <?php if ($sess['status'] === 'active'): ?>
-                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                        <button class="btn btn-danger btn-sm" title="End Session" onclick="openEndSessionModal(
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:160px;">
+                        <button class="btn btn-danger btn-sm" title="End Session"
+                            style="justify-content:center;"
+                            onclick="openEndSessionModal(
                             <?= $sess['session_id'] ?>,
                             '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                             '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
@@ -264,7 +396,7 @@
                             <i class="fas fa-stop"></i> End
                         </button>
                         <button class="btn btn-sm" title="Collect Payment"
-                            style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                            style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;justify-content:center;"
                             onclick="openPayModal(
                                 <?= $sess['session_id'] ?>,
                                 '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
@@ -278,7 +410,7 @@
                             <i class="fas fa-peso-sign"></i> Pay
                         </button>
                         <button class="btn btn-sm" title="Issue Refund"
-                            style="background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;"
+                            style="background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;justify-content:center;"
                             onclick="openRefundModal(
                                 <?= $sess['session_id'] ?>,
                                 '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
@@ -288,7 +420,7 @@
                             <i class="fas fa-undo-alt"></i> Refund
                         </button>
                         <button class="btn btn-sm" title="Extend Session"
-                            style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;"
+                            style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;"
                             onclick="openExtendModal(
                                 <?= $sess['session_id'] ?>,
                                 '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',

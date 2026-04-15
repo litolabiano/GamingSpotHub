@@ -69,7 +69,8 @@ function updateConsoleStatus($console_id, $status) {
  * Start a new gaming session.
  * Automatically marks the console as in_use.
  */
-function startSession($user_id, $console_id, $rental_mode, $created_by, $planned_minutes = null) {
+function startSession($user_id, $console_id, $rental_mode, $created_by, $planned_minutes = null,
+                      $tendered = null, $payment_method = null) {
     global $conn;
 
     // Get the console's hourly rate
@@ -98,14 +99,32 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
         // Mark console as in use
         updateConsoleStatus($console_id, 'in_use');
 
+        // Record upfront payment if provided
+        if ($tendered !== null && $payment_method !== null) {
+            $session_cost = computeRentalFee($rental_mode, $planned_minutes ?? 0, $rate, 300, $planned_minutes);
+            $tendered     = (float) $tendered;
+            $shortfall    = $session_cost - $tendered;
+
+            recordTransaction(
+                $session_id,
+                $user_id,
+                $session_cost,
+                $payment_method,
+                $created_by,
+                $tendered,
+                $shortfall > 0 ? $shortfall : null,
+                $shortfall > 0 ? 'Short payment recorded at session start' : null
+            );
+        }
+
         $conn->commit();
         return ['success' => true, 'session_id' => $session_id];
+
     } catch (Exception $e) {
         $conn->rollback();
         return ['success' => false, 'message' => $e->getMessage()];
     }
 }
-
 /**
  * End a gaming session.
  * Computes duration and total cost, marks console as available.
@@ -294,15 +313,43 @@ function getUserSessionHistory($user_id, $limit = 20) {
 
 /**
  * Record a payment transaction.
+ *
+ * @param int    $session_id
+ * @param int    $user_id
+ * @param float  $amount           Actual amount due / collected
+ * @param string $payment_method
+ * @param int    $processed_by
+ * @param float|null $tendered     Amount handed by customer (may be less than $amount)
+ * @param float|null $shortfall    How short the customer is (positive = shortage)
+ * @param string|null $note       Free-text note (e.g. "Short payment recorded")
  */
-function recordTransaction($session_id, $user_id, $amount, $payment_method, $processed_by) {
+function recordTransaction($session_id, $user_id, $amount, $payment_method, $processed_by,
+                            $tendered = null, $shortfall = null, $note = null) {
     global $conn;
+
+    // Ensure numeric types are correct; keep null as null (not coerced to 0).
+    $tendered  = ($tendered  !== null) ? (float)$tendered  : null;
+    $shortfall = ($shortfall !== null) ? (float)$shortfall : null;
+
     $stmt = $conn->prepare(
-        "INSERT INTO transactions (session_id, user_id, amount, payment_method, payment_status, processed_by)
-         VALUES (?, ?, ?, ?, 'completed', ?)"
+        "INSERT INTO transactions
+            (session_id, user_id, amount, payment_method, payment_status, processed_by,
+             tendered_amount, shortfall_amount, payment_note)
+         VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?)"
     );
-    $stmt->bind_param("iidsi", $session_id, $user_id, $amount, $payment_method, $processed_by);
-    return $stmt->execute();
+
+    // execute([...]) correctly passes NULL for all parameter types,
+    // unlike bind_param() which silently converts null→0 for d/i types in older PHP.
+    return $stmt->execute([
+        $session_id,
+        $user_id,
+        (float)$amount,
+        $payment_method,
+        $processed_by,
+        $tendered,
+        $shortfall,
+        $note,
+    ]);
 }
 
 
@@ -485,5 +532,211 @@ function updateSetting($key, $value) {
     $stmt = $conn->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
     $stmt->bind_param("ss", $value, $key);
     return $stmt->execute();
+}
+
+
+// ============================================================================
+// RESERVATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Create a new reservation.
+ *
+ * @param int    $user_id
+ * @param string $console_type      'PS5' or 'Xbox Series X'
+ * @param string $rental_mode
+ * @param int|null $planned_minutes For hourly mode
+ * @param string $reserved_date    YYYY-MM-DD
+ * @param string $reserved_time    HH:MM
+ * @param string|null $notes
+ * @param float  $downpayment_amount
+ * @param string|null $downpayment_method
+ * @return array ['success'=>bool, 'reservation_id'=>int|'message'=>string]
+ */
+function createReservation(
+    $user_id, $console_type, $rental_mode, $planned_minutes,
+    $reserved_date, $reserved_time, $notes = null,
+    $downpayment_amount = 0.0, $downpayment_method = null
+) {
+    global $conn;
+
+    // Basic validation
+    $today = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    if ($reserved_date < $today) {
+        return ['success' => false, 'message' => 'Cannot reserve a past date.'];
+    }
+
+    $downpayment_paid = ($downpayment_amount > 0 && $downpayment_method !== null) ? 1 : 0;
+
+    $stmt = $conn->prepare(
+        "INSERT INTO reservations
+            (user_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
+             notes, downpayment_amount, downpayment_method, downpayment_paid, status, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+    );
+    $stmt->bind_param(
+        'ississsdsii',
+        $user_id, $console_type, $rental_mode, $planned_minutes,
+        $reserved_date, $reserved_time, $notes,
+        $downpayment_amount, $downpayment_method, $downpayment_paid,
+        $user_id   // created_by = the customer themselves
+    );
+
+    if ($stmt->execute()) {
+        return ['success' => true, 'reservation_id' => $conn->insert_id];
+    }
+    return ['success' => false, 'message' => $conn->error];
+}
+
+/**
+ * Get reservations, optionally filtered by status and/or date.
+ */
+function getReservations($status = null, $date = null) {
+    global $conn;
+    $sql = "
+        SELECT r.*,
+               u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
+               c.unit_number, c.console_name
+          FROM reservations r
+          JOIN users u ON r.user_id = u.user_id
+          LEFT JOIN consoles c ON r.console_id = c.console_id
+         WHERE 1=1
+    ";
+    $params = []; $types = '';
+
+    if ($status) {
+        if (is_array($status)) {
+            $placeholders = implode(',', array_fill(0, count($status), '?'));
+            $sql .= " AND r.status IN ($placeholders)";
+            foreach ($status as $s) { $params[] = $s; $types .= 's'; }
+        } else {
+            $sql .= " AND r.status = ?";
+            $params[] = $status; $types .= 's';
+        }
+    }
+    if ($date) {
+        $sql .= " AND r.reserved_date = ?";
+        $params[] = $date; $types .= 's';
+    }
+    $sql .= " ORDER BY r.reserved_date ASC, r.reserved_time ASC";
+
+    $stmt = $conn->prepare($sql);
+    if (!empty($params)) { $stmt->bind_param($types, ...$params); }
+    $stmt->execute();
+    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Get a single reservation by ID.
+ */
+function getReservation($reservation_id) {
+    global $conn;
+    $stmt = $conn->prepare(
+        "SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
+                c.unit_number, c.console_name
+           FROM reservations r
+           JOIN users u ON r.user_id = u.user_id
+           LEFT JOIN consoles c ON r.console_id = c.console_id
+          WHERE r.reservation_id = ?"
+    );
+    $stmt->bind_param('i', $reservation_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+/**
+ * Update reservation status (confirm / cancel / no_show).
+ * Optionally assign a specific console_id when confirming.
+ */
+function updateReservationStatus($reservation_id, $status, $console_id = null) {
+    global $conn;
+    if ($console_id) {
+        $stmt = $conn->prepare(
+            "UPDATE reservations SET status = ?, console_id = ? WHERE reservation_id = ?"
+        );
+        $stmt->bind_param('sii', $status, $console_id, $reservation_id);
+    } else {
+        $stmt = $conn->prepare(
+            "UPDATE reservations SET status = ? WHERE reservation_id = ?"
+        );
+        $stmt->bind_param('si', $status, $reservation_id);
+    }
+    return $stmt->execute();
+}
+
+/**
+ * Convert a confirmed reservation into an active gaming session.
+ * Marks reservation as 'converted' and calls startSession().
+ *
+ * @param int $reservation_id
+ * @param int $console_id       The actual console unit to assign
+ * @param int $shopkeeper_id    Staff converting the reservation
+ * @return array ['success'=>bool, ...]
+ */
+function convertReservationToSession($reservation_id, $console_id, $shopkeeper_id) {
+    global $conn;
+
+    $res = getReservation($reservation_id);
+    if (!$res) {
+        return ['success' => false, 'message' => 'Reservation not found'];
+    }
+    if (!in_array($res['status'], ['pending', 'confirmed'])) {
+        return ['success' => false, 'message' => 'Reservation cannot be converted in its current status'];
+    }
+
+    // Start the session (downpayment already collected separately)
+    $result = startSession(
+        $res['user_id'],
+        $console_id,
+        $res['rental_mode'],
+        $shopkeeper_id,
+        $res['planned_minutes']
+    );
+
+    if ($result['success']) {
+        // Mark reservation as converted
+        updateReservationStatus($reservation_id, 'converted', $console_id);
+    }
+
+    return $result;
+}
+
+/**
+ * Get upcoming reservations for today and the next 7 days.
+ */
+function getUpcomingReservations($days = 7) {
+    global $conn;
+    $today = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    $stmt = $conn->prepare(
+        "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+                c.unit_number, c.console_name
+           FROM reservations r
+           JOIN users u ON r.user_id = u.user_id
+           LEFT JOIN consoles c ON r.console_id = c.console_id
+          WHERE r.reserved_date BETWEEN ? AND ?
+            AND r.status IN ('pending','confirmed')
+          ORDER BY r.reserved_date ASC, r.reserved_time ASC"
+    );
+    $stmt->bind_param('ss', $today, $until);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Get reservations for the logged-in customer.
+ */
+function getMyReservations($user_id) {
+    global $conn;
+    $stmt = $conn->prepare(
+        "SELECT r.*, c.unit_number, c.console_name
+           FROM reservations r
+           LEFT JOIN consoles c ON r.console_id = c.console_id
+          WHERE r.user_id = ?
+          ORDER BY r.reserved_date DESC, r.reserved_time DESC"
+    );
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 ?>

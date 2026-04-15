@@ -8,11 +8,8 @@ requireRole(['owner', 'shopkeeper']);
 require_once __DIR__ . '/includes/db_functions.php';
 
 $user = getCurrentUser();
-
-// ── Flash message: read once from session and clear ──
-$message     = $_SESSION['flash_message']      ?? '';
-$messageType = $_SESSION['flash_message_type'] ?? '';
-unset($_SESSION['flash_message'], $_SESSION['flash_message_type']);
+$message = '';
+$messageType = '';
 
 // ——————————————————————————————————————————————————————————————————————————————
 
@@ -21,16 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id              = (int)($_POST['user_id'] ?? 0);
-        $console_id           = (int)($_POST['console_id'] ?? 0);
-        $rental_mode          = $_POST['rental_mode'] ?? '';
-        $planned_minutes      = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
+        $user_id         = (int)($_POST['user_id'] ?? 0);
+        $console_id      = (int)($_POST['console_id'] ?? 0);
+        $rental_mode     = $_POST['rental_mode'] ?? '';
+        $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
-        $collect_upfront      = isset($_POST['collect_upfront']);
-        // Each mode has its own distinct field name to avoid last-value collision
-        $amt_tendered = ($rental_mode === 'unlimited')
-            ? (float)($_POST['unlim_amount_tendered'] ?? 0)
-            : (float)($_POST['start_amount_tendered'] ?? 0);
 
         if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
@@ -39,91 +31,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Please select a duration for the hourly session.';
             $messageType = 'error';
         } else {
-            // Compute expected upfront cost (used for messaging & partial-payment record)
-            $upfront_cost = 0.0;
-            if ($rental_mode === 'unlimited') {
-                $upfront_cost = (float)(getSetting('unlimited_rate') ?? 300);
-            } elseif ($rental_mode === 'hourly' && $collect_upfront && $planned_minutes) {
-                $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
-            }
-
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
-            if ($result['success']) {
-                if ($rental_mode === 'unlimited') {
-                    $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
-                    // Record whatever was tendered (partial or full)
-                    $amt_to_record = ($amt_tendered > 0) ? min($amt_tendered, $upfront_cost) : $upfront_cost;
-                    recordTransaction($result['session_id'], $user_id, $amt_to_record, $unlimited_payment, $user['user_id']);
-                    $recorded = number_format($amt_to_record, 2);
-                    if ($amt_to_record < $upfront_cost) {
-                        $remaining = number_format($upfront_cost - $amt_to_record, 2);
-                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected via " . ucfirst($unlimited_payment) . " (partial). ₱{$remaining} remaining — collect at session end.";
-                    } else {
-                        $change  = $amt_tendered > $upfront_cost ? $amt_tendered - $upfront_cost : 0;
-                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} flat rate collected via " . ucfirst($unlimited_payment) . ".";
-                        if ($change > 0) $message .= ' Change: ₱' . number_format($change, 2) . '.';
-                    }
-                    $messageType = 'success';
+      if ($result['success']) {
+    if ($rental_mode === 'unlimited') {
+        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
+        $upfront_cost      = (float)(getSetting('unlimited_rate') ?? 300);
+        $tendered          = isset($_POST['unlimited_tendered']) ? (float)$_POST['unlimited_tendered'] : null;
+        $shortfall         = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
 
-                } elseif ($rental_mode === 'hourly' && $collect_upfront && $planned_minutes) {
-                    // Record whatever was tendered (partial or full)
-                    $amt_to_record = ($amt_tendered > 0) ? min($amt_tendered, $upfront_cost) : $upfront_cost;
-                    recordTransaction($result['session_id'], $user_id, $amt_to_record, $start_payment_method, $user['user_id']);
-                    $recorded = number_format($amt_to_record, 2);
-                    if ($amt_to_record < $upfront_cost) {
-                        $remaining = number_format($upfront_cost - $amt_to_record, 2);
-                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected via " . ucfirst($start_payment_method) . " (partial). ₱{$remaining} remaining — collect at session end.";
-                    } else {
-                        $change  = $amt_tendered > $upfront_cost ? $amt_tendered - $upfront_cost : 0;
-                        $message = "Session #" . $result['session_id'] . " started. ₱{$recorded} collected upfront via " . ucfirst($start_payment_method) . ".";
-                        if ($change > 0) $message .= ' Change: ₱' . number_format($change, 2) . '.';
-                    }
-                    $messageType = 'success';
+        recordTransaction(
+            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
+            $tendered,
+            $shortfall,
+            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+        );
+        $cost = number_format($upfront_cost, 2);
+        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
 
-                } else {
-                    $message     = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
-                    $messageType = 'success';
-                }
-            } else {
-                // Generic fallback
-                $errMsg = $result['message'];
+    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
+        $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
+        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
+        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
 
-                // If the console is not available, find out why and show actionable info
-                if (stripos($result['message'], 'not available') !== false) {
-                    $blockStmt = $conn->prepare(
-                        "SELECT gs.session_id, u.full_name, c.status AS con_status
-                         FROM consoles c
-                         LEFT JOIN gaming_sessions gs ON gs.console_id = c.console_id AND gs.status = 'active'
-                         LEFT JOIN users u ON u.user_id = gs.user_id
-                         WHERE c.console_id = ?"
-                    );
-                    $blockStmt->bind_param('i', $console_id);
-                    $blockStmt->execute();
-                    $blockRow = $blockStmt->get_result()->fetch_assoc();
+        recordTransaction(
+            $result['session_id'], $user_id, $upfront_cost, $start_payment_method, $user['user_id'],
+            $tendered,
+            $shortfall,
+            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+        );
+        $cost = number_format($upfront_cost, 2);
+        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
 
-                    if ($blockRow && $blockRow['con_status'] === 'maintenance') {
-                        $errMsg = 'That console is currently under maintenance.';
-                    } elseif ($blockRow && $blockRow['session_id']) {
-                        $errMsg = 'Console is in use by session #' . $blockRow['session_id']
-                                . ' (' . htmlspecialchars($blockRow['full_name']) . ').'
-                                . ' End that session first.';
-                    } else {
-                        $errMsg = 'Console is not available. The page has been refreshed — please select another console.';
-                    }
-                }
-
-                $message     = $errMsg;
+    } else {
+        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+    }
+    $messageType = 'success';
+}else {
+                $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
             }
         }
     }
 
-
     // END SESSION + RECORD OUTSTANDING BALANCE
     elseif ($action === 'end_session') {
-        $session_id     = (int)($_POST['session_id'] ?? 0);
-        $payment_method = $_POST['payment_method'] ?? 'cash';
-        $end_tendered   = (float)($_POST['end_amount_tendered'] ?? 0);
+        $session_id      = (int)($_POST['session_id'] ?? 0);
+        $payment_method  = $_POST['payment_method'] ?? 'cash';
+        // Tendered amount entered by the cashier in the modal (may be 0 or less than due)
+        $tendered_raw    = $_POST['tendered_amount'] ?? '';
+        $tendered_amount = ($tendered_raw !== '') ? (float)$tendered_raw : null;
 
         if (!$session_id) {
             $message = 'Invalid session ID.';
@@ -137,7 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $paidStmt->execute();
                 $alreadyPaid = (float)$paidStmt->get_result()->fetch_assoc()['paid'];
 
-                $remaining = round($result['total_cost'] - $alreadyPaid, 2);
+                $remaining   = round($result['total_cost'] - $alreadyPaid, 2);
+
+                // Shortfall: how much the customer was short (0 when they paid exact or more)
+                $shortfall   = null;
+                $paymentNote = null;
+                if ($tendered_amount !== null && $remaining > 0) {
+                    $diff = $tendered_amount - $remaining;
+                    if ($diff < 0) {
+                        $shortfall   = abs($diff);
+                        $paymentNote = 'Short payment — customer short by ₱' . number_format($shortfall, 2);
+                    }
+                }
 
                 // Fetch user_id
                 $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
@@ -146,170 +113,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sess_row = $stmt->get_result()->fetch_assoc();
 
                 if ($sess_row && $remaining > 0) {
-                    // Record only the outstanding balance (overtime for hourly, full for open_time)
-                    recordTransaction($session_id, $sess_row['user_id'], $remaining, $payment_method, $user['user_id']);
+                    // Always record the transaction even if tendered < remaining (store shortfall)
+                    recordTransaction(
+                        $session_id, $sess_row['user_id'], $remaining, $payment_method,
+                        $user['user_id'], $tendered_amount, $shortfall, $paymentNote
+                    );
                 }
 
-                $mins = $result['duration_minutes'];
+                $mins  = $result['duration_minutes'];
                 $total = number_format($result['total_cost'], 2);
                 $paid  = number_format($alreadyPaid, 2);
                 $due   = number_format(max(0, $remaining), 2);
 
-                if ($remaining > 0) {
-                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
-                    if ($end_tendered > 0) {
-                        $change = $end_tendered - $remaining;
-                        if ($change > 0) $message .= ' Change: ₱' . number_format($change, 2) . '.';
-                    }
+                if ($shortfall !== null && $shortfall > 0) {
+                    $shortFmt = number_format($shortfall, 2);
+                    $message  = "Session ended. Duration: {$mins} min. Total: ₱{$total}."
+                              . " Short payment recorded — customer short by ₱{$shortFmt}.";
+                    $messageType = 'warning';
+                } elseif ($remaining > 0) {
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
+                    $messageType = 'success';
                 } else {
-                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront — no extra charge.";
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront — no extra charge.";
+                    $messageType = 'success';
                 }
-                $messageType = 'success';
             } else {
-                // Check the actual session state so we can give a helpful message
-                $chkStmt = $conn->prepare("SELECT status, total_cost FROM gaming_sessions WHERE session_id = ?");
-                $chkStmt->bind_param('i', $session_id);
-                $chkStmt->execute();
-                $chkRow = $chkStmt->get_result()->fetch_assoc();
-
-                if (!$chkRow) {
-                    $message = 'Session #' . $session_id . ' does not exist.';
-                } elseif ($chkRow['status'] === 'completed') {
-                    $message = 'Session #' . $session_id . ' was already ended';
-                    if ($chkRow['total_cost']) {
-                        $message .= ' (Total: ₱' . number_format($chkRow['total_cost'], 2) . ')';
-                    }
-                    $message .= '. Refresh the page to see updated session list.';
-                } else {
-                    $message = 'Could not end session: ' . $result['message'];
-                }
+                $message     = 'Could not end session: ' . $result['message'];
                 $messageType = 'error';
             }
         }
     }
 
-    // COLLECT PAYMENT (active session — does NOT end the session)
-    elseif ($action === 'collect_payment') {
-        $session_id     = (int)($_POST['session_id'] ?? 0);
-        $payment_method = $_POST['payment_method'] ?? 'cash';
-        $pay_amount     = (float)($_POST['pay_amount'] ?? 0);
 
-        if (!$session_id || $pay_amount <= 0) {
-            $message = 'Invalid payment details.';
-            $messageType = 'error';
-        } else {
-            // Fetch session + total already paid
-            $chk = $conn->prepare(
-                "SELECT gs.user_id, gs.status, gs.rental_mode, gs.planned_minutes,
-                        gs.start_time, gs.hourly_rate,
-                        s.setting_value AS unlimited_rate,
-                        COALESCE(SUM(t.amount), 0) AS total_paid
-                 FROM gaming_sessions gs
-                 LEFT JOIN system_settings s ON s.setting_key = 'unlimited_rate'
-                 LEFT JOIN transactions t ON t.session_id = gs.session_id AND t.payment_status = 'completed'
-                 WHERE gs.session_id = ? AND gs.status = 'active'
-                 GROUP BY gs.session_id"
-            );
-            $chk->bind_param('i', $session_id);
-            $chk->execute();
-            $sessRow = $chk->get_result()->fetch_assoc();
-
-            if (!$sessRow) {
-                $message = 'Active session #' . $session_id . ' not found.';
-                $messageType = 'error';
-            } else {
-                $alreadyPaid = (float)$sessRow['total_paid'];
-
-                // Calculate current estimated cost so we can warn about overpayment
-                $startTs  = strtotime($sessRow['start_time']);
-                $elapsed  = (int)round((time() - $startTs) / 60);
-                $estCost  = computeRentalFee(
-                    $sessRow['rental_mode'], $elapsed,
-                    $sessRow['hourly_rate'],
-                    (float)($sessRow['unlimited_rate'] ?? 300),
-                    $sessRow['planned_minutes'] ?? null
-                );
-
-                // Warn but don't block — staff may intentionally collect partial
-                recordTransaction($session_id, $sessRow['user_id'], $pay_amount, $payment_method, $user['user_id']);
-                $newTotal = $alreadyPaid + $pay_amount;
-                $message  = '₱' . number_format($pay_amount, 2) . ' collected for session #' . $session_id
-                          . '. Total paid so far: ₱' . number_format($newTotal, 2) . '.';
-                $messageType = 'success';
-            }
-        }
-    }
-
-
-    // REFUND SESSION
-    elseif ($action === 'refund_session') {
-        $session_id     = (int)($_POST['session_id'] ?? 0);
-        $refund_amount  = (float)($_POST['refund_amount'] ?? 0);
-        $refund_reason  = trim($_POST['refund_reason'] ?? '');
-        $payment_method = $_POST['payment_method'] ?? 'cash';
-
-        if (!$session_id || $refund_amount <= 0) {
-            $message = 'Invalid refund details.';
-            $messageType = 'error';
-        } else {
-            // Fetch session + total paid so far
-            $chk = $conn->prepare("SELECT gs.user_id, gs.status, COALESCE(SUM(t.amount),0) AS total_paid
-                FROM gaming_sessions gs
-                LEFT JOIN transactions t ON t.session_id = gs.session_id AND t.payment_status = 'completed'
-                WHERE gs.session_id = ? GROUP BY gs.session_id");
-            $chk->bind_param('i', $session_id);
-            $chk->execute();
-            $row = $chk->get_result()->fetch_assoc();
-
-            if (!$row) {
-                $message = 'Session not found.';
-                $messageType = 'error';
-            } elseif ($refund_amount > (float)$row['total_paid']) {
-                $message = 'Refund amount exceeds total collected (₱' . number_format($row['total_paid'], 2) . ').';
-                $messageType = 'error';
-            } else {
-                // Insert a negative transaction as refund
-                $neg = -abs($refund_amount);
-                $stmt = $conn->prepare("INSERT INTO transactions (session_id, user_id, amount, payment_method, payment_status, processed_by)
-                    VALUES (?, ?, ?, ?, 'refunded', ?)");
-                $stmt->bind_param('iidsi', $session_id, $row['user_id'], $neg, $payment_method, $user['user_id']);
-                $stmt->execute();
-                $message = 'Refund of ₱' . number_format($refund_amount, 2) . ' issued for session #' . $session_id . '.';
-                $messageType = 'success';
-            }
-        }
-    }
-
-    // EXTEND SESSION
-    elseif ($action === 'extend_session') {
-        $session_id   = (int)($_POST['session_id'] ?? 0);
-        $add_minutes  = (int)($_POST['add_minutes'] ?? 0);
-
-        if (!$session_id || $add_minutes <= 0) {
-            $message = 'Please specify a valid number of minutes to extend.';
-            $messageType = 'error';
-        } else {
-            $chk = $conn->prepare("SELECT session_id, rental_mode, planned_minutes, status FROM gaming_sessions WHERE session_id = ? AND status = 'active'");
-            $chk->bind_param('i', $session_id);
-            $chk->execute();
-            $sess = $chk->get_result()->fetch_assoc();
-
-            if (!$sess) {
-                $message = 'Active session #' . $session_id . ' not found.';
-                $messageType = 'error';
-            } else {
-                $new_planned = (int)($sess['planned_minutes'] ?? 0) + $add_minutes;
-                $upd = $conn->prepare("UPDATE gaming_sessions SET planned_minutes = ? WHERE session_id = ?");
-                $upd->bind_param('ii', $new_planned, $session_id);
-                $upd->execute();
-                $h = intdiv($add_minutes, 60);
-                $m = $add_minutes % 60;
-                $label = $h ? ($m ? "{$h}h {$m}m" : "{$h}h") : "{$m}m";
-                $message = 'Session #' . $session_id . ' extended by ' . $label . '. New booked duration: ' . intdiv($new_planned, 60) . 'h ' . ($new_planned % 60) . 'm.';
-                $messageType = 'success';
-            }
-        }
-    }
 
     // UPDATE CONSOLE STATUS
     elseif ($action === 'update_console_status') {
@@ -336,39 +171,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'success';
     }
 
-    // ── PRG: store flash and redirect so page refresh never re-submits ──
-    if ($message !== '') {
-        $_SESSION['flash_message']      = $message;
-        $_SESSION['flash_message_type'] = $messageType;
+    // CONFIRM RESERVATION
+    elseif ($action === 'confirm_reservation') {
+        $res_id    = (int)($_POST['reservation_id'] ?? 0);
+        $console_id = (int)($_POST['console_id'] ?? 0) ?: null;
+        if ($res_id) {
+            updateReservationStatus($res_id, 'confirmed', $console_id ?: null);
+            $message = 'Reservation confirmed.';
+            $messageType = 'success';
+        }
     }
-    $section = $_POST['_section'] ?? 'dashboard';
-    header('Location: admin.php#' . $section);
-    exit;
+
+    // CANCEL RESERVATION
+    elseif ($action === 'cancel_reservation') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            updateReservationStatus($res_id, 'cancelled');
+            $message = 'Reservation cancelled.';
+            $messageType = 'success';
+        }
+    }
+
+    // NO-SHOW
+    elseif ($action === 'noshow_reservation') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            updateReservationStatus($res_id, 'no_show');
+            $message = 'Marked as no-show.';
+            $messageType = 'warning';
+        }
+    }
+
+    // CONVERT RESERVATION → SESSION
+    elseif ($action === 'convert_reservation') {
+        $res_id     = (int)($_POST['reservation_id'] ?? 0);
+        $console_id = (int)($_POST['console_id'] ?? 0);
+        if ($res_id && $console_id) {
+            $result = convertReservationToSession($res_id, $console_id, $user['user_id']);
+            if ($result['success']) {
+                $message = 'Reservation converted to active session!';
+                $messageType = 'success';
+            } else {
+                $message = 'Conversion failed: ' . $result['message'];
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Please select a console unit to assign.';
+            $messageType = 'error';
+        }
+    }
+
+    // ADD RESERVATION (admin side)
+    elseif ($action === 'add_reservation') {
+        $uid          = (int)($_POST['user_id'] ?? 0);
+        $ctype        = $_POST['console_type'] ?? '';
+        $rmode        = $_POST['rental_mode']  ?? '';
+        $pmins        = $rmode === 'hourly' ? (int)($_POST['planned_minutes'] ?? 0) : null;
+        $rdate        = $_POST['reserved_date'] ?? '';
+        $rtime        = $_POST['reserved_time'] ?? '';
+        $notes        = trim($_POST['notes'] ?? '');
+        $dp_amount    = (float)($_POST['downpayment_amount'] ?? 0);
+        $dp_method    = $dp_amount > 0 ? ($_POST['downpayment_method'] ?? null) : null;
+        if ($uid && $ctype && $rmode && $rdate && $rtime) {
+            $result = createReservation($uid, $ctype, $rmode, $pmins, $rdate, $rtime,
+                                        $notes ?: null, $dp_amount, $dp_method);
+            $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
+            $messageType = $result['success'] ? 'success' : 'error';
+        } else {
+            $message = 'Please fill in all required fields.';
+            $messageType = 'error';
+        }
+    }
 }
 
 // â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Dashboard stats — revenue from transactions (cash actually collected), bookings from gaming_sessions
-$today           = date('Y-m-d');
+// Dashboard stats
+$today = date('Y-m-d');
+$todayStats = getDailySalesReport($today);
 $activeSessions  = getActiveSessions();
 $activeCount     = count($activeSessions);
-
-$todayRevStmt = $conn->prepare(
-    "SELECT COALESCE(SUM(amount), 0) AS today_revenue
-     FROM transactions
-     WHERE DATE(transaction_date) = ? AND payment_status = 'completed'"
-);
-$todayRevStmt->bind_param('s', $today);
-$todayRevStmt->execute();
-$todayRevenue = (float)$todayRevStmt->get_result()->fetch_assoc()['today_revenue'];
-
-$todayBookingsStmt = $conn->prepare(
-    "SELECT COUNT(*) AS cnt FROM gaming_sessions
-     WHERE DATE(start_time) = ? AND status IN ('active','completed')"
-);
-$todayBookingsStmt->bind_param('s', $today);
-$todayBookingsStmt->execute();
-$todayBookings = (int)$todayBookingsStmt->get_result()->fetch_assoc()['cnt'];
+$todayRevenue    = $todayStats['total_revenue'] ?? 0;
+$todayBookings   = $todayStats['total_sessions'] ?? 0;
 
 // All consoles
 $allConsoles = getConsoles();
@@ -405,37 +289,10 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// ── Pending Payments: active sessions with partial upfront (paid > 0 but < expected) ─────
-$unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
-$pendingStmt = $conn->prepare(
-    "SELECT gs.session_id, gs.rental_mode, gs.planned_minutes, gs.start_time,
-            u.full_name AS customer_name, u.user_id,
-            c.unit_number, c.console_type,
-            COALESCE(SUM(t.amount), 0) AS paid_so_far
-     FROM gaming_sessions gs
-     JOIN users u ON gs.user_id = u.user_id
-     JOIN consoles c ON gs.console_id = c.console_id
-     LEFT JOIN transactions t ON t.session_id = gs.session_id AND t.payment_status = 'completed'
-     WHERE gs.status = 'active'
-     GROUP BY gs.session_id
-     HAVING paid_so_far > 0
-     ORDER BY gs.start_time DESC"
-);
-$pendingStmt->execute();
-$pendingAllPaid = $pendingStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+// Reservations (upcoming + active)
+$upcomingReservations = getUpcomingReservations(14); // next 2 weeks
+$pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
-// Keep only sessions where paid < expected base cost
-$pendingSessions = array_filter($pendingAllPaid, function($sess) use ($unlimitedRateVal) {
-    $paid = (float)$sess['paid_so_far'];
-    if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']) {
-        $expected = $sess['planned_minutes'] <= 30 ? 50.0 : (float)($sess['planned_minutes'] / 60 * 80);
-        return $paid < $expected;
-    }
-    if ($sess['rental_mode'] === 'unlimited') {
-        return $paid < $unlimitedRateVal;
-    }
-    return false;
-});
 
 // Financial stats
 $finStmt = $conn->query(
@@ -500,11 +357,12 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Good Spot Gaming Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="assets/fonts/inter/inter.css" rel="stylesheet">
+    <link href="assets/fonts/outfit/outfit.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/libs/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/admin.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
         /* â”€â”€ Extra admin overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .flash-msg {
@@ -516,6 +374,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         }
         .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: #20c8a1; }
         .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: #fb566b; }
+        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: #f1a83c; }
         @keyframes slideInRight { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 
         .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
@@ -669,7 +528,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
 
 <!-- â”€â”€ JavaScript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script src="assets/libs/aos/aos.js"></script>
 <script>
 // â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function showPage(page, el) {
@@ -747,35 +606,46 @@ function toggleStartPaymentFields(checkbox) {
    displayId   : id of the change display div
    costHolderId: id of element whose textContent/value holds the amount due
 */
-function calcChange(tenderedId, displayId, costHolderId, isEnd) {
+function calcChange(tenderedId, displayId, costHolderId) {
     const el   = document.getElementById(costHolderId);
     const due  = parseFloat(el.value !== undefined ? el.value : el.textContent) || 0;
     const paid = parseFloat(document.getElementById(tenderedId).value) || 0;
     const disp = document.getElementById(displayId);
+    // Short-payment notice (end modal only)
+    const shortNotice = document.getElementById('endShortNotice');
 
-    if (!paid) { disp.style.display = 'none'; return; }
+    if (!paid) {
+        disp.style.display = 'none';
+        if (shortNotice) shortNotice.style.display = 'none';
+        return;
+    }
 
-    const diff = paid - due;
+    const change = paid - due;
     disp.style.display = 'block';
-    if (diff >= 0) {
-        // Exact or over — show change
+    if (change >= 0) {
         disp.style.background = 'rgba(32,200,161,.15)';
         disp.style.border     = '1px solid rgba(32,200,161,.3)';
         disp.style.color      = '#20c8a1';
-        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${diff.toFixed(2)}</strong>`;
-    } else if (isEnd) {
-        // End session — must collect full balance, no deferral allowed
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
+        if (shortNotice) shortNotice.style.display = 'none';
+    } else {
         disp.style.background = 'rgba(251,86,107,.15)';
         disp.style.border     = '1px solid rgba(251,86,107,.3)';
         disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient — short by <strong>₱${Math.abs(diff).toFixed(2)}</strong>`;
-    } else {
-        // Start session partial — balance deferred to session end
-        disp.style.background = 'rgba(241,168,60,.12)';
-        disp.style.border     = '1px solid rgba(241,168,60,.35)';
-        disp.style.color      = '#f1a83c';
-        disp.innerHTML        = `<i class="fas fa-clock"></i> Partial — <strong>₱${Math.abs(diff).toFixed(2)}</strong> remaining (collect at session end)`;
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient — short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
+        if (shortNotice) shortNotice.style.display = 'block';
     }
+}
+
+/**
+ * Called by the End Session confirm button.
+ * Copies the visible tendered input into the hidden POST field, then lets the form submit.
+ * No blocking — a short payment is always allowed through.
+ */
+function syncTenderedAndSubmit(e) {
+    const tenderedVal = document.getElementById('endTendered').value;
+    document.getElementById('endTenderedHidden').value = tenderedVal;
+    // Form submits normally after this (no e.preventDefault())
 }
 
 function updateSessionPreview() {
@@ -808,6 +678,14 @@ function updateSessionPreview() {
 document.addEventListener('DOMContentLoaded', function () {
     // Show duration picker by default (hourly is default selected)
     onRentalModeChange();
+
+    document.getElementById('startSessionForm').addEventListener('submit', function (e) {
+        const mode = document.getElementById('rentalModeSelect').value;
+        if (mode === 'hourly' && !document.getElementById('durationSelect').value) {
+            e.preventDefault();
+            alert('Please select a duration for the hourly session.');
+        }
+    });
 });
 
 // â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -864,157 +742,146 @@ function _hourlyCost(duration, planned) {
 
 let _endModalTimer = null;   // holds the live-update interval
 
-// Store Pay modal args while End modal is open so _endPayFirst() can open it
-let _endPayArgs = null;
-
-function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimRate) {
-    upfrontPaid    = upfrontPaid    || 0;
-    unlimRate      = unlimRate      || 0;
-    plannedMinutes = plannedMinutes || 0;
-
-    // Parse Manila-time datetime string to Unix epoch
-    if (typeof startTs === 'string') {
-        startTs = Math.floor(new Date(startTs.replace(' ', 'T') + '+08:00').getTime() / 1000);
-    }
-
-    // Store args for "Collect Payment First" shortcut
-    _endPayArgs = [sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimRate];
-
-    if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
-
+function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid) {
+    upfrontPaid = upfrontPaid || 0;
     document.getElementById('endSessionId').value = sessionId;
 
     const panel       = document.getElementById('endCostPanel');
     const elapsedEl   = document.getElementById('endElapsed');
     const costEl      = document.getElementById('endEstCost');
     const noteEl      = document.getElementById('endCostNote');
+    const payGroup    = document.getElementById('endPaymentMethodGroup');
+    const payLabel    = document.getElementById('endPaymentMethodLabel');
     const prepaidNote = document.getElementById('endPrepaidNote');
-    const warningDiv  = document.getElementById('endPayWarning');
-    const warningAmt  = document.getElementById('endPayWarningAmt');
-    const payFirstBtn = document.getElementById('endPayFirstBtn');
     const confirmLbl  = document.getElementById('endSessionConfirmLabel');
     const titleEl     = document.getElementById('endSessionModalTitle');
 
-    // Reset state
-    warningDiv.style.display  = 'none';
-    prepaidNote.style.display = 'none';
-    payFirstBtn.style.display = 'none';
+    // Clear any previous live timer
+    if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
+
+    // Reset tendered input & change display each time modal opens
+    const tenderedEl  = document.getElementById('endTendered');
+    const changeDisp  = document.getElementById('endChangeDisplay');
+    const costHolder  = document.getElementById('endCostAmtHolder');
+    const amountDueEl = document.getElementById('endAmountDueDisplay');
+    const amountDueLbl= document.getElementById('endAmountDueLabel');
+    const amountDueBox= document.getElementById('endAmountDueBox');
+    tenderedEl.value         = '';
+    changeDisp.style.display = 'none';
+    costHolder.value         = '0';
+    document.getElementById('endTenderedHidden').value = '';
+    const shortNotice = document.getElementById('endShortNotice');
+    if (shortNotice) shortNotice.style.display = 'none';
+
+    // Helper: update the big amount-due display + sync cost holder
+    function setAmountDue(amount, sublabel) {
+        costHolder.value      = amount.toFixed(2);
+        amountDueEl.textContent = '₱' + amount.toFixed(2);
+        if (sublabel !== undefined) amountDueLbl.textContent = sublabel;
+        amountDueBox.style.display = 'block';
+    }
+    function hideAmountDue() {
+        amountDueBox.style.display = 'none';
+    }
 
     const modeLabel = mode === 'open_time' ? 'Open Time'
-                    : mode === 'unlimited'  ? 'Unlimited'
+                    : mode === 'unlimited' ? 'Unlimited'
                     : 'Hourly';
 
     document.getElementById('endSessionSummary').textContent =
         `Ending session #${sessionId} — ${customerName} on ${unitNumber} (${modeLabel})`;
 
-    titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session';
-    confirmLbl.textContent = 'Confirm End Session';
-
-    var _endOutstanding = 0;  // tracks current outstanding amount for submit guard
-
-    function showOutstanding(remaining) {
-        _endOutstanding = remaining;
-        warningAmt.textContent = '₱' + remaining.toFixed(2);
-        warningDiv.style.display  = 'block';
-        prepaidNote.style.display = 'none';
-        payFirstBtn.style.display = 'block';
-    }
-    function showFullyPaid() {
-        _endOutstanding = 0;
-        warningDiv.style.display  = 'none';
-        prepaidNote.style.display = 'block';
-        payFirstBtn.style.display = 'none';
-    }
-
-    // Intercept form submit — warn and block if payment is still due
-    var endForm = document.getElementById('endSessionForm');
-    if (endForm) {
-        endForm.onsubmit = function(e) {
-            if (_endOutstanding > 0) {
-                e.preventDefault();
-                // Flash the warning banner with a shake effect
-                warningDiv.style.outline = '2px solid #f1a83c';
-                warningDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                warningDiv.animate
-                    ? warningDiv.animate([
-                        { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' },
-                        { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' },
-                        { transform: 'translateX(0)' }
-                      ], { duration: 350 })
-                    : null;
-                setTimeout(function() { warningDiv.style.outline = ''; }, 800);
-            }
-        };
-    }
-
-    /* ── OPEN TIME: live ticking elapsed + cost (read-only) ── */
+    /* ── OPEN TIME: pay at end, show live ticking cost ── */
     if (mode === 'open_time' && startTs) {
-        panel.style.display = 'block';
-        noteEl.innerHTML = '<i class="fas fa-info-circle"></i> Open time — session cost shown for reference.';
+        titleEl.innerHTML     = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session & Collect Payment';
+        panel.style.display   = 'block';
+        payGroup.style.display = 'block';
+        prepaidNote.style.display = 'none';
+        payLabel.textContent  = 'Payment Method';
+        confirmLbl.textContent = 'Confirm End & Record Payment';
+        noteEl.innerHTML = '<i class="fas fa-info-circle"></i> Cost is calculated at end — collect from customer after confirming.';
 
         function tick() {
-            const elapsed  = Math.floor(Date.now() / 1000 - startTs);
-            const minutes  = Math.floor(elapsed / 60);
-            const secs     = elapsed % 60;
+            const elapsed = Math.floor((Date.now() / 1000) - startTs);
+            const minutes = Math.floor(elapsed / 60);
+            const secs    = elapsed % 60;
             const h = Math.floor(minutes / 60), m = minutes % 60;
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
-            const dueCost  = _timedCost(minutes);
+            const dueCost = _timedCost(minutes);
             costEl.textContent = '₱' + dueCost.toFixed(2);
             const remaining = Math.max(0, dueCost - upfrontPaid);
-            if (remaining > 0) { showOutstanding(remaining); }
-            else                { showFullyPaid(); }
+            // Sync cost holder + big display
+            if (remaining > 0) {
+                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
+            } else {
+                hideAmountDue();
+                costHolder.value = '0';
+            }
+            if (tenderedEl.value) calcChange('endTendered','endChangeDisplay','endCostAmtHolder');
         }
         tick();
         _endModalTimer = setInterval(tick, 1000);
 
-    /* ── HOURLY ── */
-    } else if (mode === 'hourly' && plannedMinutes && startTs) {
-        panel.style.display = 'block';
-        const elapsed   = Math.floor(Date.now() / 1000 - startTs);
-        const minutes   = Math.floor(elapsed / 60);
-        const cost      = _hourlyCost(minutes, plannedMinutes);
-        const base      = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
-        const overtime  = minutes - plannedMinutes;
+    /* ── HOURLY: prepaid base, overtime may apply ── */
+    } else if (mode === 'hourly' && plannedMinutes) {
+        const base    = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
+        const elapsed = Math.floor((Date.now() / 1000) - startTs);
+        const minutes = Math.floor(elapsed / 60);
+        const overtime = minutes - plannedMinutes;
+        const cost    = _hourlyCost(minutes, plannedMinutes);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
-        const bookedStr = (ph ? ph + 'h ' : '') + (pm ? pm + 'm' : '');
+        const bookedStr = ph ? (pm ? `${ph}h ${pm}m` : `${ph}h`) : `${pm}m`;
 
+        panel.style.display = 'block';
         elapsedEl.textContent = String(Math.floor(minutes/60)).padStart(2,'0') + 'h ' + String(minutes%60).padStart(2,'0') + 'm';
         costEl.textContent    = '₱' + cost.toFixed(2);
 
-        if (overtime > 0) {
-            noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}) — <span style="color:#fb566b">Overtime: +${overtime} min</span>.`;
+        const remaining = Math.max(0, cost - upfrontPaid);
+
+        if (remaining > 0) {
+            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Payment';
+            if (overtime > 0) {
+                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
+            } else {
+                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>₱${remaining.toFixed(2)}</strong> now.`;
+            }
+            payGroup.style.display    = 'block';
+            prepaidNote.style.display = 'none';
+            payLabel.textContent      = 'Payment Method';
+            confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
         } else {
-            noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong>. Session within booked time.`;
+            // Session fully paid
+            hideAmountDue();
+            costHolder.value = '0';
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
+            payGroup.style.display    = 'none';
+            prepaidNote.style.display = 'block';
+            confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
         }
 
-        const remaining = Math.max(0, cost - upfrontPaid);
-        if (remaining > 0) { showOutstanding(remaining); }
-        else                { showFullyPaid(); }
-
-    /* ── UNLIMITED ── */
+    /* ── UNLIMITED: flat rate was fully prepaid ── */
     } else if (mode === 'unlimited') {
-        panel.style.display   = 'block';
-        elapsedEl.textContent = '—';
-        costEl.textContent    = unlimRate ? '₱' + unlimRate.toFixed(2) : 'Flat rate';
-        noteEl.innerHTML      = '<i class="fas fa-infinity"></i> Unlimited flat rate session.';
-
-        const remaining = unlimRate > 0 ? Math.max(0, unlimRate - upfrontPaid) : 0;
-        if (remaining > 0) { showOutstanding(remaining); }
-        else                { showFullyPaid(); }
+        titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+        panel.style.display       = 'block';
+        elapsedEl.textContent     = '—';
+        costEl.textContent        = 'Flat rate';
+        noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session — flat rate already collected at start.';
+        hideAmountDue();
+        payGroup.style.display    = 'none';
+        prepaidNote.style.display = 'block';
+        confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
 
     } else {
         panel.style.display = 'none';
+        payGroup.style.display = 'block';
+        prepaidNote.style.display = 'none';
+        confirmLbl.textContent = 'Confirm End & Record Payment';
     }
 
     openModal('endSession');
-}
-
-// "Collect Payment First" — close End modal and open Pay modal
-function _endPayFirst() {
-    closeModal('endSession');
-    if (_endPayArgs) {
-        openPayModal.apply(null, _endPayArgs);
-    }
 }
 
 // Stop live timer when modal is closed
@@ -1031,44 +898,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
         });
     }
-
-    // ── Custom validation for Start Session modal (replaces browser tooltips) ──
-    const startForm = document.getElementById('startSessionForm');
-    if (startForm) {
-        startForm.addEventListener('submit', function (e) {
-            const userId    = startForm.querySelector('[name="user_id"]').value;
-            const consoleId = startForm.querySelector('[name="console_id"]').value;
-            const mode      = document.getElementById('rentalModeSelect').value;
-            const planned   = document.getElementById('plannedMinutesInput').value;
-
-            if (!userId) {
-                e.preventDefault();
-                showStartError('Please select a customer before starting the session.');
-                return;
-            }
-            if (!consoleId) {
-                e.preventDefault();
-                showStartError('Please select a console for this session.');
-                return;
-            }
-            if (mode === 'hourly' && !planned) {
-                e.preventDefault();
-                showStartError('Please select a duration for the hourly session.');
-                return;
-            }
-            clearStartError();
-        });
-    }
-    function showStartError(msg) {
-        const box = document.getElementById('startFormError');
-        document.getElementById('startFormErrorMsg').textContent = msg;
-        if (box) { box.style.display = 'block'; box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-    }
-    function clearStartError() {
-        const box = document.getElementById('startFormError');
-        if (box) box.style.display = 'none';
-    }
-}); // end DOMContentLoaded
+});
 
 // â”€â”€ Live Session Timers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds

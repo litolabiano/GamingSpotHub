@@ -33,6 +33,7 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#about">About</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#gaming">Gaming Rates</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#units">Units</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/reserve.php">Reserve</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#events">Events</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#contact">Contact</a></li>
             </ul>

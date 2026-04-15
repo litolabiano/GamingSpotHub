@@ -61,8 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Good Spot Gaming Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="../assets/fonts/inter/inter.css" rel="stylesheet">
+    <link href="../assets/fonts/outfit/outfit.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/libs/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
 </head>
 <body>
@@ -73,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="orb orb-2"></div>
             <div class="orb orb-3"></div>
             <div class="grid-lines"></div>
-        </div>
+        ff</div>
 
         <!-- Left Branding Panel -->
         <div class="auth-brand-panel">
