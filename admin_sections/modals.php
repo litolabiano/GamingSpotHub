@@ -237,6 +237,159 @@
     </div>
 </div>
 
+<!-- ════ COLLECT OUTSTANDING BALANCE MODAL (mid-session, no end) ══════════ -->
+<div class="modal" id="paySessionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-peso-sign" style="color:#20c8a1;margin-right:8px"></i>Collect Balance
+            </h3>
+            <button class="modal-close" onclick="closePayModal()">&times;</button>
+        </div>
+
+        <!-- Session info -->
+        <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.15);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px">
+            <strong id="paySessionSummary">—</strong>
+        </div>
+
+        <!-- Live elapsed panel (open_time / hourly) -->
+        <div id="payCostPanel" style="display:none;background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.15);border-radius:10px;padding:12px 16px;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:#888;">
+                <span>⏱ Elapsed: <strong id="payElapsed" style="color:#f1e1aa;font-family:monospace;">—</strong></span>
+                <span>Running cost: <strong id="payEstCost" style="color:#20c8a1;">—</strong></span>
+            </div>
+            <div id="payCostBreakdown" style="margin-top:6px;font-size:11px;color:#666;"></div>
+        </div>
+
+        <!-- Prominent "Balance Due" display -->
+        <div id="payAmountDueBox" style="background:linear-gradient(135deg,rgba(32,200,161,.14),rgba(32,200,161,.06));border:1px solid rgba(32,200,161,.4);border-radius:12px;padding:18px 20px;margin-bottom:14px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:6px;">
+                <i class="fas fa-receipt" style="margin-right:4px;"></i> Balance Due
+            </div>
+            <div id="payAmountDueDisplay" style="font-size:42px;font-weight:900;color:#20c8a1;line-height:1;letter-spacing:-1px;">₱0.00</div>
+            <div id="payAmountDueLabel" style="font-size:12px;color:#888;margin-top:6px;"></div>
+        </div>
+
+        <form method="POST" id="paySessionForm">
+            <input type="hidden" name="action" value="collect_payment">
+            <input type="hidden" name="session_id" id="paySessionId">
+
+            <div class="form-group">
+                <label>Payment Method</label>
+                <select name="payment_method">
+                    <option value="cash">💵 Cash</option>
+                    <option value="gcash">📱 GCash</option>
+                    <option value="credit_card">💳 Credit Card</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:6px">
+                <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱)</label>
+                <input type="number" id="payTendered" name="tendered_amount" min="0" step="1" placeholder="Enter customer's cash"
+                       style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:18px;font-weight:700;box-sizing:border-box;"
+                       oninput="calcChange('payTendered','payChangeDisplay','payAmount'); syncPayBtn()">
+                <!-- Hidden field — stores the balance due for calcChange -->
+                <input type="hidden" name="amount" id="payAmount" value="0">
+            </div>
+            <div id="payChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
+            <div id="payShortNotice" style="display:none;margin-top:10px;background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.35);border-radius:8px;padding:10px 14px;font-size:13px;color:#f1a83c;margin-bottom:10px;">
+                <i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>
+                <strong>Short payment</strong> — the remaining shortfall will be recorded.
+            </div>
+            <button type="submit" id="payConfirmBtn" class="btn btn-primary" style="width:100%;justify-content:center;">
+                <i class="fas fa-check-circle"></i> <span id="payConfirmLabel">Record Payment</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ════ REFUND MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal" id="refundSessionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-undo-alt" style="color:#f1a83c;margin-right:8px"></i>Issue Refund
+            </h3>
+            <button class="modal-close" onclick="closeModal('refundSession')">&times;</button>
+        </div>
+
+        <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
+            <strong id="refundSessionSummary">—</strong>
+            <div style="margin-top:8px;font-size:13px;color:#888;">
+                Total paid so far: <strong id="refundPaidSoFar" style="color:#20c8a1;">₱0.00</strong>
+            </div>
+        </div>
+
+        <form method="POST" id="refundSessionForm">
+            <input type="hidden" name="action" value="issue_refund">
+            <input type="hidden" name="session_id" id="refundSessionId">
+            <div class="form-group">
+                <label>Refund Amount (₱) *</label>
+                <input type="number" name="refund_amount" id="refundAmount" min="1" step="1" required
+                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:20px;font-weight:700;box-sizing:border-box;"
+                       placeholder="Enter amount to refund">
+                <div id="refundMaxNote" style="font-size:11px;color:#888;margin-top:4px;"></div>
+            </div>
+            <div class="form-group">
+                <label>Reason (optional)</label>
+                <input type="text" name="refund_reason" id="refundReason" maxlength="200"
+                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:14px;box-sizing:border-box;"
+                       placeholder="e.g. Technical issue, customer complaint…">
+            </div>
+            <div style="background:rgba(251,86,107,.07);border:1px solid rgba(251,86,107,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#fb566b;">
+                <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and cannot be undone.
+            </div>
+            <button type="submit" class="btn btn-danger" style="width:100%;justify-content:center;"
+                    onclick="return confirm('Confirm issuing this refund?')">
+                <i class="fas fa-undo-alt"></i> Confirm Refund
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ════ EXTEND SESSION MODAL ════════════════════════════════════════════ -->
+<div class="modal" id="extendSessionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-clock" style="color:#8aa4e8;margin-right:8px"></i>Extend Session
+            </h3>
+            <button class="modal-close" onclick="closeModal('extendSession')">&times;</button>
+        </div>
+
+        <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
+            <strong id="extendSessionSummary">—</strong>
+            <div style="margin-top:8px;font-size:13px;color:#888;">
+                Current booked duration: <strong id="extendCurrentDuration" style="color:#8aa4e8;">—</strong>
+            </div>
+        </div>
+
+        <form method="POST" id="extendSessionForm">
+            <input type="hidden" name="action" value="extend_session">
+            <input type="hidden" name="session_id" id="extendSessionId">
+            <div class="form-group">
+                <label>Add Time *</label>
+                <select name="extra_minutes" id="extendMinutes" required>
+                    <option value="">— Select additional time —</option>
+                    <option value="15">+ 15 minutes</option>
+                    <option value="30">+ 30 minutes — ₱50</option>
+                    <option value="60">+ 1 hour — ₱80</option>
+                    <option value="90">+ 1h 30m — ₱120</option>
+                    <option value="120">+ 2 hours — ₱160</option>
+                    <option value="180">+ 3 hours — ₱240</option>
+                    <option value="240">+ 4 hours — ₱320</option>
+                </select>
+            </div>
+            <div style="background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#8aa4e8;">
+                <i class="fas fa-info-circle"></i> This extends the <strong>booked duration</strong> only. Use the <strong>Pay</strong> button to collect the additional fee from the customer.
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;background:rgba(95,133,218,.25);border:1px solid #5f85da;color:#8aa4e8;">
+                <i class="fas fa-clock"></i> Extend Session
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- ════ ADD RESERVATION MODAL (admin) ══════════════════════════════════ -->
 <div class="modal" id="addReservationModal">
     <div class="modal-content">
