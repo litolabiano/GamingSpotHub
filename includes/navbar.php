@@ -61,7 +61,11 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
                         <div class="dropdown-divider"></div>
                         <?php if (in_array($_SESSION['role'], ['owner', 'shopkeeper'])): ?>
                             <a href="<?= $base_url ?>/admin.php" class="dropdown-item">
-                                <i class="fas fa-gauge-high"></i> Dashboard
+                                <i class="fas fa-gauge-high"></i> Admin Dashboard
+                            </a>
+                        <?php else: ?>
+                            <a href="<?= $base_url ?>/dashboard.php" class="dropdown-item">
+                                <i class="fas fa-chart-line"></i> My Dashboard
                             </a>
                         <?php endif; ?>
                         <a href="<?= $base_url ?>/auth/logout.php" class="dropdown-item dropdown-item-danger">
