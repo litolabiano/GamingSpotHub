@@ -1,5 +1,96 @@
 <!-- ════ SESSIONS ══════════════════════════════════════════════════════════ -->
 
+
+<style>
+/* ── Sortable table headers ─────────────────────────────────────────── */
+#sessionsTable thead th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color .15s;
+}
+#sessionsTable thead th:hover { color: #20c8a1; }
+#sessionsTable thead th .sort-icon {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 10px;
+    opacity: .35;
+    transition: opacity .15s, color .15s;
+}
+#sessionsTable thead th.sort-asc  .sort-icon,
+#sessionsTable thead th.sort-desc .sort-icon { opacity: 1; color: #20c8a1; }
+#sessionsTable thead th.no-sort { cursor: default; }
+#sessionsTable thead th.no-sort:hover { color: inherit; }
+
+/* ── Editable end-time cell ─────────────────────────────────────────── */
+.end-time-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border-bottom: 1px dashed rgba(255,255,255,.25);
+    padding-bottom: 1px;
+    transition: border-color .15s, color .15s;
+}
+.end-time-display:hover { color: #20c8a1; border-color: #20c8a1; }
+.end-time-display .edit-pen {
+    font-size: 10px;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.end-time-display:hover .edit-pen { opacity: 1; }
+
+.end-time-edit-wrap {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+.end-time-edit-wrap input[type="time"] {
+    background: rgba(10,33,81,.8);
+    border: 1px solid #20c8a1;
+    color: #f0f0f0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    width: 100px;
+}
+.end-time-edit-wrap .btn-confirm {
+    background: #20c8a1;
+    color: #0a0f1c;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
+}
+.end-time-edit-wrap .btn-confirm:hover { background: #17a887; }
+.end-time-edit-wrap .btn-cancel-edit {
+    background: transparent;
+    border: 1px solid rgba(251,86,107,.5);
+    color: #fb566b;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.end-time-edit-wrap .btn-cancel-edit:hover { background: rgba(251,86,107,.1); }
+
+.saving-indicator { font-size: 11px; color: #f1e1aa; }
+
+@keyframes cellFlash {
+    0%   { background: rgba(32,200,161,.3); }
+    100% { background: transparent; }
+}
+.cell-updated { animation: cellFlash .8s ease forwards; }
+</style>
+
+<div class="page" id="sessions">
+
 <!-- ── RESERVATIONS PANEL ──────────────────────────────────────────────── -->
 <div id="reservations-panel" class="card" style="margin-bottom:28px;">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -129,95 +220,6 @@
     <?php endif; ?>
 </div>
 
-<style>
-/* ── Sortable table headers ─────────────────────────────────────────── */
-#sessionsTable thead th {
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    transition: color .15s;
-}
-#sessionsTable thead th:hover { color: #20c8a1; }
-#sessionsTable thead th .sort-icon {
-    display: inline-block;
-    margin-left: 5px;
-    font-size: 10px;
-    opacity: .35;
-    transition: opacity .15s, color .15s;
-}
-#sessionsTable thead th.sort-asc  .sort-icon,
-#sessionsTable thead th.sort-desc .sort-icon { opacity: 1; color: #20c8a1; }
-#sessionsTable thead th.no-sort { cursor: default; }
-#sessionsTable thead th.no-sort:hover { color: inherit; }
-
-/* ── Editable end-time cell ─────────────────────────────────────────── */
-.end-time-display {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    border-bottom: 1px dashed rgba(255,255,255,.25);
-    padding-bottom: 1px;
-    transition: border-color .15s, color .15s;
-}
-.end-time-display:hover { color: #20c8a1; border-color: #20c8a1; }
-.end-time-display .edit-pen {
-    font-size: 10px;
-    opacity: 0;
-    transition: opacity .15s;
-}
-.end-time-display:hover .edit-pen { opacity: 1; }
-
-.end-time-edit-wrap {
-    display: none;
-    align-items: center;
-    gap: 6px;
-}
-.end-time-edit-wrap input[type="time"] {
-    background: rgba(10,33,81,.8);
-    border: 1px solid #20c8a1;
-    color: #f0f0f0;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-    outline: none;
-    width: 100px;
-}
-.end-time-edit-wrap .btn-confirm {
-    background: #20c8a1;
-    color: #0a0f1c;
-    border: none;
-    border-radius: 6px;
-    padding: 4px 9px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background .15s;
-}
-.end-time-edit-wrap .btn-confirm:hover { background: #17a887; }
-.end-time-edit-wrap .btn-cancel-edit {
-    background: transparent;
-    border: 1px solid rgba(251,86,107,.5);
-    color: #fb566b;
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background .15s;
-}
-.end-time-edit-wrap .btn-cancel-edit:hover { background: rgba(251,86,107,.1); }
-
-.saving-indicator { font-size: 11px; color: #f1e1aa; }
-
-@keyframes cellFlash {
-    0%   { background: rgba(32,200,161,.3); }
-    100% { background: transparent; }
-}
-.cell-updated { animation: cellFlash .8s ease forwards; }
-</style>
-
-<div class="page" id="sessions">
 
 <?php if (!empty($pendingSessions)): ?>
     <div class="card" style="border-left:3px solid #f1a83c;margin-bottom:20px;">
@@ -229,7 +231,7 @@
                     <?= count($pendingSessions) ?>
                 </span>
             </h3>
-            <span style="font-size:12px;color:#888;">Active sessions with partial upfront — balance due at session end</span>
+            <span style="font-size:12px;color:#888;">Sessions with outstanding balances</span>
         </div>
         <table class="data-table" id="pendingPaymentsTable">
             <thead>
@@ -239,9 +241,10 @@
                     <th>Console</th>
                     <th>Mode</th>
                     <th>Started</th>
-                    <th>Elapsed</th>
+                    <th>Status</th>
                     <th>Paid So Far</th>
                     <th>Balance Owed</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -251,32 +254,70 @@
                 $psH = floor($psElapsed / 3600);
                 $psM = floor(($psElapsed % 3600) / 60);
                 $psPaid = (float)$ps['paid_so_far'];
-                if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
-                    $psExpected = $ps['planned_minutes'] <= 30 ? 50.0 : (float)($ps['planned_minutes'] / 60 * 80);
-                    $psModeLabel = 'Hourly';
+                $isCompleted = ($ps['status'] === 'completed');
+
+                if ($isCompleted) {
+                    // Completed: use actual total_cost
+                    $psExpected  = (float)$ps['total_cost'];
+                    $psModeLabel = match($ps['rental_mode']) {
+                        'open_time' => 'Open Time',
+                        'unlimited' => 'Unlimited',
+                        default => 'Hourly'
+                    };
                 } else {
-                    $psExpected  = $unlimitedRateVal;
-                    $psModeLabel = 'Unlimited';
+                    // Active: estimate expected cost
+                    if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
+                        $psExpected = $ps['planned_minutes'] <= 30 ? 50.0 : (float)($ps['planned_minutes'] / 60 * 80);
+                        $psModeLabel = 'Hourly';
+                    } else {
+                        $psExpected  = $unlimitedRateVal;
+                        $psModeLabel = 'Unlimited';
+                    }
                 }
-                $psOwed = $psExpected - $psPaid;
+                $psOwed = max(0, $psExpected - $psPaid);
+                $bookedMinutes = ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) ? (int)$ps['planned_minutes'] : 0;
             ?>
-            <tr>
+            <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
                 <td>#<?= $ps['session_id'] ?></td>
                 <td><?= htmlspecialchars($ps['customer_name']) ?></td>
                 <td><?= htmlspecialchars($ps['unit_number']) ?></td>
                 <td><?= $psModeLabel ?></td>
                 <td><?= date('h:i A', $psStart) ?></td>
                 <td>
+                    <?php if ($isCompleted): ?>
+                    <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
+                        Ended
+                    </span>
+                    <?php else: ?>
                     <span class="session-timer" data-start="<?= $ps['start_time'] ?>" style="color:#f1e1aa;font-family:monospace;">
                         <?= ($psH ? $psH.'h ' : '') . str_pad($psM, 2, '0', STR_PAD_LEFT) . 'm' ?>
                     </span>
+                    <?php endif; ?>
                 </td>
                 <td style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
                 <td>
-                    <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);
+                    <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
                                  padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">
                         ₱<?= number_format($psOwed, 2) ?> due
                     </span>
+                </td>
+                <td>
+                    <?php if ($psOwed > 0): ?>
+                    <button class="btn btn-sm" title="Collect Payment"
+                        style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                        onclick="openPayModal(
+                            <?= $ps['session_id'] ?>,
+                            '<?= htmlspecialchars(addslashes($ps['customer_name'])) ?>',
+                            '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>',
+                            '<?= $ps['rental_mode'] ?>',
+                            <?= $psStart ?>,
+                            <?= $bookedMinutes ?>,
+                            <?= $psPaid ?>,
+                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>
+                        )">
+                        <i class="fas fa-peso-sign"></i> Pay
+                    </button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

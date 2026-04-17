@@ -105,18 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $paidStmt->execute();
                 $alreadyPaid = (float)$paidStmt->get_result()->fetch_assoc()['paid'];
 
-                $remaining   = round($result['total_cost'] - $alreadyPaid, 2);
-
-                // Shortfall: how much the customer was short (0 when they paid exact or more)
-                $shortfall   = null;
-                $paymentNote = null;
-                if ($tendered_amount !== null && $remaining > 0) {
-                    $diff = $tendered_amount - $remaining;
-                    if ($diff < 0) {
-                        $shortfall   = abs($diff);
-                        $paymentNote = 'Short payment — customer short by ₱' . number_format($shortfall, 2);
-                    }
-                }
+                $remaining = round($result['total_cost'] - $alreadyPaid, 2);
 
                 // Fetch user_id
                 $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
@@ -124,10 +113,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute();
                 $sess_row = $stmt->get_result()->fetch_assoc();
 
-                if ($sess_row && $remaining > 0) {
-                    // Always record the transaction even if tendered < remaining (store shortfall)
+                // Determine shortfall
+                $shortfall   = null;
+                $paymentNote = null;
+                $actualCollected = $remaining; // default: assume full payment
+
+                if ($tendered_amount !== null && $remaining > 0) {
+                    if ($tendered_amount < $remaining) {
+                        // Short payment — record only what was tendered
+                        $actualCollected = $tendered_amount;
+                        $shortfall       = round($remaining - $tendered_amount, 2);
+                        $paymentNote     = 'Short payment — collected ₱' . number_format($tendered_amount, 2)
+                                         . ', short by ₱' . number_format($shortfall, 2);
+                    } else {
+                        $paymentNote = 'Balance payment collected at session end';
+                    }
+                }
+
+                if ($sess_row && $remaining > 0 && $actualCollected > 0) {
                     recordTransaction(
-                        $session_id, $sess_row['user_id'], $remaining, $payment_method,
+                        $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
                         $user['user_id'], $tendered_amount, $shortfall, $paymentNote
                     );
                 }
@@ -135,15 +140,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mins  = $result['duration_minutes'];
                 $total = number_format($result['total_cost'], 2);
                 $paid  = number_format($alreadyPaid, 2);
-                $due   = number_format(max(0, $remaining), 2);
 
                 if ($shortfall !== null && $shortfall > 0) {
-                    $shortFmt = number_format($shortfall, 2);
-                    $message  = "Session ended. Duration: {$mins} min. Total: ₱{$total}."
-                              . " Short payment recorded — customer short by ₱{$shortFmt}.";
+                    $shortFmt    = number_format($shortfall, 2);
+                    $tenderedFmt = number_format($tendered_amount, 2);
+                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} — still ₱{$shortFmt} outstanding.";
                     $messageType = 'warning';
                 } elseif ($remaining > 0) {
-                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
+                    $due     = number_format($remaining, 2);
+                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
                     $messageType = 'success';
                 } else {
                     $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront — no extra charge.";
@@ -273,7 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Invalid payment — balance must be greater than ₱0.';
             $messageType = 'error';
         } else {
-            $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status = 'active'");
+            $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
             $stmt->bind_param('i', $session_id);
             $stmt->execute();
             $sess_row = $stmt->get_result()->fetch_assoc();
@@ -436,11 +441,17 @@ $transSessions = $conn->query(
 // Unlimited rate constant (used by sessions.php pending balance display)
 $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
 
-// Pending sessions: active sessions that have already collected some upfront payment
+// Pending sessions: active sessions with upfront payment OR completed sessions with outstanding balance
 $pendingSessions = [];
 foreach ($recentSessions as $sess) {
-    if ($sess['status'] === 'active' && (float)($sess['upfront_paid'] ?? 0) > 0) {
-        $sess['paid_so_far'] = (float)$sess['upfront_paid'];
+    $paidSoFar = (float)($sess['upfront_paid'] ?? 0);
+    if ($sess['status'] === 'active' && $paidSoFar > 0) {
+        // Active session with upfront payment — balance pending at end
+        $sess['paid_so_far'] = $paidSoFar;
+        $pendingSessions[] = $sess;
+    } elseif ($sess['status'] === 'completed' && $sess['total_cost'] > 0 && $paidSoFar < (float)$sess['total_cost']) {
+        // Completed session where total paid < total cost — outstanding balance
+        $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
 }
@@ -674,12 +685,31 @@ function showPage(page, el) {
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
+    // Persist active page in URL hash so reloads stay on the same section
+    history.replaceState(null, '', '#' + page);
+
     // Render charts lazily on first visit to reports
     if (page === 'reports' && !window.chartsRendered) {
         renderCharts();
         window.chartsRendered = true;
     }
 }
+
+// ── Restore active page from URL hash on load ──
+(function () {
+    const hash = window.location.hash.replace('#', '');
+    const validPages = ['dashboard','consoles','sessions','financial','reports','settings'];
+    if (hash && validPages.includes(hash)) {
+        const navItems = document.querySelectorAll('.nav-item[onclick]');
+        let matchEl = null;
+        navItems.forEach(n => {
+            if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + hash + "'")) {
+                matchEl = n;
+            }
+        });
+        showPage(hash, matchEl);
+    }
+})();
 
 function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
@@ -778,6 +808,22 @@ function calcChange(tenderedId, displayId, costHolderId) {
  */
 function syncTenderedAndSubmit(e) {
     const tenderedVal = document.getElementById('endTendered').value;
+    const payGroup    = document.getElementById('endPaymentMethodGroup');
+
+    // If the payment section is visible (balance due) and no amount entered, block submission
+    if (payGroup && payGroup.style.display !== 'none') {
+        if (!tenderedVal || parseFloat(tenderedVal) <= 0) {
+            e.preventDefault();
+            // Highlight the tendered input
+            const input = document.getElementById('endTendered');
+            input.style.borderColor = '#fb566b';
+            input.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.25)';
+            input.focus();
+            input.setAttribute('placeholder', '⚠ Enter amount tendered');
+            return false;
+        }
+    }
+
     document.getElementById('endTenderedHidden').value = tenderedVal;
     // Form submits normally after this (no e.preventDefault())
 }

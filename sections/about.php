@@ -16,11 +16,11 @@
                 <div class="about-features mt-4">
                     <div class="feature-item">
                         <div class="feature-icon">
-                            <i class="fas fa-desktop"></i>
+                            <i class="fab fa-playstation"></i>
                         </div>
                         <div class="feature-content">
-                            <h4>High-End Gaming PCs</h4>
-                            <p>Latest hardware for smooth gaming experience</p>
+                            <h4>Next-Gen Consoles</h4>
+                            <p>PS5, PS4 & Xbox Series X with premium displays</p>
                         </div>
                     </div>
 

@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="orb orb-2"></div>
             <div class="orb orb-3"></div>
             <div class="grid-lines"></div>
-        ff</div>
+        </div>
 
         <!-- Left Branding Panel -->
         <div class="auth-brand-panel">

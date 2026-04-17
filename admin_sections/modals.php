@@ -182,7 +182,7 @@
             <div id="endCostNote" style="margin-top:10px;font-size:12px;color:#aaa;"></div>
         </div>
 
-        <form method="POST" id="endSessionForm">
+        <form method="POST" id="endSessionForm" onsubmit="return syncTenderedAndSubmit(event)">
             <input type="hidden" name="action" value="end_session">
             <input type="hidden" name="session_id" id="endSessionId">
             <!-- Synced with the visible endTendered input on submit -->

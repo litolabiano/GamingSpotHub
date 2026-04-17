@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gspot Gaming Hub - Your Ultimate Gaming Destination in Dasma</title>
-    <meta name="description" content="Your go spot for gaming fun! Dive into Xbox, PlayStation, and Nintendo Switch action in our cozy playful paradise.">
+    <meta name="description" content="Your go spot for gaming fun! Dive into PS5, PS4, and Xbox Series X action in our cozy playful paradise.">
     
     <!-- Bootstrap CSS -->
     <link href="assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
@@ -50,7 +50,7 @@
                     <div class="hero-content">
                         <h1 class="hero-title">YOUR ULTIMATE<br><span class="gradient-text">GAMING DESTINATION</span></h1>
                         <p class="hero-subtitle">PLAY. ENJOY. COMPETE.</p>
-                        <p class="hero-description">Your go spot for gaming fun! Dive into Xbox, PlayStation, and Nintendo Switch action in our cozy playful paradise.</p>
+                        <p class="hero-description">Your go spot for gaming fun! Dive into PS5, PS4, and Xbox Series X action in our cozy playful paradise.</p>
                         <div class="hero-buttons">
                             <a href="#booking" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> View Available Units</a>
                             <a href="#pricing" class="btn btn-secondary btn-lg"><i class="fas fa-peso-sign me-2"></i> See Pricing Plans</a>
