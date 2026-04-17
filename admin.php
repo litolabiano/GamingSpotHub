@@ -413,7 +413,7 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 $availableConsoles = getAvailableConsoles();
 
 // Reservations (upcoming + active)
-$upcomingReservations = getUpcomingReservations(14); // next 2 weeks
+$upcomingReservations = getUpcomingReservations(); // all future pending/confirmed
 $pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
 
@@ -609,19 +609,33 @@ $typeCounts = array_column($typeUsage, 'cnt');
             </div>
         </a>
     </div>
+    <?php $navBadge = 'style="background:#fb566b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;margin-left:auto;min-width:18px;text-align:center;"'; ?>
     <div class="nav-item active" onclick="showPage('dashboard', this)">
         <i class="fas fa-chart-line"></i><span>Dashboard</span>
     </div>
     <div class="nav-item" onclick="showPage('consoles', this)">
         <i class="fas fa-desktop"></i><span>Consoles</span>
+        <?php if ($maintenanceCount > 0): ?>
+        <span <?= $navBadge ?>><?= $maintenanceCount ?></span>
+        <?php endif; ?>
     </div>
     <div class="nav-item" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
+        <?php if ($activeCount > 0): ?>
+        <span <?= $navBadge ?>><?= $activeCount ?></span>
+        <?php endif; ?>
     </div>
-
-
+    <div class="nav-item" onclick="showPage('reservations', this)">
+        <i class="fas fa-calendar-check"></i><span>Reservations</span>
+        <?php if ($pendingResCount > 0): ?>
+        <span <?= $navBadge ?>><?= $pendingResCount ?></span>
+        <?php endif; ?>
+    </div>
     <div class="nav-item" onclick="showPage('financial', this)">
         <i class="fas fa-peso-sign"></i><span>Financial</span>
+        <?php if (count($pendingSessions) > 0): ?>
+        <span <?= $navBadge ?>><?= count($pendingSessions) ?></span>
+        <?php endif; ?>
     </div>
     <div class="nav-item" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
@@ -661,6 +675,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
 <?php include __DIR__ . '/admin_sections/consoles.php'; ?>
 <?php include __DIR__ . '/admin_sections/sessions.php'; ?>
+<?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/financial.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
@@ -678,7 +693,7 @@ function showPage(page, el) {
     document.getElementById(page).classList.add('active');
     if (el) el.classList.add('active');
     const titles = {
-        dashboard: 'Dashboard', consoles: 'Console Management',
+        dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management',
         financial: 'Financial', reports: 'Analytics & Reports',
         settings: 'Settings'
@@ -698,7 +713,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','financial','reports','settings'];
+    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gspot Gaming Hub - Your Ultimate Gaming Destination in Dasma</title>
-    <meta name="description" content="Your go spot for gaming fun! Dive into PS5, PS4, and Xbox Series X action in our cozy playful paradise.">
+    <meta name="description" content="Your go spot for gaming fun! Dive into console gaming action in our cozy playful paradise.">
     
     <!-- Bootstrap CSS -->
     <link href="assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
@@ -32,13 +32,28 @@
     // --- Hero Stats: pull real counts from the database ---
     require_once __DIR__ . '/includes/db_config.php';
 
-
     $r = $conn->query("SELECT COUNT(*) AS cnt FROM consoles");
     if ($r) $stat_consoles = (int) $r->fetch_assoc()['cnt'];
 
     $r = $conn->query("SELECT COUNT(*) AS cnt FROM users WHERE role = 'customer' AND status = 'active'");
     if ($r) $stat_members = (int) $r->fetch_assoc()['cnt'];
+
+    // Build dynamic console-type list from the database
+    $r = $conn->query("SELECT DISTINCT console_type FROM consoles ORDER BY console_type");
+    $consoleTypes = [];
+    while ($row = $r->fetch_assoc()) { $consoleTypes[] = $row['console_type']; }
+    // Format: "PS4, PS5 & Xbox Series X"
+    if (count($consoleTypes) > 1) {
+        $last = array_pop($consoleTypes);
+        $consoleList = implode(', ', $consoleTypes) . ' & ' . $last;
+    } else {
+        $consoleList = $consoleTypes[0] ?? 'console';
+    }
+    $heroDesc = "Your go spot for gaming fun! Dive into {$consoleList} action in our cozy playful paradise.";
     ?>
+
+    <!-- Dynamic meta injected from DB -->
+    <script>document.querySelector('meta[name="description"]').setAttribute('content', <?= json_encode($heroDesc) ?>);</script>
 
     <!-- Hero Section -->
     <section id="home" class="hero-section">
@@ -50,7 +65,7 @@
                     <div class="hero-content">
                         <h1 class="hero-title">YOUR ULTIMATE<br><span class="gradient-text">GAMING DESTINATION</span></h1>
                         <p class="hero-subtitle">PLAY. ENJOY. COMPETE.</p>
-                        <p class="hero-description">Your go spot for gaming fun! Dive into PS5, PS4, and Xbox Series X action in our cozy playful paradise.</p>
+                        <p class="hero-description"><?= htmlspecialchars($heroDesc) ?></p>
                         <div class="hero-buttons">
                             <a href="#booking" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> View Available Units</a>
                             <a href="#pricing" class="btn btn-secondary btn-lg"><i class="fas fa-peso-sign me-2"></i> See Pricing Plans</a>

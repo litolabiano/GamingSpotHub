@@ -704,21 +704,37 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
 /**
  * Get upcoming reservations for today and the next 7 days.
  */
-function getUpcomingReservations($days = 7) {
+function getUpcomingReservations($days = null) {
     global $conn;
     $today = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
-    $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
-    $stmt = $conn->prepare(
-        "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
-                c.unit_number, c.console_name
-           FROM reservations r
-           JOIN users u ON r.user_id = u.user_id
-           LEFT JOIN consoles c ON r.console_id = c.console_id
-          WHERE r.reserved_date BETWEEN ? AND ?
-            AND r.status IN ('pending','confirmed')
-          ORDER BY r.reserved_date ASC, r.reserved_time ASC"
-    );
-    $stmt->bind_param('ss', $today, $until);
+
+    if ($days !== null) {
+        $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+        $stmt = $conn->prepare(
+            "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+                    c.unit_number, c.console_name
+               FROM reservations r
+               JOIN users u ON r.user_id = u.user_id
+               LEFT JOIN consoles c ON r.console_id = c.console_id
+              WHERE r.reserved_date BETWEEN ? AND ?
+                AND r.status IN ('pending','confirmed')
+              ORDER BY r.reserved_date ASC, r.reserved_time ASC"
+        );
+        $stmt->bind_param('ss', $today, $until);
+    } else {
+        // Show ALL future reservations (no upper bound)
+        $stmt = $conn->prepare(
+            "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+                    c.unit_number, c.console_name
+               FROM reservations r
+               JOIN users u ON r.user_id = u.user_id
+               LEFT JOIN consoles c ON r.console_id = c.console_id
+              WHERE r.reserved_date >= ?
+                AND r.status IN ('pending','confirmed')
+              ORDER BY r.reserved_date ASC, r.reserved_time ASC"
+        );
+        $stmt->bind_param('s', $today);
+    }
     $stmt->execute();
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }

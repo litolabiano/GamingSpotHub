@@ -1,116 +1,61 @@
-<!-- ════ DASHBOARD ════════════════════════════════════════════════════════ -->
-<div class="page active" id="dashboard">
+<!-- ════ RESERVATIONS ════════════════════════════════════════════════════ -->
+<div class="page" id="reservations">
 
-
-
-    <div class="stats-grid">
+    <!-- Stats summary -->
+    <div class="stats-grid" style="margin-bottom:24px;">
+        <?php
+            $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
+            $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
+            $resToday     = count(array_filter($upcomingReservations, fn($r) => $r['reserved_date'] === date('Y-m-d')));
+        ?>
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value">₱<?= number_format($todayRevenue, 2) ?></div>
-                    <div class="stat-label">Today's Revenue</div>
+                    <div class="stat-value"><?= count($upcomingReservations) ?></div>
+                    <div class="stat-label">Total Upcoming</div>
                 </div>
-                <div class="stat-icon revenue"><i class="fas fa-peso-sign"></i></div>
+                <div class="stat-icon" style="background:rgba(32,200,161,.15);color:#20c8a1;"><i class="fas fa-calendar-check"></i></div>
             </div>
-            <div class="stat-change up"><i class="fas fa-calendar-day"></i> <?= date('F d, Y') ?></div>
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value"><?= $activeCount ?></div>
-                    <div class="stat-label">Active Sessions</div>
+                    <div class="stat-value"><?= $resPending ?></div>
+                    <div class="stat-label">Pending</div>
                 </div>
-                <div class="stat-icon sessions"><i class="fas fa-play-circle"></i></div>
+                <div class="stat-icon" style="background:rgba(241,168,60,.15);color:#f1a83c;"><i class="fas fa-hourglass-half"></i></div>
             </div>
-            <div class="stat-change up"><i class="fas fa-circle" style="color:#20c8a1;font-size:8px"></i> Live right now</div>
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value"><?= $todayBookings ?></div>
-                    <div class="stat-label">Sessions Today</div>
+                    <div class="stat-value"><?= $resConfirmed ?></div>
+                    <div class="stat-label">Confirmed</div>
                 </div>
-                <div class="stat-icon bookings"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-icon sessions"><i class="fas fa-check-circle"></i></div>
             </div>
-            <div class="stat-change up"><i class="fas fa-check"></i> Completed today</div>
         </div>
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value"><?= $availableCount ?>/<?= count($allConsoles) ?></div>
-                    <div class="stat-label">Consoles Available</div>
+                    <div class="stat-value"><?= $resToday ?></div>
+                    <div class="stat-label">Today</div>
                 </div>
-                <div class="stat-icon consoles"><i class="fas fa-desktop"></i></div>
-            </div>
-            <div class="stat-change up">
-                <span style="color:#5f85da"><?= $inUseCount ?> in use</span> &nbsp;
-                <span style="color:#fb566b"><?= $maintenanceCount ?> maintenance</span>
+                <div class="stat-icon" style="background:rgba(179,123,236,.15);color:#b37bec;"><i class="fas fa-calendar-day"></i></div>
             </div>
         </div>
     </div>
 
-    <!-- Active Sessions Right Now -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-circle" style="color:#20c8a1;font-size:10px;margin-right:8px"></i>Live Sessions</h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> Start Session</button>
-        </div>
-        <?php if (empty($activeSessions)): ?>
-            <div class="empty-state"><i class="fas fa-couch"></i>No active sessions right now</div>
-        <?php else: ?>
-        <table class="data-table">
-            <thead><tr><th>Session #</th><th>Customer</th><th>Console</th><th>Mode</th><th>Started</th><th>Booked Until</th><th>Elapsed / Remaining</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php foreach ($activeSessions as $sess): ?>
-            <tr>
-                <td>#<?= $sess['session_id'] ?></td>
-                <td><?= htmlspecialchars($sess['customer_name']) ?></td>
-                <td>
-                    <span class="console-type-badge <?= $sess['console_type'] === 'PS5' ? 'ps5' : ($sess['console_type'] === 'PS4' ? 'ps4' : 'xbox') ?>">
-                        <?= $sess['console_type'] ?>
-                    </span>
-                    <?= htmlspecialchars($sess['unit_number']) ?>
-                </td>
-                <td><span class="badge pending"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></span></td>
-                <td><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
-                <td>
-                    <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']):
-                        $bookedEndDt = new DateTime($sess['start_time'], new DateTimeZone('Asia/Manila'));
-                        $bookedEndDt->modify('+' . $sess['planned_minutes'] . ' minutes');
-                    ?>
-                        <span style="color:#f1e1aa;font-weight:600"><?= $bookedEndDt->format('h:i A') ?></span>
-                    <?php else: ?>—<?php endif; ?>
-                </td>
-                <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>" data-planned="<?= $sess['planned_minutes'] ?? '' ?>">—</span></td>
-                <td>
-                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(
-                        <?= $sess['session_id'] ?>,
-                        '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
-                        '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
-                        '<?= $sess['rental_mode'] ?>',
-                        <?= strtotime($sess['start_time']) ?>,
-                        <?= (int)($sess['planned_minutes'] ?? 0) ?>,
-                        <?= (float)($sess['upfront_paid'] ?? 0) ?>)">
-                        <i class="fas fa-stop-circle"></i> End &amp; Pay
-                    </button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- ── RESERVATIONS (Dashboard view) ─────────────────────────────────── -->
-    <div class="card" style="border-left:3px solid #20c8a1;margin-bottom:20px;">
+    <!-- Upcoming Reservations Table -->
+    <div class="card" style="border-left:3px solid #20c8a1;">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <h3 class="card-title" style="margin:0;">
-                    <i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:8px;"></i>Upcoming Reservations
+                    <i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:8px;"></i>All Upcoming Reservations
                 </h3>
-                <?php if ($pendingResCount > 0): ?>
+                <?php if ($resPending > 0): ?>
                 <span style="background:rgba(241,168,60,.2);color:#f1a83c;border:1px solid rgba(241,168,60,.35);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
-                    <?= $pendingResCount ?> Pending
+                    <?= $resPending ?> Pending
                 </span>
                 <?php endif; ?>
             </div>
@@ -120,15 +65,17 @@
         </div>
 
         <?php if (empty($upcomingReservations)): ?>
-        <div style="padding:30px;text-align:center;color:#555;">
-            <i class="fas fa-calendar-xmark" style="font-size:1.8rem;display:block;margin-bottom:8px;"></i>
-            No upcoming reservations.
+        <div style="padding:50px;text-align:center;color:#555;">
+            <i class="fas fa-calendar-xmark" style="font-size:2.5rem;display:block;margin-bottom:12px;"></i>
+            <p style="font-size:15px;margin:0;">No upcoming reservations.</p>
+            <p style="font-size:12px;color:#444;margin-top:4px;">New reservations will appear here once added.</p>
         </div>
         <?php else: ?>
         <div style="overflow-x:auto;">
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Date & Time</th>
                         <th>Customer</th>
                         <th>Console</th>
@@ -148,6 +95,7 @@
                     $sc = $statusColors[$r['status']] ?? ['bg'=>'rgba(100,100,100,.1)','text'=>'#888','border'=>'rgba(100,100,100,.2)'];
                 ?>
                 <tr style="<?= $isToday ? 'background:rgba(32,200,161,.03);' : '' ?>">
+                    <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
                     <td style="white-space:nowrap;">
                         <?php if ($isToday): ?>
                         <span style="color:#20c8a1;font-size:10px;font-weight:700;display:block;">TODAY</span>
@@ -230,24 +178,4 @@
         <?php endif; ?>
     </div>
 
-    <!-- Recent Sessions -->
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Recent Sessions</h3></div>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Duration</th><th>Cost</th><th>Status</th></tr></thead>
-            <tbody>
-            <?php foreach (array_slice($recentSessions, 0, 8) as $sess): ?>
-            <tr>
-                <td>#<?= $sess['session_id'] ?></td>
-                <td><?= htmlspecialchars($sess['customer_name']) ?></td>
-                <td><?= htmlspecialchars($sess['unit_number']) ?></td>
-                <td><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></td>
-                <td><?= $sess['duration_minutes'] !== null ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'].' min' : '< 1 min') : '—' ?></td>
-                <td><?= $sess['total_cost'] ? '₱'.number_format($sess['total_cost'],2) : '—' ?></td>
-                <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
 </div>
