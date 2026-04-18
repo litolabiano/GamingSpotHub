@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 14, 2026 at 11:29 AM
+-- Generation Time: Apr 18, 2026 at 03:20 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -46,7 +46,7 @@ CREATE TABLE `additional_requests` (
 CREATE TABLE `consoles` (
   `console_id` int(11) NOT NULL,
   `console_name` varchar(50) NOT NULL,
-  `console_type` enum('PS5','Xbox Series X','PS4') NOT NULL,
+  `console_type` enum('PS5','PS4','Xbox Series X') NOT NULL,
   `unit_number` varchar(10) NOT NULL,
   `status` enum('available','in_use','maintenance') NOT NULL DEFAULT 'available',
   `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -59,11 +59,11 @@ CREATE TABLE `consoles` (
 
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
 (1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'in_use', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'in_use', 80.00, '2026-02-21 19:55:41'),
-(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'maintenance', 80.00, '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
+(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
-(6, 'PS4 Unit 6', 'PS4', 'PS4-06', 'available', 80.00, '2026-02-21 19:55:41'),
+(6, 'PS4 Unit 6', 'PS4', 'PS4-07', 'available', 80.00, '2026-02-21 19:55:41'),
 (7, 'Xbox Unit 2', 'Xbox Series X', 'XBX-02', 'available', 80.00, '2026-02-21 19:55:41'),
 (8, 'Xbox Unit 3', 'Xbox Series X', 'XBX-03', 'available', 80.00, '2026-02-21 19:55:41');
 
@@ -85,6 +85,7 @@ CREATE TABLE `gaming_sessions` (
   `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
   `total_cost` decimal(10,2) DEFAULT NULL,
   `status` enum('active','completed','cancelled') NOT NULL DEFAULT 'active',
+  `payment_status` enum('paid','unpaid','partial') DEFAULT NULL,
   `created_by` int(11) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -93,38 +94,47 @@ CREATE TABLE `gaming_sessions` (
 -- Dumping data for table `gaming_sessions`
 --
 
-INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mode`, `planned_minutes`, `start_time`, `end_time`, `duration_minutes`, `hourly_rate`, `total_cost`, `status`, `created_by`, `created_at`) VALUES
-(1, 17, 1, 'hourly', NULL, '2026-04-14 10:12:13', '2026-04-14 11:42:00', 90, 80.00, 120.00, 'completed', 12, '2026-04-14 11:42:13'),
-(2, 17, 1, 'hourly', NULL, '2026-04-14 10:24:52', '2026-04-15 00:20:00', 835, 80.00, 1120.00, 'completed', 12, '2026-04-14 11:44:52'),
-(3, 17, 1, 'hourly', 180, '2026-04-14 12:19:37', '2026-04-14 15:25:00', 185, 80.00, 260.00, 'completed', 12, '2026-04-14 12:19:37'),
-(4, 18, 1, 'hourly', 30, '2026-04-14 13:03:37', '2026-04-14 13:33:00', 29, 80.00, 50.00, 'completed', 12, '2026-04-14 13:03:37'),
-(5, 5, 2, 'hourly', 60, '2026-04-14 13:03:58', '2026-04-14 14:25:34', 82, 80.00, 120.00, 'completed', 12, '2026-04-14 13:03:58'),
-(6, 19, 5, 'hourly', 30, '2026-04-14 14:11:38', '2026-04-14 14:11:42', 0, 80.00, 50.00, 'completed', 12, '2026-04-14 14:11:38'),
-(7, 18, 1, 'unlimited', NULL, '2026-04-14 14:17:34', '2026-04-14 14:28:25', 11, 80.00, 400.00, 'completed', 12, '2026-04-14 14:17:34'),
-(8, 4, 2, 'open_time', NULL, '2026-04-14 14:27:44', '2026-04-14 14:28:22', 1, 80.00, 0.00, 'completed', 12, '2026-04-14 14:27:44'),
-(9, 4, 3, 'hourly', 150, '2026-04-14 14:28:04', '2026-04-14 14:28:26', 0, 80.00, 200.00, 'completed', 12, '2026-04-14 14:28:04'),
-(10, 18, 1, 'hourly', 30, '2026-04-14 14:29:16', '2026-04-14 15:54:19', 85, 80.00, 130.00, 'completed', 12, '2026-04-14 14:29:16'),
-(11, 3, 2, 'hourly', 60, '2026-04-14 14:39:29', '2026-04-14 14:39:39', 0, 80.00, 80.00, 'completed', 12, '2026-04-14 14:39:29'),
-(12, 3, 2, 'hourly', 210, '2026-04-14 14:42:09', '2026-04-14 15:54:35', 72, 80.00, 280.00, 'completed', 12, '2026-04-14 14:42:09'),
-(13, 3, 2, 'hourly', 210, '2026-04-14 15:05:39', '2026-04-14 16:26:04', 80, 80.00, 280.00, 'completed', 12, '2026-04-14 15:05:39'),
-(14, 3, 2, 'hourly', 210, '2026-04-14 15:14:11', '2026-04-14 16:26:02', 72, 80.00, 280.00, 'completed', 12, '2026-04-14 15:14:11'),
-(15, 3, 2, 'hourly', 210, '2026-04-14 15:14:13', '2026-04-14 16:26:00', 72, 80.00, 280.00, 'completed', 12, '2026-04-14 15:14:13'),
-(16, 3, 2, 'hourly', 210, '2026-04-14 15:14:19', '2026-04-14 16:19:47', 65, 80.00, 280.00, 'completed', 12, '2026-04-14 15:14:19'),
-(17, 3, 2, 'hourly', 210, '2026-04-14 15:15:19', '2026-04-14 15:59:14', 44, 80.00, 280.00, 'completed', 12, '2026-04-14 15:15:19'),
-(18, 3, 2, 'hourly', 210, '2026-04-14 15:15:22', '2026-04-14 15:54:14', 39, 80.00, 280.00, 'completed', 12, '2026-04-14 15:15:22'),
-(19, 3, 2, 'hourly', 210, '2026-04-14 15:15:41', '2026-04-14 15:54:09', 38, 80.00, 280.00, 'completed', 12, '2026-04-14 15:15:41'),
-(20, 3, 2, 'hourly', 210, '2026-04-14 15:36:27', '2026-04-14 15:54:08', 18, 80.00, 280.00, 'completed', 12, '2026-04-14 15:36:27'),
-(21, 3, 2, 'hourly', 210, '2026-04-14 15:37:13', '2026-04-14 15:54:06', 17, 80.00, 280.00, 'completed', 12, '2026-04-14 15:37:13'),
-(22, 3, 2, 'hourly', 210, '2026-04-14 15:43:32', '2026-04-14 15:53:31', 10, 80.00, 280.00, 'completed', 12, '2026-04-14 15:43:32'),
-(23, 4, 1, 'hourly', 30, '2026-04-14 15:21:12', '2026-04-14 16:44:00', 83, 80.00, 130.00, 'completed', 12, '2026-04-14 16:12:02'),
-(24, 3, 1, 'hourly', 240, '2026-04-14 16:21:19', '2026-04-14 16:25:58', 5, 80.00, 320.00, 'completed', 12, '2026-04-14 16:21:19'),
-(25, 3, 2, 'hourly', 30, '2026-04-14 15:23:42', '2026-04-14 16:56:23', 93, 80.00, 130.00, 'completed', 12, '2026-04-14 16:23:42'),
-(26, 17, 1, 'hourly', 30, '2026-04-14 16:37:26', '2026-04-14 17:05:25', 28, 80.00, 50.00, 'completed', 12, '2026-04-14 16:37:26'),
-(27, 18, 2, 'hourly', 30, '2026-04-14 16:55:13', '2026-04-14 17:05:21', 10, 80.00, 50.00, 'completed', 12, '2026-04-14 16:55:13'),
-(28, 3, 3, 'hourly', 150, '2026-04-14 16:58:05', '2026-04-14 17:05:16', 7, 80.00, 200.00, 'completed', 12, '2026-04-14 16:58:05'),
-(29, 4, 2, 'hourly', 30, '2026-04-14 17:05:02', '2026-04-14 17:05:07', 0, 80.00, 50.00, 'completed', 12, '2026-04-14 17:05:02'),
-(30, 3, 3, 'hourly', 420, '2026-04-14 17:06:31', NULL, NULL, 80.00, NULL, 'active', 12, '2026-04-14 17:06:31'),
-(31, 3, 2, 'hourly', 480, '2026-04-14 17:20:32', NULL, NULL, 80.00, NULL, 'active', 12, '2026-04-14 17:20:32');
+INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mode`, `planned_minutes`, `start_time`, `end_time`, `duration_minutes`, `hourly_rate`, `total_cost`, `status`, `payment_status`, `created_by`, `created_at`) VALUES
+(1, 17, 1, 'hourly', 390, '2026-04-15 20:10:32', '2026-04-15 20:10:40', 0, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 20:10:32'),
+(2, 17, 1, 'hourly', 420, '2026-04-15 20:12:27', '2026-04-15 20:30:26', 18, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 20:12:27'),
+(3, 17, 3, 'hourly', 450, '2026-04-15 20:20:08', '2026-04-15 20:30:35', 10, 80.00, 600.00, 'completed', NULL, 12, '2026-04-15 20:20:08'),
+(4, 17, 2, 'hourly', 1020, '2026-04-15 20:31:02', '2026-04-15 20:57:50', 27, 80.00, 1360.00, 'completed', NULL, 12, '2026-04-15 20:31:02'),
+(5, 17, 1, 'hourly', 360, '2026-04-15 20:58:00', '2026-04-15 20:58:05', 0, 80.00, 480.00, 'completed', NULL, 12, '2026-04-15 20:58:00'),
+(6, 17, 2, 'hourly', 420, '2026-04-15 20:58:35', '2026-04-15 21:01:49', 3, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 20:58:35'),
+(7, 17, 2, 'hourly', 420, '2026-04-15 21:02:04', '2026-04-15 21:02:32', 0, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 21:02:04'),
+(8, 17, 2, 'hourly', 480, '2026-04-15 21:02:47', '2026-04-15 21:04:23', 2, 80.00, 640.00, 'completed', NULL, 12, '2026-04-15 21:02:47'),
+(9, 17, 1, 'hourly', 390, '2026-04-15 21:07:16', '2026-04-15 21:07:18', 0, 80.00, 520.00, 'completed', 'unpaid', 12, '2026-04-15 21:07:16'),
+(10, 17, 1, 'hourly', 420, '2026-04-15 21:14:10', '2026-04-15 21:14:22', 0, 80.00, 560.00, 'completed', 'unpaid', 12, '2026-04-15 21:14:10'),
+(11, 17, 2, 'hourly', 390, '2026-04-15 21:20:37', '2026-04-15 21:34:56', 14, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 21:20:37'),
+(12, 17, 1, 'hourly', 390, '2026-04-15 21:30:05', '2026-04-15 21:34:54', 5, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 21:30:05'),
+(13, 17, 3, 'hourly', 420, '2026-04-15 21:31:12', '2026-04-15 21:34:53', 4, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 21:31:12'),
+(14, 17, 4, 'hourly', 390, '2026-04-15 21:31:37', '2026-04-15 21:34:50', 3, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 21:31:37'),
+(15, 17, 2, 'hourly', 435, '2026-04-15 21:35:06', '2026-04-15 23:44:15', 129, 80.00, 580.00, 'completed', NULL, 12, '2026-04-15 21:35:06'),
+(16, 17, 3, 'hourly', 420, '2026-04-15 21:36:05', '2026-04-15 21:36:14', 0, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 21:36:05'),
+(17, 17, 2, 'hourly', 420, '2026-04-15 23:48:55', '2026-04-15 23:52:51', 4, 80.00, 560.00, 'completed', NULL, 12, '2026-04-15 23:48:55'),
+(18, 17, 1, 'hourly', 390, '2026-04-15 23:53:11', '2026-04-15 23:54:00', 1, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 23:53:11'),
+(19, 17, 1, 'hourly', 390, '2026-04-15 23:54:21', '2026-04-15 23:57:39', 3, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 23:54:21'),
+(20, 17, 1, 'hourly', 390, '2026-04-15 23:57:51', '2026-04-16 00:36:44', 39, 80.00, 520.00, 'completed', NULL, 12, '2026-04-15 23:57:51'),
+(21, 17, 3, 'hourly', 330, '2026-04-16 12:00:27', '2026-04-16 13:25:16', 85, 80.00, 440.00, 'completed', NULL, 12, '2026-04-16 12:00:27'),
+(22, 17, 1, 'hourly', 360, '2026-04-16 13:25:41', '2026-04-16 13:26:18', 1, 80.00, 480.00, 'completed', NULL, 12, '2026-04-16 13:25:41'),
+(23, 17, 2, 'hourly', 450, '2026-04-16 22:48:29', '2026-04-16 22:49:15', 1, 80.00, 600.00, 'completed', NULL, 12, '2026-04-16 22:48:29'),
+(24, 17, 1, 'hourly', 390, '2026-04-17 12:15:40', '2026-04-17 12:17:52', 2, 80.00, 520.00, 'completed', NULL, 12, '2026-04-17 12:15:40'),
+(25, 17, 1, 'hourly', 450, '2026-04-17 12:20:19', '2026-04-17 12:20:25', 0, 80.00, 600.00, 'completed', NULL, 12, '2026-04-17 12:20:19'),
+(26, 17, 1, 'hourly', 360, '2026-04-17 12:23:05', '2026-04-17 12:23:13', 0, 80.00, 480.00, 'completed', NULL, 12, '2026-04-17 12:23:05'),
+(27, 21, 3, 'hourly', 420, '2026-04-17 12:26:48', '2026-04-17 18:01:18', 335, 80.00, 560.00, 'completed', NULL, 12, '2026-04-17 12:26:48'),
+(28, 17, 1, 'hourly', 390, '2026-04-17 18:02:47', '2026-04-17 18:03:30', 1, 80.00, 520.00, 'completed', NULL, 12, '2026-04-17 18:02:47'),
+(29, 21, 1, 'hourly', 390, '2026-04-17 19:09:50', '2026-04-17 19:14:51', 5, 80.00, 520.00, 'completed', NULL, 12, '2026-04-17 19:09:50'),
+(30, 21, 1, 'hourly', 390, '2026-04-17 19:17:32', '2026-04-17 22:33:07', 196, 80.00, 520.00, 'completed', NULL, 12, '2026-04-17 19:17:32'),
+(31, 21, 1, 'hourly', 420, '2026-04-18 00:31:57', '2026-04-18 00:32:45', 1, 80.00, 560.00, 'completed', NULL, 12, '2026-04-18 00:31:57'),
+(32, 17, 1, 'hourly', 60, '2026-04-18 16:12:24', '2026-04-18 16:12:47', 0, 80.00, 80.00, 'completed', NULL, 12, '2026-04-18 16:12:24'),
+(33, 17, 1, 'hourly', 120, '2026-04-18 16:21:20', '2026-04-18 16:24:37', 3, 80.00, 160.00, 'completed', NULL, 12, '2026-04-18 16:21:20'),
+(34, 21, 6, 'hourly', 180, '2026-04-18 16:24:20', '2026-04-18 16:24:32', 0, 80.00, 240.00, 'completed', NULL, 12, '2026-04-18 16:24:20'),
+(35, 21, 1, 'hourly', 240, '2026-04-18 16:25:04', '2026-04-18 16:26:07', 1, 80.00, 320.00, 'completed', NULL, 12, '2026-04-18 16:25:04'),
+(36, 21, 2, 'hourly', 240, '2026-04-18 16:25:30', '2026-04-18 16:26:03', 1, 80.00, 320.00, 'completed', NULL, 12, '2026-04-18 16:25:30'),
+(37, 17, 3, 'hourly', 240, '2026-04-18 16:25:52', '2026-04-18 16:25:58', 0, 80.00, 320.00, 'completed', NULL, 12, '2026-04-18 16:25:52'),
+(38, 12, 2, 'hourly', 480, '2026-04-18 16:38:33', '2026-04-18 16:41:32', 3, 80.00, 640.00, 'completed', NULL, 12, '2026-04-18 16:38:33'),
+(39, 17, 6, 'hourly', 90, '2026-04-18 16:44:07', '2026-04-18 17:08:14', 24, 80.00, 120.00, 'completed', NULL, 12, '2026-04-18 16:44:07'),
+(40, 17, 1, 'hourly', 450, '2026-04-18 17:08:28', '2026-04-18 17:08:33', 0, 80.00, 600.00, 'completed', NULL, 12, '2026-04-18 17:08:28');
 
 -- --------------------------------------------------------
 
@@ -142,14 +152,46 @@ CREATE TABLE `reports` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `reports`
+-- Table structure for table `reservations`
 --
 
-INSERT INTO `reports` (`report_id`, `report_type`, `generated_by`, `date_from`, `date_to`, `file_path`, `created_at`) VALUES
-(1, 'daily_sales', 1, '2026-02-20', '2026-02-20', NULL, '2026-02-21 19:55:41'),
-(2, 'console_usage', 1, '2026-02-01', '2026-02-20', NULL, '2026-02-21 19:55:41'),
-(3, 'rental_records', 1, '2026-02-01', '2026-02-21', NULL, '2026-02-21 19:55:41');
+CREATE TABLE `reservations` (
+  `reservation_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `console_id` int(11) DEFAULT NULL,
+  `console_type` enum('PS5','Xbox Series X','PS4') NOT NULL,
+  `rental_mode` enum('hourly','open_time','unlimited') NOT NULL DEFAULT 'hourly',
+  `planned_minutes` int(11) DEFAULT NULL,
+  `reserved_date` date NOT NULL,
+  `reserved_time` time NOT NULL,
+  `notes` text DEFAULT NULL,
+  `downpayment_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `downpayment_method` enum('cash','gcash','credit_card') DEFAULT NULL,
+  `downpayment_paid` tinyint(1) NOT NULL DEFAULT 0,
+  `status` enum('pending','confirmed','converted','cancelled','no_show') NOT NULL DEFAULT 'pending',
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `reservations`
+--
+
+INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 17, NULL, 'PS5', 'hourly', 60, '2321-12-31', '12:31:00', NULL, 1333340.00, 'cash', 1, 'cancelled', 17, '2026-04-16 22:49:03', '2026-04-18 16:05:12'),
+(2, 17, 1, 'PS5', 'hourly', 60, '2321-12-31', '12:31:00', NULL, 1333340.00, 'cash', 1, 'converted', 17, '2026-04-16 22:49:11', '2026-04-18 16:12:24'),
+(3, 21, NULL, 'PS5', 'open_time', NULL, '2026-06-10', '00:33:00', NULL, 1200.00, 'cash', 1, 'cancelled', 21, '2026-04-17 12:18:53', '2026-04-18 16:13:06'),
+(4, 21, 1, 'PS5', 'hourly', 240, '2026-06-19', '10:00:00', NULL, 90.00, 'cash', 1, 'converted', 21, '2026-04-17 18:59:53', '2026-04-18 16:25:04'),
+(5, 17, 1, 'PS5', 'hourly', 120, '2026-06-19', '10:10:00', NULL, 100.00, 'cash', 1, 'converted', 17, '2026-04-17 19:13:05', '2026-04-18 16:21:20'),
+(6, 12, NULL, 'PS4', 'open_time', NULL, '2026-06-19', '12:13:00', NULL, 100.00, 'cash', 1, 'cancelled', 12, '2026-04-17 22:34:02', '2026-04-18 16:23:59'),
+(7, 21, 6, 'PS4', 'hourly', 180, '2026-06-19', '10:10:00', 'nothing', 100.00, 'cash', 1, 'converted', 21, '2026-04-18 00:25:54', '2026-04-18 16:24:20'),
+(8, 21, 2, 'PS5', 'hourly', 240, '3030-06-01', '10:10:00', NULL, 100.00, 'cash', 1, 'converted', 21, '2026-04-18 00:30:59', '2026-04-18 16:25:30'),
+(9, 12, 2, 'PS5', 'hourly', 480, '2026-06-10', '10:20:00', NULL, 320.00, 'cash', 1, 'converted', 12, '2026-04-18 16:38:16', '2026-04-18 16:38:33'),
+(10, 17, 6, 'PS4', 'hourly', 90, '2026-06-19', '10:10:00', NULL, 60.00, 'cash', 1, 'converted', 17, '2026-04-18 16:43:53', '2026-04-18 16:44:07');
 
 -- --------------------------------------------------------
 
@@ -202,15 +244,6 @@ CREATE TABLE `tournaments` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Dumping data for table `tournaments`
---
-
-INSERT INTO `tournaments` (`tournament_id`, `tournament_name`, `game_id`, `console_type`, `start_date`, `end_date`, `entry_fee`, `prize_pool`, `max_participants`, `status`, `announcement`, `created_at`) VALUES
-(1, 'NBA 2K25 Monthly Showdown', 1, 'PS5', '2026-03-01 13:00:00', '2026-03-01 20:00:00', 100.00, 3000.00, 16, 'upcoming', 'Join our monthly NBA 2K25 tournament! ₱100 entry fee with ₱3,000 prize pool. Register now at the shop or through the website.', '2026-02-21 19:55:41'),
-(2, 'Tekken 8 Fight Night', 5, 'PS5', '2026-02-15 14:00:00', '2026-02-15 21:00:00', 50.00, 1500.00, 32, 'completed', 'Tekken 8 tournament completed! Congratulations to all winners!', '2026-02-21 19:55:41'),
-(3, 'COD Warzone Battle', 3, 'Xbox Series X', '2026-03-15 10:00:00', '2026-03-15 18:00:00', 75.00, 2000.00, 20, 'upcoming', 'Call of Duty tournament coming soon! Team up and compete for ₱2,000!', '2026-02-21 19:55:41');
-
 -- --------------------------------------------------------
 
 --
@@ -227,17 +260,6 @@ CREATE TABLE `tournament_participants` (
   `prize_amount` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Dumping data for table `tournament_participants`
---
-
-INSERT INTO `tournament_participants` (`participant_id`, `tournament_id`, `user_id`, `registration_date`, `payment_status`, `placement`, `prize_amount`) VALUES
-(1, 2, 3, '2026-02-13 10:00:00', 'paid', 1, 800.00),
-(2, 2, 4, '2026-02-13 11:00:00', 'paid', 2, 450.00),
-(3, 2, 5, '2026-02-14 09:00:00', 'paid', 3, 250.00),
-(4, 1, 3, '2026-02-20 15:00:00', 'paid', NULL, NULL),
-(5, 1, 4, '2026-02-21 10:00:00', 'pending', NULL, NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -249,6 +271,9 @@ CREATE TABLE `transactions` (
   `session_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `tendered_amount` decimal(10,2) DEFAULT NULL,
+  `shortfall_amount` decimal(10,2) DEFAULT NULL,
+  `payment_note` varchar(255) DEFAULT NULL,
   `payment_method` enum('cash','gcash','credit_card') NOT NULL DEFAULT 'cash',
   `payment_status` enum('pending','completed','failed') NOT NULL DEFAULT 'pending',
   `transaction_date` datetime NOT NULL DEFAULT current_timestamp(),
@@ -260,38 +285,132 @@ CREATE TABLE `transactions` (
 -- Dumping data for table `transactions`
 --
 
-INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`, `payment_method`, `payment_status`, `transaction_date`, `processed_by`, `created_at`) VALUES
-(1, 1, 17, 120.00, 'cash', 'completed', '2026-04-14 11:42:57', 12, '2026-04-14 11:42:57'),
-(2, 2, 17, 1120.00, 'cash', 'completed', '2026-04-14 11:46:26', 12, '2026-04-14 11:46:26'),
-(3, 3, 17, 260.00, 'cash', 'completed', '2026-04-14 12:20:27', 12, '2026-04-14 12:20:27'),
-(4, 4, 18, 50.00, 'cash', 'completed', '2026-04-14 13:42:08', 12, '2026-04-14 13:42:08'),
-(5, 6, 19, 50.00, 'cash', 'completed', '2026-04-14 14:11:42', 12, '2026-04-14 14:11:42'),
-(6, 5, 5, 120.00, 'cash', 'completed', '2026-04-14 14:25:34', 12, '2026-04-14 14:25:34'),
-(7, 8, 4, 0.00, 'cash', 'completed', '2026-04-14 14:28:23', 12, '2026-04-14 14:28:23'),
-(8, 7, 18, 400.00, 'cash', 'completed', '2026-04-14 14:28:25', 12, '2026-04-14 14:28:25'),
-(9, 9, 4, 200.00, 'cash', 'completed', '2026-04-14 14:28:26', 12, '2026-04-14 14:28:26'),
-(10, 11, 3, 80.00, 'cash', 'completed', '2026-04-14 14:39:29', 12, '2026-04-14 14:39:29'),
-(11, 12, 3, 280.00, 'cash', 'completed', '2026-04-14 14:42:09', 12, '2026-04-14 14:42:09'),
-(12, 22, 3, 280.00, 'cash', 'completed', '2026-04-14 15:53:31', 12, '2026-04-14 15:53:31'),
-(13, 21, 3, 280.00, 'cash', 'completed', '2026-04-14 15:54:06', 12, '2026-04-14 15:54:06'),
-(14, 20, 3, 280.00, 'cash', 'completed', '2026-04-14 15:54:08', 12, '2026-04-14 15:54:08'),
-(15, 19, 3, 280.00, 'cash', 'completed', '2026-04-14 15:54:09', 12, '2026-04-14 15:54:09'),
-(16, 18, 3, 280.00, 'cash', 'completed', '2026-04-14 15:54:14', 12, '2026-04-14 15:54:14'),
-(17, 10, 18, 130.00, 'cash', 'completed', '2026-04-14 15:54:19', 12, '2026-04-14 15:54:19'),
-(18, 17, 3, 280.00, 'cash', 'completed', '2026-04-14 15:59:14', 12, '2026-04-14 15:59:14'),
-(19, 23, 4, 130.00, 'cash', 'completed', '2026-04-14 16:14:21', 12, '2026-04-14 16:14:21'),
-(20, 16, 3, 280.00, 'cash', 'completed', '2026-04-14 16:19:47', 12, '2026-04-14 16:19:47'),
-(21, 24, 3, 320.00, 'cash', 'completed', '2026-04-14 16:21:19', 12, '2026-04-14 16:21:19'),
-(22, 15, 3, 280.00, 'cash', 'completed', '2026-04-14 16:26:00', 12, '2026-04-14 16:26:00'),
-(23, 14, 3, 280.00, 'cash', 'completed', '2026-04-14 16:26:02', 12, '2026-04-14 16:26:02'),
-(24, 13, 3, 280.00, 'cash', 'completed', '2026-04-14 16:26:04', 12, '2026-04-14 16:26:04'),
-(25, 25, 3, 130.00, 'cash', 'completed', '2026-04-14 16:56:23', 12, '2026-04-14 16:56:23'),
-(26, 29, 4, 50.00, 'cash', 'completed', '2026-04-14 17:05:07', 12, '2026-04-14 17:05:07'),
-(27, 28, 3, 200.00, 'cash', 'completed', '2026-04-14 17:05:16', 12, '2026-04-14 17:05:16'),
-(28, 27, 18, 50.00, 'cash', 'completed', '2026-04-14 17:05:21', 12, '2026-04-14 17:05:21'),
-(29, 26, 17, 50.00, 'cash', 'completed', '2026-04-14 17:05:25', 12, '2026-04-14 17:05:25'),
-(30, 30, 3, 560.00, 'cash', 'completed', '2026-04-14 17:06:31', 12, '2026-04-14 17:06:31'),
-(31, 31, 3, 640.00, 'cash', 'completed', '2026-04-14 17:20:32', 12, '2026-04-14 17:20:32');
+INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`, `tendered_amount`, `shortfall_amount`, `payment_note`, `payment_method`, `payment_status`, `transaction_date`, `processed_by`, `created_at`) VALUES
+(1, 1, 17, 200.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-15 20:10:32', 12, '2026-04-15 20:10:32'),
+(2, 1, 17, 320.00, 31.00, 289.00, 'Short payment — customer short by ₱289.00', 'cash', 'completed', '2026-04-15 20:10:40', 12, '2026-04-15 20:10:40'),
+(3, 2, 17, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-15 20:12:27', 12, '2026-04-15 20:12:27'),
+(4, 3, 17, 12.00, 12.00, 588.00, 'Short payment at session start — short by ₱588.00', 'cash', 'completed', '2026-04-15 20:20:08', 12, '2026-04-15 20:20:08'),
+(5, 2, 17, 360.00, 360.00, NULL, NULL, 'cash', 'completed', '2026-04-15 20:30:26', 12, '2026-04-15 20:30:26'),
+(6, 3, 17, 588.00, 588.00, NULL, NULL, 'cash', 'completed', '2026-04-15 20:30:35', 12, '2026-04-15 20:30:35'),
+(7, 4, 17, 200.00, 200.00, 400.00, 'Short payment at session start — short by ₱400.00', 'cash', 'completed', '2026-04-15 20:31:02', 12, '2026-04-15 20:31:02'),
+(8, 4, 17, -100.00, NULL, NULL, 'Refund issued — ₱100.00 returned to customer.', 'cash', 'completed', '2026-04-15 20:36:43', 12, '2026-04-15 20:36:43'),
+(9, 4, 17, 1260.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 20:57:50', 12, '2026-04-15 20:57:50'),
+(10, 5, 17, 200.00, 200.00, 280.00, 'Short payment at session start — short by ₱280.00', 'cash', 'completed', '2026-04-15 20:58:00', 12, '2026-04-15 20:58:00'),
+(11, 5, 17, 280.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 20:58:05', 12, '2026-04-15 20:58:05'),
+(12, 6, 17, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-15 20:58:35', 12, '2026-04-15 20:58:35'),
+(13, 7, 17, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-15 21:02:04', 12, '2026-04-15 21:02:04'),
+(14, 7, 17, 360.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:02:32', 12, '2026-04-15 21:02:32'),
+(15, 8, 17, 200.00, 200.00, 440.00, 'Short payment at session start — short by ₱440.00', 'cash', 'completed', '2026-04-15 21:02:47', 12, '2026-04-15 21:02:47'),
+(16, 9, 17, 200.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-15 21:07:16', 12, '2026-04-15 21:07:16'),
+(17, 10, 17, 300.00, 300.00, 260.00, 'Short payment at session start — short by ₱260.00', 'cash', 'completed', '2026-04-15 21:14:10', 12, '2026-04-15 21:14:10'),
+(18, 11, 17, 520.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:20:37', 12, '2026-04-15 21:20:37'),
+(19, 12, 17, 520.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:30:05', 12, '2026-04-15 21:30:05'),
+(20, 13, 17, 560.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:31:12', 12, '2026-04-15 21:31:12'),
+(21, 14, 17, 520.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:31:37', 12, '2026-04-15 21:31:37'),
+(22, 15, 17, 520.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-15 21:35:06', 12, '2026-04-15 21:35:06'),
+(23, 16, 17, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-15 21:36:05', 12, '2026-04-15 21:36:05'),
+(24, 16, 17, 360.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 21:36:14', 12, '2026-04-15 21:36:14'),
+(25, 15, 17, 10.00, 123.00, NULL, 'Mid-session payment collected', 'cash', 'completed', '2026-04-15 23:42:56', 12, '2026-04-15 23:42:56'),
+(26, 15, 17, -50.00, NULL, NULL, 'Refund issued: idk', '', 'completed', '2026-04-15 23:43:55', 12, '2026-04-15 23:43:55'),
+(27, 15, 17, 100.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-15 23:44:15', 12, '2026-04-15 23:44:15'),
+(28, 17, 17, 20.00, 20.00, 540.00, 'Short payment at session start — short by ₱540.00', 'cash', 'completed', '2026-04-15 23:48:55', 12, '2026-04-15 23:48:55'),
+(29, 17, 17, 540.00, 20.00, 520.00, 'Mid-session partial payment — short by ₱520.00', 'cash', 'completed', '2026-04-15 23:52:03', 12, '2026-04-15 23:52:03'),
+(30, 17, 17, 540.00, 20.00, 520.00, 'Mid-session partial payment — short by ₱520.00', 'cash', 'completed', '2026-04-15 23:52:32', 12, '2026-04-15 23:52:32'),
+(31, 18, 17, 20.00, 20.00, 500.00, 'Short payment at session start — short by ₱500.00', 'cash', 'completed', '2026-04-15 23:53:11', 12, '2026-04-15 23:53:11'),
+(32, 18, 17, 500.00, 123.00, 377.00, 'Mid-session partial payment — short by ₱377.00', 'cash', 'completed', '2026-04-15 23:53:47', 12, '2026-04-15 23:53:47'),
+(33, 19, 17, 123.00, 123.00, 397.00, 'Short payment at session start — short by ₱397.00', 'cash', 'completed', '2026-04-15 23:54:21', 12, '2026-04-15 23:54:21'),
+(34, 19, 17, 397.00, 123.00, 274.00, 'Mid-session partial payment — short by ₱274.00', 'cash', 'completed', '2026-04-15 23:56:14', 12, '2026-04-15 23:56:14'),
+(35, 20, 17, 123.00, 123.00, 397.00, 'Short payment at session start — short by ₱397.00', 'cash', 'completed', '2026-04-15 23:57:51', 12, '2026-04-15 23:57:51'),
+(36, 20, 17, 397.00, NULL, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-16 00:10:17', 12, '2026-04-16 00:10:17'),
+(37, 20, 17, 397.00, NULL, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-16 00:10:24', 12, '2026-04-16 00:10:24'),
+(38, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:11:10', 12, '2026-04-16 00:11:10'),
+(39, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:12:18', 12, '2026-04-16 00:12:18'),
+(40, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:12:27', 12, '2026-04-16 00:12:27'),
+(41, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:12:37', 12, '2026-04-16 00:12:37'),
+(42, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:18:37', 12, '2026-04-16 00:18:37'),
+(43, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:18:51', 12, '2026-04-16 00:18:51'),
+(44, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:19:10', 12, '2026-04-16 00:19:10'),
+(45, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:20:34', 12, '2026-04-16 00:20:34'),
+(46, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:22:02', 12, '2026-04-16 00:22:02'),
+(47, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:22:14', 12, '2026-04-16 00:22:14'),
+(48, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:22:25', 12, '2026-04-16 00:22:25'),
+(49, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:24:01', 12, '2026-04-16 00:24:01'),
+(50, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:24:49', 12, '2026-04-16 00:24:49'),
+(51, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:25:08', 12, '2026-04-16 00:25:08'),
+(52, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:27:41', 12, '2026-04-16 00:27:41'),
+(53, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:27:41', 12, '2026-04-16 00:27:41'),
+(54, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:28:11', 12, '2026-04-16 00:28:11'),
+(55, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:29:09', 12, '2026-04-16 00:29:09'),
+(56, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:29:14', 12, '2026-04-16 00:29:14'),
+(57, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:29:20', 12, '2026-04-16 00:29:20'),
+(58, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:30:02', 12, '2026-04-16 00:30:02'),
+(59, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:30:52', 12, '2026-04-16 00:30:52'),
+(60, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:30:55', 12, '2026-04-16 00:30:55'),
+(61, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:35:54', 12, '2026-04-16 00:35:54'),
+(62, 20, 17, -1220.00, NULL, NULL, 'Refund issued: 123', '', 'completed', '2026-04-16 00:36:18', 12, '2026-04-16 00:36:18'),
+(63, 20, 17, 12312.00, 12312.00, 17791.00, 'Partial payment — collected ₱12,312.00, short by ₱17,791.00 of ₱30,103.00 balance', 'cash', 'completed', '2026-04-16 00:36:37', 12, '2026-04-16 00:36:37'),
+(64, 20, 17, 17791.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-16 00:36:44', 12, '2026-04-16 00:36:44'),
+(65, 21, 17, 200.00, 200.00, 240.00, 'Short payment at session start — short by ₱240.00', 'cash', 'completed', '2026-04-16 12:00:27', 12, '2026-04-16 12:00:27'),
+(66, 21, 17, 12.00, 12.00, 228.00, 'Partial payment — collected ₱12.00, short by ₱228.00 of ₱240.00 balance', 'cash', 'completed', '2026-04-16 12:00:40', 12, '2026-04-16 12:00:40'),
+(67, 21, 17, 228.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-16 13:25:16', 12, '2026-04-16 13:25:16'),
+(68, 22, 17, 200.00, 200.00, 280.00, 'Short payment at session start — short by ₱280.00', 'cash', 'completed', '2026-04-16 13:25:41', 12, '2026-04-16 13:25:41'),
+(69, 22, 17, 100.00, 100.00, 180.00, 'Partial payment — collected ₱100.00, short by ₱180.00 of ₱280.00 balance', 'cash', 'completed', '2026-04-16 13:25:57', 12, '2026-04-16 13:25:57'),
+(70, 22, 17, 120.00, 120.00, 60.00, 'Partial payment — collected ₱120.00, short by ₱60.00 of ₱180.00 balance', 'cash', 'completed', '2026-04-16 13:26:11', 12, '2026-04-16 13:26:11'),
+(71, 22, 17, 60.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-16 13:26:18', 12, '2026-04-16 13:26:18'),
+(72, 23, 17, 200.00, 200.00, 400.00, 'Short payment at session start — short by ₱400.00', 'cash', 'completed', '2026-04-16 22:48:29', 12, '2026-04-16 22:48:29'),
+(73, 23, 17, 400.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-16 22:49:15', 12, '2026-04-16 22:49:15'),
+(74, 24, 17, 300.00, 300.00, 220.00, 'Short payment at session start — short by ₱220.00', 'cash', 'completed', '2026-04-17 12:15:40', 12, '2026-04-17 12:15:40'),
+(75, 24, 17, 12.00, 12.00, 208.00, 'Partial payment — collected ₱12.00, short by ₱208.00 of ₱220.00 balance', 'cash', 'completed', '2026-04-17 12:17:40', 12, '2026-04-17 12:17:40'),
+(76, 24, 17, 208.00, NULL, NULL, NULL, 'cash', 'completed', '2026-04-17 12:17:52', 12, '2026-04-17 12:17:52'),
+(77, 25, 17, 200.00, 200.00, 400.00, 'Short payment at session start — short by ₱400.00', 'cash', 'completed', '2026-04-17 12:20:19', 12, '2026-04-17 12:20:19'),
+(78, 25, 17, 400.00, 200.00, 200.00, 'Short payment — customer short by ₱200.00', 'cash', 'completed', '2026-04-17 12:20:25', 12, '2026-04-17 12:20:25'),
+(79, 26, 17, 200.00, 200.00, 280.00, 'Short payment at session start — short by ₱280.00', 'cash', 'completed', '2026-04-17 12:23:05', 12, '2026-04-17 12:23:05'),
+(80, 26, 17, 280.00, 100.00, 180.00, 'Short payment — customer short by ₱180.00', 'cash', 'completed', '2026-04-17 12:23:13', 12, '2026-04-17 12:23:13'),
+(81, 27, 21, 300.00, 300.00, 260.00, 'Short payment at session start — short by ₱260.00', 'cash', 'completed', '2026-04-17 12:26:48', 12, '2026-04-17 12:26:48'),
+(82, 27, 21, 26.00, 26.00, 234.00, 'Partial payment — collected ₱26.00, still short by ₱234.00', 'cash', 'completed', '2026-04-17 12:26:56', 12, '2026-04-17 12:26:56'),
+(83, 27, 21, 100.00, 100.00, 134.00, 'Partial payment — collected ₱100.00, short by ₱134.00 of ₱234.00 balance', 'cash', 'completed', '2026-04-17 18:00:49', 12, '2026-04-17 18:00:49'),
+(84, 27, 21, 100.00, 100.00, 34.00, 'Partial payment — collected ₱100.00, short by ₱34.00 of ₱134.00 balance', 'cash', 'completed', '2026-04-17 18:00:54', 12, '2026-04-17 18:00:54'),
+(85, 27, 21, 34.00, 120.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-17 18:01:00', 12, '2026-04-17 18:01:00'),
+(86, 10, 17, 1000.00, 1000.00, 1680.00, 'Partial payment — collected ₱1,000.00, short by ₱1,680.00 of ₱2,680.00 balance', 'cash', 'completed', '2026-04-17 18:01:23', 12, '2026-04-17 18:01:23'),
+(87, 9, 17, 2000.00, 2000.00, 800.00, 'Partial payment — collected ₱2,000.00, short by ₱800.00 of ₱2,800.00 balance', 'cash', 'completed', '2026-04-17 18:01:28', 12, '2026-04-17 18:01:28'),
+(88, 8, 17, 200.00, 200.00, 2640.00, 'Partial payment — collected ₱200.00, short by ₱2,640.00 of ₱2,840.00 balance', 'cash', 'completed', '2026-04-17 18:01:46', 12, '2026-04-17 18:01:46'),
+(89, 8, 17, 200.00, 200.00, 2440.00, 'Partial payment — collected ₱200.00, short by ₱2,440.00 of ₱2,640.00 balance', 'cash', 'completed', '2026-04-17 18:01:50', 12, '2026-04-17 18:01:50'),
+(90, 8, 17, 40.00, 40.00, 2400.00, 'Partial payment — collected ₱40.00, short by ₱2,400.00 of ₱2,440.00 balance', 'cash', 'completed', '2026-04-17 18:01:54', 12, '2026-04-17 18:01:54'),
+(91, 6, 17, 200.00, 200.00, 2600.00, 'Partial payment — collected ₱200.00, short by ₱2,600.00 of ₱2,800.00 balance', 'cash', 'completed', '2026-04-17 18:02:19', 12, '2026-04-17 18:02:19'),
+(92, 6, 17, 100.00, 100.00, 2500.00, 'Partial payment — collected ₱100.00, short by ₱2,500.00 of ₱2,600.00 balance', 'cash', 'completed', '2026-04-17 18:02:25', 12, '2026-04-17 18:02:25'),
+(93, 6, 17, 10.00, 10.00, 2490.00, 'Partial payment — collected ₱10.00, short by ₱2,490.00 of ₱2,500.00 balance', 'cash', 'completed', '2026-04-17 18:02:30', 12, '2026-04-17 18:02:30'),
+(94, 6, 17, 100.00, 100.00, 2390.00, 'Partial payment — collected ₱100.00, short by ₱2,390.00 of ₱2,490.00 balance', 'cash', 'completed', '2026-04-17 18:02:35', 12, '2026-04-17 18:02:35'),
+(95, 28, 17, 300.00, 300.00, 220.00, 'Short payment at session start — short by ₱220.00', 'cash', 'completed', '2026-04-17 18:02:47', 12, '2026-04-17 18:02:47'),
+(96, 28, 17, 100.00, 100.00, 120.00, 'Partial payment — collected ₱100.00, short by ₱120.00 of ₱220.00 balance', 'cash', 'completed', '2026-04-17 18:02:58', 12, '2026-04-17 18:02:58'),
+(97, 28, 17, 10.00, 10.00, 110.00, 'Partial payment — collected ₱10.00, short by ₱110.00 of ₱120.00 balance', 'cash', 'completed', '2026-04-17 18:03:09', 12, '2026-04-17 18:03:09'),
+(98, 28, 17, 20.00, 20.00, 90.00, 'Partial payment — collected ₱20.00, short by ₱90.00 of ₱110.00 balance', 'cash', 'completed', '2026-04-17 18:03:13', 12, '2026-04-17 18:03:13'),
+(99, 28, 17, 0.00, 0.00, 90.00, 'Partial payment — collected ₱0.00, short by ₱90.00 of ₱90.00 balance', 'cash', 'completed', '2026-04-17 18:03:17', 12, '2026-04-17 18:03:17'),
+(100, 28, 17, 10.00, 10.00, 80.00, 'Short payment — collected ₱10.00, short by ₱80.00', 'cash', 'completed', '2026-04-17 18:03:30', 12, '2026-04-17 18:03:30'),
+(101, 28, 17, 10.00, 10.00, 70.00, 'Partial payment — collected ₱10.00, short by ₱70.00 of ₱80.00 balance', 'cash', 'completed', '2026-04-17 18:03:36', 12, '2026-04-17 18:03:36'),
+(102, 28, 17, 70.00, 100.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-17 18:03:40', 12, '2026-04-17 18:03:40'),
+(103, 29, 21, 200.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-17 19:09:50', 12, '2026-04-17 19:09:50'),
+(104, 29, 21, 100.00, 100.00, 220.00, 'Short payment — collected ₱100.00, short by ₱220.00', 'cash', 'completed', '2026-04-17 19:14:51', 12, '2026-04-17 19:14:51'),
+(105, 29, 21, 220.00, 220.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-17 19:15:10', 12, '2026-04-17 19:15:10'),
+(106, 30, 21, 23.00, 23.00, 497.00, 'Short payment at session start — short by ₱497.00', 'cash', 'completed', '2026-04-17 19:17:32', 12, '2026-04-17 19:17:32'),
+(107, 30, 21, 100.00, 100.00, 397.00, 'Partial payment — collected ₱100.00, short by ₱397.00 of ₱497.00 balance', 'cash', 'completed', '2026-04-17 22:32:20', 12, '2026-04-17 22:32:20'),
+(108, 30, 21, 397.00, 400.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-17 22:33:07', 12, '2026-04-17 22:33:07'),
+(109, 31, 21, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-18 00:31:57', 12, '2026-04-18 00:31:57'),
+(110, 31, 21, 360.00, 360.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 00:32:45', 12, '2026-04-18 00:32:45'),
+(111, 32, 17, 20.00, 20.00, 60.00, 'Short payment — collected ₱20.00, short by ₱60.00', 'cash', 'completed', '2026-04-18 16:12:47', 12, '2026-04-18 16:12:47'),
+(112, 34, 21, 200.00, 200.00, 40.00, 'Short payment — collected ₱200.00, short by ₱40.00', 'cash', 'completed', '2026-04-18 16:24:32', 12, '2026-04-18 16:24:32'),
+(113, 33, 17, 100.00, 100.00, 60.00, 'Short payment — collected ₱100.00, short by ₱60.00', 'cash', 'completed', '2026-04-18 16:24:37', 12, '2026-04-18 16:24:37'),
+(114, 34, 21, 40.00, 40.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-18 16:24:45', 12, '2026-04-18 16:24:45'),
+(115, 33, 17, 60.00, 60.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-18 16:24:50', 12, '2026-04-18 16:24:50'),
+(116, 32, 17, 60.00, 80.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-18 16:24:55', 12, '2026-04-18 16:24:55'),
+(117, 37, 17, 200.00, 200.00, 120.00, 'Short payment at session start — short by ₱120.00', 'cash', 'completed', '2026-04-18 16:25:52', 12, '2026-04-18 16:25:52'),
+(118, 37, 17, 120.00, 120.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 16:25:58', 12, '2026-04-18 16:25:58'),
+(119, 36, 21, 320.00, 320.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 16:26:03', 12, '2026-04-18 16:26:03'),
+(120, 35, 21, 320.00, 320.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 16:26:07', 12, '2026-04-18 16:26:07'),
+(121, 38, 12, 640.00, 640.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-18 16:41:27', 12, '2026-04-18 16:41:27'),
+(122, 39, 17, 60.00, 60.00, NULL, 'Downpayment transferred from reservation #10', 'cash', 'completed', '2026-04-18 16:44:07', 12, '2026-04-18 16:44:07'),
+(123, 39, 17, 60.00, 60.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 17:08:14', 12, '2026-04-18 17:08:14'),
+(124, 40, 17, 20.00, 20.00, 580.00, 'Short payment at session start — short by ₱580.00', 'cash', 'completed', '2026-04-18 17:08:28', 12, '2026-04-18 17:08:28'),
+(125, 40, 17, 580.00, 580.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 17:08:33', 12, '2026-04-18 17:08:33');
 
 -- --------------------------------------------------------
 
@@ -320,15 +439,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, `role`, `status`, `email_verified`, `verification_token`, `verification_expires`, `reset_token`, `reset_expires`, `created_at`) VALUES
-(1, 'owner@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Juan Dela Cruz', '09171234567', 'owner', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 19:55:40'),
-(2, 'shopkeeper@goodspot.ph', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Maria Santos', '09181234567', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 19:55:40'),
-(3, 'carlos@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Carlos Reyes', '09191234567', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 19:55:40'),
-(4, 'anna@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Anna Garcia', '09201234567', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 19:55:40'),
-(5, 'mark@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mark Bautista', '09211234567', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 19:55:40'),
-(12, 'ljlabianao@gmail.com', '$2y$10$nEuBy0VoWqtbRETOnAD99eurxRHdLaGpxROWA//NGpziKgIG1CmmS', 'lito', '09916310227', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 20:45:06'),
+(12, 'ljlabianao@gmail.com', '$2y$10$nEuBy0VoWqtbRETOnAD99eurxRHdLaGpxROWA//NGpziKgIG1CmmS', 'lito', '09916310227', 'owner', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 20:45:06'),
 (17, 'llabianojr@kld.edu.ph', '$2y$10$N97t4MFGjElD3iM.nlpn3uZ/hy1zNC/Lfqi/YozlBB6BG1VWkL.Oe', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-12 19:54:25'),
-(18, 'casansdkas@dasm.csaosa', '$2y$10$tV7HN.E35YZut4Zl4SNdQuUAq0Bw0goQKPSthSwMyavH3rNEpDypi', 'kry', '', 'customer', 'active', 0, '5b19a837b7908226bef29dc2bf76e46ad734ec0638087eb5d3156f2c9527e451', '2026-04-15 02:36:15', NULL, NULL, '2026-04-14 08:36:15'),
-(19, 'dzong@kld.edu.ph', '$2y$10$Tb6WBsj2hjwvHh97ihRFnu4s77TJLEgVk1IBVWsRZM7Ldz0Tuz5vu', 'zeus', '', 'customer', 'active', 1, '6e1acddd2b2d56f157ac13cb34162bde6e74d0b7d94ebe82df97119b7cd7cb4c', '2026-04-15 02:38:31', NULL, NULL, '2026-04-14 08:38:31');
+(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29');
 
 --
 -- Indexes for dumped tables
@@ -360,7 +473,8 @@ ALTER TABLE `gaming_sessions`
   ADD KEY `idx_sessions_user` (`user_id`),
   ADD KEY `idx_sessions_console` (`console_id`),
   ADD KEY `idx_sessions_start` (`start_time`),
-  ADD KEY `fk_sessions_created_by` (`created_by`);
+  ADD KEY `fk_sessions_created_by` (`created_by`),
+  ADD KEY `idx_sessions_pay_status` (`payment_status`);
 
 --
 -- Indexes for table `reports`
@@ -370,6 +484,18 @@ ALTER TABLE `reports`
   ADD KEY `idx_reports_type` (`report_type`),
   ADD KEY `idx_reports_date` (`created_at`),
   ADD KEY `fk_reports_user` (`generated_by`);
+
+--
+-- Indexes for table `reservations`
+--
+ALTER TABLE `reservations`
+  ADD PRIMARY KEY (`reservation_id`),
+  ADD KEY `idx_res_status` (`status`),
+  ADD KEY `idx_res_date` (`reserved_date`),
+  ADD KEY `idx_res_user` (`user_id`),
+  ADD KEY `idx_res_console` (`console_id`),
+  ADD KEY `idx_res_console_type` (`console_type`),
+  ADD KEY `fk_res_created_by` (`created_by`);
 
 --
 -- Indexes for table `system_settings`
@@ -431,19 +557,25 @@ ALTER TABLE `additional_requests`
 -- AUTO_INCREMENT for table `consoles`
 --
 ALTER TABLE `consoles`
-  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3212;
 
 --
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `report_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `report_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `reservations`
+--
+ALTER TABLE `reservations`
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -455,25 +587,25 @@ ALTER TABLE `system_settings`
 -- AUTO_INCREMENT for table `tournaments`
 --
 ALTER TABLE `tournaments`
-  MODIFY `tournament_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `tournament_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tournament_participants`
 --
 ALTER TABLE `tournament_participants`
-  MODIFY `participant_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `participant_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=126;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- Constraints for dumped tables
@@ -498,6 +630,14 @@ ALTER TABLE `gaming_sessions`
 --
 ALTER TABLE `reports`
   ADD CONSTRAINT `fk_reports_user` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `reservations`
+--
+ALTER TABLE `reservations`
+  ADD CONSTRAINT `fk_res_console` FOREIGN KEY (`console_id`) REFERENCES `consoles` (`console_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_res_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
 
 --
 -- Constraints for table `tournaments`
