@@ -67,6 +67,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $myReservations = getMyReservations($user['user_id']);
 $todayStr = date('Y-m-d');
 $minDateTime = date('Y-m-d\TH:i', strtotime('+30 minutes'));
+
+// Pre-selected console type from URL (e.g. reserve.php?console=PS5)
+$presetConsole = '';
+$validConsoleTypes = ['PS5', 'PS4', 'Xbox Series X'];
+if (!empty($_GET['console'])) {
+    $candidate = urldecode(trim($_GET['console']));
+    if (in_array($candidate, $validConsoleTypes)) {
+        $presetConsole = $candidate;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -489,20 +499,25 @@ $minDateTime = date('Y-m-d\TH:i', strtotime('+30 minutes'));
                         </div>
                     </div>
 
-                    <div class="reserve-card" style="margin-bottom:24px;">
-                        <h2><i class="fas fa-peso-sign"></i> Step 4 — Downpayment (Optional)</h2>
+                    <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
+                        <h2><i class="fas fa-peso-sign"></i> Step 4 — Downpayment <span id="dpCardMode" style="font-size:13px;font-weight:500;color:#888;"></span></h2>
                         <p style="color:#888;font-size:13px;margin-bottom:18px;">
-                            Paying a downpayment helps confirm your slot. The remaining balance is collected in-store.
+                            A 50% downpayment is required to confirm your hourly reservation. The remaining balance is collected in-store.
                         </p>
                         <div class="dp-box">
-                            <div class="dp-title"><i class="fas fa-coins"></i> Downpayment Amount</div>
+                            <div class="dp-title" style="justify-content:space-between;">
+                                <span><i class="fas fa-coins"></i> Downpayment Amount</span>
+                                <span id="dpHint" style="font-size:12px;font-weight:600;color:#20c8a1;"></span>
+                            </div>
                             <input type="number" name="downpayment_amount" id="dpAmount" class="res-input"
-                                   min="0" step="10" placeholder="₱0 — leave blank to skip"
-                                   value="<?= htmlspecialchars($_POST['downpayment_amount'] ?? '') ?>"
-                                   oninput="onDpAmountChange()">
+                                   min="0" step="1" placeholder="Select a duration above first"
+                                   readonly
+                                   style="cursor:not-allowed;background:rgba(32,200,161,.06);border-color:rgba(32,200,161,.3);color:#20c8a1;font-size:16px;font-weight:700;"
+                                   value="<?= htmlspecialchars($_POST['downpayment_amount'] ?? '') ?>">
+                            <p style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of your session cost.</p>
 
                             <div id="dpMethodSection" style="display:none;">
-                                <div class="sec-label">Payment Method</div>
+                                <div class="sec-label">Payment Method *</div>
                                 <div class="dp-method-grid">
                                     <div class="pm-card" id="pm-cash" onclick="selectDpMethod('cash')">
                                         <span class="pm-icon">💵</span>Cash
@@ -516,7 +531,7 @@ $minDateTime = date('Y-m-d\TH:i', strtotime('+30 minutes'));
                                 </div>
                                 <p style="font-size:11px;color:#888;margin-bottom:0;">
                                     <i class="fas fa-info-circle"></i>
-                                    Downpayment will be recorded and deducted from your total at session end.
+                                    Downpayment will be deducted from your total at session end.
                                 </p>
                             </div>
                         </div>
@@ -649,6 +664,23 @@ $minDateTime = date('Y-m-d\TH:i', strtotime('+30 minutes'));
 <script>
 AOS.init({ duration: 600, once: true });
 
+/* ── Auto-select console type from URL param (?console=PS5 etc.) ── */
+(function () {
+    const preset = <?= json_encode($presetConsole) ?>;
+    if (preset) {
+        // setTimeout so all functions below are fully defined before this runs
+        setTimeout(function () {
+            selectConsoleType(preset);
+            // Scroll the chosen console card into view
+            const cardId = CONSOLE_TYPE_IDS[preset];
+            if (cardId) {
+                const card = document.getElementById(cardId);
+                if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 300);
+    }
+})();
+
 /* ── State ──────────────────────────────────────────── */
 let selectedConsoleType = '';
 let selectedMode        = '';
@@ -691,20 +723,20 @@ function selectDuration(mins) {
     document.getElementById('hiddenPlannedMinutes').value = mins;
     document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
+
+    // Auto-calculate 50% downpayment (read-only field)
+    const fullCost = mins <= 30 ? 50 : (mins / 60 * 80);
+    const dp       = Math.ceil(fullCost * 0.5);
+    document.getElementById('dpAmount').value = dp;
+    document.getElementById('dpHint').textContent = `50% of \u20b1${fullCost.toFixed(0)}`;
+    document.getElementById('dpMethodSection').style.display = 'block';
+
     updateSummary();
 }
 
 /* ── Downpayment ────────────────────────────────────── */
-function onDpAmountChange() {
-    const amt = parseFloat(document.getElementById('dpAmount').value) || 0;
-    document.getElementById('dpMethodSection').style.display = amt > 0 ? 'block' : 'none';
-    if (amt <= 0) {
-        selectedDpMethod = '';
-        document.getElementById('hiddenDpMethod').value = '';
-        document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
-    }
-    updateSummary();
-}
+/* Read-only field — driven entirely by selectDuration(). No manual input needed. */
+function onDpAmountChange() {}
 
 function selectDpMethod(method) {
     selectedDpMethod = method;

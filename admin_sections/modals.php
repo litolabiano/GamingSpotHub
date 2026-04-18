@@ -1,5 +1,112 @@
 <!-- ════ MODALS ══════════════════════════════════════════════════════════════ -->
 
+<!-- ════ CUSTOM CONFIRM DIALOG ══════════════════════════════════════════════ -->
+<div id="gspotConfirmModal" style="
+    display:none;position:fixed;inset:0;z-index:99999;
+    background:rgba(0,0,0,0.72);backdrop-filter:blur(6px);
+    align-items:center;justify-content:center;
+">
+    <div style="
+        background:linear-gradient(145deg,#0d1b3e,#08101c);
+        border:1px solid rgba(95,133,218,0.3);
+        border-radius:18px;
+        padding:32px 30px 28px;
+        max-width:400px;width:90%;
+        box-shadow:0 24px 64px rgba(0,0,0,0.6),0 0 0 1px rgba(32,200,161,0.08);
+        animation:gspotConfirmIn .22s cubic-bezier(.34,1.56,.64,1);
+        position:relative;
+    ">
+        <!-- Icon -->
+        <div style="
+            width:52px;height:52px;border-radius:14px;
+            background:rgba(241,168,60,0.15);border:1px solid rgba(241,168,60,0.3);
+            display:flex;align-items:center;justify-content:center;
+            font-size:22px;color:#f1a83c;
+            margin:0 auto 18px;
+        ">
+            <i class="fas fa-circle-question"></i>
+        </div>
+        <!-- Message -->
+        <p id="gspotConfirmMsg" style="
+            text-align:center;font-size:15px;font-weight:600;
+            color:#e8eaf0;margin:0 0 24px;line-height:1.55;
+        "></p>
+        <!-- Buttons -->
+        <div style="display:flex;gap:10px;">
+            <button id="gspotConfirmNo" style="
+                flex:1;padding:11px;border-radius:10px;
+                background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+                color:#aaa;font-size:14px;font-weight:600;cursor:pointer;
+                transition:.18s;font-family:inherit;
+            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">
+                <i class="fas fa-times" style="margin-right:6px"></i>Cancel
+            </button>
+            <button id="gspotConfirmYes" style="
+                flex:1;padding:11px;border-radius:10px;
+                background:linear-gradient(135deg,#20c8a1,#5f85da);
+                border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+                box-shadow:0 4px 16px rgba(32,200,161,0.3);transition:.18s;font-family:inherit;
+            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+                <i class="fas fa-check" style="margin-right:6px"></i>Confirm
+            </button>
+        </div>
+    </div>
+</div>
+<style>
+@keyframes gspotConfirmIn {
+    from { opacity:0; transform:scale(.88) translateY(12px); }
+    to   { opacity:1; transform:scale(1)  translateY(0); }
+}
+</style>
+<script>
+(function(){
+    const modal   = document.getElementById('gspotConfirmModal');
+    const msgEl   = document.getElementById('gspotConfirmMsg');
+    const yesBtn  = document.getElementById('gspotConfirmYes');
+    const noBtn   = document.getElementById('gspotConfirmNo');
+    let _cb       = null;
+
+    window.gspotConfirm = function(message, callback, opts) {
+        opts = opts || {};
+        msgEl.textContent = message;
+
+        // Customise Yes button label/colour for destructive actions
+        if (opts.danger) {
+            yesBtn.style.background = 'linear-gradient(135deg,#fb566b,#c0392b)';
+            yesBtn.style.boxShadow  = '0 4px 16px rgba(251,86,107,0.35)';
+        } else {
+            yesBtn.style.background = 'linear-gradient(135deg,#20c8a1,#5f85da)';
+            yesBtn.style.boxShadow  = '0 4px 16px rgba(32,200,161,0.3)';
+        }
+        yesBtn.innerHTML = '<i class="fas fa-check" style="margin-right:6px"></i>' + (opts.yesLabel || 'Confirm');
+
+        _cb = callback;
+        modal.style.display = 'flex';
+        /* micro-delay so the CSS animation fires on each open */
+        modal.firstElementChild.style.animation = 'none';
+        requestAnimationFrame(() => { modal.firstElementChild.style.animation = ''; });
+    };
+
+    yesBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+        if (typeof _cb === 'function') _cb();
+        _cb = null;
+    });
+    noBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+        _cb = null;
+    });
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) { modal.style.display = 'none'; _cb = null; }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display !== 'none') {
+            modal.style.display = 'none'; _cb = null;
+        }
+    });
+})();
+</script>
+
 <!-- Start Session Modal -->
 <div class="modal" id="startSessionModal">
     <div class="modal-content">
@@ -339,8 +446,8 @@
             <div style="background:rgba(251,86,107,.07);border:1px solid rgba(251,86,107,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#fb566b;">
                 <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and cannot be undone.
             </div>
-            <button type="submit" class="btn btn-danger" style="width:100%;justify-content:center;"
-                    onclick="return confirm('Confirm issuing this refund?')">
+            <button type="button" class="btn btn-danger" style="width:100%;justify-content:center;"
+                    onclick="gspotConfirm('Issue this refund? This cannot be undone.', function(){ document.getElementById('refundSessionForm').submit(); }, {danger:true, yesLabel:'Yes, Refund'})">
                 <i class="fas fa-undo-alt"></i> Confirm Refund
             </button>
         </form>
@@ -415,6 +522,7 @@
                     <label>Console Type *</label>
                     <select name="console_type" required>
                         <option value="">— Select —</option>
+                        <option value="PS4">PS4</option>
                         <option value="PS5">PS5</option>
                         <option value="Xbox Series X">Xbox Series X</option>
                     </select>
@@ -430,7 +538,7 @@
             </div>
             <div id="adminResDurGroup" class="form-group">
                 <label>Duration *</label>
-                <select name="planned_minutes" id="adminResPlannedMins">
+                <select name="planned_minutes" id="adminResPlannedMins" onchange="adminResCalcDownpayment()">
                     <option value="">— Select —</option>
                     <option value="30">30 min — ₱50</option>
                     <option value="60">1 hr — ₱80</option>
@@ -456,15 +564,21 @@
                            style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Downpayment Amount (₱)</label>
-                <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="10"
-                       placeholder="₱0 — leave blank to skip" onchange="adminDpChange()"
-                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;">
+            <div class="form-group" id="adminDpGroup" style="display:none;">
+                <label style="display:flex;justify-content:space-between;align-items:center;">
+                    Downpayment Amount (₱)
+                    <span id="adminDpHint" style="font-size:11px;color:#20c8a1;font-weight:600;"></span>
+                </label>
+                <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="1"
+                       readonly
+                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(32,200,161,.35);
+                              background:rgba(32,200,161,.06);color:#20c8a1;font-size:15px;font-weight:700;
+                              cursor:not-allowed;">
+                <p style="font-size:11px;color:#888;margin:6px 0 0;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of session cost — collected to secure the booking.</p>
             </div>
             <div class="form-group" id="adminDpMethodGroup" style="display:none;">
-                <label>Payment Method</label>
-                <select name="downpayment_method">
+                <label>Payment Method *</label>
+                <select name="downpayment_method" id="adminDpMethodSelect">
                     <option value="cash">💵 Cash</option>
                     <option value="gcash">📱 GCash</option>
                     <option value="credit_card">💳 Credit Card</option>
@@ -518,9 +632,44 @@
 /* ── Reservation modal helpers ───────────────────────────────────── */
 function adminResOnModeChange() {
     const mode = document.getElementById('resAdminModeSelect').value;
-    document.getElementById('adminResDurGroup').style.display = (mode === 'hourly') ? 'block' : 'none';
+    const isDurGroup   = (mode === 'hourly');
+    document.getElementById('adminResDurGroup').style.display = isDurGroup ? 'block' : 'none';
+
+    // Reset downpayment whenever mode changes
+    document.getElementById('adminDpAmount').value = '';
+    document.getElementById('adminDpGroup').style.display      = 'none';
+    document.getElementById('adminDpMethodGroup').style.display = 'none';
+    document.getElementById('adminResPlannedMins').value       = '';
+    document.getElementById('adminDpHint').textContent         = '';
 }
 
+/* Calculates 50% of the selected duration cost and fills the downpayment field */
+function adminResCalcDownpayment() {
+    const mins = parseInt(document.getElementById('adminResPlannedMins').value) || 0;
+    const dpGroup    = document.getElementById('adminDpGroup');
+    const dpMethod   = document.getElementById('adminDpMethodGroup');
+    const dpInput    = document.getElementById('adminDpAmount');
+    const dpHint     = document.getElementById('adminDpHint');
+
+    if (!mins) {
+        dpGroup.style.display  = 'none';
+        dpMethod.style.display = 'none';
+        dpInput.value          = '';
+        dpHint.textContent     = '';
+        return;
+    }
+
+    // Mirror PHP pricing: 30 min = ₱50, otherwise ₱80/hr
+    const fullCost = mins <= 30 ? 50 : (mins / 60 * 80);
+    const dp       = Math.ceil(fullCost * 0.5); // 50%, rounded up to nearest peso
+
+    dpInput.value          = dp;
+    dpHint.textContent     = `50% of ₱${fullCost.toFixed(0)}`;
+    dpGroup.style.display  = 'block';
+    dpMethod.style.display = 'block';
+}
+
+/* Legacy — kept for safety but no longer needed */
 function adminDpChange() {
     const amt = parseFloat(document.getElementById('adminDpAmount').value) || 0;
     document.getElementById('adminDpMethodGroup').style.display = amt > 0 ? 'block' : 'none';

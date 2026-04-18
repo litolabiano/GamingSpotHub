@@ -1,7 +1,9 @@
 <?php
 // Pull real console data from the database
 require_once __DIR__ . '/../includes/db_functions.php';
-$allConsoles = getConsoles();
+require_once __DIR__ . '/../includes/session_helper.php';
+$allConsoles  = getConsoles();
+$isLoggedIn   = isLoggedIn();
 ?>
 <!-- Units Section -->
 <section id="units" class="units-section py-5">
@@ -66,8 +68,17 @@ $allConsoles = getConsoles();
                             <li><i class="fas fa-couch"></i> Comfortable Seating</li>
                         </ul>
                     </div>
+                    <?php
+                        $consoleParam  = urlencode($type);
+                        $reserveUrl    = 'reserve.php?console=' . $consoleParam;
+                        $bookHref      = $isLoggedIn
+                            ? $reserveUrl
+                            : 'auth/login.php?redirect=' . urlencode($reserveUrl);
+                    ?>
                     <?php if ($status === 'available'): ?>
-                    <a href="auth/login.php" class="unit-book-btn">Book Now</a>
+                    <a href="<?= $bookHref ?>" class="unit-book-btn">
+                        <i class="fas fa-calendar-check" style="margin-right:6px;"></i>Book Now
+                    </a>
                     <?php else: ?>
                     <a href="#" class="unit-book-btn disabled"><?= $statusLabel ?></a>
                     <?php endif; ?>

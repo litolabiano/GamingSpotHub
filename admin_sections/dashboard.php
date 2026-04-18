@@ -190,10 +190,11 @@
                     <td>
                         <div style="display:flex;gap:6px;flex-wrap:wrap;">
                             <?php if ($r['status'] === 'pending'): ?>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Confirm this reservation?')">
+                            <form method="POST" style="display:inline;" onsubmit="return false" id="dashFormConfirm<?= $r['reservation_id'] ?>">
                                 <input type="hidden" name="action" value="confirm_reservation">
                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="submit" class="btn btn-primary btn-sm" title="Confirm">
+                                <button type="button" class="btn btn-primary btn-sm" title="Confirm"
+                                        onclick="gspotConfirm('Confirm this reservation?', function(){ document.getElementById('dashFormConfirm<?= $r['reservation_id'] ?>').submit(); }, {yesLabel:'Yes, Confirm'})">
                                     <i class="fas fa-check"></i> Confirm
                                 </button>
                             </form>
@@ -205,17 +206,19 @@
                                     title="Convert to Session">
                                 <i class="fas fa-play"></i> Start
                             </button>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Mark as no-show?')">
+                            <form method="POST" style="display:inline;" onsubmit="return false" id="dashFormNoshow<?= $r['reservation_id'] ?>">
                                 <input type="hidden" name="action" value="noshow_reservation">
                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="submit" class="btn btn-secondary btn-sm" title="No-show">
+                                <button type="button" class="btn btn-secondary btn-sm" title="No-show"
+                                        onclick="gspotConfirm('Mark this reservation as no-show?', function(){ document.getElementById('dashFormNoshow<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Mark No-Show'})">
                                     <i class="fas fa-ghost"></i>
                                 </button>
                             </form>
-                            <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this reservation?')">
+                            <form method="POST" style="display:inline;" onsubmit="return false" id="dashFormCancel<?= $r['reservation_id'] ?>">
                                 <input type="hidden" name="action" value="cancel_reservation">
                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="submit" class="btn btn-danger btn-sm" title="Cancel">
+                                <button type="button" class="btn btn-danger btn-sm" title="Cancel"
+                                        onclick="gspotConfirm('Cancel this reservation?', function(){ document.getElementById('dashFormCancel<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Yes, Cancel'})">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </form>

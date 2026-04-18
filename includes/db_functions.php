@@ -684,7 +684,7 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
         return ['success' => false, 'message' => 'Reservation cannot be converted in its current status'];
     }
 
-    // Start the session (downpayment already collected separately)
+    // Start the session
     $result = startSession(
         $res['user_id'],
         $console_id,
@@ -694,6 +694,23 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
     );
 
     if ($result['success']) {
+        // ── Credit the reservation downpayment against the new session ──
+        // The downpayment was physically collected at reservation time.
+        // Recording it here links it to the session so that every balance
+        // calculation (upfront_paid) correctly shows only the REMAINING amount.
+        if (!empty($res['downpayment_amount']) && (float)$res['downpayment_amount'] > 0) {
+            recordTransaction(
+                $result['session_id'],
+                $res['user_id'],
+                (float)$res['downpayment_amount'],
+                $res['downpayment_method'] ?? 'cash',
+                $shopkeeper_id,
+                (float)$res['downpayment_amount'],
+                null,
+                'Downpayment transferred from reservation #' . $reservation_id
+            );
+        }
+
         // Mark reservation as converted
         updateReservationStatus($reservation_id, 'converted', $console_id);
     }
