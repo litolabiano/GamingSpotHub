@@ -18,7 +18,7 @@
                 <ul class="footer-links">
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About</a></li>
-                    <li><a href="#cafe">Cafe</a></li>
+                    <li><a href="faqs.php">FAQs</a></li>
                 </ul>
             </div>
             <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
@@ -26,7 +26,6 @@
                 <ul class="footer-links">
                     <li><a href="#gaming">Gaming Rates</a></li>
                     <li><a href="#events">Tournaments</a></li>
-                    <li><a href="#cafe">Cafe & Snacks</a></li>
                 </ul>
             </div>
             <div class="col-lg-4 col-md-12">
