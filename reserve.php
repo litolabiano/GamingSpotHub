@@ -9,6 +9,9 @@ require_once __DIR__ . '/includes/db_functions.php';
 
 requireLogin();
 
+// Start session for flash messages if not already started
+if (session_status() === PHP_SESSION_NONE) session_start();
+
 $user    = getCurrentUser();
 $success = '';
 $error   = '';
@@ -18,6 +21,19 @@ $allConsoles = getConsoles();
 $ps5Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'));
 $ps4Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'));
 $xboxCount   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X'));
+
+// Group non-maintenance consoles by type for the unit picker (passed to JS)
+$consolesByType = [];
+foreach ($allConsoles as $c) {
+    if ($c['status'] !== 'maintenance') {
+        $consolesByType[$c['console_type']][] = [
+            'id'     => (int)$c['console_id'],
+            'unit'   => $c['unit_number'],
+            'name'   => $c['console_name'],
+            'status' => $c['status'],
+        ];
+    }
+}
 
 $unlimitedRate = getSetting('unlimited_rate') ?? 300;
 
@@ -29,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reserved_date      = $_POST['reserved_date'] ?? '';
     $reserved_time      = $_POST['reserved_time'] ?? '';
     $notes              = trim($_POST['notes']     ?? '');
+    $preferred_unit_id  = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
     $dp_amount          = (float)($_POST['downpayment_amount']  ?? 0);
     $dp_method          = !empty($_POST['downpayment_method']) && $dp_amount > 0
                           ? $_POST['downpayment_method'] : null;
@@ -44,6 +61,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please provide both date and time.';
     } elseif ($reserved_date < date('Y-m-d')) {
         $error = 'Reservation date cannot be in the past.';
+    } elseif (strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
+        $error = 'Reservation must be at least 1 hour from now.';
+    } elseif ((int)date('H', strtotime($reserved_time)) < 12) {
+        $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
+    } elseif ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59') {
+        $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
     } elseif ($dp_amount > 0 && !$dp_method) {
         $error = 'Please select a payment method for your downpayment.';
     } else {
@@ -51,22 +74,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user['user_id'], $console_type, $rental_mode, $planned_minutes,
             $reserved_date, $reserved_time,
             $notes ?: null,
-            $dp_amount, $dp_method
+            $dp_amount, $dp_method,
+            $preferred_unit_id
         );
 
         if ($result['success']) {
-            $success = 'Your reservation #' . $result['reservation_id'] . ' has been submitted! ' .
-                       'A staff member will confirm it shortly.';
+            // PRG pattern: store success flash in session, then redirect to GET
+            $_SESSION['reserve_success'] = 'Your reservation #' . $result['reservation_id'] . ' has been submitted! ' .
+                                           'A staff member will confirm it shortly.';
+            header('Location: reserve.php');
+            exit;
         } else {
             $error = 'Could not save reservation: ' . htmlspecialchars($result['message']);
         }
     }
 }
 
+// Read and clear the flash success message (set after PRG redirect)
+$success = '';
+if (!empty($_SESSION['reserve_success'])) {
+    $success = $_SESSION['reserve_success'];
+    unset($_SESSION['reserve_success']);
+}
+
 // My reservations
 $myReservations = getMyReservations($user['user_id']);
 $todayStr = date('Y-m-d');
-$minDateTime = date('Y-m-d\TH:i', strtotime('+30 minutes'));
+// Earliest bookable datetime = now + 1 hour (rounded down to the minute)
+$minDateTime = date('Y-m-d\TH:i', strtotime('+1 hour'));
 
 // Pre-selected console type from URL (e.g. reserve.php?console=PS5)
 $presetConsole = '';
@@ -95,7 +130,12 @@ if (!empty($_GET['console'])) {
     <link rel="stylesheet" href="assets/css/style.css">
 
     <style>
-    /* ── Reserve page overrides ─────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════
+       RESERVE PAGE — RESPONSIVE DESIGN SYSTEM
+       Breakpoints: xs <480  sm <576  md <768  lg <992
+    ══════════════════════════════════════════════════════ */
+
+    /* ── Hero ───────────────────────────────────────────── */
     .reserve-hero {
         background: linear-gradient(135deg, #0a0f1c 0%, #0d1b3e 50%, #0a1225 100%);
         padding: 120px 0 60px;
@@ -112,63 +152,69 @@ if (!empty($_GET['console'])) {
     .reserve-hero h1 { font-family: 'Outfit', sans-serif; font-weight: 900; color: #fff; }
     .reserve-hero p  { color: rgba(255,255,255,.65); }
 
-    /* Form card */
+    /* ── Form card ──────────────────────────────────────── */
     .reserve-card {
         background: rgba(10,20,50,.7);
         border: 1px solid rgba(95,133,218,.2);
         border-radius: 20px;
-        padding: 36px;
+        padding: 28px;
         backdrop-filter: blur(12px);
     }
     .reserve-card h2 {
         font-family: 'Outfit', sans-serif;
         font-weight: 800;
-        font-size: 1.4rem;
+        font-size: 1.25rem;
         color: #fff;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         display: flex;
         align-items: center;
         gap: 10px;
+        flex-wrap: wrap;
     }
-    .reserve-card h2 i { color: #20c8a1; }
+    .reserve-card h2 i { color: #20c8a1; flex-shrink: 0; }
 
-    /* Console type selector */
-    .console-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+    /* ── Console type grid ──────────────────────────────── */
+    .console-type-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
     .console-type-card {
         border: 2px solid rgba(255,255,255,.1);
         border-radius: 14px;
-        padding: 20px;
+        padding: 18px 12px;
         cursor: pointer;
         transition: all .2s;
         text-align: center;
         background: rgba(255,255,255,.03);
         user-select: none;
     }
-    .console-type-card:hover { border-color: rgba(32,200,161,.5); background: rgba(32,200,161,.05); }
+    .console-type-card:hover  { border-color: rgba(32,200,161,.5); background: rgba(32,200,161,.05); }
     .console-type-card.selected { border-color: #20c8a1; background: rgba(32,200,161,.1); }
-    .console-type-card .ct-icon { font-size: 2.4rem; margin-bottom: 8px; }
-    .console-type-card .ct-name { font-weight: 700; font-size: 1rem; color: #fff; }
-    .console-type-card .ct-count { font-size: 12px; color: #888; margin-top: 4px; }
-    .console-type-card .ct-avail { font-size: 11px; margin-top: 4px; }
+    .console-type-card .ct-icon  { font-size: 2rem; margin-bottom: 6px; }
+    .console-type-card .ct-name  { font-weight: 700; font-size: .9rem; color: #fff; }
+    .console-type-card .ct-count { font-size: 11px; color: #888; margin-top: 3px; }
+    .console-type-card .ct-avail { font-size: 10px; margin-top: 3px; }
 
-    /* Mode selector */
+    /* ── Mode grid ──────────────────────────────────────── */
     .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
     .mode-card {
         border: 2px solid rgba(255,255,255,.1);
         border-radius: 12px;
-        padding: 14px 10px;
+        padding: 14px 8px;
         cursor: pointer;
         transition: all .2s;
         text-align: center;
         background: rgba(255,255,255,.03);
     }
-    .mode-card:hover { border-color: rgba(179,123,236,.5); }
+    .mode-card:hover   { border-color: rgba(179,123,236,.5); }
     .mode-card.selected { border-color: #b37bec; background: rgba(179,123,236,.1); }
     .mode-card .mc-icon { font-size: 1.4rem; margin-bottom: 6px; }
-    .mode-card .mc-name { font-weight: 700; font-size: 13px; color: #fff; }
-    .mode-card .mc-desc { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4; }
+    .mode-card .mc-name { font-weight: 700; font-size: 12px; color: #fff; }
+    .mode-card .mc-desc { font-size: 10px; color: #888; margin-top: 4px; line-height: 1.4; }
 
-    /* Duration grid */
+    /* ── Duration grid ──────────────────────────────────── */
     .duration-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -178,20 +224,20 @@ if (!empty($_GET['console'])) {
     .dur-btn {
         border: 1px solid rgba(255,255,255,.12);
         border-radius: 10px;
-        padding: 10px 6px;
+        padding: 10px 4px;
         cursor: pointer;
         transition: all .2s;
         text-align: center;
         background: rgba(255,255,255,.04);
         color: #ccc;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
     }
-    .dur-btn:hover { border-color: #f1a83c; color: #f1a83c; }
+    .dur-btn:hover   { border-color: #f1a83c; color: #f1a83c; }
     .dur-btn.selected { border-color: #f1a83c; background: rgba(241,168,60,.12); color: #f1a83c; }
-    .dur-btn .dur-price { display: block; font-size: 13px; font-weight: 800; color: #f1e1aa; margin-top: 3px; }
+    .dur-btn .dur-price { display: block; font-size: 12px; font-weight: 800; color: #f1e1aa; margin-top: 3px; }
 
-    /* Section label */
+    /* ── Section label ──────────────────────────────────── */
     .sec-label {
         font-size: 11px;
         font-weight: 700;
@@ -201,46 +247,47 @@ if (!empty($_GET['console'])) {
         margin-bottom: 10px;
     }
 
-    /* Downpayment box */
+    /* ── Payment box ────────────────────────────────────── */
     .dp-box {
         background: rgba(32,200,161,.06);
         border: 1px solid rgba(32,200,161,.2);
         border-radius: 14px;
-        padding: 20px;
+        padding: 18px;
         margin-bottom: 20px;
     }
     .dp-box .dp-title {
         font-weight: 700;
         color: #20c8a1;
-        font-size: 14px;
+        font-size: 13px;
         margin-bottom: 14px;
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
     }
     .dp-method-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
     .pm-card {
         border: 1px solid rgba(255,255,255,.1);
         border-radius: 10px;
-        padding: 10px 8px;
+        padding: 10px 6px;
         text-align: center;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         color: #aaa;
         transition: all .2s;
     }
-    .pm-card:hover { border-color: #20c8a1; }
+    .pm-card:hover   { border-color: #20c8a1; }
     .pm-card.selected { border-color: #20c8a1; background: rgba(32,200,161,.1); color: #20c8a1; }
     .pm-card .pm-icon { display: block; font-size: 1.2rem; margin-bottom: 4px; }
 
-    /* Reserve form inputs */
+    /* ── Form inputs ────────────────────────────────────── */
     .res-input {
         width: 100%;
         background: rgba(10,33,81,.6);
         border: 1px solid rgba(95,133,218,.25);
         color: #f0f0f0;
-        padding: 12px 16px;
+        padding: 12px 14px;
         border-radius: 10px;
         font-size: 14px;
         font-family: inherit;
@@ -252,27 +299,28 @@ if (!empty($_GET['console'])) {
     .res-input:focus { border-color: #20c8a1; box-shadow: 0 0 0 3px rgba(32,200,161,.1); }
     textarea.res-input { min-height: 80px; resize: vertical; }
 
-    /* Summary preview */
+    /* ── Summary preview ────────────────────────────────── */
     .reserve-summary {
         background: linear-gradient(135deg, rgba(32,200,161,.08), rgba(95,133,218,.06));
         border: 1px solid rgba(32,200,161,.25);
         border-radius: 14px;
-        padding: 20px;
+        padding: 18px;
         margin-bottom: 24px;
     }
-    .rs-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
+    .rs-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; gap: 8px; }
     .rs-row:last-child { border-bottom: none; }
-    .rs-label { color: #888; }
-    .rs-value { font-weight: 700; color: #f0f0f0; }
+    .rs-label { color: #888; white-space: nowrap; }
+    .rs-value { font-weight: 700; color: #f0f0f0; text-align: right; word-break: break-word; }
 
-    /* My Reservations table */
+    /* ── My reservations table ──────────────────────────── */
     .my-res-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .my-res-table th { color: #888; font-weight: 600; text-align: left; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
-    .my-res-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.05); color: #d0d0d0; vertical-align: middle; }
+    .my-res-table th { color: #888; font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .my-res-table td { padding: 10px 10px; border-bottom: 1px solid rgba(255,255,255,.05); color: #d0d0d0; vertical-align: middle; }
     .my-res-table tr:last-child td { border-bottom: none; }
     .res-badge {
         display: inline-block; padding: 3px 10px; border-radius: 20px;
-        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        white-space: nowrap;
     }
     .res-badge.pending   { background:rgba(241,168,60,.15);  color:#f1a83c;  border:1px solid rgba(241,168,60,.3); }
     .res-badge.confirmed { background:rgba(32,200,161,.15);  color:#20c8a1;  border:1px solid rgba(32,200,161,.3); }
@@ -280,6 +328,7 @@ if (!empty($_GET['console'])) {
     .res-badge.cancelled { background:rgba(251,86,107,.12);  color:#fb566b;  border:1px solid rgba(251,86,107,.3); }
     .res-badge.no_show   { background:rgba(100,100,100,.15); color:#888;     border:1px solid rgba(100,100,100,.3); }
 
+    /* ── Submit button ──────────────────────────────────── */
     .res-submit-btn {
         width: 100%; padding: 16px;
         background: linear-gradient(135deg, #20c8a1, #17a887);
@@ -289,7 +338,9 @@ if (!empty($_GET['console'])) {
         display: flex; align-items: center; justify-content: center; gap: 10px;
     }
     .res-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(32,200,161,.35); }
+    .res-submit-btn:active { transform: translateY(0); }
 
+    /* ── Availability badges ────────────────────────────── */
     .avail-badge {
         display: inline-flex; align-items: center; gap: 5px;
         padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
@@ -297,15 +348,184 @@ if (!empty($_GET['console'])) {
     .avail-badge.ok   { background: rgba(32,200,161,.15); color: #20c8a1; }
     .avail-badge.none { background: rgba(251,86,107,.15); color: #fb566b; }
 
-    @media (max-width: 768px) {
-        .console-type-grid { grid-template-columns: repeat(2, 1fr); }
+    /* ── Hero stat boxes ────────────────────────────────── */
+    .hero-stats { display: flex; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
+    .hero-stat  { text-align: center; }
+
+    /* ══════════════════════════════════════════════════════
+       RESPONSIVE BREAKPOINTS
+    ══════════════════════════════════════════════════════ */
+
+    /* ── ≤992px : tablet landscape ──────────────────────── */
+    @media (max-width: 992px) {
+        .reserve-hero { padding: 100px 0 50px; }
+        .reserve-card { padding: 24px; }
+        .duration-grid { grid-template-columns: repeat(4, 1fr); }
     }
+
+    /* ── ≤768px : tablet portrait ───────────────────────── */
+    @media (max-width: 768px) {
+        .reserve-hero { padding: 90px 0 40px; }
+        .reserve-hero h1 { font-size: clamp(1.6rem, 5vw, 2.4rem) !important; }
+        .reserve-card { padding: 20px; border-radius: 16px; }
+        .reserve-card h2 { font-size: 1.1rem; margin-bottom: 16px; }
+
+        /* Grids collapse to 2 cols */
+        .console-type-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .duration-grid     { grid-template-columns: repeat(3, 1fr); }
+
+        /* Right sidebar drops below on mobile (Bootstrap handles col stacking) */
+        .hero-stats { gap: 14px; }
+        .hero-stats .hero-stat div:first-child { font-size: 1.5rem !important; }
+    }
+
+    /* ── ≤576px : large phone ───────────────────────────── */
     @media (max-width: 576px) {
-        .console-type-grid, .mode-grid, .duration-grid, .dp-method-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        .reserve-hero { padding: 80px 0 32px; }
+        .reserve-card { padding: 16px; border-radius: 14px; }
+        .reserve-card h2 { font-size: 1rem; gap: 8px; }
+
+        /* All selector grids → 2 cols */
+        .console-type-grid,
+        .mode-grid,
+        .dp-method-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+        /* Duration → 3 cols to keep them readable */
+        .duration-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .dur-btn { padding: 8px 2px; font-size: 10px; }
+        .dur-btn .dur-price { font-size: 11px; }
+
+        /* Date + time stacked on very small screens */
+        .date-time-row .col-6 { flex: 0 0 100%; max-width: 100%; }
+
+        /* Full-width inputs feel better on mobile */
+        .res-input { padding: 11px 12px; font-size: 13px; }
+
+        /* Summary rows wrap gracefully */
+        .rs-row { font-size: 12px; }
+
+        /* Table horizontal scroll */
+        .my-res-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .my-res-table       { min-width: 380px; }
+
+        /* Submit button */
+        .res-submit-btn { font-size: 15px; padding: 14px; }
+
+        .dp-box { padding: 14px; }
+        .reserve-summary { padding: 14px; }
+    }
+
+    /* ── ≤480px : small phone ───────────────────────────── */
+    @media (max-width: 480px) {
+        .console-type-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .console-type-card { padding: 12px 8px; }
+        .console-type-card .ct-icon { font-size: 1.6rem; }
+
+        .mode-card .mc-desc { display: none; } /* hide descriptions to save space */
+
+        .duration-grid { grid-template-columns: repeat(2, 1fr); }
+
+        /* Hero stat numbers smaller */
+        .hero-stats { gap: 10px; }
+    }
+
+    /* ── Date & Time modern picker ──────────────────────── */
+    .dt-field-wrap {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: rgba(10,33,81,.55);
+        border: 1.5px solid rgba(95,133,218,.2);
+        border-radius: 16px;
+        padding: 14px 16px;
+        cursor: pointer;
+        transition: all .25s;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+    }
+    .dt-field-wrap:hover {
+        border-color: rgba(32,200,161,.5);
+        background: rgba(10,33,81,.75);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    }
+    .dt-field-wrap.dt-filled {
+        border-color: rgba(32,200,161,.45);
+        box-shadow: 0 0 0 3px rgba(32,200,161,.07);
+    }
+    .dt-field-icon {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(32,200,161,.25), rgba(32,200,161,.1));
+        color: #20c8a1;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        transition: all .25s;
+    }
+    .dt-field-wrap:hover .dt-field-icon { transform: scale(1.08); }
+    .dt-field-body {
+        flex: 1;
+        min-width: 0;
+    }
+    .dt-field-label {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #888;
+        margin-bottom: 2px;
+    }
+    .dt-native-input {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #f0f0f0;
+        font-size: 1rem;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        padding: 0;
+        /* make the native picker wide enough */
+        min-width: 0;
+    }
+    .dt-native-input::-webkit-calendar-picker-indicator {
+        /* stretch it to cover the whole wrapper */
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    .dt-field-sublabel {
+        font-size: 11px;
+        color: #555;
+        margin-top: 2px;
+        transition: color .2s;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .dt-field-wrap.dt-filled .dt-field-sublabel { color: #20c8a1; }
+    #timeWrap.dt-filled .dt-field-sublabel { color: #b37bec; }
+    .dt-field-arrow {
+        font-size: 11px;
+        color: rgba(255,255,255,.2);
+        flex-shrink: 0;
+        transition: all .2s;
+    }
+    .dt-field-wrap:hover .dt-field-arrow { color: rgba(32,200,161,.7); transform: translateX(2px); }
+
+    /* Pulse animation for banner dot */
+    @keyframes dtPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: .5; transform: scale(1.4); }
     }
     </style>
+
 </head>
 <body>
 <?php include __DIR__ . '/includes/navbar.php'; ?>
@@ -371,7 +591,7 @@ if (!empty($_GET['console'])) {
 </section>
 
 <!-- ── Main Content ──────────────────────────────────────────────────── -->
-<section style="padding: 60px 0 80px; background: #07101f;">
+<section style="padding: clamp(32px, 6vw, 60px) 0 clamp(48px, 8vw, 80px); background: #07101f;">
     <div class="container">
 
         <?php if ($success): ?>
@@ -399,10 +619,11 @@ if (!empty($_GET['console'])) {
             <!-- ── LEFT: Reservation Form ─────────────────────────── -->
             <div class="col-lg-7" data-aos="fade-up">
                 <form method="POST" id="reserveForm">
-                    <input type="hidden" name="console_type"    id="hiddenConsoleType">
-                    <input type="hidden" name="rental_mode"     id="hiddenRentalMode">
-                    <input type="hidden" name="planned_minutes" id="hiddenPlannedMinutes">
-                    <input type="hidden" name="downpayment_method" id="hiddenDpMethod">
+                    <input type="hidden" name="console_type"         id="hiddenConsoleType">
+                    <input type="hidden" name="rental_mode"          id="hiddenRentalMode">
+                    <input type="hidden" name="planned_minutes"      id="hiddenPlannedMinutes">
+                    <input type="hidden" name="downpayment_method"   id="hiddenDpMethod">
+                    <input type="hidden" name="preferred_console_id" id="hiddenPreferredUnit" value="">
 
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-desktop"></i> Step 1 — Choose Console Type</h2>
@@ -441,25 +662,119 @@ if (!empty($_GET['console'])) {
                         </div>
                     </div>
 
-                    <div class="reserve-card" style="margin-bottom:24px;">
-                        <h2><i class="fas fa-calendar-alt"></i> Step 2 — Pick Date & Time</h2>
-                        <div class="row gx-3">
-                            <div class="col-6">
-                                <div class="sec-label">Date *</div>
-                                <input type="date" id="reservedDate" name="reserved_date"
-                                       class="res-input" min="<?= date('Y-m-d') ?>"
-                                       value="<?= htmlspecialchars($_POST['reserved_date'] ?? '') ?>"
-                                       onchange="onDateTimeChange()" required>
+
+
+                    <!-- ── Step 2: Date & Time ──────────────────────────── -->
+                    <div class="reserve-card" style="margin-bottom:24px;position:relative;overflow:hidden;" id="step2Card">
+
+                        <!-- Decorative glow -->
+                        <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;
+                                    background:radial-gradient(circle, rgba(32,200,161,.12) 0%, transparent 70%);
+                                    pointer-events:none;border-radius:50%;"></div>
+
+                        <h2><i class="fas fa-calendar-alt"></i> Step 2 &mdash; Pick Date &amp; Time</h2>
+
+                        <!-- Live selection preview banner -->
+                        <div id="dtPreviewBanner" style="
+                            display:none;
+                            background:linear-gradient(135deg, rgba(32,200,161,.12), rgba(95,133,218,.1));
+                            border:1px solid rgba(32,200,161,.3);
+                            border-radius:14px;
+                            padding:14px 18px;
+                            margin-bottom:20px;
+                            align-items:center;gap:14px;">
+                            <div style="background:linear-gradient(135deg,#20c8a1,#17a887);
+                                        border-radius:12px;padding:10px 14px;text-align:center;flex-shrink:0;">
+                                <div id="dtBannerDay"   style="font-size:11px;font-weight:800;color:#0a1a10;text-transform:uppercase;letter-spacing:1px;">—</div>
+                                <div id="dtBannerDate"  style="font-size:1.6rem;font-weight:900;color:#0a1a10;line-height:1;">—</div>
+                                <div id="dtBannerMonth" style="font-size:11px;font-weight:700;color:#0a1a10;">—</div>
                             </div>
-                            <div class="col-6">
-                                <div class="sec-label">Time *</div>
-                                <input type="time" id="reservedTime" name="reserved_time"
-                                       class="res-input"
-                                       value="<?= htmlspecialchars($_POST['reserved_time'] ?? '') ?>"
-                                       onchange="onDateTimeChange()" required>
+                            <div>
+                                <div id="dtBannerTime"  style="font-size:1.4rem;font-weight:800;color:#fff;line-height:1.2;">—:— —</div>
+                                <div id="dtBannerLabel" style="font-size:12px;color:#20c8a1;margin-top:4px;font-weight:600;">
+                                    <i class="fas fa-circle" style="font-size:7px;vertical-align:middle;margin-right:5px;animation:dtPulse 1.5s ease-in-out infinite;"></i>
+                                    Session scheduled
+                                </div>
                             </div>
                         </div>
-                        <div id="availabilityResult" style="display:none;margin-top:-8px;margin-bottom:12px;"></div>
+
+                        <!-- Pickers row -->
+                        <div class="row gx-3 date-time-row">
+
+                            <!-- Date picker -->
+                            <div class="col-sm-6 col-12" style="margin-bottom:4px;">
+                                <div class="dt-field-wrap" id="dateWrap">
+                                    <div class="dt-field-icon"><i class="fas fa-calendar"></i></div>
+                                    <div class="dt-field-body">
+                                        <div class="dt-field-label">Date</div>
+                                        <input type="date" id="reservedDate" name="reserved_date"
+                                               class="dt-native-input"
+                                               min="<?= date('Y-m-d') ?>"
+                                               value="<?= htmlspecialchars($_POST['reserved_date'] ?? '') ?>"
+                                               onchange="onDateTimeChange(); updateDtBanner();" required>
+                                        <div class="dt-field-sublabel" id="dateSublabel">Pick your visit date</div>
+                                    </div>
+                                    <div class="dt-field-arrow"><i class="fas fa-chevron-right"></i></div>
+                                </div>
+                            </div>
+
+                            <!-- Time picker -->
+                            <div class="col-sm-6 col-12" style="margin-bottom:4px;">
+                                <div class="dt-field-wrap" id="timeWrap">
+                                    <div class="dt-field-icon" style="background:linear-gradient(135deg,rgba(179,123,236,.25),rgba(95,133,218,.2));color:#b37bec;">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                    <div class="dt-field-body">
+                                        <div class="dt-field-label">Time</div>
+                                        <input type="time" id="reservedTime" name="reserved_time"
+                                               class="dt-native-input"
+                                               min="12:00" max="23:59"
+                                               value="<?= htmlspecialchars($_POST['reserved_time'] ?? '') ?>"
+                                               onchange="onDateTimeChange(); updateDtBanner();" required>
+                                        <div class="dt-field-sublabel" id="timeSublabel">12:00 PM – 12:00 AM</div>
+                                    </div>
+                                    <div class="dt-field-arrow" style="color:#b37bec;"><i class="fas fa-chevron-right"></i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Operating hours info strip -->
+                        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;
+                                    padding:10px 14px;border-radius:10px;
+                                    background:rgba(32,200,161,.05);border:1px solid rgba(32,200,161,.12);">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#20c8a1;flex-shrink:0;
+                                         box-shadow:0 0 0 3px rgba(32,200,161,.2);"></span>
+                            <span style="font-size:12px;color:#888;">
+                                Operating hours &nbsp;<strong style="color:#20c8a1;">12:00 PM</strong> to
+                                <strong style="color:#20c8a1;">12:00 AM</strong>
+                                &nbsp;&middot;&nbsp; Reservation requires <strong style="color:#ccc;">1 hr lead time</strong>
+                            </span>
+                        </div>
+
+                        <!-- Availability result -->
+                        <div id="availabilityResult" style="display:none;margin-top:14px;"></div>
+                    </div>
+
+                    <!-- ── Step 2b: Choose Preferred Unit (unlocks after date+time) ── -->
+                    <div class="reserve-card" id="unitPickerCard" style="margin-bottom:24px;display:none;">
+                        <h2>
+                            <i class="fas fa-tv"></i> Step 2b &mdash; Choose Preferred Unit
+                            <span style="font-size:12px;font-weight:500;color:#888;margin-left:6px;">(Optional)</span>
+                        </h2>
+                        <p style="color:#888;font-size:13px;margin-bottom:14px;">
+                            Availability shown is based on your chosen date &amp; time.
+                            <strong style="color:#20c8a1;">✅ Available at that slot &nbsp;·&nbsp; 🔒 Already reserved &nbsp;·&nbsp; 🎮 In Use now</strong>
+                        </p>
+                        <div id="unitPickerGrid"
+                             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px;"></div>
+                        <div id="unitPickerAny" onclick="selectUnit(null)"
+                             style="padding:10px 16px;border-radius:10px;border:2px solid rgba(32,200,161,.35);
+                                    background:rgba(32,200,161,.06);color:#20c8a1;font-size:13px;font-weight:700;
+                                    cursor:pointer;text-align:center;transition:.2s;"
+                             onmouseover="this.style.borderColor='rgba(32,200,161,.8)'"
+                             onmouseout="this.style.borderColor='rgba(32,200,161,.35)'">
+                            <i class="fas fa-shuffle" style="margin-right:6px;"></i> No preference &mdash; let staff assign
+                        </div>
                     </div>
 
                     <div class="reserve-card" style="margin-bottom:24px;">
@@ -511,13 +826,13 @@ if (!empty($_GET['console'])) {
                     </div>
 
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
-                        <h2><i class="fas fa-peso-sign"></i> Step 4 — Downpayment <span id="dpCardMode" style="font-size:13px;font-weight:500;color:#888;"></span></h2>
+                        <h2><i class="fas fa-peso-sign"></i> Step 4 — Payment <span id="dpCardMode" style="font-size:13px;font-weight:500;color:#888;"></span></h2>
                         <p style="color:#888;font-size:13px;margin-bottom:18px;">
-                            A 50% downpayment is required to confirm your hourly reservation. The remaining balance is collected in-store.
+                            Full payment is required to confirm your hourly reservation.
                         </p>
                         <div class="dp-box">
                             <div class="dp-title" style="justify-content:space-between;">
-                                <span><i class="fas fa-coins"></i> Downpayment Amount</span>
+                                <span><i class="fas fa-coins"></i> Payment Amount</span>
                                 <span id="dpHint" style="font-size:12px;font-weight:600;color:#20c8a1;"></span>
                             </div>
                             <input type="number" name="downpayment_amount" id="dpAmount" class="res-input"
@@ -525,7 +840,7 @@ if (!empty($_GET['console'])) {
                                    readonly
                                    style="cursor:not-allowed;background:rgba(32,200,161,.06);border-color:rgba(32,200,161,.3);color:#20c8a1;font-size:16px;font-weight:700;"
                                    value="<?= htmlspecialchars($_POST['downpayment_amount'] ?? '') ?>">
-                            <p style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of your session cost.</p>
+                            <p style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.</p>
 
                             <div id="dpMethodSection" style="display:none;">
                                 <div class="sec-label">Payment Method *</div>
@@ -539,7 +854,7 @@ if (!empty($_GET['console'])) {
                                 </div>
                                 <p style="font-size:11px;color:#888;margin-bottom:0;">
                                     <i class="fas fa-info-circle"></i>
-                                    Downpayment will be deducted from your total at session end.
+                                    Payment will be recorded as your session upfront payment.
                                 </p>
                             </div>
                         </div>
@@ -559,7 +874,7 @@ if (!empty($_GET['console'])) {
                         <div class="rs-row"><span class="rs-label">Date & Time</span><span class="rs-value" id="s-datetime">—</span></div>
                         <div class="rs-row"><span class="rs-label">Mode</span><span class="rs-value" id="s-mode">—</span></div>
                         <div class="rs-row"><span class="rs-label">Duration</span><span class="rs-value" id="s-duration">—</span></div>
-                        <div class="rs-row"><span class="rs-label">Downpayment</span><span class="rs-value" id="s-dp">None</span></div>
+                        <div class="rs-row"><span class="rs-label">Payment</span><span class="rs-value" id="s-dp">None</span></div>
                     </div>
 
                     <button type="submit" class="res-submit-btn" id="submitBtn">
@@ -694,8 +1009,11 @@ let selectedConsoleType = '';
 let selectedMode        = '';
 let selectedDuration    = 0;
 let selectedDpMethod    = '';
+let selectedUnitId      = null;
+let selectedUnitLabel   = '';
 
-const unlimitedRate = <?= (int)$unlimitedRate ?>;
+const unlimitedRate   = <?= (int)$unlimitedRate ?>;
+const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 
 /* ── Console type ───────────────────────────────────── */
 const CONSOLE_TYPE_IDS = { 'PS5': 'ct-ps5', 'PS4': 'ct-ps4', 'Xbox Series X': 'ct-xbox' };
@@ -705,8 +1023,199 @@ function selectConsoleType(type) {
     document.querySelectorAll('.console-type-card').forEach(c => c.classList.remove('selected'));
     const el = document.getElementById(CONSOLE_TYPE_IDS[type]);
     if (el) el.classList.add('selected');
+
+    // Reset unit selection; show picker only if date+time already chosen
+    selectUnit(null, true);
+    refreshUnitPicker();
+
     updateSummary();
     checkAvailability();
+}
+
+/* ── Unit picker ─────────────────────────────────────────
+   Logic:
+   • Hidden until console type AND date AND time are all set
+   • When all three are set, queries the reservation DB via AJAX
+   • Shows real availability at the chosen date/time (not live status)
+   ───────────────────────────────────────────────────────── */
+let unitPickerTimer = null;
+
+function refreshUnitPicker() {
+    const card  = document.getElementById('unitPickerCard');
+    const dateV = document.getElementById('reservedDate').value;
+    const timeV = document.getElementById('reservedTime').value;
+
+    // Hide entirely until a console type is selected
+    if (!selectedConsoleType) {
+        card.style.display = 'none';
+        return;
+    }
+
+    // Console type chosen but date/time not yet set → show locked placeholder
+    if (!dateV || !timeV) {
+        card.style.display = 'block';
+        renderUnitPickerLocked();
+        return;
+    }
+
+    // All three set — fetch real availability (debounced)
+    card.style.display = 'block';
+    clearTimeout(unitPickerTimer);
+    unitPickerTimer = setTimeout(() => fetchUnitAvailability(dateV, timeV), 350);
+}
+
+function renderUnitPickerLocked() {
+    const grid = document.getElementById('unitPickerGrid');
+    // Show static cards from PHP data but greyed out with a lock overlay
+    const units = CONSOLES_BY_TYPE[selectedConsoleType] || [];
+    if (!units.length) {
+        document.getElementById('unitPickerCard').style.display = 'none';
+        return;
+    }
+    grid.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:22px 16px;
+                    background:rgba(255,255,255,.03);border-radius:12px;
+                    border:1.5px dashed rgba(255,255,255,.1);color:#555;font-size:13px;">
+            <i class="fas fa-calendar-clock" style="font-size:1.6rem;display:block;margin-bottom:10px;color:#444;"></i>
+            <strong style="color:#888;">Pick a date &amp; time first</strong><br>
+            <span style="font-size:11px;">Available units will appear here once you've chosen your slot in Step 2.</span>
+        </div>`;
+    const anyBtn = document.getElementById('unitPickerAny');
+    if (anyBtn) { anyBtn.style.opacity = '.35'; anyBtn.style.pointerEvents = 'none'; }
+}
+
+function fetchUnitAvailability(dateV, timeV) {
+    const grid = document.getElementById('unitPickerGrid');
+    const anyBtn = document.getElementById('unitPickerAny');
+
+    // Loading state
+    grid.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#888;font-size:12px;">
+            <i class="fas fa-spinner fa-spin" style="margin-right:6px;color:#20c8a1;"></i>
+            Checking availability for ${dateV} at ${formatTime12(timeV)}…
+        </div>`;
+
+    fetch(`ajax/check_unit_availability.php?date=${encodeURIComponent(dateV)}&time=${encodeURIComponent(timeV)}&console_type=${encodeURIComponent(selectedConsoleType)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                grid.innerHTML = `<div style="grid-column:1/-1;color:#fb566b;font-size:12px;padding:12px;">
+                    <i class="fas fa-exclamation-circle"></i> ${data.message}</div>`;
+                return;
+            }
+
+            // ── Unassigned reservation warning ──────────────────────────
+            let extraHtml = '';
+            if (data.unassigned_count > 0) {
+                const names = data.unassigned_reservations
+                    .map(r => `<strong>${r.reserved_by}</strong> @ ${formatTime12(r.reserved_time)}`)
+                    .join(', ');
+                extraHtml = `
+                <div style="grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;
+                            padding:10px 14px;border-radius:10px;margin-bottom:6px;
+                            background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.3);">
+                    <i class="fas fa-triangle-exclamation" style="color:#f1a83c;margin-top:2px;flex-shrink:0;"></i>
+                    <span style="font-size:12px;color:#ccc;">
+                        <strong style="color:#f1a83c;">${data.unassigned_count} reservation${data.unassigned_count > 1 ? 's' : ''}</strong>
+                        exist for this date but no specific unit was assigned yet
+                        (${names}). Staff will allocate a unit at check-in.
+                    </span>
+                </div>`;
+            }
+
+            renderUnitCards(data.units, extraHtml);
+            if (anyBtn) { anyBtn.style.opacity = '1'; anyBtn.style.pointerEvents = ''; }
+        })
+        .catch(() => {
+            grid.innerHTML = `<div style="grid-column:1/-1;color:#fb566b;font-size:12px;padding:12px;">
+                <i class="fas fa-exclamation-circle"></i> Could not check availability.</div>`;
+        });
+}
+
+function renderUnitCards(units, extraHtml = '') {
+    const grid = document.getElementById('unitPickerGrid');
+
+    grid.innerHTML = extraHtml + units.map(u => {
+        const isAvail    = u.status === 'available';
+        const isReserved = u.status === 'reserved';
+        const isInUse    = u.status === 'in_use';
+
+        const colour  = isAvail ? '#20c8a1' : isInUse ? '#f1a83c' : '#fb566b';
+        const bgAlpha = isAvail ? '.03'     : '.06';
+        const border  = isAvail
+            ? 'rgba(255,255,255,.12)'
+            : isInUse ? 'rgba(241,168,60,.3)' : 'rgba(251,86,107,.3)';
+
+        const statusIcon  = isAvail ? '✅' : isReserved ? '🔒' : '🎮';
+        const statusLabel = isAvail ? 'Available' : isReserved ? 'Reserved' : 'In Use';
+        const clickable   = isAvail;
+
+        const tooltip = isReserved && u.conflict
+            ? `title="Reserved at ${u.conflict.reserved_time} by ${u.conflict.reserved_by}"`
+            : '';
+
+        return `<div id="unit-${u.id}" data-unit-id="${u.id}" ${tooltip}
+                     onclick="${clickable ? `selectUnit(${u.id}, false, '${u.unit}')` : ''}"
+                     style="border:2px solid ${border};border-radius:12px;padding:14px 8px;
+                            cursor:${clickable ? 'pointer' : 'not-allowed'};transition:all .2s;
+                            text-align:center;background:rgba(255,255,255,${bgAlpha});
+                            user-select:none;opacity:${clickable ? '1' : '.65'};">
+                    <div style="font-size:1.2rem;margin-bottom:6px;">${statusIcon}</div>
+                    <div style="font-weight:700;font-size:13px;color:#fff;margin-bottom:4px;">${u.unit}</div>
+                    <div style="font-size:10px;color:${colour};font-weight:700;">${statusLabel}</div>
+                </div>`;
+    }).join('');
+
+    // Restore "any" button
+    const anyBtn = document.getElementById('unitPickerAny');
+    if (anyBtn) {
+        anyBtn.style.opacity = '1';
+        anyBtn.style.pointerEvents = '';
+        // Re-highlight if "any" is currently selected
+        if (!selectedUnitId) {
+            anyBtn.style.borderColor = '#20c8a1';
+            anyBtn.style.background  = 'rgba(32,200,161,.15)';
+        } else {
+            anyBtn.style.borderColor = 'rgba(32,200,161,.35)';
+            anyBtn.style.background  = 'rgba(32,200,161,.06)';
+        }
+    }
+}
+
+function formatTime12(timeStr) {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':');
+    const hh = parseInt(h), ampm = hh >= 12 ? 'PM' : 'AM';
+    return `${hh % 12 || 12}:${m} ${ampm}`;
+}
+
+function selectUnit(id, silent = false, label = '') {
+    selectedUnitId    = id;
+    selectedUnitLabel = label;
+    document.getElementById('hiddenPreferredUnit').value = id || '';
+
+    // Reset all unit cards
+    document.querySelectorAll('[data-unit-id]').forEach(el => {
+        const isReserved = el.querySelector('div:last-child')?.textContent.trim() === 'Reserved';
+        const isInUse    = el.querySelector('div:last-child')?.textContent.trim() === 'In Use';
+        el.style.borderColor = isReserved ? 'rgba(251,86,107,.3)'
+                             : isInUse    ? 'rgba(241,168,60,.3)'
+                             :              'rgba(255,255,255,.12)';
+        el.style.background  = 'rgba(255,255,255,.03)';
+    });
+
+    const anyBtn = document.getElementById('unitPickerAny');
+    if (anyBtn) { anyBtn.style.borderColor = 'rgba(32,200,161,.35)'; anyBtn.style.background = 'rgba(32,200,161,.06)'; }
+
+    if (id) {
+        const card = document.getElementById(`unit-${id}`);
+        if (card) { card.style.borderColor = '#f1a83c'; card.style.background = 'rgba(241,168,60,.13)'; }
+    } else if (!silent && anyBtn) {
+        anyBtn.style.borderColor = '#20c8a1';
+        anyBtn.style.background  = 'rgba(32,200,161,.15)';
+    }
+
+    if (!silent) updateSummary();
 }
 
 /* ── Rental mode ────────────────────────────────────── */
@@ -732,11 +1241,11 @@ function selectDuration(mins) {
     document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
-    // Auto-calculate 50% downpayment (read-only field)
+    // Auto-calculate 100% payment (read-only field)
     const fullCost = mins <= 30 ? 50 : (mins / 60 * 80);
-    const dp       = Math.ceil(fullCost * 0.5);
+    const dp       = fullCost;
     document.getElementById('dpAmount').value = dp;
-    document.getElementById('dpHint').textContent = `50% of \u20b1${fullCost.toFixed(0)}`;
+    document.getElementById('dpHint').textContent = `Full cost: \u20b1${fullCost.toFixed(0)}`;
     document.getElementById('dpMethodSection').style.display = 'block';
 
     updateSummary();
@@ -754,17 +1263,129 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
+/* ── Operating hours + 1-hr lead-time enforcement ──── */
+const MIN_LEAD_SECONDS = 3600; // 1 hour
+const OPEN_TIME        = '12:00'; // noon
+const CLOSE_TIME       = '23:59'; // last slot (midnight closing)
+
+function getMinTimeForDate(dateStr) {
+    const today    = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+
+    // Earliest bookable = opening OR now+1hr, whichever is later
+    if (dateStr === todayStr) {
+        const earliest = new Date(today.getTime() + MIN_LEAD_SECONDS * 1000);
+        const lead = String(earliest.getHours()).padStart(2,'0') + ':' + String(earliest.getMinutes()).padStart(2,'0');
+        // If lead time falls before opening, snap to opening
+        return lead > OPEN_TIME ? lead : OPEN_TIME;
+    }
+    // Future date: just use opening time
+    return OPEN_TIME;
+}
+
+function enforceMinTime() {
+    const dateEl = document.getElementById('reservedDate');
+    const timeEl = document.getElementById('reservedTime');
+    const minT   = getMinTimeForDate(dateEl.value);
+
+    // Always enforce operating window
+    timeEl.min = minT;
+    timeEl.max = CLOSE_TIME;
+
+    let invalid = false;
+    if (timeEl.value && timeEl.value < minT) {
+        invalid = true;
+        timeEl.title = timeEl.value < OPEN_TIME
+            ? 'We\'re open from 12:00 PM (noon)'
+            : 'Must be at least 1 hour from now';
+    } else if (timeEl.value && timeEl.value > CLOSE_TIME) {
+        invalid = true;
+        timeEl.title = 'We close at 12:00 AM (midnight)';
+    }
+
+    if (invalid) {
+        timeEl.value       = '';
+        timeEl.style.borderColor = '#fb566b';
+        timeEl.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.2)';
+    } else {
+        timeEl.style.borderColor = '';
+        timeEl.style.boxShadow   = '';
+        timeEl.title = '';
+    }
+}
+
 /* ── Availability check ─────────────────────────────── */
 let availTimer = null;
-function onDateTimeChange() { clearTimeout(availTimer); availTimer = setTimeout(checkAvailability, 500); updateSummary(); }
+function onDateTimeChange() {
+    enforceMinTime();
+    clearTimeout(availTimer);
+    availTimer = setTimeout(checkAvailability, 500);
+    // Refresh unit picker with reservation-aware availability for the new slot
+    refreshUnitPicker();
+    updateSummary();
+}
+
+// Run on page load — pre-fill and clamp to operating hours
+document.addEventListener('DOMContentLoaded', function () {
+    const dateEl = document.getElementById('reservedDate');
+    const timeEl = document.getElementById('reservedTime');
+
+    if (!dateEl.value && !timeEl.value) {
+        const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
+        const yyyy = earliest.getFullYear();
+        const mm   = String(earliest.getMonth() + 1).padStart(2, '0');
+        const dd   = String(earliest.getDate()).padStart(2, '0');
+        const hh   = String(earliest.getHours()).padStart(2, '0');
+        const min  = String(earliest.getMinutes()).padStart(2, '0');
+        const leadt = `${hh}:${min}`;
+
+        dateEl.value = `${yyyy}-${mm}-${dd}`;
+
+        // Snap to noon if lead-time falls before opening
+        if (leadt < OPEN_TIME) {
+            timeEl.value = OPEN_TIME;
+        } else if (leadt > CLOSE_TIME) {
+            // Past closing — move to next day at noon
+            const tomorrow = new Date(earliest);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            dateEl.value = tomorrow.toISOString().slice(0, 10);
+            timeEl.value = OPEN_TIME;
+        } else {
+            timeEl.value = leadt;
+        }
+    }
+
+    enforceMinTime();
+    updateDtBanner();
+    updateSummary();
+    checkAvailability();
+    // If a console was pre-selected (e.g. via URL ?console=PS5), refresh the unit picker
+    refreshUnitPicker();
+});
+
 
 function checkAvailability() {
     const date = document.getElementById('reservedDate').value;
     const time = document.getElementById('reservedTime').value;
-    const el = document.getElementById('availabilityResult');
-    const miniEls = { 'PS5': document.getElementById('avail-ps5'), 'PS4': document.getElementById('avail-ps4'), 'Xbox Series X': document.getElementById('avail-xbox') };
+    const el   = document.getElementById('availabilityResult');
+    const miniEls = {
+        'PS5':         document.getElementById('avail-ps5'),
+        'PS4':         document.getElementById('avail-ps4'),
+        'Xbox Series X': document.getElementById('avail-xbox')
+    };
+    // Map console type → ct-avail badge inside the type card
+    const ctAvailEls = {
+        'PS5':         document.querySelector('#ct-ps5 .ct-avail'),
+        'PS4':         document.querySelector('#ct-ps4 .ct-avail'),
+        'Xbox Series X': document.querySelector('#ct-xbox .ct-avail'),
+    };
 
-    if (!date || !time) { el.style.display='none'; return; }
+    if (!date || !time) {
+        el.style.display = 'none';
+        // Reset badges to live status (PHP-rendered text stays)
+        Object.values(ctAvailEls).forEach(e => { if (e) e.removeAttribute('data-dt-checked'); });
+        return;
+    }
 
     el.style.display = 'block';
     el.innerHTML = '<span style="color:#888;font-size:12px;"><i class="fas fa-spinner fa-spin"></i> Checking availability…</span>';
@@ -773,20 +1394,38 @@ function checkAvailability() {
     fetch(`ajax/check_availability.php?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`)
         .then(r => r.json())
         .then(data => {
-            if (!data.success) { el.innerHTML = `<span style="color:#fb566b;font-size:12px;"><i class="fas fa-exclamation-circle"></i> ${data.message}</span>`; return; }
+            if (!data.success) {
+                el.innerHTML = `<span style="color:#fb566b;font-size:12px;"><i class="fas fa-exclamation-circle"></i> ${data.message}</span>`;
+                return;
+            }
 
             const av = data.availability;
             let html = '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
 
             ['PS5','PS4','Xbox Series X'].forEach(type => {
                 const info = av[type];
-                if (!info) return; // type not in DB, skip
-                const ok = info.available > 0;
+                if (!info) return;
+                const ok  = info.available > 0;
                 const cls = ok ? 'ok' : 'none';
-                html += `<span class="avail-badge ${cls}"><i class="fas fa-${ok ? 'check' : 'xmark'}"></i> ${type}: ${info.available}/${info.total} free</span>`;
+                html += `<span class="avail-badge ${cls}"><i class="fas fa-${ok ? 'check' : 'xmark'}"></i> ${type}: ${info.available}/${info.total} free at this slot</span>`;
 
+                // Update mini badge in the availability result area
                 const miniEl = miniEls[type];
                 if (miniEl) miniEl.innerHTML = `<span class="avail-badge ${cls}" style="font-size:10px;">${ok ? info.available + ' free' : 'Full'}</span>`;
+
+                // ── Update the "X free" badge INSIDE the console type card ──
+                const ctEl = ctAvailEls[type];
+                if (ctEl) {
+                    const color = ok ? '#20c8a1' : '#fb566b';
+                    const label = ok ? info.available + (info.available === 1 ? ' free' : ' free') : 'None free';
+                    ctEl.innerHTML = `<span style="display:inline-block;padding:2px 8px;border-radius:20px;
+                                             background:${ok ? 'rgba(32,200,161,.15)' : 'rgba(251,86,107,.15)'};
+                                             color:${color};font-size:10px;font-weight:700;
+                                             border:1px solid ${ok ? 'rgba(32,200,161,.3)' : 'rgba(251,86,107,.3)'};">
+                                        ${label} at this slot
+                                     </span>`;
+                    ctEl.setAttribute('data-dt-checked', '1');
+                }
             });
 
             html += '</div>';
@@ -795,7 +1434,57 @@ function checkAvailability() {
         .catch(() => { el.innerHTML = '<span style="color:#888;font-size:12px;">Could not check availability</span>'; });
 }
 
-/* ── Summary ────────────────────────────────────────── */
+/* ── Date & Time banner ─────────────────────────────── */
+function updateDtBanner() {
+    const dateVal = document.getElementById('reservedDate').value;
+    const timeVal = document.getElementById('reservedTime').value;
+    const banner  = document.getElementById('dtPreviewBanner');
+    const dateWrap = document.getElementById('dateWrap');
+    const timeWrap = document.getElementById('timeWrap');
+
+    // Update filled state on wrappers
+    if (dateVal) {
+        dateWrap.classList.add('dt-filled');
+        const d = new Date(dateVal + 'T12:00:00');
+        document.getElementById('dateSublabel').textContent =
+            d.toLocaleDateString('en-PH', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    } else {
+        dateWrap.classList.remove('dt-filled');
+        document.getElementById('dateSublabel').textContent = 'Pick your visit date';
+    }
+
+    if (timeVal) {
+        timeWrap.classList.add('dt-filled');
+        // Format time as 12-hr
+        const [hStr, mStr] = timeVal.split(':');
+        const h = parseInt(hStr), m = mStr;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12  = h % 12 || 12;
+        document.getElementById('timeSublabel').textContent = `${h12}:${m} ${ampm} selected`;
+    } else {
+        timeWrap.classList.remove('dt-filled');
+        document.getElementById('timeSublabel').textContent = '12:00 PM – 12:00 AM';
+    }
+
+    // Show / update banner if both are set
+    if (dateVal && timeVal) {
+        const d = new Date(dateVal + 'T' + timeVal);
+        const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        document.getElementById('dtBannerDay').textContent   = DAYS[d.getDay()];
+        document.getElementById('dtBannerDate').textContent  = d.getDate();
+        document.getElementById('dtBannerMonth').textContent = MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+        const h = d.getHours(), m = String(d.getMinutes()).padStart(2,'0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12  = h % 12 || 12;
+        document.getElementById('dtBannerTime').textContent = `${h12}:${m} ${ampm}`;
+        banner.style.display = 'flex';
+    } else {
+        banner.style.display = 'none';
+    }
+}
+
+
 function updateSummary() {
     const date = document.getElementById('reservedDate').value;
     const time = document.getElementById('reservedTime').value;
@@ -810,6 +1499,11 @@ function updateSummary() {
     if (!ready) return;
 
     document.getElementById('s-console').textContent  = selectedConsoleType;
+    const unitEl = document.getElementById('s-unit');
+    if (unitEl) {
+        unitEl.textContent  = selectedUnitId ? selectedUnitLabel : 'Any available';
+        unitEl.style.color  = selectedUnitId ? '#f1a83c' : '#888';
+    }
     document.getElementById('s-datetime').textContent =
         new Date(date + 'T' + time).toLocaleDateString('en-PH', {weekday:'short',month:'short',day:'numeric',year:'numeric'}) +
         ' at ' + new Date(date + 'T' + time).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit'});
@@ -829,7 +1523,7 @@ function updateSummary() {
     document.getElementById('s-duration').textContent = durText;
     document.getElementById('s-dp').textContent = dp > 0
         ? '₱' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' (method required)')
-        : 'None — pay in full on arrival';
+        : 'None — select a duration above';
 }
 
 /* ── Form validation ────────────────────────────────── */
@@ -837,6 +1531,35 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
+
+    const dateVal = document.getElementById('reservedDate').value;
+    const timeVal = document.getElementById('reservedTime').value;
+
+    if (dateVal && timeVal) {
+        // Operating hours check
+        if (timeVal < OPEN_TIME) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f We\u2019re only open from 12:00 PM (noon). Please pick a time between noon and midnight.');
+            document.getElementById('reservedTime').focus();
+            return;
+        }
+        if (timeVal > CLOSE_TIME) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f We close at 12:00 AM (midnight). Please pick a time before midnight.');
+            document.getElementById('reservedTime').focus();
+            return;
+        }
+
+        // 1-hour lead time check
+        const chosen   = new Date(dateVal + 'T' + timeVal);
+        const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
+        if (chosen < earliest) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f Reservations must be at least 1 hour from now. Please pick a later time.');
+            document.getElementById('reservedTime').focus();
+            return;
+        }
+    }
 
     const dp = parseFloat(document.getElementById('dpAmount').value) || 0;
     if (dp > 0 && !selectedDpMethod) { e.preventDefault(); alert('Please select a payment method for your downpayment.'); return; }

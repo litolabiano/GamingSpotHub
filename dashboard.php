@@ -393,6 +393,19 @@ function fmtMins(int $m): string {
         .cd-badge.gold    { background: rgba(241,168,60,0.15); color: var(--gold); }
         .cd-badge.gray    { background: rgba(150,150,150,0.15); color: #aaa; }
 
+        /* ── Cancel reservation button ────────────────────────────────── */
+        .cd-cancel-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(251,86,107,.35);
+            background: rgba(251,86,107,.06); color: #fb566b;
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            transition: background .2s, border-color .2s;
+            white-space: nowrap;
+        }
+        .cd-cancel-btn:hover {
+            background: rgba(251,86,107,.15); border-color: rgba(251,86,107,.6);
+        }
+
         /* ── Active session live card ─────────────────────────────────── */
         .cd-live-card {
             background: linear-gradient(135deg, rgba(32,200,161,0.14), rgba(95,133,218,0.07));
@@ -866,7 +879,7 @@ function fmtMins(int $m): string {
                 </div>
                 <div style="overflow-x:auto">
                 <table class="cd-table">
-                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Mode</th><th>Downpayment</th><th>Status</th><th>Notes</th></tr></thead>
+                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Mode</th><th>Payment</th><th>Status</th><th>Notes</th><th></th></tr></thead>
                     <tbody>
                     <?php foreach ($upcoming as $r):
                         $isToday = ($r['reserved_date'] === date('Y-m-d'));
@@ -892,6 +905,18 @@ function fmtMins(int $m): string {
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
                         </td>
                         <td style="color:var(--muted)"><?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?></td>
+                        <td>
+                            <?php if (in_array($r['status'], ['pending','confirmed'])): ?>
+                            <button class="cd-cancel-btn"
+                                    data-id="<?= $r['reservation_id'] ?>"
+                                    data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
+                                    data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
+                                    onclick="openCancelModal(this)"
+                                    title="Cancel this reservation">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -919,8 +944,35 @@ function fmtMins(int $m): string {
                         <td><?= htmlspecialchars($r['console_type']) ?></td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
                         <td>
-                            <?php $stMap2=['converted'=>['mint','play'],'cancelled'=>['coral','times-circle'],'no_show'=>['gray','ghost']]; $sc2=$stMap2[$r['status']]??['gray','circle']; ?>
-                            <span class="cd-badge <?= $sc2[0] ?>"><i class="fas fa-<?= $sc2[1] ?>" style="margin-right:4px"></i><?= ucfirst(str_replace('_',' ',$r['status'])) ?></span>
+                            <?php
+                              $stMap2 = [
+                                'converted' => ['mint','play'],
+                                'cancelled' => ['coral','times-circle'],
+                                'no_show'   => ['gray','ghost'],
+                              ];
+                              $sc2 = $stMap2[$r['status']] ?? ['gray','circle'];
+                            ?>
+                            <span class="cd-badge <?= $sc2[0] ?>">
+                                <i class="fas fa-<?= $sc2[1] ?>" style="margin-right:4px"></i>
+                                <?= ucfirst(str_replace('_',' ',$r['status'])) ?>
+                            </span>
+                            <?php if ($r['status'] === 'cancelled' && !empty($r['cancelled_by'])): ?>
+                            <div style="font-size:10px;color:#888;margin-top:3px;">
+                                <?php if ($r['cancelled_by'] === 'user'): ?>
+                                    <i class="fas fa-user" style="margin-right:3px;"></i>Cancelled by you
+                                    <?php if ((float)$r['downpayment_amount'] > 0): ?>
+                                    &middot;
+                                    <?php if ($r['refund_issued']): ?>
+                                        <span style="color:#20c8a1;"><i class="fas fa-check-circle"></i> Refunded</span>
+                                    <?php else: ?>
+                                        <span style="color:#f1a83c;"><i class="fas fa-hourglass-half"></i> Refund pending</span>
+                                    <?php endif; ?>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <i class="fas fa-user-shield" style="margin-right:3px;"></i>Cancelled by staff
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -931,6 +983,54 @@ function fmtMins(int $m): string {
             <?php endif; ?>
             <?php endif; ?>
         </div>
+
+        <!-- ── Cancel Reservation Modal ──────────────────────────── -->
+        <div id="cancelResModal" style="display:none;position:fixed;inset:0;z-index:9999;
+             background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+             align-items:center;justify-content:center;">
+            <div style="background:#0e1d36;border:1px solid rgba(251,86,107,.35);border-radius:18px;
+                        padding:28px 28px 24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+                    <div style="width:40px;height:40px;border-radius:12px;background:rgba(251,86,107,.15);
+                                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fas fa-triangle-exclamation" style="color:#fb566b;"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:800;color:#fff;font-size:15px;">Cancel Reservation</div>
+                        <div style="font-size:12px;color:#888;" id="cancelResSubtitle">Reservation #...</div>
+                    </div>
+                </div>
+                <p style="color:#ccc;font-size:13px;line-height:1.6;margin-bottom:8px;" id="cancelResMsg">
+                    Are you sure you want to cancel this reservation?
+                </p>
+                <div id="cancelResRefundNote" style="display:none;padding:10px 14px;border-radius:10px;
+                     background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);margin-bottom:16px;
+                     font-size:12px;color:#f1a83c;">
+                    <i class="fas fa-coins" style="margin-right:6px;"></i>
+                    You have a payment of <strong id="cancelResAmt"></strong> on this reservation.
+                    A refund will be processed by staff.
+                </div>
+                <div style="display:flex;gap:10px;margin-top:16px;">
+                    <button id="cancelResConfirmBtn" style="flex:1;padding:11px;border-radius:10px;border:none;
+                            background:linear-gradient(135deg,#fb566b,#e03050);color:#fff;font-weight:700;
+                            font-size:13px;cursor:pointer;transition:.2s;"
+                            onclick="submitCancelReservation()">
+                        <i class="fas fa-times"></i> Yes, Cancel It
+                    </button>
+                    <button onclick="closeCancelModal()" style="flex:1;padding:11px;border-radius:10px;
+                            border:1px solid rgba(255,255,255,.15);background:transparent;color:#aaa;
+                            font-weight:700;font-size:13px;cursor:pointer;">
+                        Keep Reservation
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notification -->
+        <div id="dashToast" style="display:none;position:fixed;bottom:24px;right:24px;z-index:10000;
+             padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;
+             box-shadow:0 8px 32px rgba(0,0,0,.4);max-width:360px;transition:opacity .3s;"></div>
+
 
 
         <!-- ══ PAGE: MY STATS ══════════════════════════════════════════════ -->
@@ -1173,6 +1273,85 @@ new Chart(document.getElementById('chartSpend'), {
             }}
         }
     }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   CANCEL RESERVATION LOGIC
+═══════════════════════════════════════════════════════════ */
+let _cancelResId = null;
+
+function openCancelModal(btn) {
+    _cancelResId = btn.dataset.id;
+    const paid   = btn.dataset.paid === '1';
+    const amount = btn.dataset.amount;
+    document.getElementById('cancelResSubtitle').textContent = 'Reservation #' + _cancelResId;
+    const refundNote = document.getElementById('cancelResRefundNote');
+    refundNote.style.display = paid ? 'block' : 'none';
+    if (paid) document.getElementById('cancelResAmt').textContent = '₱' + amount;
+    const modal = document.getElementById('cancelResModal');
+    modal.style.display = 'flex';
+}
+
+function closeCancelModal() {
+    document.getElementById('cancelResModal').style.display = 'none';
+    _cancelResId = null;
+}
+
+function submitCancelReservation() {
+    if (!_cancelResId) return;
+    const btn = document.getElementById('cancelResConfirmBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling…';
+
+    const fd = new FormData();
+    fd.append('reservation_id', _cancelResId);
+
+    fetch('ajax/cancel_reservation.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            closeCancelModal();
+            if (data.success) {
+                // Fade out the row
+                const row = document.querySelector(`[data-cancel-row="${_cancelResId || data.reservation_id}"]`)
+                         || document.querySelector(`button[data-id="${_cancelResId}"]`)?.closest('tr');
+                if (row) {
+                    row.style.transition = 'opacity .4s, transform .4s';
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(20px)';
+                    setTimeout(() => { row.remove(); }, 420);
+                }
+                showDashToast(data.message, 'success');
+                // Reload after short delay so Past table updates
+                setTimeout(() => location.reload(), 2200);
+            } else {
+                showDashToast(data.message || 'Could not cancel reservation.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-times"></i> Yes, Cancel It';
+            }
+        })
+        .catch(() => {
+            closeCancelModal();
+            showDashToast('Network error — please try again.', 'error');
+        });
+}
+
+function showDashToast(msg, type) {
+    const t = document.getElementById('dashToast');
+    t.style.background = type === 'success'
+        ? 'linear-gradient(135deg,#0d3d2e,#0a2218)'
+        : 'linear-gradient(135deg,#3d0d0d,#220a0a)';
+    t.style.border = '1px solid ' + (type === 'success' ? 'rgba(32,200,161,.4)' : 'rgba(251,86,107,.4)');
+    t.style.color  = type === 'success' ? '#20c8a1' : '#fb566b';
+    t.innerHTML = (type === 'success' ? '<i class="fas fa-check-circle" style="margin-right:8px;"></i>' : '<i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>') + msg;
+    t.style.display = 'block';
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 320); }, 3500);
+}
+
+// Close cancel modal on backdrop click
+document.getElementById('cancelResModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeCancelModal();
 });
 </script>
 <!-- Bootstrap JS (navbar mobile toggler) -->

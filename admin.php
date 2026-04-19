@@ -200,13 +200,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // CANCEL RESERVATION
+    // CANCEL RESERVATION (admin-initiated → cancelled_by = 'admin')
     elseif ($action === 'cancel_reservation') {
         $res_id = (int)($_POST['reservation_id'] ?? 0);
         if ($res_id) {
-            updateReservationStatus($res_id, 'cancelled');
+            $stmt = $conn->prepare("UPDATE reservations SET status='cancelled', cancelled_by='admin' WHERE reservation_id=?");
+            $stmt->bind_param('i', $res_id);
+            $stmt->execute();
             $message = 'Reservation cancelled.';
             $messageType = 'success';
+        }
+    }
+
+    // PROCESS REFUND for a customer-cancelled reservation
+    elseif ($action === 'process_refund') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            // Fetch the reservation to get payment details
+            $stmt = $conn->prepare(
+                "SELECT r.*, u.user_id AS cust_uid
+                   FROM reservations r
+                   JOIN users u ON r.user_id = u.user_id
+                  WHERE r.reservation_id = ?
+                    AND r.status = 'cancelled'
+                    AND r.cancelled_by = 'user'
+                    AND r.downpayment_amount > 0
+                    AND r.refund_issued = 0"
+            );
+            $stmt->bind_param('i', $res_id);
+            $stmt->execute();
+            $res = $stmt->get_result()->fetch_assoc();
+
+            if ($res) {
+                $refundAmt = (float)$res['downpayment_amount'];
+                $method    = $res['downpayment_method'] ?? 'cash';
+
+                // Record as negative transaction (refund out)
+                // session_id = NULL for reservation-only refunds
+                $stmt2 = $conn->prepare(
+                    "INSERT INTO transactions
+                        (session_id, user_id, amount, payment_method, processed_by, notes, payment_status, transaction_date)
+                     VALUES (NULL, ?, ?, ?, ?, ?, 'completed', NOW())"
+                );
+                $negAmt = -$refundAmt;
+                $notes  = 'Refund for customer-cancelled reservation #' . $res_id;
+                $stmt2->bind_param('idsss', $res['cust_uid'], $negAmt, $method, $user['user_id'], $notes);
+                $stmt2->execute();
+
+                // Mark reservation as refunded
+                $stmt3 = $conn->prepare("UPDATE reservations SET refund_issued = 1 WHERE reservation_id = ?");
+                $stmt3->bind_param('i', $res_id);
+                $stmt3->execute();
+
+                $message = '₱' . number_format($refundAmt, 2) . ' refund recorded for reservation #' . $res_id . '.';
+                $messageType = 'success';
+            } else {
+                $message = 'Reservation not eligible for refund.';
+                $messageType = 'error';
+            }
         }
     }
 
@@ -566,7 +617,8 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 $availableConsoles = getAvailableConsoles();
 
 // Reservations (upcoming + active)
-$upcomingReservations = getUpcomingReservations(); // all future pending/confirmed
+$upcomingReservations  = getUpcomingReservations(); // all future pending/confirmed
+$cancelledReservations = getCancelledReservations(); // all cancelled (for refund management)
 $pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
 
