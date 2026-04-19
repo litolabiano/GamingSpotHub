@@ -584,7 +584,23 @@ function createReservation(
     );
 
     if ($stmt->execute()) {
-        return ['success' => true, 'reservation_id' => $conn->insert_id];
+        $reservation_id = $conn->insert_id;
+
+        // Record the downpayment as a transaction so it appears in financial reports
+        if ($downpayment_amount > 0 && $downpayment_method !== null) {
+            recordTransaction(
+                null,                   // no session yet
+                $user_id,               // who paid
+                $downpayment_amount,    // amount paid
+                $downpayment_method,    // payment method
+                $user_id,               // processed_by = the customer (self-serve)
+                $downpayment_amount,    // tendered = same as amount (exact)
+                null,                   // no shortfall
+                'Downpayment for reservation #' . $reservation_id
+            );
+        }
+
+        return ['success' => true, 'reservation_id' => $reservation_id];
     }
     return ['success' => false, 'message' => $conn->error];
 }
