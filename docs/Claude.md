@@ -288,3 +288,37 @@ Purpose: Shop configuration
   setting_value   │ TEXT                                       │
   description     │ VARCHAR(255)                               │
   updated_at      │ DATETIME                                   │
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEVELOPER RULES — MANDATORY (apply to ALL future code changes)
+
+1. NO CDN LINKS — EVER.
+   All external libraries (Bootstrap, Font Awesome, AOS, Chart.js, particles.js,
+   Google Fonts, etc.) MUST be served from locally downloaded files only.
+   Never add <link> or <script> tags pointing to cdn.jsdelivr.net,
+   cdnjs.cloudflare.com, fonts.googleapis.com, unpkg.com, or any other CDN.
+
+2. LOCAL LIBRARY PATHS (already downloaded):
+
+   Library               │ Local Path
+   ──────────────────────┼─────────────────────────────────────────────────────
+   Bootstrap 5.3.2 CSS   │ assets/libs/bootstrap/bootstrap.min.css
+   Bootstrap 5.3.2 JS    │ assets/libs/bootstrap/bootstrap.bundle.min.js
+   Font Awesome 6.5.1    │ assets/libs/fontawesome/css/all.min.css
+   AOS 2.3.1 CSS         │ assets/libs/aos/aos.css
+   AOS 2.3.1 JS          │ assets/libs/aos/aos.js
+   Chart.js 4.4.2        │ assets/libs/chartjs/chart.min.js
+   particles.js 2.0.0    │ assets/libs/particles/particles.min.js
+   Inter font            │ assets/fonts/inter/inter.css
+   Outfit font           │ assets/fonts/outfit/outfit.css
+
+3. PATH PREFIX RULES:
+   - Root-level files (index.php, admin.php, units.php):
+       use  assets/libs/...  and  assets/fonts/...
+   - Files inside a subdirectory (auth/, admin_sections/, ajax/):
+       use  ../assets/libs/...  and  ../assets/fonts/...
+
+4. If a NEW library is ever needed, download it to assets/libs/<name>/
+   first, then reference it locally. Do NOT use a CDN as a shortcut.

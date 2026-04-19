@@ -485,6 +485,18 @@ body {
     box-shadow: 0 6px 20px rgba(251, 86, 107, 0.4);
 }
 
+.btn-secondary {
+    background: rgba(95, 133, 218, 0.15);
+    color: var(--color-blue);
+    border: 1px solid rgba(95, 133, 218, 0.3);
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    background: rgba(95, 133, 218, 0.25);
+    border-color: var(--color-blue);
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 12px;

@@ -8,19 +8,19 @@
                     <h2 class="section-title">Welcome to Gspot Gaming Hub</h2>
                 </div>
                 <p class="about-text">
-                    Located in the heart of Dasma, we're more than just a gaming cafe - we're a community hub where gamers come together to play, compete, and connect.
+                    Located in the heart of Dasma, we're more than just a gaming spot - we're a community hub where gamers come together to play, compete, and connect.
                 </p>
                 <p class="about-text">
                     Whether you're into competitive esports, casual gaming with friends, or just looking for a cozy spot to enjoy great food and games, we've got you covered.
                 </p>
                 <div class="about-features mt-4">
-                    <div class="feature-item">
+                    <div class="feature-item"
                         <div class="feature-icon">
-                            <i class="fas fa-desktop"></i>
+                            <i class="fab fa-playstation"></i>
                         </div>
                         <div class="feature-content">
-                            <h4>High-End Gaming PCs</h4>
-                            <p>Latest hardware for smooth gaming experience</p>
+                            <h4>Next-Gen Consoles</h4>
+                            <p>PS5, PS4 & Xbox Series X with premium displays</p>
                         </div>
                     </div>
 

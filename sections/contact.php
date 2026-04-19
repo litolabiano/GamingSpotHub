@@ -14,7 +14,7 @@
                         </div>
                         <div class="contact-details">
                             <h4>Location</h4>
-                            <p>123 Gamer Street, Dasmarinas, Cavite</p>
+                            <p>29 Don Placido Avenue, Dasmariñas, Philippines, 4114</p>
                         </div>
                     </div>
                     <div class="contact-item">
@@ -41,15 +41,12 @@
                         </div>
                         <div class="contact-details">
                             <h4>Hours</h4>
-                            <p>Open 24/7</p>
+                            <p>Open 12:00 PM - 12:00 AM</p>
                         </div>
                     </div>
                 </div>
                 <div class="social-links mt-4">
-                    <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
-                    <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
-                    <a href="#" class="social-link"><i class="fab fa-discord"></i></a>
+                    <a href="https://www.facebook.com/gspotgaminghub" target="_blank" rel="noopener noreferrer" class="social-link"><i class="fab fa-facebook-f"></i></a>
                 </div>
             </div>
             <div class="col-lg-6" data-aos="fade-left">

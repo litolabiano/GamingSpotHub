@@ -23,6 +23,10 @@ if ($conn->connect_error) {
 // Set character encoding to UTF-8
 $conn->set_charset("utf8mb4");
 
-// Set timezone
+// Set MySQL session timezone
 $conn->query("SET time_zone = '+08:00'");
+
+// Set PHP timezone to match — ensures strtotime(), date(), time() all use Manila time.
+// Without this, XAMPP may default to UTC, causing 8-hour offsets in elapsed time calculations.
+date_default_timezone_set('Asia/Manila');
 ?>

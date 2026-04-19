@@ -11,36 +11,87 @@ $user = getCurrentUser();
 $message = '';
 $messageType = '';
 
-// ─── POST ACTION HANDLERS ──────────────────────────────────────────────────
+// ——————————————————————————————————————————————————————————————————————————————
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id    = (int)($_POST['user_id'] ?? 0);
-        $console_id = (int)($_POST['console_id'] ?? 0);
-        $rental_mode = $_POST['rental_mode'] ?? '';
+        $user_id         = (int)($_POST['user_id'] ?? 0);
+        $console_id      = (int)($_POST['console_id'] ?? 0);
+        $rental_mode     = $_POST['rental_mode'] ?? '';
+        $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
+        $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
 
         if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
             $messageType = 'error';
+        } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
+            $message = 'Please select a duration for the hourly session.';
+            $messageType = 'error';
         } else {
-            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id']);
-            if ($result['success']) {
-                $message = 'Session started successfully! Session ID: #' . $result['session_id'];
-                $messageType = 'success';
-            } else {
+            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
+      if ($result['success']) {
+    if ($rental_mode === 'unlimited') {
+        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
+        $upfront_cost      = (float)(getSetting('unlimited_rate') ?? 300);
+        $tendered          = isset($_POST['unlimited_tendered']) ? (float)$_POST['unlimited_tendered'] : null;
+        $shortfall         = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
+
+        recordTransaction(
+            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
+            $tendered,
+            $shortfall,
+            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+        );
+        $cost = number_format($upfront_cost, 2);
+        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+
+    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
+        $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
+        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
+        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
+
+        // Amount actually collected — if customer paid less, record only what they gave
+        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
+
+        recordTransaction(
+            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
+            $tendered,
+            $shortfall,
+            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+        );
+        $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
+        $cost      = number_format($upfront_cost, 2);
+        if ($shortfall !== null && $shortfall > 0) {
+            $tendFmt  = number_format($tendered, 2);
+            $shortFmt = number_format($shortfall, 2);
+            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
+                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
+            $messageType = 'warning';
+        } else {
+            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+        }
+
+    } else {
+        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+    }
+    if (!$messageType) $messageType = 'success';
+}else {
                 $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
             }
         }
     }
 
-    // END SESSION + RECORD PAYMENT
+    // END SESSION + RECORD OUTSTANDING BALANCE
     elseif ($action === 'end_session') {
-        $session_id     = (int)($_POST['session_id'] ?? 0);
-        $payment_method = $_POST['payment_method'] ?? 'cash';
+        $session_id      = (int)($_POST['session_id'] ?? 0);
+        $payment_method  = $_POST['payment_method'] ?? 'cash';
+        // Tendered amount entered by the cashier in the modal (may be 0 or less than due)
+        $tendered_raw    = $_POST['tendered_amount'] ?? '';
+        $tendered_amount = ($tendered_raw !== '') ? (float)$tendered_raw : null;
 
         if (!$session_id) {
             $message = 'Invalid session ID.';
@@ -48,61 +99,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = endSession($session_id);
             if ($result['success']) {
-                // Fetch the user_id for the session to record transaction
+                // How much has already been paid (e.g. upfront for hourly/unlimited)
+                $paidStmt = $conn->prepare("SELECT COALESCE(SUM(amount), 0) AS paid FROM transactions WHERE session_id = ?");
+                $paidStmt->bind_param('i', $session_id);
+                $paidStmt->execute();
+                $alreadyPaid = (float)$paidStmt->get_result()->fetch_assoc()['paid'];
+
+                $remaining = round($result['total_cost'] - $alreadyPaid, 2);
+
+                // Fetch user_id
                 $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
-                $stmt->bind_param("i", $session_id);
+                $stmt->bind_param('i', $session_id);
                 $stmt->execute();
                 $sess_row = $stmt->get_result()->fetch_assoc();
 
-                if ($sess_row) {
-                    recordTransaction($session_id, $sess_row['user_id'], $result['total_cost'], $payment_method, $user['user_id']);
+                // Determine shortfall
+                $shortfall   = null;
+                $paymentNote = null;
+                $actualCollected = $remaining; // default: assume full payment
+
+                if ($tendered_amount !== null && $remaining > 0) {
+                    if ($tendered_amount < $remaining) {
+                        // Short payment — record only what was tendered
+                        $actualCollected = $tendered_amount;
+                        $shortfall       = round($remaining - $tendered_amount, 2);
+                        $paymentNote     = 'Short payment — collected ₱' . number_format($tendered_amount, 2)
+                                         . ', short by ₱' . number_format($shortfall, 2);
+                    } else {
+                        $paymentNote = 'Balance payment collected at session end';
+                    }
                 }
-                $mins = $result['duration_minutes'];
-                $cost = number_format($result['total_cost'], 2);
-                $message = "Session ended. Duration: {$mins} min. Total: ₱{$cost}. Payment recorded.";
-                $messageType = 'success';
+
+                if ($sess_row && $remaining > 0 && $actualCollected > 0) {
+                    recordTransaction(
+                        $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
+                        $user['user_id'], $tendered_amount, $shortfall, $paymentNote
+                    );
+                }
+
+                $mins  = $result['duration_minutes'];
+                $total = number_format($result['total_cost'], 2);
+                $paid  = number_format($alreadyPaid, 2);
+
+                if ($shortfall !== null && $shortfall > 0) {
+                    $shortFmt    = number_format($shortfall, 2);
+                    $tenderedFmt = number_format($tendered_amount, 2);
+                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} — still ₱{$shortFmt} outstanding.";
+                    $messageType = 'warning';
+                } elseif ($remaining > 0) {
+                    $due     = number_format($remaining, 2);
+                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
+                    $messageType = 'success';
+                } else {
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront — no extra charge.";
+                    $messageType = 'success';
+                }
             } else {
-                $message = 'Could not end session: ' . $result['message'];
+                $message     = 'Could not end session: ' . $result['message'];
                 $messageType = 'error';
             }
         }
     }
 
-    // ADD GAME
-    elseif ($action === 'add_game') {
-        $game_name    = trim($_POST['game_name'] ?? '');
-        $console_type = $_POST['console_type'] ?? '';
-        $genre        = trim($_POST['genre'] ?? '');
-        $is_new       = isset($_POST['is_new_release']) ? 1 : 0;
-        $description  = trim($_POST['description'] ?? '');
 
-        if (!$game_name || !$console_type) {
-            $message = 'Game name and console type are required.';
-            $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare("INSERT INTO games (game_name, console_type, genre, is_new_release, description) VALUES (?,?,?,?,?)");
-            $stmt->bind_param("sssis", $game_name, $console_type, $genre, $is_new, $description);
-            if ($stmt->execute()) {
-                $message = "Game \"{$game_name}\" added to the library.";
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to add game.';
-                $messageType = 'error';
-            }
-        }
-    }
-
-    // REMOVE GAME
-    elseif ($action === 'remove_game') {
-        $game_id = (int)($_POST['game_id'] ?? 0);
-        if ($game_id) {
-            $stmt = $conn->prepare("UPDATE games SET is_available = 0 WHERE game_id = ?");
-            $stmt->bind_param("i", $game_id);
-            $stmt->execute();
-            $message = 'Game removed from library.';
-            $messageType = 'success';
-        }
-    }
 
     // UPDATE CONSOLE STATUS
     elseif ($action === 'update_console_status') {
@@ -128,9 +187,233 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Settings saved successfully.';
         $messageType = 'success';
     }
+
+    // CONFIRM RESERVATION
+    elseif ($action === 'confirm_reservation') {
+        $res_id    = (int)($_POST['reservation_id'] ?? 0);
+        $console_id = (int)($_POST['console_id'] ?? 0) ?: null;
+        if ($res_id) {
+            updateReservationStatus($res_id, 'confirmed', $console_id ?: null);
+            $message = 'Reservation confirmed.';
+            $messageType = 'success';
+        }
+    }
+
+    // CANCEL RESERVATION
+    elseif ($action === 'cancel_reservation') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            updateReservationStatus($res_id, 'cancelled');
+            $message = 'Reservation cancelled.';
+            $messageType = 'success';
+        }
+    }
+
+    // NO-SHOW
+    elseif ($action === 'noshow_reservation') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            updateReservationStatus($res_id, 'no_show');
+            $message = 'Marked as no-show.';
+            $messageType = 'warning';
+        }
+    }
+
+    // CONVERT RESERVATION → SESSION
+    elseif ($action === 'convert_reservation') {
+        $res_id     = (int)($_POST['reservation_id'] ?? 0);
+        $console_id = (int)($_POST['console_id'] ?? 0);
+        if ($res_id && $console_id) {
+            $result = convertReservationToSession($res_id, $console_id, $user['user_id']);
+            if ($result['success']) {
+                $message = 'Reservation converted to active session!';
+                $messageType = 'success';
+            } else {
+                $message = 'Conversion failed: ' . $result['message'];
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Please select a console unit to assign.';
+            $messageType = 'error';
+        }
+    }
+
+    // ADD RESERVATION (admin side)
+    elseif ($action === 'add_reservation') {
+        $uid          = (int)($_POST['user_id'] ?? 0);
+        $ctype        = $_POST['console_type'] ?? '';
+        $rmode        = $_POST['rental_mode']  ?? '';
+        $pmins        = $rmode === 'hourly' ? (int)($_POST['planned_minutes'] ?? 0) : null;
+        $rdate        = $_POST['reserved_date'] ?? '';
+        $rtime        = $_POST['reserved_time'] ?? '';
+        $notes        = trim($_POST['notes'] ?? '');
+        $dp_amount    = (float)($_POST['downpayment_amount'] ?? 0);
+        $dp_method    = $dp_amount > 0 ? ($_POST['downpayment_method'] ?? null) : null;
+        if ($uid && $ctype && $rmode && $rdate && $rtime) {
+            $result = createReservation($uid, $ctype, $rmode, $pmins, $rdate, $rtime,
+                                        $notes ?: null, $dp_amount, $dp_method);
+            $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
+            $messageType = $result['success'] ? 'success' : 'error';
+        } else {
+            $message = 'Please fill in all required fields.';
+            $messageType = 'error';
+        }
+    }
+
+    // COLLECT PAYMENT (mid-session, does NOT end the session)
+    elseif ($action === 'collect_payment') {
+        $session_id     = (int)($_POST['session_id'] ?? 0);
+        $payment_method = $_POST['payment_method'] ?? 'cash';
+        $balanceDue     = (float)($_POST['amount'] ?? 0);   // full balance owed
+        $tendered_raw   = $_POST['tendered_amount'] ?? '';
+        $tendered       = ($tendered_raw !== '') ? (float)$tendered_raw : null;
+
+        // What was ACTUALLY handed over — capped at the balance due
+        // (if no tendered entered, assume exact payment of balance due)
+        $actualCollected = ($tendered !== null) ? min($tendered, $balanceDue) : $balanceDue;
+        $shortfall       = ($tendered !== null && $tendered < $balanceDue)
+                            ? round($balanceDue - $tendered, 2) : null;
+
+        if (!$session_id || $balanceDue <= 0) {
+            $message = 'Invalid payment — balance must be greater than ₱0.';
+            $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
+            $stmt->bind_param('i', $session_id);
+            $stmt->execute();
+            $sess_row = $stmt->get_result()->fetch_assoc();
+            if ($sess_row) {
+                recordTransaction(
+                    $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
+                    $user['user_id'], $tendered, $shortfall,
+                    $shortfall
+                        ? 'Partial payment — collected ₱' . number_format($actualCollected, 2)
+                          . ', short by ₱' . number_format($shortfall, 2)
+                          . ' of ₱' . number_format($balanceDue, 2) . ' balance'
+                        : 'Balance payment collected'
+                );
+                if ($shortfall !== null && $shortfall > 0) {
+                    $message = 'Collected ₱' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
+                             . '. Still short by ₱' . number_format($shortfall, 2) . '.';
+                    $messageType = 'warning';
+                } else {
+                    $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
+                    $messageType = 'success';
+                }
+            } else {
+                $message = 'Session not found or already ended.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // ISSUE REFUND
+    elseif ($action === 'issue_refund') {
+        $session_id    = (int)($_POST['session_id'] ?? 0);
+        $refund_amount = (float)($_POST['refund_amount'] ?? 0);
+        $refund_reason = trim($_POST['refund_reason'] ?? '');
+
+        if (!$session_id || $refund_amount <= 0) {
+            $message = 'Invalid refund — amount must be greater than ₱0.';
+            $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
+            $stmt->bind_param('i', $session_id);
+            $stmt->execute();
+            $sess_row = $stmt->get_result()->fetch_assoc();
+            if ($sess_row) {
+                $note = 'Refund issued' . ($refund_reason ? ': ' . $refund_reason : '');
+                recordTransaction(
+                    $session_id, $sess_row['user_id'], -abs($refund_amount), 'refund',
+                    $user['user_id'], null, null, $note
+                );
+                $message = 'Refund of ₱' . number_format($refund_amount, 2) . ' issued.' .
+                           ($refund_reason ? ' Reason: ' . htmlspecialchars($refund_reason) : '');
+                $messageType = 'success';
+            } else {
+                $message = 'Session not found.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // EARLY END — refund unused time AND end the session in one step
+    elseif ($action === 'early_end_session') {
+        $session_id    = (int)($_POST['session_id'] ?? 0);
+        $refund_amount = (float)($_POST['refund_amount'] ?? 0);
+        $refund_reason = trim($_POST['refund_reason'] ?? '');
+
+        if (!$session_id) {
+            $message = 'Invalid session ID.';
+            $messageType = 'error';
+        } else {
+            // 1) Record refund transaction if there is anything to refund
+            if ($refund_amount > 0) {
+                $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
+                $stmt->bind_param('i', $session_id);
+                $stmt->execute();
+                $sess_row = $stmt->get_result()->fetch_assoc();
+                if ($sess_row) {
+                    $note = 'Early end – refund for unused time' .
+                            ($refund_reason ? ': ' . $refund_reason : '');
+                    recordTransaction(
+                        $session_id, $sess_row['user_id'], -abs($refund_amount), 'refund',
+                        $user['user_id'], null, null, $note
+                    );
+                }
+            }
+
+            // 2) End the session
+            $result = endSession($session_id);
+            if ($result['success']) {
+                $mins  = $result['duration_minutes'];
+                $total = number_format($result['total_cost'], 2);
+                $refFmt = number_format($refund_amount, 2);
+                if ($refund_amount > 0) {
+                    $message = "Session ended early after {$mins} min. Refund of ₱{$refFmt} issued for unused time.";
+                } else {
+                    $message = "Session ended early after {$mins} min. No refund needed — consumed time covered the full payment.";
+                }
+                $messageType = 'success';
+            } else {
+                $message = 'Could not end session: ' . $result['message'];
+                $messageType = 'error';
+            }
+        }
+    }
+
+
+    // EXTEND SESSION (adds to planned_minutes for hourly sessions)
+    elseif ($action === 'extend_session') {
+        $session_id    = (int)($_POST['session_id'] ?? 0);
+        $extra_minutes = (int)($_POST['extra_minutes'] ?? 0);
+
+        if (!$session_id || $extra_minutes <= 0) {
+            $message = 'Invalid extend — please select additional time.';
+            $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare("SELECT planned_minutes FROM gaming_sessions WHERE session_id = ? AND status = 'active'");
+            $stmt->bind_param('i', $session_id);
+            $stmt->execute();
+            $sess_row = $stmt->get_result()->fetch_assoc();
+            if ($sess_row !== false && $sess_row !== null) {
+                $new_planned = ((int)($sess_row['planned_minutes'] ?? 0)) + $extra_minutes;
+                $stmt2 = $conn->prepare("UPDATE gaming_sessions SET planned_minutes = ? WHERE session_id = ?");
+                $stmt2->bind_param('ii', $new_planned, $session_id);
+                $stmt2->execute();
+                $h = intdiv($new_planned, 60); $m = $new_planned % 60;
+                $dStr = $h ? ($m ? "{$h}h {$m}m" : "{$h}h") : "{$m}m";
+                $message = "Session #{$session_id} extended by {$extra_minutes} min. New booked duration: {$dStr}.";
+                $messageType = 'success';
+            } else {
+                $message = 'Session not found or already ended.';
+                $messageType = 'error';
+            }
+        }
+    }
 }
 
-// ─── DATA FETCHING ─────────────────────────────────────────────────────────
+// â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Dashboard stats
 $today = date('Y-m-d');
@@ -146,13 +429,24 @@ $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
 
-// Recent 20 completed sessions
+// Sessions: active/live first (sorted by urgency — closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type
+    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
-     ORDER BY gs.created_at DESC LIMIT 20"
+     ORDER BY
+         CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
+         CASE
+             WHEN gs.status = 'active' AND gs.planned_minutes IS NOT NULL
+                 THEN DATE_ADD(gs.start_time, INTERVAL gs.planned_minutes MINUTE)
+             WHEN gs.status = 'active'
+                 THEN DATE_ADD(gs.start_time, INTERVAL 9999 MINUTE)
+             ELSE NULL
+         END ASC,
+         gs.created_at DESC
+     LIMIT 50"
 );
 $stmt->execute();
 $recentSessions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -164,8 +458,10 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// Games
-$allGames = $conn->query("SELECT * FROM games ORDER BY is_available DESC, added_date DESC")->fetch_all(MYSQLI_ASSOC);
+// Reservations (upcoming + active)
+$upcomingReservations = getUpcomingReservations(); // all future pending/confirmed
+$pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
+
 
 // Financial stats
 $finStmt = $conn->query(
@@ -188,13 +484,24 @@ $transSessions = $conn->query(
      ORDER BY t.transaction_date DESC LIMIT 30"
 )->fetch_all(MYSQLI_ASSOC);
 
-// Game requests
-$gameRequests = $conn->query(
-    "SELECT gr.*, u.full_name AS customer_name
-     FROM game_requests gr
-     JOIN users u ON gr.user_id = u.user_id
-     ORDER BY gr.created_at DESC LIMIT 20"
-)->fetch_all(MYSQLI_ASSOC);
+// Unlimited rate constant (used by sessions.php pending balance display)
+$unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
+
+// Pending sessions: active sessions with upfront payment OR completed sessions with outstanding balance
+$pendingSessions = [];
+foreach ($recentSessions as $sess) {
+    $paidSoFar = (float)($sess['upfront_paid'] ?? 0);
+    if ($sess['status'] === 'active' && $paidSoFar > 0) {
+        // Active session with upfront payment — balance pending at end
+        $sess['paid_so_far'] = $paidSoFar;
+        $pendingSessions[] = $sess;
+    } elseif ($sess['status'] === 'completed' && $sess['total_cost'] > 0 && $paidSoFar < (float)$sess['total_cost']) {
+        // Completed session where total paid < total cost — outstanding balance
+        $sess['paid_so_far'] = $paidSoFar;
+        $pendingSessions[] = $sess;
+    }
+}
+
 
 // Console usage (all time)
 $usageReport = getConsoleUsageReport('2020-01-01', $today);
@@ -236,14 +543,30 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard — Good Spot Gaming Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <title>Admin Dashboard - Good Spot Gaming Hub</title>
+    <link href="assets/fonts/inter/inter.css" rel="stylesheet">
+    <link href="assets/fonts/outfit/outfit.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/libs/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/admin.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
-        /* ── Extra admin overrides ────────────────── */
+        /* Disabled submit buttons inside the end-session form (early-end guard) */
+        #endSessionForm button[type="submit"]:disabled {
+            opacity: 0.35 !important;
+            filter: grayscale(40%);
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+        }
+        /* Keep the Refund & End button always clickable inside the warning banner */
+        #endEarlyWarning button {
+            pointer-events: auto !important;
+            opacity: 1 !important;
+            filter: none !important;
+            cursor: pointer !important;
+        }
+
+        /* â”€â”€ Extra admin overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
             padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
@@ -253,6 +576,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         }
         .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: #20c8a1; }
         .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: #fb566b; }
+        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: #f1a83c; }
         @keyframes slideInRight { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 
         .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
@@ -262,13 +586,14 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
         .console-type-badge { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
         .console-type-badge.ps5  { background:rgba(95,133,218,.2); color:#5f85da; border:1px solid rgba(95,133,218,.3); }
+        .console-type-badge.ps4  { background:rgba(241,168,60,.15); color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
         .console-type-badge.xbox { background:rgba(32,200,161,.2); color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
-        /* ── Session timer ────────────────────────── */
+        /* â”€â”€ Session timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .session-timer { font-family: monospace; font-size: 13px; color: #f1e1aa; font-weight: 600; }
         .session-timer.stale { color: #fb566b; font-size:11px; font-weight:500; }
 
-        /* ── Form layout ──────────────────────────── */
+        /* â”€â”€ Form layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
         .form-group { margin-bottom:16px; }
         .form-group label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; font-weight:600; }
@@ -283,7 +608,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .form-check { display:flex; align-items:center; gap:8px; margin-top:6px; }
         .form-check input { width:auto; accent-color:#20c8a1; }
 
-        /* ── Stat cards ───────────────────────────── */
+        /* â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
         .stat-change.up { color:#20c8a1; }
         .stat-icon.revenue  { background:rgba(32,200,161,.15); color:#20c8a1; }
@@ -291,7 +616,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .stat-icon.bookings { background:rgba(179,123,236,.15); color:#b37bec; }
         .stat-icon.consoles { background:rgba(241,225,170,.15); color:#f1e1aa; }
 
-        /* ── Console cards ────────────────────────── */
+        /* â”€â”€ Console cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
         .console-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.15);
             border-radius:12px; padding:18px; position:relative; transition:.2s; }
@@ -304,16 +629,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .console-rate  { font-size:12px; color:#f1e1aa; margin-bottom:12px; }
         .console-actions { display:flex; gap:6px; flex-wrap:wrap; }
 
-        /* ── Game cards ───────────────────────────── */
-        .game-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
-        .game-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.12);
-            border-radius:12px; overflow:hidden; transition:.2s; }
-        .game-card:hover { border-color:rgba(32,200,161,.3); transform:translateY(-2px); }
-        .game-card-body { padding:14px; }
-        .game-title { font-weight:700; font-size:14px; margin-bottom:4px; color:#fff; }
-        .game-meta { font-size:12px; color:#888; }
 
-        /* ── Badge ────────────────────────────────── */
+
+        /* â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
         .badge.active     { background:rgba(95,133,218,.2);  color:#5f85da; }
         .badge.completed  { background:rgba(32,200,161,.2);  color:#20c8a1; }
@@ -324,11 +642,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .badge.maintenance{ background:rgba(251,86,107,.2);  color:#fb566b; }
         .badge.installed  { background:rgba(179,123,236,.2); color:#b37bec; }
 
-        /* ── Empty state ──────────────────────────── */
+        /* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .empty-state { text-align:center; padding:40px; color:#555; }
         .empty-state i { font-size:36px; margin-bottom:12px; display:block; }
 
-        /* ── Responsive form ──────────────────────── */
+        /* â”€â”€ Responsive form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
     </style>
 </head>
@@ -342,7 +660,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <script>setTimeout(() => document.getElementById('flashMsg')?.remove(), 4500);</script>
 <?php endif; ?>
 
-<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
     <div class="sidebar-header">
         <a class="navbar-brand" href="index.php">
@@ -352,26 +670,33 @@ $typeCounts = array_column($typeUsage, 'cnt');
             </div>
         </a>
     </div>
+    <?php $navBadge = 'style="background:#fb566b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;margin-left:auto;min-width:18px;text-align:center;"'; ?>
     <div class="nav-item active" onclick="showPage('dashboard', this)">
         <i class="fas fa-chart-line"></i><span>Dashboard</span>
     </div>
     <div class="nav-item" onclick="showPage('consoles', this)">
         <i class="fas fa-desktop"></i><span>Consoles</span>
+        <?php if ($maintenanceCount > 0): ?>
+        <span <?= $navBadge ?>><?= $maintenanceCount ?></span>
+        <?php endif; ?>
     </div>
     <div class="nav-item" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
+        <?php if ($activeCount > 0): ?>
+        <span <?= $navBadge ?>><?= $activeCount ?></span>
+        <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('games', this)">
-        <i class="fas fa-gamepad"></i><span>Game Library</span>
+    <div class="nav-item" onclick="showPage('reservations', this)">
+        <i class="fas fa-calendar-check"></i><span>Reservations</span>
+        <?php if ($pendingResCount > 0): ?>
+        <span <?= $navBadge ?>><?= $pendingResCount ?></span>
+        <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('requests', this)">
-        <i class="fas fa-inbox"></i><span>Game Requests
-        <?php $pendingReqs = count(array_filter($gameRequests, fn($r) => $r['status'] === 'pending'));
-        if ($pendingReqs > 0): ?><span style="background:#fb566b;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px"><?= $pendingReqs ?></span><?php endif; ?>
-        </span>
-    </div>
-    <div class="nav-item" onclick="showPage('financial', this)">
-        <i class="fas fa-peso-sign"></i><span>Financial</span>
+    <div class="nav-item" onclick="showPage('transactions', this)">
+        <i class="fas fa-exchange-alt"></i><span>Transactions</span>
+        <?php if (count($pendingSessions) > 0): ?>
+        <span <?= $navBadge ?>><?= count($pendingSessions) ?></span>
+        <?php endif; ?>
     </div>
     <div class="nav-item" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
@@ -385,7 +710,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </a>
 </div>
 
-<!-- ── Top Bar ──────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="topbar">
     <div class="topbar-left">
         <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
@@ -405,525 +730,39 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- ── Main Content ─────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="main-content">
 
-<!-- ════ DASHBOARD ════════════════════════════════════════════════════════ -->
-<div class="page active" id="dashboard">
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div>
-                    <div class="stat-value">₱<?= number_format($todayRevenue, 2) ?></div>
-                    <div class="stat-label">Today's Revenue</div>
-                </div>
-                <div class="stat-icon revenue"><i class="fas fa-peso-sign"></i></div>
-            </div>
-            <div class="stat-change up"><i class="fas fa-calendar-day"></i> <?= date('F d, Y') ?></div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div>
-                    <div class="stat-value"><?= $activeCount ?></div>
-                    <div class="stat-label">Active Sessions</div>
-                </div>
-                <div class="stat-icon sessions"><i class="fas fa-play-circle"></i></div>
-            </div>
-            <div class="stat-change up"><i class="fas fa-circle" style="color:#20c8a1;font-size:8px"></i> Live right now</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div>
-                    <div class="stat-value"><?= $todayBookings ?></div>
-                    <div class="stat-label">Sessions Today</div>
-                </div>
-                <div class="stat-icon bookings"><i class="fas fa-calendar-check"></i></div>
-            </div>
-            <div class="stat-change up"><i class="fas fa-check"></i> Completed today</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-card-header">
-                <div>
-                    <div class="stat-value"><?= $availableCount ?>/<?= count($allConsoles) ?></div>
-                    <div class="stat-label">Consoles Available</div>
-                </div>
-                <div class="stat-icon consoles"><i class="fas fa-desktop"></i></div>
-            </div>
-            <div class="stat-change up">
-                <span style="color:#5f85da"><?= $inUseCount ?> in use</span> &nbsp;
-                <span style="color:#fb566b"><?= $maintenanceCount ?> maintenance</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Active Sessions Right Now -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-circle" style="color:#20c8a1;font-size:10px;margin-right:8px"></i>Live Sessions</h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> Start Session</button>
-        </div>
-        <?php if (empty($activeSessions)): ?>
-            <div class="empty-state"><i class="fas fa-couch"></i>No active sessions right now</div>
-        <?php else: ?>
-        <table class="data-table">
-            <thead><tr><th>Session #</th><th>Customer</th><th>Console</th><th>Mode</th><th>Started</th><th>Elapsed</th><th>Actions</th></tr></thead>
-            <tbody>
-            <?php foreach ($activeSessions as $sess): ?>
-            <tr>
-                <td>#<?= $sess['session_id'] ?></td>
-                <td><?= htmlspecialchars($sess['customer_name']) ?></td>
-                <td>
-                    <span class="console-type-badge <?= strtolower(str_replace(' ','-',$sess['console_type'])) === 'ps5' ? 'ps5' : 'xbox' ?>">
-                        <?= $sess['console_type'] ?>
-                    </span>
-                    <?= htmlspecialchars($sess['unit_number']) ?>
-                </td>
-                <td><span class="badge pending"><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></span></td>
-                <td><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
-                <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>">—</span></td>
-                <td>
-                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['customer_name']) ?>', '<?= htmlspecialchars($sess['unit_number']) ?>')">
-                        <i class="fas fa-stop-circle"></i> End &amp; Pay
-                    </button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Recent Sessions -->
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Recent Sessions</h3></div>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Duration</th><th>Cost</th><th>Status</th></tr></thead>
-            <tbody>
-            <?php foreach (array_slice($recentSessions, 0, 8) as $sess): ?>
-            <tr>
-                <td>#<?= $sess['session_id'] ?></td>
-                <td><?= htmlspecialchars($sess['customer_name']) ?></td>
-                <td><?= htmlspecialchars($sess['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></td>
-                <td><?= $sess['duration_minutes'] ? $sess['duration_minutes'].' min' : '—' ?></td>
-                <td><?= $sess['total_cost'] ? '₱'.number_format($sess['total_cost'],2) : '—' ?></td>
-                <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- ════ CONSOLES ══════════════════════════════════════════════════════════ -->
-<div class="page" id="consoles">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div>
-            <span style="margin-right:16px;font-size:13px"><span class="status-dot available"></span><?= $availableCount ?> Available</span>
-            <span style="margin-right:16px;font-size:13px"><span class="status-dot in_use"></span><?= $inUseCount ?> In Use</span>
-            <span style="font-size:13px"><span class="status-dot maintenance"></span><?= $maintenanceCount ?> Maintenance</span>
-        </div>
-    </div>
-    <div class="console-grid">
-    <?php foreach ($allConsoles as $con): ?>
-        <div class="console-card <?= $con['status'] ?>">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-                <span class="console-type-badge <?= $con['console_type'] === 'PS5' ? 'ps5' : 'xbox' ?>">
-                    <i class="fab fa-<?= $con['console_type'] === 'PS5' ? 'playstation' : 'xbox' ?>"></i>
-                    <?= $con['console_type'] ?>
-                </span>
-                <span class="badge <?= $con['status'] ?>"><?= ucfirst(str_replace('_',' ',$con['status'])) ?></span>
-            </div>
-            <div class="console-unit"><?= htmlspecialchars($con['unit_number']) ?></div>
-            <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
-            <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
-            <div class="console-actions">
-                <?php if ($con['status'] !== 'available'): ?>
-                <form method="POST" style="display:inline">
-                    <input type="hidden" name="action" value="update_console_status">
-                    <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                    <input type="hidden" name="status" value="available">
-                    <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Set Available</button>
-                </form>
-                <?php endif; ?>
-                <?php if ($con['status'] !== 'maintenance'): ?>
-                <form method="POST" style="display:inline">
-                    <input type="hidden" name="action" value="update_console_status">
-                    <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                    <input type="hidden" name="status" value="maintenance">
-                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-wrench"></i> Maintenance</button>
-                </form>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endforeach; ?>
-    </div>
-</div>
-
-<!-- ════ SESSIONS ══════════════════════════════════════════════════════════ -->
-<div class="page" id="sessions">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">All Sessions</h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
-        </div>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Start</th><th>End</th><th>Duration</th><th>Cost</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody>
-            <?php foreach ($recentSessions as $sess): ?>
-            <tr>
-                <td>#<?= $sess['session_id'] ?></td>
-                <td><?= htmlspecialchars($sess['customer_name']) ?></td>
-                <td><?= htmlspecialchars($sess['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$sess['rental_mode'])) ?></td>
-                <td><?= date('M d h:i A', strtotime($sess['start_time'])) ?></td>
-                <td><?= $sess['end_time'] ? date('h:i A', strtotime($sess['end_time'])) : '<span style="color:#20c8a1">Live</span>' ?></td>
-                <td><?= $sess['duration_minutes'] ? $sess['duration_minutes'].' min' : '—' ?></td>
-                <td><?= $sess['total_cost'] ? '₱'.number_format($sess['total_cost'],2) : '—' ?></td>
-                <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
-                <td>
-                <?php if ($sess['status'] === 'active'): ?>
-                    <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['customer_name']) ?>', '<?= htmlspecialchars($sess['unit_number']) ?>')">
-                        <i class="fas fa-stop"></i> End
-                    </button>
-                <?php else: ?>—<?php endif; ?>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- ════ GAME LIBRARY ═══════════════════════════════════════════════════════ -->
-<div class="page" id="games">
-    <div class="card-header" style="margin-bottom:16px">
-        <h3 class="card-title">Game Library (<?= count(array_filter($allGames, fn($g) => $g['is_available'])) ?> active)</h3>
-        <button class="btn btn-primary btn-sm" onclick="openModal('addGame')"><i class="fas fa-plus"></i> Add Game</button>
-    </div>
-    <div class="game-grid">
-    <?php foreach ($allGames as $game): ?>
-        <div class="game-card" style="<?= !$game['is_available'] ? 'opacity:.45' : '' ?>">
-            <div class="game-card-body">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-                    <span class="badge <?= $game['is_new_release'] ? 'available' : 'completed' ?>" style="font-size:10px">
-                        <?= $game['is_new_release'] ? '🔥 NEW' : 'AVAILABLE' ?>
-                    </span>
-                    <span style="font-size:11px;color:#888"><?= htmlspecialchars($game['console_type']) ?></span>
-                </div>
-                <div class="game-title"><?= htmlspecialchars($game['game_name']) ?></div>
-                <div class="game-meta"><?= htmlspecialchars($game['genre'] ?? 'Unknown genre') ?></div>
-                <?php if ($game['description']): ?>
-                <div style="font-size:11px;color:#666;margin-top:6px;line-height:1.4"><?= htmlspecialchars(mb_substr($game['description'],0,60)).(strlen($game['description'])>60?'…':'') ?></div>
-                <?php endif; ?>
-                <?php if ($game['is_available']): ?>
-                <form method="POST" style="margin-top:12px" onsubmit="return confirm('Remove this game?')">
-                    <input type="hidden" name="action" value="remove_game">
-                    <input type="hidden" name="game_id" value="<?= $game['game_id'] ?>">
-                    <button type="submit" class="btn btn-danger btn-sm" style="width:100%"><i class="fas fa-times"></i> Remove</button>
-                </form>
-                <?php else: ?>
-                <div style="margin-top:12px;font-size:11px;color:#fb566b;text-align:center">Removed from library</div>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endforeach; ?>
-    </div>
-</div>
-
-<!-- ════ GAME REQUESTS ══════════════════════════════════════════════════════ -->
-<div class="page" id="requests">
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Customer Game Requests</h3></div>
-        <?php if (empty($gameRequests)): ?>
-            <div class="empty-state"><i class="fas fa-inbox"></i>No game requests yet</div>
-        <?php else: ?>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Game</th><th>Console</th><th>Message</th><th>Submitted</th><th>Status</th></tr></thead>
-            <tbody>
-            <?php foreach ($gameRequests as $req): ?>
-            <tr>
-                <td>#<?= $req['gr_id'] ?></td>
-                <td><?= htmlspecialchars($req['customer_name']) ?></td>
-                <td><?= htmlspecialchars($req['game_name']) ?></td>
-                <td><?= htmlspecialchars($req['console_type']) ?></td>
-                <td style="max-width:200px;font-size:12px;color:#888"><?= htmlspecialchars(mb_substr($req['message'] ?? '—', 0, 60)) ?></td>
-                <td><?= date('M d, Y', strtotime($req['created_at'])) ?></td>
-                <td><span class="badge <?= $req['status'] ?>"><?= ucfirst($req['status']) ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- ════ FINANCIAL ══════════════════════════════════════════════════════════ -->
-<div class="page" id="financial">
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">Today's Revenue</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">This Month's Revenue</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">All-Time Revenue</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value"><?= $finStats['total_transactions'] ?? 0 ?></div>
-            <div class="stat-label">Total Transactions</div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Transaction History</h3></div>
-        <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
-            <tbody>
-            <?php foreach ($transSessions as $t): ?>
-            <tr>
-                <td>#<?= $t['transaction_id'] ?></td>
-                <td><?= htmlspecialchars($t['customer_name']) ?></td>
-                <td><?= htmlspecialchars($t['unit_number']) ?></td>
-                <td><?= ucfirst(str_replace('_',' ',$t['rental_mode'])) ?></td>
-                <td style="color:#20c8a1;font-weight:700">₱<?= number_format($t['amount'],2) ?></td>
-                <td><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
-                <td><?= date('M d, Y h:i A', strtotime($t['transaction_date'])) ?></td>
-                <td><span class="badge <?= $t['payment_status'] === 'completed' ? 'completed' : 'cancelled' ?>"><?= ucfirst($t['payment_status']) ?></span></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- ════ REPORTS ════════════════════════════════════════════════════════════ -->
-<div class="page" id="reports">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>
-            <canvas id="revChart" height="200"></canvas>
-        </div>
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Sessions by Console Type</h3></div>
-            <canvas id="typeChart" height="200"></canvas>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">Console Usage Report (All Time)</h3></div>
-        <table class="data-table">
-            <thead><tr><th>Unit</th><th>Type</th><th>Total Sessions</th><th>Total Hours</th><th>Revenue</th></tr></thead>
-            <tbody>
-            <?php foreach ($usageReport as $u): ?>
-            <tr>
-                <td><?= htmlspecialchars($u['unit_number']) ?></td>
-                <td><?= htmlspecialchars($u['console_type']) ?></td>
-                <td><?= $u['total_sessions'] ?></td>
-                <td><?= number_format($u['total_minutes']/60, 1) ?> hrs</td>
-                <td style="color:#20c8a1">₱<?= number_format($u['total_revenue'], 2) ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- ════ SETTINGS ═══════════════════════════════════════════════════════════ -->
-<div class="page" id="settings">
-    <form method="POST">
-        <input type="hidden" name="action" value="save_settings">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Pricing</h3></div>
-                <div class="form-group">
-                    <label>PS5 Hourly Rate (₱)</label>
-                    <input type="number" step="0.01" name="ps5_hourly_rate" value="<?= htmlspecialchars($settings['ps5_hourly_rate'] ?? '60') ?>">
-                </div>
-                <div class="form-group">
-                    <label>Xbox Hourly Rate (₱)</label>
-                    <input type="number" step="0.01" name="xbox_hourly_rate" value="<?= htmlspecialchars($settings['xbox_hourly_rate'] ?? '60') ?>">
-                </div>
-                <div class="form-group">
-                    <label>Unlimited (whole day) Rate (₱)</label>
-                    <input type="number" step="0.01" name="unlimited_rate" value="<?= htmlspecialchars($settings['unlimited_rate'] ?? '300') ?>">
-                </div>
-                <div class="form-group">
-                    <label>Controller Rental Fee (₱)</label>
-                    <input type="number" step="0.01" name="controller_rental_fee" value="<?= htmlspecialchars($settings['controller_rental_fee'] ?? '20') ?>">
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Shop Information</h3></div>
-                <div class="form-group">
-                    <label>Shop Name</label>
-                    <input type="text" name="shop_name" value="<?= htmlspecialchars($settings['shop_name'] ?? '') ?>" readonly style="opacity:.6">
-                </div>
-                <div class="form-group">
-                    <label>Address</label>
-                    <input type="text" name="shop_address" value="<?= htmlspecialchars($settings['shop_address'] ?? '') ?>" readonly style="opacity:.6">
-                </div>
-                <div class="form-group">
-                    <label>Opening Time</label>
-                    <input type="time" name="business_hours_open" value="<?= htmlspecialchars($settings['business_hours_open'] ?? '09:00') ?>">
-                </div>
-                <div class="form-group">
-                    <label>Closing Time</label>
-                    <input type="time" name="business_hours_close" value="<?= htmlspecialchars($settings['business_hours_close'] ?? '23:00') ?>">
-                </div>
-                <div class="form-group">
-                    <label>Shop Phone</label>
-                    <input type="text" name="shop_phone" value="<?= htmlspecialchars($settings['shop_phone'] ?? '') ?>">
-                </div>
-            </div>
-        </div>
-        <div style="margin-top:10px">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
-        </div>
-    </form>
-</div>
+<?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
+<?php include __DIR__ . '/admin_sections/consoles.php'; ?>
+<?php include __DIR__ . '/admin_sections/sessions.php'; ?>
+<?php include __DIR__ . '/admin_sections/reservations.php'; ?>
+<?php include __DIR__ . '/admin_sections/transactions.php'; ?>
+<?php include __DIR__ . '/admin_sections/reports.php'; ?>
+<?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
+<?php include __DIR__ . '/admin_sections/modals.php'; ?>
 
-<!-- ════ MODALS ══════════════════════════════════════════════════════════════ -->
-
-<!-- Start Session Modal -->
-<div class="modal" id="startSessionModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title"><i class="fas fa-play-circle" style="color:#20c8a1;margin-right:8px"></i>Start New Session</h3>
-            <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
-        </div>
-        <form method="POST">
-            <input type="hidden" name="action" value="start_session">
-            <div class="form-group">
-                <label>Customer *</label>
-                <select name="user_id" required>
-                    <option value="">— Select customer —</option>
-                    <?php foreach ($customers as $c): ?>
-                    <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Console *</label>
-                    <select name="console_id" required>
-                        <option value="">— Select console —</option>
-                        <?php foreach ($availableConsoles as $con): ?>
-                        <option value="<?= $con['console_id'] ?>"><?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Rental Mode *</label>
-                    <select name="rental_mode" required>
-                        <option value="hourly">Hourly (rounded up per hour)</option>
-                        <option value="open_time">Open Time (per minute)</option>
-                        <option value="unlimited">Unlimited (flat ₱<?= htmlspecialchars($settings['unlimited_rate'] ?? '300') ?>)</option>
-                    </select>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
-                <i class="fas fa-play"></i> Start Session
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- End Session Modal -->
-<div class="modal" id="endSessionModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title"><i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session &amp; Collect Payment</h3>
-            <button class="modal-close" onclick="closeModal('endSession')">&times;</button>
-        </div>
-        <div style="background:rgba(251,86,107,.08);border:1px solid rgba(251,86,107,.2);border-radius:10px;padding:14px;margin-bottom:20px;font-size:14px">
-            <strong id="endSessionSummary">—</strong>
-        </div>
-        <form method="POST">
-            <input type="hidden" name="action" value="end_session">
-            <input type="hidden" name="session_id" id="endSessionId">
-            <div class="form-group">
-                <label>Payment Method</label>
-                <select name="payment_method">
-                    <option value="cash">💵 Cash</option>
-                    <option value="gcash">📱 GCash</option>
-                    <option value="credit_card">💳 Credit Card</option>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-danger" style="width:100%;justify-content:center">
-                <i class="fas fa-check-circle"></i> Confirm End &amp; Record Payment
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- Add Game Modal -->
-<div class="modal" id="addGameModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title"><i class="fas fa-plus-circle" style="color:#20c8a1;margin-right:8px"></i>Add Game to Library</h3>
-            <button class="modal-close" onclick="closeModal('addGame')">&times;</button>
-        </div>
-        <form method="POST">
-            <input type="hidden" name="action" value="add_game">
-            <div class="form-group">
-                <label>Game Title *</label>
-                <input type="text" name="game_name" placeholder="e.g. EA Sports FC 25" required>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Platform *</label>
-                    <select name="console_type" required>
-                        <option value="PS5">PS5 Only</option>
-                        <option value="Xbox Series X">Xbox Series X Only</option>
-                        <option value="Both">Both Platforms</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Genre</label>
-                    <input type="text" name="genre" placeholder="e.g. Sports, FPS, RPG">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea name="description" placeholder="Short description..."></textarea>
-            </div>
-            <div class="form-group">
-                <div class="form-check">
-                    <input type="checkbox" name="is_new_release" id="isNewRelease">
-                    <label for="isNewRelease">🔥 Mark as New Release</label>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
-                <i class="fas fa-plus"></i> Add Game
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- ── JavaScript ────────────────────────────────────────────────────────── -->
-<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<!-- â”€â”€ JavaScript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<script src="assets/libs/aos/aos.js"></script>
 <script>
-// ── Navigation ──────────────────────────────────────────────────────────────
+// â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function showPage(page, el) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById(page).classList.add('active');
     if (el) el.classList.add('active');
     const titles = {
-        dashboard: 'Dashboard', consoles: 'Console Management',
-        sessions: 'Session Management', games: 'Game Library',
-        requests: 'Game Requests', financial: 'Financial',
-        reports: 'Analytics & Reports', settings: 'Settings'
+        dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
+        sessions: 'Session Management',
+        financial: 'Financial', reports: 'Analytics & Reports',
+        settings: 'Settings'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
+
+    // Persist active page in URL hash so reloads stay on the same section
+    history.replaceState(null, '', '#' + page);
 
     // Render charts lazily on first visit to reports
     if (page === 'reports' && !window.chartsRendered) {
@@ -931,6 +770,22 @@ function showPage(page, el) {
         window.chartsRendered = true;
     }
 }
+
+// ── Restore active page from URL hash on load ──
+(function () {
+    const hash = window.location.hash.replace('#', '');
+    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings'];
+    if (hash && validPages.includes(hash)) {
+        const navItems = document.querySelectorAll('.nav-item[onclick]');
+        let matchEl = null;
+        navItems.forEach(n => {
+            if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + hash + "'")) {
+                matchEl = n;
+            }
+        });
+        showPage(hash, matchEl);
+    }
+})();
 
 function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
@@ -942,51 +797,730 @@ function toggleSidebar() {
     mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
 }
 
-// ── Modals ──────────────────────────────────────────────────────────────────
+// â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function onRentalModeChange() {
+    const mode            = document.getElementById('rentalModeSelect').value;
+    const group           = document.getElementById('durationPickerGroup');
+    const preview         = document.getElementById('sessionPreview');
+    const hourlyPayGroup  = document.getElementById('startPaymentGroup');
+    const unlimPayGroup   = document.getElementById('unlimitedPaymentGroup');
+    const openTimeNote    = document.getElementById('openTimeNote');
+    const toggle          = document.getElementById('collectNowToggle');
+
+    // Duration picker: only for hourly
+    group.style.display   = (mode === 'hourly') ? 'block' : 'none';
+    if (mode !== 'hourly') {
+        preview.style.display = 'none';
+        document.getElementById('plannedMinutesInput').value = '';
+        document.getElementById('durationSelect').value      = '';
+    }
+
+    // Show the right payment section per mode
+    hourlyPayGroup.style.display  = (mode === 'hourly')     ? 'block' : 'none';
+    unlimPayGroup.style.display   = (mode === 'unlimited')  ? 'block' : 'none';
+    openTimeNote.style.display    = (mode === 'open_time')  ? 'block' : 'none';
+
+    // Reset optional checkbox each time mode switches to hourly
+    if (mode === 'hourly') {
+        toggle.checked = false;
+        document.getElementById('startPaymentFields').style.display = 'none';
+    }
+}
+
+/* Show/hide payment method when the optional checkbox is toggled */
+function toggleStartPaymentFields(checkbox) {
+    const fields = document.getElementById('startPaymentFields');
+    fields.style.display = checkbox.checked ? 'block' : 'none';
+    if (!checkbox.checked) {
+        document.getElementById('startTendered').value = '';
+        document.getElementById('startChangeDisplay').style.display = 'none';
+    }
+}
+
+/* ── Change calculator ──
+   tenderedId  : id of the amount-tendered input
+   displayId   : id of the change display div
+   costHolderId: id of element whose textContent/value holds the amount due
+*/
+function calcChange(tenderedId, displayId, costHolderId) {
+    const el   = document.getElementById(costHolderId);
+    const due  = parseFloat(el.value !== undefined ? el.value : el.textContent) || 0;
+    const paid = parseFloat(document.getElementById(tenderedId).value) || 0;
+    const disp = document.getElementById(displayId);
+    // Short-payment notices — end modal and pay modal
+    const endShortNotice = document.getElementById('endShortNotice');
+    const payShortNotice = document.getElementById('payShortNotice');
+
+    if (!paid) {
+        disp.style.display = 'none';
+        if (endShortNotice) endShortNotice.style.display = 'none';
+        if (payShortNotice) payShortNotice.style.display = 'none';
+        return;
+    }
+
+    const change = paid - due;
+    disp.style.display = 'block';
+    if (change >= 0) {
+        disp.style.background = 'rgba(32,200,161,.15)';
+        disp.style.border     = '1px solid rgba(32,200,161,.3)';
+        disp.style.color      = '#20c8a1';
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
+        if (endShortNotice) endShortNotice.style.display = 'none';
+        if (payShortNotice) payShortNotice.style.display = 'none';
+    } else {
+        disp.style.background = 'rgba(251,86,107,.15)';
+        disp.style.border     = '1px solid rgba(251,86,107,.3)';
+        disp.style.color      = '#fb566b';
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient — short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
+        if (endShortNotice) endShortNotice.style.display = 'block';
+        if (payShortNotice) payShortNotice.style.display = 'block';
+    }
+}
+
+/**
+ * Called by the End Session confirm button.
+ * Copies the visible tendered input into the hidden POST field, then lets the form submit.
+ * No blocking — a short payment is always allowed through.
+ */
+function syncTenderedAndSubmit(e) {
+    // Block if the early-end warning is active (confirm button disabled)
+    const confirmBtn = document.getElementById('endSessionConfirmBtn');
+    if (confirmBtn && confirmBtn.disabled) {
+        e.preventDefault();
+        // Pulse the warning banner to draw attention
+        const warn = document.getElementById('endEarlyWarning');
+        if (warn) {
+            warn.style.transition = 'box-shadow .15s';
+            warn.style.boxShadow  = '0 0 0 3px rgba(241,168,60,.5)';
+            setTimeout(() => { warn.style.boxShadow = ''; }, 600);
+        }
+        return false;
+    }
+
+    const tenderedVal = document.getElementById('endTendered').value;
+    const payGroup    = document.getElementById('endPaymentMethodGroup');
+
+    // If the payment section is visible (balance due) and no amount entered, block submission
+    if (payGroup && payGroup.style.display !== 'none') {
+        if (!tenderedVal || parseFloat(tenderedVal) <= 0) {
+            e.preventDefault();
+            // Highlight the tendered input
+            const input = document.getElementById('endTendered');
+            input.style.borderColor = '#fb566b';
+            input.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.25)';
+            input.focus();
+            input.setAttribute('placeholder', '⚠ Enter amount tendered');
+            return false;
+        }
+    }
+
+    document.getElementById('endTenderedHidden').value = tenderedVal;
+    // Form submits normally after this (no e.preventDefault())
+}
+
+function updateSessionPreview() {
+    const minutes = parseInt(document.getElementById('durationSelect').value);
+    const input   = document.getElementById('plannedMinutesInput');
+    const preview = document.getElementById('sessionPreview');
+    if (!minutes) { preview.style.display = 'none'; input.value = ''; return; }
+
+    input.value = minutes;
+
+    // Estimated end time
+    const now    = new Date();
+    const endAt  = new Date(now.getTime() + minutes * 60000);
+    const endStr = endAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    // Base cost (mirrors PHP logic)
+    const cost = (minutes <= 30) ? 50 : (minutes / 60 * 80);
+
+    // Populate hidden cost holder for the change calculator
+    const costHolder = document.getElementById('startCostAmt');
+    if (costHolder) costHolder.textContent = cost.toFixed(2);
+
+    document.getElementById('previewEndTime').textContent = endStr;
+    document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
+    document.getElementById('previewOvertime').style.display = 'block';
+    preview.style.display = 'block';
+}
+
+// Form validation: require duration for hourly
+document.addEventListener('DOMContentLoaded', function () {
+    // Show duration picker by default (hourly is default selected)
+    onRentalModeChange();
+
+    document.getElementById('startSessionForm').addEventListener('submit', function (e) {
+        const mode = document.getElementById('rentalModeSelect').value;
+        if (mode === 'hourly' && !document.getElementById('durationSelect').value) {
+            e.preventDefault();
+            alert('Please select a duration for the hourly session.');
+        }
+    });
+});
+
+// â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
 }
 function closeModal(name) {
     document.getElementById(name + 'Modal').classList.remove('active');
+    if (name === 'endSession' && typeof _endModalTimer !== 'undefined' && _endModalTimer) {
+        clearInterval(_endModalTimer);
+        _endModalTimer = null;
+    }
 }
 // Close on outside click
 document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
 });
 
-function openEndSessionModal(sessionId, customerName, unitNumber) {
+/* ── Billing helpers — mirrors PHP computePartialPeriodCost / computeTimedCost ── *
+ * Rule: FREE 30 min after every 2 paid hours.
+ * Cycle = 150 min (120 paid + 30 free) = ₱160 per cycle.
+ */
+function _bracketCost(partialMin) {
+    // Partial-hour bracket for minutes 0–59
+    if (partialMin <= 4)  return 0;   // grace
+    if (partialMin <= 19) return 20;
+    if (partialMin <= 34) return 40;
+    if (partialMin <= 49) return 60;
+    return 80;
+}
+function _timedCost(totalMin) {
+    if (totalMin <= 0) return 0;
+    const CYCLE = 150;   // 120 min paid + 30 min free
+    const CYCLE_COST = 160;
+    const fullCycles = Math.floor(totalMin / CYCLE);
+    const remainder  = totalMin % CYCLE;
+    let cost = fullCycles * CYCLE_COST;
+    if (remainder > 120) {
+        // Inside the free 30-min window — charge the full 2-hour block
+        cost += CYCLE_COST;
+    } else {
+        // Inside the paid window — hourly bracket billing
+        cost += Math.floor(remainder / 60) * 80 + _bracketCost(remainder % 60);
+    }
+    return cost;
+}
+function _hourlyCost(duration, planned) {
+    const base     = planned <= 30 ? 50 : (planned / 60 * 80);
+    const overtime = duration - planned;
+    if (overtime <= 0) return base;
+    return base + _timedCost(overtime);
+}
+
+let _endModalTimer = null;   // holds the live-update interval
+
+// Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
+let _pendingRefundArgs = null;
+
+function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
+    upfrontPaid = upfrontPaid || 0;
     document.getElementById('endSessionId').value = sessionId;
+
+    // ── Early-end guard (hourly only) ────────────────────────────────────
+    const earlyWarning    = document.getElementById('endEarlyWarning');
+    const earlyRemStr     = document.getElementById('endEarlyRemainingStr');
+    const earlyRefundBtn  = document.getElementById('endEarlyRefundBtn');
+    const confirmBtn      = document.getElementById('endSessionConfirmBtn');
+
+    // Reset guard UI first
+    earlyWarning.style.display = 'none';
+    confirmBtn.disabled        = false;
+    confirmBtn.style.opacity   = '1';
+    confirmBtn.style.cursor    = 'pointer';
+
+    if (mode === 'hourly' && plannedMinutes && startTs) {
+        const nowSec    = Math.floor(Date.now() / 1000);
+        const elapsed   = nowSec - startTs;           // total elapsed seconds
+        const remaining = (plannedMinutes * 60) - elapsed; // seconds
+
+        if (remaining > 0) {
+            // ── Remaining time label ─────────────────────────────────────
+            const remH = Math.floor(remaining / 3600);
+            const remM = Math.floor((remaining % 3600) / 60);
+            const remS = remaining % 60;
+            earlyRemStr.textContent = (remH ? remH + 'h ' : '') +
+                String(remM).padStart(2,'0') + ':' + String(remS).padStart(2,'0');
+
+            // ── Consumed time & cost calculation ─────────────────────────
+            const elapsedMin    = Math.floor(elapsed / 60);
+            const elH           = Math.floor(elapsedMin / 60);
+            const elM           = elapsedMin % 60;
+            const elapsedLabel  = (elH ? elH + 'h ' : '') + String(elM).padStart(2,'0') + 'm';
+
+            // Customer only pays for actual time used (open-time bracket billing)
+            const consumedCost  = _timedCost(elapsedMin);
+            // Refund = what they paid upfront minus what they owe for consumed time
+            const refundAmt     = Math.max(0, upfrontPaid - consumedCost);
+            const hasRefund     = refundAmt > 0;
+
+            // ── Populate breakdown display ───────────────────────────────
+            document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
+            document.getElementById('endEarlyConsumedCost').textContent = '₱' + consumedCost.toFixed(2);
+            document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
+            document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
+            document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
+
+            const noRefundNote = document.getElementById('endEarlyNoRefundNote');
+            if (noRefundNote) noRefundNote.style.display = hasRefund ? 'none' : 'block';
+
+            // Colour the refund amount green if 0 (no refund), red if positive
+            const refundEl = document.getElementById('endEarlyRefundAmt');
+            refundEl.style.color = hasRefund ? '#fb566b' : '#888';
+
+            // ── Show warning, disable confirm button ─────────────────────
+            earlyWarning.style.display = 'block';
+            confirmBtn.disabled        = true;
+            confirmBtn.style.opacity   = '0.35';
+            confirmBtn.style.cursor    = 'not-allowed';
+
+            // ── Wire up "Refund & End" button ────────────────────────────
+            _pendingRefundArgs = { sessionId, customerName, unitNumber, upfrontPaid, refundAmt, consumedCost, elapsedLabel };
+            earlyRefundBtn.onclick = function () {
+                closeModal('endSession');
+
+                // Open the refund modal
+                openRefundModal(
+                    _pendingRefundArgs.sessionId,
+                    _pendingRefundArgs.customerName,
+                    _pendingRefundArgs.unitNumber,
+                    _pendingRefundArgs.upfrontPaid
+                );
+
+                // Switch form action to early_end_session (refund + end in one step)
+                document.getElementById('refundActionField').value  = 'early_end_session';
+                document.getElementById('refundEarlyEndFlag').value = '1';
+
+                // Pre-fill refund amount
+                const amtEl = document.getElementById('refundAmount');
+                if (amtEl) amtEl.value = _pendingRefundArgs.refundAmt.toFixed(0);
+
+                // Pre-fill reason
+                const reasonEl = document.getElementById('refundReason');
+                if (reasonEl) {
+                    reasonEl.value =
+                        'Early end \u2013 used ' + _pendingRefundArgs.elapsedLabel +
+                        ' (\u20b1' + _pendingRefundArgs.consumedCost.toFixed(2) + ')' +
+                        ', refunding unused time (\u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ')';
+                }
+
+                // Show early-end notice inside refund modal
+                const earlyNote = document.getElementById('refundEarlyEndNote');
+                if (earlyNote) earlyNote.style.display = 'block';
+
+                // Update confirm button label
+                const lbl = document.getElementById('refundConfirmLabel');
+                if (lbl) {
+                    lbl.textContent = _pendingRefundArgs.refundAmt > 0
+                        ? 'Refund \u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ' & End Session'
+                        : 'End Session (No Refund)';
+                }
+            };
+        }
+    }
+
+    // ── End early-end guard ───────────────────────────────────────────────
+
+    const panel       = document.getElementById('endCostPanel');
+    const elapsedEl   = document.getElementById('endElapsed');
+    const costEl      = document.getElementById('endEstCost');
+    const noteEl      = document.getElementById('endCostNote');
+    const payGroup    = document.getElementById('endPaymentMethodGroup');
+    const payLabel    = document.getElementById('endPaymentMethodLabel');
+    const prepaidNote = document.getElementById('endPrepaidNote');
+    const confirmLbl  = document.getElementById('endSessionConfirmLabel');
+    const titleEl     = document.getElementById('endSessionModalTitle');
+
+    // Clear any previous live timer
+    if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
+
+    // Reset tendered input & change display each time modal opens
+    const tenderedEl  = document.getElementById('endTendered');
+    const changeDisp  = document.getElementById('endChangeDisplay');
+    const costHolder  = document.getElementById('endCostAmtHolder');
+    const amountDueEl = document.getElementById('endAmountDueDisplay');
+    const amountDueLbl= document.getElementById('endAmountDueLabel');
+    const amountDueBox= document.getElementById('endAmountDueBox');
+    tenderedEl.value         = '';
+    changeDisp.style.display = 'none';
+    costHolder.value         = '0';
+    document.getElementById('endTenderedHidden').value = '';
+    const shortNotice = document.getElementById('endShortNotice');
+    if (shortNotice) shortNotice.style.display = 'none';
+
+    // Helper: update the big amount-due display + sync cost holder
+    function setAmountDue(amount, sublabel) {
+        costHolder.value      = amount.toFixed(2);
+        amountDueEl.textContent = '₱' + amount.toFixed(2);
+        if (sublabel !== undefined) amountDueLbl.textContent = sublabel;
+        amountDueBox.style.display = 'block';
+    }
+    function hideAmountDue() {
+        amountDueBox.style.display = 'none';
+    }
+
+    const modeLabel = mode === 'open_time' ? 'Open Time'
+                    : mode === 'unlimited' ? 'Unlimited'
+                    : 'Hourly';
+
     document.getElementById('endSessionSummary').textContent =
-        `Ending session #${sessionId} — ${customerName} on ${unitNumber}. Cost will be calculated automatically.`;
+        `Ending session #${sessionId} — ${customerName} on ${unitNumber} (${modeLabel})`;
+
+    /* ── OPEN TIME: pay at end, show live ticking cost ── */
+    if (mode === 'open_time' && startTs) {
+        titleEl.innerHTML     = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session & Collect Payment';
+        panel.style.display   = 'block';
+        payGroup.style.display = 'block';
+        prepaidNote.style.display = 'none';
+        payLabel.textContent  = 'Payment Method';
+        confirmLbl.textContent = 'Confirm End & Record Payment';
+        noteEl.innerHTML = '<i class="fas fa-info-circle"></i> Cost is calculated at end — collect from customer after confirming.';
+
+        function tick() {
+            const elapsed = Math.floor((Date.now() / 1000) - startTs);
+            const minutes = Math.floor(elapsed / 60);
+            const secs    = elapsed % 60;
+            const h = Math.floor(minutes / 60), m = minutes % 60;
+            elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+            const dueCost = _timedCost(minutes);
+            costEl.textContent = '₱' + dueCost.toFixed(2);
+            const remaining = Math.max(0, dueCost - upfrontPaid);
+            // Sync cost holder + big display
+            if (remaining > 0) {
+                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
+            } else {
+                hideAmountDue();
+                costHolder.value = '0';
+            }
+            if (tenderedEl.value) calcChange('endTendered','endChangeDisplay','endCostAmtHolder');
+        }
+        tick();
+        _endModalTimer = setInterval(tick, 1000);
+
+    /* ── HOURLY: prepaid base, overtime may apply ── */
+    } else if (mode === 'hourly' && plannedMinutes) {
+        const base    = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
+        const elapsed = Math.floor((Date.now() / 1000) - startTs);
+        const minutes = Math.floor(elapsed / 60);
+        const overtime = minutes - plannedMinutes;
+        const cost    = _hourlyCost(minutes, plannedMinutes);
+        const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
+        const bookedStr = ph ? (pm ? `${ph}h ${pm}m` : `${ph}h`) : `${pm}m`;
+
+        panel.style.display = 'block';
+        elapsedEl.textContent = String(Math.floor(minutes/60)).padStart(2,'0') + 'h ' + String(minutes%60).padStart(2,'0') + 'm';
+        costEl.textContent    = '₱' + cost.toFixed(2);
+
+        const remaining = Math.max(0, cost - upfrontPaid);
+
+        if (remaining > 0) {
+            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Payment';
+            if (overtime > 0) {
+                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
+            } else {
+                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>₱${remaining.toFixed(2)}</strong> now.`;
+            }
+            payGroup.style.display    = 'block';
+            prepaidNote.style.display = 'none';
+            payLabel.textContent      = 'Payment Method';
+            confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
+        } else {
+            // Session fully paid
+            hideAmountDue();
+            costHolder.value = '0';
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
+            payGroup.style.display    = 'none';
+            prepaidNote.style.display = 'block';
+            confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+        }
+
+    /* ── UNLIMITED: flat rate was fully prepaid ── */
+    } else if (mode === 'unlimited') {
+        titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+        panel.style.display       = 'block';
+        elapsedEl.textContent     = '—';
+        costEl.textContent        = 'Flat rate';
+        noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session — flat rate already collected at start.';
+        hideAmountDue();
+        payGroup.style.display    = 'none';
+        prepaidNote.style.display = 'block';
+        confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+
+    } else {
+        panel.style.display = 'none';
+        payGroup.style.display = 'block';
+        prepaidNote.style.display = 'none';
+        confirmLbl.textContent = 'Confirm End & Record Payment';
+    }
+
     openModal('endSession');
 }
 
-// ── Live Session Timers ─────────────────────────────────────────────────────
+/* ── Pay Modal (collect outstanding balance, session continues) ──────── */
+let _payModalTimer = null;
+
+function openPayModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
+    upfrontPaid   = upfrontPaid   || 0;
+    unlimitedRate = unlimitedRate || 300;
+
+    document.getElementById('paySessionId').value = sessionId;
+    document.getElementById('paySessionSummary').textContent =
+        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber +
+        ' (' + (mode === 'open_time' ? 'Open Time' : mode === 'unlimited' ? 'Unlimited' : 'Hourly') + ')';
+
+    // Reset
+    document.getElementById('payTendered').value              = '';
+    document.getElementById('payChangeDisplay').style.display = 'none';
+    document.getElementById('payShortNotice').style.display   = 'none';
+    document.getElementById('payAmountDueDisplay').style.color = '#20c8a1';
+
+    if (_payModalTimer) { clearInterval(_payModalTimer); _payModalTimer = null; }
+
+    const costPanel   = document.getElementById('payCostPanel');
+    const elapsedEl   = document.getElementById('payElapsed');
+    const costEl      = document.getElementById('payEstCost');
+    const breakdownEl = document.getElementById('payCostBreakdown');
+    const dueBigEl    = document.getElementById('payAmountDueDisplay');
+    const dueLblEl    = document.getElementById('payAmountDueLabel');
+    const amtHidden   = document.getElementById('payAmount');
+    const confirmBtn  = document.getElementById('payConfirmBtn');
+    const confirmLbl  = document.getElementById('payConfirmLabel');
+
+    function setPayDue(due, sublabel) {
+        dueBigEl.textContent   = '₱' + due.toFixed(2);
+        dueLblEl.textContent   = sublabel || '';
+        amtHidden.value        = due.toFixed(2);
+        if (due > 0) {
+            confirmLbl.textContent = 'Collect ₱' + due.toFixed(2) + ' Balance';
+            confirmBtn.disabled    = false;
+            confirmBtn.style.opacity = '1';
+        } else {
+            confirmLbl.textContent = 'No Balance Due';
+            confirmBtn.disabled    = true;
+            confirmBtn.style.opacity = '0.5';
+        }
+        // Refresh change display if tendered already entered
+        if (document.getElementById('payTendered').value)
+            calcChange('payTendered','payChangeDisplay','payAmount');
+    }
+
+    /* ── Open Time: live-ticking balance ── */
+    if (mode === 'open_time' && startTs) {
+        costPanel.style.display = 'block';
+        var payTick = function() {
+            const elapsed  = Math.floor((Date.now() / 1000) - startTs);
+            const minutes  = Math.floor(elapsed / 60);
+            const h = Math.floor(minutes / 60), m = minutes % 60, s = elapsed % 60;
+            elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+            const totalCost = _timedCost(minutes);
+            costEl.textContent  = '₱' + totalCost.toFixed(2);
+            const due = Math.max(0, totalCost - upfrontPaid);
+            const sublabel = upfrontPaid > 0
+                ? 'Running cost ₱' + totalCost.toFixed(2) + ' — Already paid ₱' + upfrontPaid.toFixed(2)
+                : 'Cost accumulating — pay at any time';
+            setPayDue(due, sublabel);
+        };
+        payTick();
+        _payModalTimer = setInterval(payTick, 1000);
+
+    /* ── Hourly: snapshot at open time ── */
+    } else if (mode === 'hourly' && plannedMinutes && startTs) {
+        costPanel.style.display = 'block';
+        const elapsed   = Math.floor((Date.now() / 1000) - startTs);
+        const minutes   = Math.floor(elapsed / 60);
+        const totalCost = _hourlyCost(minutes, plannedMinutes);
+        const due       = Math.max(0, totalCost - upfrontPaid);
+        const h = Math.floor(minutes / 60), m = minutes % 60;
+        elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
+        costEl.textContent    = '₱' + totalCost.toFixed(2);
+        const baseCost  = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
+        const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
+        const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
+        const overtime  = Math.max(0, minutes - plannedMinutes);
+        let sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ')';
+        if (upfrontPaid > 0) sublabel += ' — Prepaid ₱' + upfrontPaid.toFixed(2);
+        if (overtime > 0)    sublabel += ' — +' + overtime + 'min overtime';
+        setPayDue(due, sublabel);
+
+    /* ── Unlimited: already fully paid ── */
+    } else if (mode === 'unlimited') {
+        costPanel.style.display = 'none';
+        dueBigEl.textContent = '₱0.00';
+        dueBigEl.style.color = '#888';
+        dueLblEl.textContent = 'Unlimited session — flat rate already collected at start';
+        amtHidden.value      = '0';
+        confirmLbl.textContent = 'No Balance Due';
+        confirmBtn.disabled    = true;
+        confirmBtn.style.opacity = '0.5';
+
+    } else {
+        costPanel.style.display = 'none';
+        setPayDue(0, 'Enter amount if needed');
+    }
+
+    openModal('paySession');
+}
+
+function closePayModal() {
+    if (_payModalTimer) { clearInterval(_payModalTimer); _payModalTimer = null; }
+    closeModal('paySession');
+}
+
+/* Updates the Collect button label to match what will actually be recorded
+   (the smaller of tendered vs balance due) */
+function syncPayBtn() {
+    const balanceDue = parseFloat(document.getElementById('payAmount').value) || 0;
+    const tenderedEl = document.getElementById('payTendered');
+    const tendered   = parseFloat(tenderedEl.value);
+    const confirmLbl = document.getElementById('payConfirmLabel');
+    const confirmBtn = document.getElementById('payConfirmBtn');
+    if (!tenderedEl.value || isNaN(tendered)) {
+        // No tendered value — revert to full balance label
+        if (balanceDue > 0) {
+            confirmLbl.textContent   = 'Collect \u20b1' + balanceDue.toFixed(2) + ' Balance';
+            confirmBtn.disabled      = false;
+            confirmBtn.style.opacity = '1';
+        }
+        return;
+    }
+    const collect = Math.min(tendered, balanceDue);
+    if (collect > 0) {
+        confirmLbl.textContent   = 'Collect \u20b1' + collect.toFixed(2);
+        confirmBtn.disabled      = false;
+        confirmBtn.style.opacity = '1';
+    }
+}
+
+/* ── Refund Modal ─────────────────────────────────────────────────────── */
+function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid) {
+    document.getElementById('refundSessionId').value = sessionId;
+    document.getElementById('refundSessionSummary').textContent =
+        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber;
+    const paid = parseFloat(upfrontPaid || 0).toFixed(2);
+    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
+    document.getElementById('refundMaxNote').textContent   = 'Max refundable: ₱' + paid;
+    document.getElementById('refundAmount').value = '';
+    document.getElementById('refundReason').value = '';
+
+    // Reset to normal refund mode (in case previously used for early-end)
+    document.getElementById('refundActionField').value  = 'issue_refund';
+    document.getElementById('refundEarlyEndFlag').value = '0';
+    const earlyNote = document.getElementById('refundEarlyEndNote');
+    if (earlyNote) earlyNote.style.display = 'none';
+    const lbl = document.getElementById('refundConfirmLabel');
+    if (lbl) lbl.textContent = 'Confirm Refund';
+
+    openModal('refundSession');
+}
+
+/* ── Refund form submission helper ───────────────────────────────────── */
+function submitRefundForm() {
+    const isEarlyEnd = document.getElementById('refundEarlyEndFlag').value === '1';
+    const refundAmt  = parseFloat(document.getElementById('refundAmount').value) || 0;
+
+    if (isEarlyEnd) {
+        const msg = refundAmt > 0
+            ? 'Issue a refund of \u20b1' + refundAmt.toFixed(2) + ' and end the session? This cannot be undone.'
+            : 'End the session now? No refund will be issued. This cannot be undone.';
+        gspotConfirm(msg, function () {
+            document.getElementById('refundSessionForm').submit();
+        }, { danger: true, yesLabel: refundAmt > 0 ? 'Yes, Refund & End' : 'Yes, End Session' });
+    } else {
+        if (refundAmt <= 0) {
+            alert('Please enter a refund amount greater than \u20b10.');
+            return;
+        }
+        gspotConfirm('Issue this refund of \u20b1' + refundAmt.toFixed(2) + '? This cannot be undone.',
+            function () { document.getElementById('refundSessionForm').submit(); },
+            { danger: true, yesLabel: 'Yes, Refund' });
+    }
+}
+
+
+/* ── Extend Modal ─────────────────────────────────────────────────────── */
+function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes) {
+    document.getElementById('extendSessionId').value = sessionId;
+    document.getElementById('extendSessionSummary').textContent =
+        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber;
+    const h = Math.floor(bookedMinutes / 60), m = bookedMinutes % 60;
+    document.getElementById('extendCurrentDuration').textContent =
+        bookedMinutes > 0
+            ? (h ? (m ? h + 'h ' + m + 'm' : h + 'h') : m + 'm')
+            : 'Open / Unlimited';
+    document.getElementById('extendMinutes').value = '';
+    openModal('extendSession');
+}
+
+// Stop live timer when modal is closed
+document.addEventListener('DOMContentLoaded', function () {
+    const endModal = document.getElementById('endSessionModal');
+    if (endModal) {
+        endModal.addEventListener('click', function (e) {
+            if (e.target === endModal && _endModalTimer) {
+                clearInterval(_endModalTimer); _endModalTimer = null;
+            }
+        });
+        const closeBtn = endModal.querySelector('.modal-close');
+        if (closeBtn) closeBtn.addEventListener('click', function () {
+            if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
+        });
+    }
+});
+
+// â”€â”€ Live Session Timers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
+
+function pad(n) { return String(n).padStart(2, '0'); }
 
 function updateTimers() {
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
-        const start = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
-        const now   = new Date();
-        const elapsed = Math.floor((now - start) / 1000);
+        const start   = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
+        const planned = el.dataset.planned ? parseInt(el.dataset.planned) : null;
+        const now     = new Date();
+        const elapsed = Math.floor((now - start) / 1000); // seconds
 
+        // Stale session guard (>24h open â€” likely test/orphan data)
         if (elapsed > STALE_THRESHOLD) {
-            // Session is stale (>24h) — DB data likely from sample/test data
             el.classList.add('stale');
-            const days = Math.floor(elapsed / 86400);
-            el.textContent = `⚠️ ${days}d old — end session`;
+            el.textContent = `âš ï¸ ${Math.floor(elapsed / 86400)}d old â€” end session`;
+            return;
+        }
+
+        if (planned) {
+            // Hourly: show countdown; flip to overtime when past booked time
+            const remaining = (planned * 60) - elapsed;
+            if (remaining > 0) {
+                const h = Math.floor(remaining / 3600);
+                const m = Math.floor((remaining % 3600) / 60);
+                const s = remaining % 60;
+                el.style.color = '#20c8a1';
+                el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
+            } else {
+                const over = -remaining;
+                const m = Math.floor(over / 60);
+                const s = over % 60;
+                el.style.color = '#fb566b';
+                el.textContent = `+${pad(m)}:${pad(s)} OVERTIME`;
+            }
         } else {
+            // Open Time / Unlimited: show elapsed
             const h = Math.floor(elapsed / 3600);
             const m = Math.floor((elapsed % 3600) / 60);
             const s = elapsed % 60;
-            el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            el.style.color = '';
+            el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
         }
     });
 }
 updateTimers();
 setInterval(updateTimers, 1000);
 
-// ── Charts ──────────────────────────────────────────────────────────────────
+// â”€â”€ Charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderCharts() {
     const revLabels = <?= json_encode($revLabels) ?>;
     const revData   = <?= json_encode($revChartData) ?>;
@@ -1001,7 +1535,7 @@ function renderCharts() {
         type: 'bar',
         data: {
             labels: revLabels,
-            datasets: [{ label: 'Revenue (₱)', data: revData,
+            datasets: [{ label: 'Revenue (â‚±)', data: revData,
                 backgroundColor: 'rgba(32,200,161,.5)', borderColor: '#20c8a1',
                 borderWidth: 2, borderRadius: 6 }]
         },
