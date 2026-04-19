@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 19, 2026 at 11:12 AM
+-- Generation Time: Apr 19, 2026 at 11:18 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -431,7 +431,9 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (138, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:57', 12, '2026-04-19 16:54:57'),
 (139, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:59', 12, '2026-04-19 16:54:59'),
 (140, 44, 17, 200.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-19 16:58:09', 12, '2026-04-19 16:58:09'),
-(141, 44, 17, -200.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱200.00)', '', 'completed', '2026-04-19 16:58:18', 12, '2026-04-19 16:58:18');
+(141, 44, 17, -200.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱200.00)', '', 'completed', '2026-04-19 16:58:18', 12, '2026-04-19 16:58:18'),
+(142, 44, 17, 520.00, 520.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-19 17:13:17', 12, '2026-04-19 17:13:17'),
+(143, 43, 21, 1260.00, 1260.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-19 17:13:25', 12, '2026-04-19 17:13:25');
 
 -- --------------------------------------------------------
 
@@ -621,7 +623,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=142;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=144;
 
 --
 -- AUTO_INCREMENT for table `users`
