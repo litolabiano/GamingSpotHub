@@ -211,6 +211,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // PROCESS REFUND for a customer-cancelled reservation
+    elseif ($action === 'process_refund') {
+        $res_id = (int)($_POST['reservation_id'] ?? 0);
+        if ($res_id) {
+            $stmt = $conn->prepare(
+                "SELECT user_id, downpayment_amount, downpayment_method
+                   FROM reservations
+                  WHERE reservation_id = ?
+                    AND status         = 'cancelled'
+                    AND (cancelled_by  = 'user' OR cancelled_by IS NULL)
+                    AND downpayment_amount > 0
+                    AND refund_issued = 0"
+            );
+            $stmt->bind_param('i', $res_id);
+            $stmt->execute();
+            $res = $stmt->get_result()->fetch_assoc();
+
+            if ($res) {
+                $refundAmt = (float)$res['downpayment_amount'];
+                $method    = $res['downpayment_method'] ?? 'cash';
+                $note      = 'Refund for cancelled reservation #' . $res_id;
+
+                // recordTransaction() handles NULL session_id correctly
+                recordTransaction(null, $res['user_id'], -$refundAmt, $method,
+                                  $user['user_id'], null, null, $note);
+
+                $stmt2 = $conn->prepare("UPDATE reservations SET refund_issued = 1 WHERE reservation_id = ?");
+                $stmt2->bind_param('i', $res_id);
+                $stmt2->execute();
+
+                $message     = '₱' . number_format($refundAmt, 2) . ' refund issued for reservation #' . $res_id . '.';
+                $messageType = 'success';
+            } else {
+                $message     = 'Reservation not eligible for refund (already processed or no payment on record).';
+                $messageType = 'error';
+            }
+        } else {
+            $message     = 'Invalid reservation ID.';
+            $messageType = 'error';
+        }
+    }
+
     // NO-SHOW
     elseif ($action === 'noshow_reservation') {
         $res_id = (int)($_POST['reservation_id'] ?? 0);
@@ -460,9 +502,10 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// Reservations (upcoming + active)
-$upcomingReservations = getUpcomingReservations(); // all future pending/confirmed
-$pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
+// Reservations — upcoming (pending/confirmed) + cancelled (for refund management)
+$upcomingReservations  = getUpcomingReservations();
+$cancelledReservations = getCancelledReservations();
+$pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
 
 // Financial stats
