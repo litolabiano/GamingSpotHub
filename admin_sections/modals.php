@@ -498,6 +498,8 @@
             <!-- action is overridden to 'early_end_session' when coming from early-end flow -->
             <input type="hidden" name="action" id="refundActionField" value="issue_refund">
             <input type="hidden" name="session_id" id="refundSessionId">
+            <!-- For reservation-cancellation refunds -->
+            <input type="hidden" name="reservation_id" id="refundReservationId" value="">
             <!-- Flag set by JS when this is an early-end (refund + end) submission -->
             <input type="hidden" name="early_end" id="refundEarlyEndFlag" value="0">
             <div class="form-group">

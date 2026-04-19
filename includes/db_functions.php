@@ -556,8 +556,7 @@ function updateSetting($key, $value) {
 function createReservation(
     $user_id, $console_type, $rental_mode, $planned_minutes,
     $reserved_date, $reserved_time, $notes = null,
-    $downpayment_amount = 0.0, $downpayment_method = null,
-    $preferred_console_id = null
+    $downpayment_amount = 0.0, $downpayment_method = null
 ) {
     global $conn;
 
@@ -572,15 +571,14 @@ function createReservation(
     $stmt = $conn->prepare(
         "INSERT INTO reservations
             (user_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
-             notes, downpayment_amount, downpayment_method, downpayment_paid, console_id, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+             notes, downpayment_amount, downpayment_method, downpayment_paid, status, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
     );
     $stmt->bind_param(
-        'ississsdsiii',
+        'ississsdsii',
         $user_id, $console_type, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
-        $preferred_console_id,
         $user_id   // created_by = the customer themselves
     );
 
@@ -759,26 +757,6 @@ function getUpcomingReservations($days = null) {
 }
 
 /**
- * Get cancelled reservations for admin refund management.
- * Returns: all cancelled reservations, newest first.
- * cancelled_by = 'user' + downpayment_amount > 0 + refund_issued = 0 → refund needed.
- */
-function getCancelledReservations() {
-    global $conn;
-    $stmt = $conn->prepare(
-        "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
-                c.unit_number, c.console_name
-           FROM reservations r
-           JOIN users u ON r.user_id = u.user_id
-           LEFT JOIN consoles c ON r.console_id = c.console_id
-          WHERE r.status = 'cancelled'
-          ORDER BY r.reserved_date DESC, r.reserved_time DESC"
-    );
-    $stmt->execute();
-    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-}
-
-/**
  * Get reservations for the logged-in customer.
  */
 function getMyReservations($user_id) {
@@ -794,4 +772,24 @@ function getMyReservations($user_id) {
     $stmt->execute();
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
+
+/**
+ * Get all cancelled reservations (any canceller) for admin refund management.
+ * Includes customer and console info. Ordered newest cancellation first.
+ */
+function getCancelledReservations() {
+    global $conn;
+    $stmt = $conn->prepare(
+        "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+                c.unit_number, c.console_name
+           FROM reservations r
+           JOIN users u ON r.user_id = u.user_id
+           LEFT JOIN consoles c ON r.console_id = c.console_id
+          WHERE r.status = 'cancelled'
+          ORDER BY r.reserved_date DESC, r.reserved_time DESC"
+    );
+    $stmt->execute();
+    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
 ?>
+
