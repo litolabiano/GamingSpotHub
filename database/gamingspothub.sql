@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 18, 2026 at 03:20 PM
+-- Generation Time: Apr 19, 2026 at 11:12 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -134,7 +134,11 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (37, 17, 3, 'hourly', 240, '2026-04-18 16:25:52', '2026-04-18 16:25:58', 0, 80.00, 320.00, 'completed', NULL, 12, '2026-04-18 16:25:52'),
 (38, 12, 2, 'hourly', 480, '2026-04-18 16:38:33', '2026-04-18 16:41:32', 3, 80.00, 640.00, 'completed', NULL, 12, '2026-04-18 16:38:33'),
 (39, 17, 6, 'hourly', 90, '2026-04-18 16:44:07', '2026-04-18 17:08:14', 24, 80.00, 120.00, 'completed', NULL, 12, '2026-04-18 16:44:07'),
-(40, 17, 1, 'hourly', 450, '2026-04-18 17:08:28', '2026-04-18 17:08:33', 0, 80.00, 600.00, 'completed', NULL, 12, '2026-04-18 17:08:28');
+(40, 17, 1, 'hourly', 450, '2026-04-18 17:08:28', '2026-04-18 17:08:33', 0, 80.00, 600.00, 'completed', NULL, 12, '2026-04-18 17:08:28'),
+(41, 21, 2, 'hourly', 150, '2026-04-19 15:38:47', '2026-04-19 15:41:05', 2, 80.00, 200.00, 'completed', NULL, 12, '2026-04-19 15:38:47'),
+(42, 21, 1, 'hourly', 390, '2026-04-19 15:45:41', '2026-04-19 18:46:00', 180, 80.00, 520.00, 'completed', NULL, 12, '2026-04-19 15:45:41'),
+(43, 21, 2, 'hourly', 420, '2026-04-19 15:47:02', '2026-04-19 16:57:57', 71, 80.00, 560.00, 'completed', NULL, 12, '2026-04-19 15:47:02'),
+(44, 17, 2, 'hourly', 390, '2026-04-19 16:58:09', '2026-04-19 16:58:18', 0, 80.00, 520.00, 'completed', NULL, 12, '2026-04-19 16:58:09');
 
 -- --------------------------------------------------------
 
@@ -191,7 +195,8 @@ INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_
 (7, 21, 6, 'PS4', 'hourly', 180, '2026-06-19', '10:10:00', 'nothing', 100.00, 'cash', 1, 'converted', 21, '2026-04-18 00:25:54', '2026-04-18 16:24:20'),
 (8, 21, 2, 'PS5', 'hourly', 240, '3030-06-01', '10:10:00', NULL, 100.00, 'cash', 1, 'converted', 21, '2026-04-18 00:30:59', '2026-04-18 16:25:30'),
 (9, 12, 2, 'PS5', 'hourly', 480, '2026-06-10', '10:20:00', NULL, 320.00, 'cash', 1, 'converted', 12, '2026-04-18 16:38:16', '2026-04-18 16:38:33'),
-(10, 17, 6, 'PS4', 'hourly', 90, '2026-06-19', '10:10:00', NULL, 60.00, 'cash', 1, 'converted', 17, '2026-04-18 16:43:53', '2026-04-18 16:44:07');
+(10, 17, 6, 'PS4', 'hourly', 90, '2026-06-19', '10:10:00', NULL, 60.00, 'cash', 1, 'converted', 17, '2026-04-18 16:43:53', '2026-04-18 16:44:07'),
+(11, 21, 2, 'PS5', 'hourly', 150, '2026-06-19', '10:00:00', NULL, 100.00, 'cash', 1, 'converted', 21, '2026-04-19 15:36:54', '2026-04-19 15:38:47');
 
 -- --------------------------------------------------------
 
@@ -410,7 +415,23 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (122, 39, 17, 60.00, 60.00, NULL, 'Downpayment transferred from reservation #10', 'cash', 'completed', '2026-04-18 16:44:07', 12, '2026-04-18 16:44:07'),
 (123, 39, 17, 60.00, 60.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 17:08:14', 12, '2026-04-18 17:08:14'),
 (124, 40, 17, 20.00, 20.00, 580.00, 'Short payment at session start — short by ₱580.00', 'cash', 'completed', '2026-04-18 17:08:28', 12, '2026-04-18 17:08:28'),
-(125, 40, 17, 580.00, 580.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 17:08:33', 12, '2026-04-18 17:08:33');
+(125, 40, 17, 580.00, 580.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-18 17:08:33', 12, '2026-04-18 17:08:33'),
+(126, 41, 21, 100.00, 100.00, NULL, 'Downpayment transferred from reservation #11', 'cash', 'completed', '2026-04-19 15:38:47', 12, '2026-04-19 15:38:47'),
+(127, 41, 21, 100.00, 100.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-19 15:41:05', 12, '2026-04-19 15:41:05'),
+(128, 42, 21, 204.00, 204.00, 316.00, 'Short payment at session start — short by ₱316.00', 'cash', 'completed', '2026-04-19 15:45:41', 12, '2026-04-19 15:45:41'),
+(129, 42, 21, 316.00, 316.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-04-19 15:46:00', 12, '2026-04-19 15:46:00'),
+(130, 43, 21, 200.00, 200.00, 360.00, 'Short payment at session start — short by ₱360.00', 'cash', 'completed', '2026-04-19 15:47:02', 12, '2026-04-19 15:47:02'),
+(131, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:52:17', 12, '2026-04-19 16:52:17'),
+(132, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:53:42', 12, '2026-04-19 16:53:42'),
+(133, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:53:47', 12, '2026-04-19 16:53:47'),
+(134, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:03', 12, '2026-04-19 16:54:03'),
+(135, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:05', 12, '2026-04-19 16:54:05'),
+(136, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:34', 12, '2026-04-19 16:54:34'),
+(137, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:39', 12, '2026-04-19 16:54:39'),
+(138, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:57', 12, '2026-04-19 16:54:57'),
+(139, 43, 21, -100.00, NULL, NULL, 'Refund issued: Early end – used 1h 05m (₱100.00), refunding unused time (₱100.00)', '', 'completed', '2026-04-19 16:54:59', 12, '2026-04-19 16:54:59'),
+(140, 44, 17, 200.00, 200.00, 320.00, 'Short payment at session start — short by ₱320.00', 'cash', 'completed', '2026-04-19 16:58:09', 12, '2026-04-19 16:58:09'),
+(141, 44, 17, -200.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱200.00)', '', 'completed', '2026-04-19 16:58:18', 12, '2026-04-19 16:58:18');
 
 -- --------------------------------------------------------
 
@@ -441,7 +462,8 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, `role`, `status`, `email_verified`, `verification_token`, `verification_expires`, `reset_token`, `reset_expires`, `created_at`) VALUES
 (12, 'ljlabianao@gmail.com', '$2y$10$nEuBy0VoWqtbRETOnAD99eurxRHdLaGpxROWA//NGpziKgIG1CmmS', 'lito', '09916310227', 'owner', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 20:45:06'),
 (17, 'llabianojr@kld.edu.ph', '$2y$10$N97t4MFGjElD3iM.nlpn3uZ/hy1zNC/Lfqi/YozlBB6BG1VWkL.Oe', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-12 19:54:25'),
-(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29');
+(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29'),
+(22, 'admin@gmail.com', '$2y$10$kZCF21cxNKIxXE99XNGyF.nGfT94FZeDaGtbH4YTBOxrpumQLDvIK', 'Admin User', '', 'customer', 'active', 0, '9ad4e0d4b2004d75a763bd2e6e9af695cdb053e39c7cadd65db419783c75b54f', '2026-04-20 16:02:24', NULL, NULL, '2026-04-19 16:02:24');
 
 --
 -- Indexes for dumped tables
@@ -563,7 +585,7 @@ ALTER TABLE `consoles`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -575,7 +597,7 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
@@ -599,13 +621,13 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=126;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=142;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- Constraints for dumped tables
