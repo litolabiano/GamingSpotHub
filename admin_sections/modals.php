@@ -274,6 +274,73 @@
             <strong id="endSessionSummary">—</strong>
         </div>
 
+        <!-- ── Early-end warning (shown when hourly session still has time left) ── -->
+        <div id="endEarlyWarning" style="display:none;background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.45);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(241,168,60,.2);border:1px solid rgba(241,168,60,.4);display:flex;align-items:center;justify-content:center;font-size:18px;color:#f1a83c;flex-shrink:0;">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700;color:#f1e1aa;font-size:14px;margin-bottom:2px;">Session Time Not Yet Elapsed</div>
+                    <div style="font-size:12px;color:#aaa;">The customer still has <strong id="endEarlyRemainingStr" style="color:#f1a83c;">—</strong> remaining on their booked session.</div>
+                </div>
+            </div>
+
+            <!-- ── Refund Breakdown ── -->
+            <div id="endEarlyBreakdown" style="background:rgba(0,0,0,.25);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:10px;">
+                    <i class="fas fa-calculator" style="margin-right:5px;"></i> Refund Calculation
+                </div>
+                <!-- Row: Consumed -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;">
+                    <span style="color:#aaa;">
+                        <i class="fas fa-play-circle" style="color:#20c8a1;margin-right:6px;font-size:11px;"></i>
+                        Time Used <span id="endEarlyElapsedStr" style="color:#f1e1aa;font-family:monospace;font-size:12px;">(—)</span>
+                    </span>
+                    <span style="font-weight:700;color:#20c8a1;" id="endEarlyConsumedCost">₱0.00</span>
+                </div>
+                <!-- Row: Paid -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);">
+                    <span style="color:#aaa;">
+                        <i class="fas fa-receipt" style="color:#f1a83c;margin-right:6px;font-size:11px;"></i>
+                        Amount Paid Upfront
+                    </span>
+                    <span style="font-weight:700;color:#f1e1aa;" id="endEarlyUpfrontStr">₱0.00</span>
+                </div>
+                <!-- Row: Refund -->
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;">
+                    <span style="font-weight:700;color:#fff;">
+                        <i class="fas fa-undo-alt" style="color:#fb566b;margin-right:6px;font-size:12px;"></i>
+                        Refund to Customer
+                    </span>
+                    <span style="font-size:20px;font-weight:900;color:#fb566b;font-family:'Outfit',monospace;" id="endEarlyRefundAmt">₱0.00</span>
+                </div>
+                <div id="endEarlyNoRefundNote" style="display:none;margin-top:8px;font-size:12px;color:#888;text-align:right;">
+                    <i class="fas fa-info-circle"></i> No refund — consumed cost covers or exceeds amount paid.
+                </div>
+            </div>
+
+            <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#aaa;line-height:1.6;margin-bottom:12px;">
+                <i class="fas fa-info-circle" style="color:#f1a83c;margin-right:5px;"></i>
+                The customer only pays for <strong style="color:#f1e1aa;">time actually used</strong>. The refund is pre-calculated above.
+            </div>
+
+            <!-- Refund & End action -->
+            <button type="button" id="endEarlyRefundBtn"
+                    style="width:100%;padding:12px;border-radius:10px;
+                           background:linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15));
+                           border:1px solid rgba(241,168,60,.5);color:#f1e1aa;
+                           font-size:14px;font-weight:700;cursor:pointer;
+                           display:flex;align-items:center;justify-content:center;gap:8px;
+                           transition:.2s;"
+                    onmouseover="this.style.background='linear-gradient(135deg,rgba(241,168,60,.35),rgba(251,86,107,.25))'"
+                    onmouseout="this.style.background='linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15))'">
+                <i class="fas fa-undo-alt"></i>
+                <span>Refund <span id="endEarlyRefundBtnAmt">—</span> &amp; End Session Early</span>
+            </button>
+        </div>
+
+
         <!-- Cost preview panel (shown for open_time; updated live) -->
         <div id="endCostPanel" style="display:none;background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.2);border-radius:10px;padding:16px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
@@ -428,11 +495,14 @@
         </div>
 
         <form method="POST" id="refundSessionForm">
-            <input type="hidden" name="action" value="issue_refund">
+            <!-- action is overridden to 'early_end_session' when coming from early-end flow -->
+            <input type="hidden" name="action" id="refundActionField" value="issue_refund">
             <input type="hidden" name="session_id" id="refundSessionId">
+            <!-- Flag set by JS when this is an early-end (refund + end) submission -->
+            <input type="hidden" name="early_end" id="refundEarlyEndFlag" value="0">
             <div class="form-group">
                 <label>Refund Amount (₱) *</label>
-                <input type="number" name="refund_amount" id="refundAmount" min="1" step="1" required
+                <input type="number" name="refund_amount" id="refundAmount" min="0" step="1"
                        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:20px;font-weight:700;box-sizing:border-box;"
                        placeholder="Enter amount to refund">
                 <div id="refundMaxNote" style="font-size:11px;color:#888;margin-top:4px;"></div>
@@ -446,11 +516,17 @@
             <div style="background:rgba(251,86,107,.07);border:1px solid rgba(251,86,107,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#fb566b;">
                 <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and cannot be undone.
             </div>
-            <button type="button" class="btn btn-danger" style="width:100%;justify-content:center;"
-                    onclick="gspotConfirm('Issue this refund? This cannot be undone.', function(){ document.getElementById('refundSessionForm').submit(); }, {danger:true, yesLabel:'Yes, Refund'})">
-                <i class="fas fa-undo-alt"></i> Confirm Refund
+            <!-- Early-end note — shown only when triggered from early-end flow -->
+            <div id="refundEarlyEndNote" style="display:none;background:rgba(241,168,60,.1);border:1px solid rgba(241,168,60,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#f1a83c;">
+                <i class="fas fa-stop-circle" style="margin-right:5px;"></i>
+                <strong>Early End:</strong> Confirming will issue the refund above <strong>and immediately end the session</strong>.
+            </div>
+            <button type="button" id="refundConfirmBtn" class="btn btn-danger" style="width:100%;justify-content:center;"
+                    onclick="submitRefundForm()">
+                <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
             </button>
         </form>
+
     </div>
 </div>
 

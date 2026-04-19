@@ -1,5 +1,5 @@
-<!-- ════ FINANCIAL ══════════════════════════════════════════════════════════ -->
-<div class="page" id="financial">
+<!-- ════ TRANSACTIONS ══════════════════════════════════════════════════════════ -->
+<div class="page" id="transactions">
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>

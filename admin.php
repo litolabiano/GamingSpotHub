@@ -337,6 +337,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // EARLY END — refund unused time AND end the session in one step
+    elseif ($action === 'early_end_session') {
+        $session_id    = (int)($_POST['session_id'] ?? 0);
+        $refund_amount = (float)($_POST['refund_amount'] ?? 0);
+        $refund_reason = trim($_POST['refund_reason'] ?? '');
+
+        if (!$session_id) {
+            $message = 'Invalid session ID.';
+            $messageType = 'error';
+        } else {
+            // 1) Record refund transaction if there is anything to refund
+            if ($refund_amount > 0) {
+                $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
+                $stmt->bind_param('i', $session_id);
+                $stmt->execute();
+                $sess_row = $stmt->get_result()->fetch_assoc();
+                if ($sess_row) {
+                    $note = 'Early end – refund for unused time' .
+                            ($refund_reason ? ': ' . $refund_reason : '');
+                    recordTransaction(
+                        $session_id, $sess_row['user_id'], -abs($refund_amount), 'refund',
+                        $user['user_id'], null, null, $note
+                    );
+                }
+            }
+
+            // 2) End the session
+            $result = endSession($session_id);
+            if ($result['success']) {
+                $mins  = $result['duration_minutes'];
+                $total = number_format($result['total_cost'], 2);
+                $refFmt = number_format($refund_amount, 2);
+                if ($refund_amount > 0) {
+                    $message = "Session ended early after {$mins} min. Refund of ₱{$refFmt} issued for unused time.";
+                } else {
+                    $message = "Session ended early after {$mins} min. No refund needed — consumed time covered the full payment.";
+                }
+                $messageType = 'success';
+            } else {
+                $message = 'Could not end session: ' . $result['message'];
+                $messageType = 'error';
+            }
+        }
+    }
+
+
     // EXTEND SESSION (adds to planned_minutes for hourly sessions)
     elseif ($action === 'extend_session') {
         $session_id    = (int)($_POST['session_id'] ?? 0);
@@ -505,6 +551,21 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <link rel="stylesheet" href="assets/css/admin.css">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
+        /* Disabled submit buttons inside the end-session form (early-end guard) */
+        #endSessionForm button[type="submit"]:disabled {
+            opacity: 0.35 !important;
+            filter: grayscale(40%);
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+        }
+        /* Keep the Refund & End button always clickable inside the warning banner */
+        #endEarlyWarning button {
+            pointer-events: auto !important;
+            opacity: 1 !important;
+            filter: none !important;
+            cursor: pointer !important;
+        }
+
         /* â”€â”€ Extra admin overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
@@ -631,8 +692,8 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <span <?= $navBadge ?>><?= $pendingResCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('financial', this)">
-        <i class="fas fa-peso-sign"></i><span>Financial</span>
+    <div class="nav-item" onclick="showPage('transactions', this)">
+        <i class="fas fa-exchange-alt"></i><span>Transactions</span>
         <?php if (count($pendingSessions) > 0): ?>
         <span <?= $navBadge ?>><?= count($pendingSessions) ?></span>
         <?php endif; ?>
@@ -676,7 +737,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/consoles.php'; ?>
 <?php include __DIR__ . '/admin_sections/sessions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
-<?php include __DIR__ . '/admin_sections/financial.php'; ?>
+<?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
@@ -822,6 +883,20 @@ function calcChange(tenderedId, displayId, costHolderId) {
  * No blocking — a short payment is always allowed through.
  */
 function syncTenderedAndSubmit(e) {
+    // Block if the early-end warning is active (confirm button disabled)
+    const confirmBtn = document.getElementById('endSessionConfirmBtn');
+    if (confirmBtn && confirmBtn.disabled) {
+        e.preventDefault();
+        // Pulse the warning banner to draw attention
+        const warn = document.getElementById('endEarlyWarning');
+        if (warn) {
+            warn.style.transition = 'box-shadow .15s';
+            warn.style.boxShadow  = '0 0 0 3px rgba(241,168,60,.5)';
+            setTimeout(() => { warn.style.boxShadow = ''; }, 600);
+        }
+        return false;
+    }
+
     const tenderedVal = document.getElementById('endTendered').value;
     const payGroup    = document.getElementById('endPaymentMethodGroup');
 
@@ -937,9 +1012,116 @@ function _hourlyCost(duration, planned) {
 
 let _endModalTimer = null;   // holds the live-update interval
 
+// Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
+let _pendingRefundArgs = null;
+
 function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
     upfrontPaid = upfrontPaid || 0;
     document.getElementById('endSessionId').value = sessionId;
+
+    // ── Early-end guard (hourly only) ────────────────────────────────────
+    const earlyWarning    = document.getElementById('endEarlyWarning');
+    const earlyRemStr     = document.getElementById('endEarlyRemainingStr');
+    const earlyRefundBtn  = document.getElementById('endEarlyRefundBtn');
+    const confirmBtn      = document.getElementById('endSessionConfirmBtn');
+
+    // Reset guard UI first
+    earlyWarning.style.display = 'none';
+    confirmBtn.disabled        = false;
+    confirmBtn.style.opacity   = '1';
+    confirmBtn.style.cursor    = 'pointer';
+
+    if (mode === 'hourly' && plannedMinutes && startTs) {
+        const nowSec    = Math.floor(Date.now() / 1000);
+        const elapsed   = nowSec - startTs;           // total elapsed seconds
+        const remaining = (plannedMinutes * 60) - elapsed; // seconds
+
+        if (remaining > 0) {
+            // ── Remaining time label ─────────────────────────────────────
+            const remH = Math.floor(remaining / 3600);
+            const remM = Math.floor((remaining % 3600) / 60);
+            const remS = remaining % 60;
+            earlyRemStr.textContent = (remH ? remH + 'h ' : '') +
+                String(remM).padStart(2,'0') + ':' + String(remS).padStart(2,'0');
+
+            // ── Consumed time & cost calculation ─────────────────────────
+            const elapsedMin    = Math.floor(elapsed / 60);
+            const elH           = Math.floor(elapsedMin / 60);
+            const elM           = elapsedMin % 60;
+            const elapsedLabel  = (elH ? elH + 'h ' : '') + String(elM).padStart(2,'0') + 'm';
+
+            // Customer only pays for actual time used (open-time bracket billing)
+            const consumedCost  = _timedCost(elapsedMin);
+            // Refund = what they paid upfront minus what they owe for consumed time
+            const refundAmt     = Math.max(0, upfrontPaid - consumedCost);
+            const hasRefund     = refundAmt > 0;
+
+            // ── Populate breakdown display ───────────────────────────────
+            document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
+            document.getElementById('endEarlyConsumedCost').textContent = '₱' + consumedCost.toFixed(2);
+            document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
+            document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
+            document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
+
+            const noRefundNote = document.getElementById('endEarlyNoRefundNote');
+            if (noRefundNote) noRefundNote.style.display = hasRefund ? 'none' : 'block';
+
+            // Colour the refund amount green if 0 (no refund), red if positive
+            const refundEl = document.getElementById('endEarlyRefundAmt');
+            refundEl.style.color = hasRefund ? '#fb566b' : '#888';
+
+            // ── Show warning, disable confirm button ─────────────────────
+            earlyWarning.style.display = 'block';
+            confirmBtn.disabled        = true;
+            confirmBtn.style.opacity   = '0.35';
+            confirmBtn.style.cursor    = 'not-allowed';
+
+            // ── Wire up "Refund & End" button ────────────────────────────
+            _pendingRefundArgs = { sessionId, customerName, unitNumber, upfrontPaid, refundAmt, consumedCost, elapsedLabel };
+            earlyRefundBtn.onclick = function () {
+                closeModal('endSession');
+
+                // Open the refund modal
+                openRefundModal(
+                    _pendingRefundArgs.sessionId,
+                    _pendingRefundArgs.customerName,
+                    _pendingRefundArgs.unitNumber,
+                    _pendingRefundArgs.upfrontPaid
+                );
+
+                // Switch form action to early_end_session (refund + end in one step)
+                document.getElementById('refundActionField').value  = 'early_end_session';
+                document.getElementById('refundEarlyEndFlag').value = '1';
+
+                // Pre-fill refund amount
+                const amtEl = document.getElementById('refundAmount');
+                if (amtEl) amtEl.value = _pendingRefundArgs.refundAmt.toFixed(0);
+
+                // Pre-fill reason
+                const reasonEl = document.getElementById('refundReason');
+                if (reasonEl) {
+                    reasonEl.value =
+                        'Early end \u2013 used ' + _pendingRefundArgs.elapsedLabel +
+                        ' (\u20b1' + _pendingRefundArgs.consumedCost.toFixed(2) + ')' +
+                        ', refunding unused time (\u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ')';
+                }
+
+                // Show early-end notice inside refund modal
+                const earlyNote = document.getElementById('refundEarlyEndNote');
+                if (earlyNote) earlyNote.style.display = 'block';
+
+                // Update confirm button label
+                const lbl = document.getElementById('refundConfirmLabel');
+                if (lbl) {
+                    lbl.textContent = _pendingRefundArgs.refundAmt > 0
+                        ? 'Refund \u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ' & End Session'
+                        : 'End Session (No Refund)';
+                }
+            };
+        }
+    }
+
+    // ── End early-end guard ───────────────────────────────────────────────
 
     const panel       = document.getElementById('endCostPanel');
     const elapsedEl   = document.getElementById('endElapsed');
@@ -1224,8 +1406,41 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid) {
     document.getElementById('refundMaxNote').textContent   = 'Max refundable: ₱' + paid;
     document.getElementById('refundAmount').value = '';
     document.getElementById('refundReason').value = '';
+
+    // Reset to normal refund mode (in case previously used for early-end)
+    document.getElementById('refundActionField').value  = 'issue_refund';
+    document.getElementById('refundEarlyEndFlag').value = '0';
+    const earlyNote = document.getElementById('refundEarlyEndNote');
+    if (earlyNote) earlyNote.style.display = 'none';
+    const lbl = document.getElementById('refundConfirmLabel');
+    if (lbl) lbl.textContent = 'Confirm Refund';
+
     openModal('refundSession');
 }
+
+/* ── Refund form submission helper ───────────────────────────────────── */
+function submitRefundForm() {
+    const isEarlyEnd = document.getElementById('refundEarlyEndFlag').value === '1';
+    const refundAmt  = parseFloat(document.getElementById('refundAmount').value) || 0;
+
+    if (isEarlyEnd) {
+        const msg = refundAmt > 0
+            ? 'Issue a refund of \u20b1' + refundAmt.toFixed(2) + ' and end the session? This cannot be undone.'
+            : 'End the session now? No refund will be issued. This cannot be undone.';
+        gspotConfirm(msg, function () {
+            document.getElementById('refundSessionForm').submit();
+        }, { danger: true, yesLabel: refundAmt > 0 ? 'Yes, Refund & End' : 'Yes, End Session' });
+    } else {
+        if (refundAmt <= 0) {
+            alert('Please enter a refund amount greater than \u20b10.');
+            return;
+        }
+        gspotConfirm('Issue this refund of \u20b1' + refundAmt.toFixed(2) + '? This cannot be undone.',
+            function () { document.getElementById('refundSessionForm').submit(); },
+            { danger: true, yesLabel: 'Yes, Refund' });
+    }
+}
+
 
 /* ── Extend Modal ─────────────────────────────────────────────────────── */
 function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes) {
