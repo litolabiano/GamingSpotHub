@@ -212,55 +212,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // PROCESS REFUND for a customer-cancelled reservation
-    elseif ($action === 'process_refund') {
-        $res_id = (int)($_POST['reservation_id'] ?? 0);
-        if ($res_id) {
-            // Fetch the reservation to get payment details
-            $stmt = $conn->prepare(
-                "SELECT r.*, u.user_id AS cust_uid
-                   FROM reservations r
-                   JOIN users u ON r.user_id = u.user_id
-                  WHERE r.reservation_id = ?
-                    AND r.status = 'cancelled'
-                    AND r.cancelled_by = 'user'
-                    AND r.downpayment_amount > 0
-                    AND r.refund_issued = 0"
-            );
-            $stmt->bind_param('i', $res_id);
-            $stmt->execute();
-            $res = $stmt->get_result()->fetch_assoc();
-
-            if ($res) {
-                $refundAmt = (float)$res['downpayment_amount'];
-                $method    = $res['downpayment_method'] ?? 'cash';
-
-                // Record as negative transaction (refund out)
-                // session_id = NULL for reservation-only refunds
-                $stmt2 = $conn->prepare(
-                    "INSERT INTO transactions
-                        (session_id, user_id, amount, payment_method, processed_by, notes, payment_status, transaction_date)
-                     VALUES (NULL, ?, ?, ?, ?, ?, 'completed', NOW())"
-                );
-                $negAmt = -$refundAmt;
-                $notes  = 'Refund for customer-cancelled reservation #' . $res_id;
-                $stmt2->bind_param('idsss', $res['cust_uid'], $negAmt, $method, $user['user_id'], $notes);
-                $stmt2->execute();
-
-                // Mark reservation as refunded
-                $stmt3 = $conn->prepare("UPDATE reservations SET refund_issued = 1 WHERE reservation_id = ?");
-                $stmt3->bind_param('i', $res_id);
-                $stmt3->execute();
-
-                $message = '₱' . number_format($refundAmt, 2) . ' refund recorded for reservation #' . $res_id . '.';
-                $messageType = 'success';
-            } else {
-                $message = 'Reservation not eligible for refund.';
-                $messageType = 'error';
-            }
-        }
-    }
-
     // NO-SHOW
     elseif ($action === 'noshow_reservation') {
         $res_id = (int)($_POST['reservation_id'] ?? 0);
@@ -617,8 +568,7 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 $availableConsoles = getAvailableConsoles();
 
 // Reservations (upcoming + active)
-$upcomingReservations  = getUpcomingReservations(); // all future pending/confirmed
-$cancelledReservations = getCancelledReservations(); // all cancelled (for refund management)
+$upcomingReservations = getUpcomingReservations(); // all future pending/confirmed
 $pendingResCount = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
 
@@ -1570,23 +1520,43 @@ function syncPayBtn() {
 }
 
 /* ── Refund Modal ─────────────────────────────────────────────────────── */
-function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid) {
-    document.getElementById('refundSessionId').value = sessionId;
-    document.getElementById('refundSessionSummary').textContent =
-        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber;
-    const paid = parseFloat(upfrontPaid || 0).toFixed(2);
-    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
-    document.getElementById('refundMaxNote').textContent   = 'Max refundable: ₱' + paid;
-    document.getElementById('refundAmount').value = '';
-    document.getElementById('refundReason').value = '';
+function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reservationId) {
+    const isRes = !!reservationId;
+    const paid  = parseFloat(upfrontPaid || 0).toFixed(2);
 
-    // Reset to normal refund mode (in case previously used for early-end)
-    document.getElementById('refundActionField').value  = 'issue_refund';
-    document.getElementById('refundEarlyEndFlag').value = '0';
+    // Hidden control fields
+    document.getElementById('refundSessionId').value     = sessionId || '';
+    document.getElementById('refundReservationId').value = reservationId || '';
+    document.getElementById('refundActionField').value   = isRes ? 'process_refund' : 'issue_refund';
+    document.getElementById('refundEarlyEndFlag').value  = '0';
+
+    // Summary banner text
+    document.getElementById('refundSessionSummary').textContent = isRes
+        ? 'Reservation #' + reservationId + ' — ' + customerName
+        : 'Session #'     + sessionId     + ' — ' + customerName + ' on ' + unitNumber;
+    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
+
+    // Amount input — locked + pre-filled for reservation
+    const amtInput = document.getElementById('refundAmount');
+    const maxNote  = document.getElementById('refundMaxNote');
+    amtInput.readOnly     = isRes;
+    amtInput.style.opacity = isRes ? '0.7' : '1';
+    amtInput.value = isRes ? parseFloat(upfrontPaid || 0) : '';
+    maxNote.textContent = isRes
+        ? 'Full payment amount — will be returned to customer.'
+        : 'Max refundable: ₱' + paid;
+
+    // Reason input — pre-filled for reservation
+    const reasonInput = document.getElementById('refundReason');
+    reasonInput.readOnly      = isRes;
+    reasonInput.style.opacity = isRes ? '0.7' : '1';
+    reasonInput.value = isRes ? 'Customer cancelled reservation #' + reservationId : '';
+
+    // Confirm label & early-end note
+    const lbl = document.getElementById('refundConfirmLabel');
+    if (lbl) lbl.textContent = isRes ? 'Issue Reservation Refund' : 'Confirm Refund';
     const earlyNote = document.getElementById('refundEarlyEndNote');
     if (earlyNote) earlyNote.style.display = 'none';
-    const lbl = document.getElementById('refundConfirmLabel');
-    if (lbl) lbl.textContent = 'Confirm Refund';
 
     openModal('refundSession');
 }
