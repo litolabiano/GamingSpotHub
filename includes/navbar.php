@@ -33,6 +33,7 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#about">About</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#gaming">Gaming Rates</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#units">Units</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/reserve.php">Reserve</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#events">Events</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#contact">Contact</a></li>
             </ul>
@@ -60,7 +61,11 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
                         <div class="dropdown-divider"></div>
                         <?php if (in_array($_SESSION['role'], ['owner', 'shopkeeper'])): ?>
                             <a href="<?= $base_url ?>/admin.php" class="dropdown-item">
-                                <i class="fas fa-gauge-high"></i> Dashboard
+                                <i class="fas fa-gauge-high"></i> Admin Dashboard
+                            </a>
+                        <?php else: ?>
+                            <a href="<?= $base_url ?>/dashboard.php" class="dropdown-item">
+                                <i class="fas fa-chart-line"></i> My Dashboard
                             </a>
                         <?php endif; ?>
                         <a href="<?= $base_url ?>/auth/logout.php" class="dropdown-item dropdown-item-danger">
