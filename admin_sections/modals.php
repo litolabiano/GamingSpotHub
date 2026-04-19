@@ -642,7 +642,7 @@
             </div>
             <div class="form-group" id="adminDpGroup" style="display:none;">
                 <label style="display:flex;justify-content:space-between;align-items:center;">
-                    Downpayment Amount (₱)
+                    Payment Amount (₱)
                     <span id="adminDpHint" style="font-size:11px;color:#20c8a1;font-weight:600;"></span>
                 </label>
                 <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="1"
@@ -760,7 +760,7 @@ function openConvertModal(res) {
         `<strong style="color:#fff;">${res.customer_name}</strong><br>` +
         `${res.console_type} · ${mode}${dur}<br>` +
         `${new Date(res.reserved_date).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})} at ${res.reserved_time.slice(0,5)}<br>` +
-        (res.downpayment_amount > 0 ? `<span style="color:#20c8a1;">Downpayment: ₱${parseFloat(res.downpayment_amount).toFixed(2)} (${res.downpayment_method})</span>` : '');
+        (res.downpayment_amount > 0 ? `<span style="color:#20c8a1;">Payment: ₱${parseFloat(res.downpayment_amount).toFixed(2)} (${res.downpayment_method})</span>` : '');
 
     // Filter console dropdown to matching type
     const sel = document.getElementById('convertConsoleSelect');

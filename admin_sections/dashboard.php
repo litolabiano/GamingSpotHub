@@ -133,7 +133,7 @@
                         <th>Customer</th>
                         <th>Console</th>
                         <th>Mode</th>
-                        <th>Downpayment</th>
+                        <th>Payment</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
