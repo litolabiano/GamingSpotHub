@@ -64,7 +64,7 @@ $isLoggedIn   = isLoggedIn();
                         <ul>
                             <li><i class="fas fa-gamepad"></i> <?= htmlspecialchars($type) ?> Console</li>
                             <li><i class="fas fa-tv"></i> HD / 4K Display</li>
-                            <li><i class="fas fa-headphones"></i> Gaming Headset</li>
+                            <li><i class="fas fa-headphones"></i> Gaming Head</li>
                             <li><i class="fas fa-couch"></i> Comfortable Seating</li>
                         </ul>
                     </div>
