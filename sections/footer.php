@@ -19,7 +19,6 @@
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About</a></li>
                     <li><a href="faqs.php">FAQs</a></li>
-                    <li><a href="terms.php">Terms &amp; Conditions</a></li>
                 </ul>
             </div>
             <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
@@ -45,6 +44,9 @@
         <hr class="footer-divider">
         <div class="footer-bottom">
             <p>&copy; 2026 Gspot Gaming Hub. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="https://www.facebook.com/gspotgaminghub" target="_blank" rel="noopener noreferrer"><i class="fab fa-facebook-f"></i></a>
+            </div>
         </div>
     </div>
 </footer>
