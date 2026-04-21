@@ -72,7 +72,7 @@ function getRoleBadge() {
     $role = $_SESSION['role'] ?? 'customer';
     $labels = [
         'owner'      => 'Owner',
-        'shopkeeper' => 'Staff',
+        'shopkeeper' => 'Shopkeeper',
         'customer'   => 'Gamer'
     ];
     return $labels[$role] ?? ucfirst($role);
