@@ -6,60 +6,28 @@
             <h2 class="section-title">Epic Monthly Events</h2>
             <p class="section-subtitle">Join our community tournaments and win amazing prizes</p>
         </div>
-        <div class="row g-4">
-            <div class="col-lg-6" data-aos="fade-right">
+        <div class="row g-4 justify-content-center">
+            <div class="col-lg-8" data-aos="fade-up">
                 <div class="event-card">
                     <div class="event-badge">UPCOMING</div>
                     <div class="event-content">
                         <div class="event-date">
-                            <span class="date-day">15</span>
-                            <span class="date-month">FEB</span>
+                            <span class="date-day">TBA</span>
+                            <span class="date-month">2026</span>
                         </div>
                         <div class="event-info">
-                            <h3 class="event-title">Valorant Championship 2026</h3>
+                            <h3 class="event-title">Tekken 8 Tournament</h3>
                             <p class="event-description">
-                                Join the biggest Valorant tournament in Dasma! ₱10,000 prize pool and exclusive gaming gear for winners.
+                                Come and join our Tekken 8 Tournament! Show off your fighting skills and compete for glory. Registration fee is only ₱250. Platform: PS5.
                             </p>
                             <div class="event-meta">
-                                <span><i class="fas fa-users"></i> 32 Teams</span>
-                                <span><i class="fas fa-trophy"></i> ₱10,000 Prize</span>
-                                <span><i class="fas fa-clock"></i> 6:00 PM</span>
+                                <span><i class="fas fa-peso-sign"></i> ₱250 Registration</span>
+                                <span><i class="fab fa-playstation"></i> Platform: PS5</span>
+                                <span><i class="fas fa-map-marker-alt"></i> Good Spot Gaming Hub 29 Don Placido Ave. Zone 2 Dasmariñas, Cavite</span>
                             </div>
-                            <a href="#register" class="btn btn-primary mt-3">Register Now</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6" data-aos="fade-up">
-                <div class="event-card small">
-                    <div class="event-content">
-                        <div class="event-date small">
-                            <span class="date-day">22</span>
-                            <span class="date-month">FEB</span>
-                        </div>
-                        <div class="event-info">
-                            <h4 class="event-title">Mobile Legends Cup</h4>
-                            <p class="event-description">5v5 tournament</p>
-                            <div class="event-meta">
-                                <span><i class="fas fa-trophy"></i> ₱5,000</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6" data-aos="fade-left">
-                <div class="event-card small">
-                    <div class="event-content">
-                        <div class="event-date small">
-                            <span class="date-day">28</span>
-                            <span class="date-month">FEB</span>
-                        </div>
-                        <div class="event-info">
-                            <h4 class="event-title">CS2 Community Night</h4>
-                            <p class="event-description">Casual games & prizes</p>
-                            <div class="event-meta">
-                                <span><i class="fas fa-trophy"></i> ₱3,000</span>
-                            </div>
+                            <a href="tournament_register.php" class="btn btn-primary mt-3">
+                                <i class="fas fa-trophy me-2"></i>Register Now
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -95,8 +63,9 @@
     position: absolute;
     top: 20px;
     right: 20px;
-    background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
-    color: white;
+    background: #0a2151;
+    border: 1px solid var(--color-mint);
+    color: var(--color-secondary);
     padding: 0.4rem 1rem;
     border-radius: 50px;
     font-size: 0.75rem;
@@ -115,7 +84,8 @@
 }
 
 .event-date {
-    background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+    background: #0a2151;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1.5rem;
     border-radius: 15px;
     text-align: center;
@@ -130,7 +100,7 @@
     display: block;
     font-size: 2.5rem;
     font-weight: 900;
-    color: white;
+    color: var(--color-secondary);
     line-height: 1;
 }
 
@@ -141,7 +111,7 @@
 .date-month {
     display: block;
     font-size: 1rem;
-    color: white;
+    color: var(--color-secondary);
     font-weight: 600;
     text-transform: uppercase;
     margin-top: 0.25rem;

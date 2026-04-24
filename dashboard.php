@@ -1179,5 +1179,21 @@ new Chart(document.getElementById('chartSpend'), {
 <script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="assets/libs/aos/aos.js"></script>
 
-</body>
+<script>
+// ── Navbar scroll effect (same as index.php) ──────────────────────────────
+AOS.init({ duration: 800, once: true, offset: 80 });
+
+const mainNav = document.getElementById('mainNav');
+if (mainNav) {
+    window.addEventListener('scroll', function () {
+        if (window.scrollY > 100) {
+            mainNav.classList.add('scrolled');
+        } else {
+            mainNav.classList.remove('scrolled');
+        }
+    });
+    // Apply immediately in case page is already scrolled on load
+    if (window.scrollY > 100) mainNav.classList.add('scrolled');
+}
+</script></body>
 </html>

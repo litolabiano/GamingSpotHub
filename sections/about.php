@@ -14,7 +14,7 @@
                     Whether you're into competitive esports, casual gaming with friends, or just looking for a cozy spot to enjoy great food and games, we've got you covered.
                 </p>
                 <div class="about-features mt-4">
-                    <div class="feature-item"
+                    <div class="feature-item">
                         <div class="feature-icon">
                             <i class="fab fa-playstation"></i>
                         </div>
@@ -116,7 +116,8 @@
 .feature-icon {
     width: 60px;
     height: 60px;
-    background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+    background: #0a2151;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 15px;
     display: flex;
     align-items: center;
@@ -126,7 +127,7 @@
 
 .feature-icon i {
     font-size: 1.5rem;
-    color: white;
+    color: var(--color-secondary);
 }
 
 .feature-content h4 {
