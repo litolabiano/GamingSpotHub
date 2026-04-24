@@ -44,9 +44,6 @@
         <hr class="footer-divider">
         <div class="footer-bottom">
             <p>&copy; 2026 Gspot Gaming Hub. All rights reserved.</p>
-            <div class="footer-social">
-                <a href="https://www.facebook.com/gspotgaminghub" target="_blank" rel="noopener noreferrer"><i class="fab fa-facebook-f"></i></a>
-            </div>
         </div>
     </div>
 </footer>

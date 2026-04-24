@@ -567,17 +567,6 @@ function fmtMins(int $m): string {
 
         <div class="cd-nav-spacer"></div>
 
-        <div class="cd-sidebar-bottom">
-            <a href="reserve.php" class="cd-btn cd-btn-primary" style="width:100%;justify-content:center;margin-bottom:10px;">
-                <i class="fas fa-calendar-plus"></i> New Reservation
-            </a>
-            <a href="index.php" class="cd-nav-btn" style="text-decoration:none;">
-                <i class="fas fa-home"></i> Back to Home
-            </a>
-            <a href="auth/logout.php" class="cd-nav-btn" style="color:var(--coral);text-decoration:none;">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
-            </a>
-        </div>
     </aside>
 
     <!-- ══ MAIN ═════════════════════════════════════════════════════════════ -->
