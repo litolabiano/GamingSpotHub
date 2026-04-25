@@ -245,6 +245,41 @@ Extra services during a session.
 
 ---
 
+### Table 4b: `session_extensions`
+
+Time extension requests for active sessions (customer-initiated or staff-direct).
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `extension_id` | INT | PK, AUTO_INCREMENT | Unique extension ID |
+| `session_id` | INT | FK → `gaming_sessions.session_id` | Session being extended |
+| `requested_by` | INT | FK → `users.user_id` | Who requested (customer or staff) |
+| `approved_by` | INT | FK → `users.user_id`, DEFAULT NULL | Staff who approved (NULL = pending/denied) |
+| `extra_minutes` | INT | NOT NULL | Minutes to add |
+| `extra_cost` | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00 | Cost at straight ₱80/hr (0 for open_time/unlimited) |
+| `payment_method` | ENUM | DEFAULT NULL | Collected on approval for hourly sessions |
+| `status` | ENUM | NOT NULL, DEFAULT 'pending' | `pending`, `approved`, `denied` |
+| `note` | VARCHAR(255) | DEFAULT NULL | Staff remark or reason |
+| `requested_at` | DATETIME | DEFAULT NOW() | When request was made |
+| `resolved_at` | DATETIME | DEFAULT NULL | When staff approved or denied |
+
+**Lifecycle:**
+- Customer request: `pending` → `approved` (staff approves + collects payment) | `denied`
+- Staff direct: inserted immediately as `approved` (no pending step)
+
+**Pricing rule:** Extensions use **straight ₱80/hr** — no ₱50 session-start minimum. 30 min = ₱40, 60 min = ₱80, etc.
+
+**New column on `gaming_sessions`:** `extended_minutes INT DEFAULT 0` — tracks total minutes added across all approved extensions.
+
+**Foreign Keys:**
+- `fk_ext_session` → `gaming_sessions(session_id)` ON DELETE **CASCADE**
+- `fk_ext_requested_by` → `users(user_id)` ON DELETE RESTRICT
+- `fk_ext_approved_by` → `users(user_id)` ON DELETE RESTRICT
+
+> **SQL file:** `database/migration_extensions.sql` — run after `schema.sql` and `migration_auth.sql`.
+
+
+
 ### Table 5: `transactions`
 
 Payment records linked to sessions.

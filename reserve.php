@@ -57,6 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please select a valid rental mode.';
     } elseif ($rental_mode === 'hourly' && $planned_minutes < 30) {
         $error = 'Please select a duration for hourly mode.';
+    } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
+        $rules = getPricingRules();
+        $error = 'Hourly reservations are limited to a maximum of ' . ($rules['max_hourly_minutes'] / 60) . ' hours.';
     } elseif (!$reserved_date || !$reserved_time) {
         $error = 'Please provide both date and time.';
     } elseif ($reserved_date < date('Y-m-d')) {
@@ -739,12 +742,10 @@ if (!empty($_GET['console'])) {
                                 &nbsp;&middot;&nbsp; Reservation requires <strong style="color:#ccc;">1 hr lead time</strong>
                             </span>
                         </div>
-
-                        <!-- Availability result -->
                         <div id="availabilityResult" style="display:none;margin-top:14px;"></div>
                     </div>
 
-                    <!-- ── Step 2b: Choose Preferred Unit (unlocks after date+time) ── -->
+                    <!-- ── Step 2b: Unit Picker ── -->
                     <div class="reserve-card" id="unitPickerCard" style="margin-bottom:24px;display:none;">
                         <h2>
                             <i class="fas fa-tv"></i> Step 2b &mdash; Choose Preferred Unit
@@ -752,7 +753,6 @@ if (!empty($_GET['console'])) {
                         </h2>
                         <p style="color:#888;font-size:13px;margin-bottom:14px;">
                             Availability shown is based on your chosen date &amp; time.
-                            <strong style="color:#20c8a1;">✅ Available at that slot &nbsp;·&nbsp; 🔒 Already reserved &nbsp;·&nbsp; 🎮 In Use now</strong>
                         </p>
                         <div id="unitPickerGrid"
                              style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px;"></div>
@@ -766,6 +766,7 @@ if (!empty($_GET['console'])) {
                         </div>
                     </div>
 
+                    <!-- ── Step 3: Rental Mode ── -->
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-gamepad"></i> Step 3 — Rental Mode</h2>
                         <div class="mode-grid">
@@ -786,40 +787,61 @@ if (!empty($_GET['console'])) {
                             </div>
                         </div>
 
-                        <!-- Duration picker (hourly only) -->
-                        <div id="durationSection" style="display:none;">
-                            <div class="sec-label">Duration *</div>
+                        <!-- Duration picker (hourly only) — max 4 hrs -->
+                        <div id="durationSection" style="display:none;margin-top:20px;">
+                            <div class="sec-label" style="display:flex;align-items:center;gap:8px;">Duration *
+                                <span style="font-size:10px;background:rgba(32,200,161,.15);color:#20c8a1;border:1px solid rgba(32,200,161,.3);border-radius:20px;padding:2px 8px;font-weight:700;">
+                                    Max 4 hrs
+                                </span>
+                            </div>
                             <div class="duration-grid">
                                 <?php
-                                $durations = [
-                                    [30,'30 min','₱50'],
-                                    [60,'1 hr','₱80'],
-                                    [90,'1h 30m','₱120'],
-                                    [120,'2 hrs','₱160'],
-                                    [150,'2h 30m','₱200'],
-                                    [180,'3 hrs','₱240'],
-                                    [240,'4 hrs','₱320'],
-                                    [300,'5 hrs','₱400'],
-                                    [360,'6 hrs','₱480'],
-                                    [420,'7 hrs','₱560'],
-                                    [480,'8 hrs','₱640'],
-                                ];
-                                foreach ($durations as [$mins, $label, $price]): ?>
-                                <div class="dur-btn" data-mins="<?= $mins ?>" onclick="selectDuration(<?= $mins ?>)">
-                                    <?= $label ?>
-                                    <span class="dur-price"><?= $price ?></span>
+                                // DB-driven: reads bonus_paid_minutes, bonus_free_minutes, max_hourly_minutes
+                                // from system_settings. Change the DB to change this list.
+                                $durationOptions = getHourlyDurationOptions();
+                                foreach ($durationOptions as $opt):
+                                    $bonus = $opt['bonus_free'] ?? $opt['bonus'];
+                                    $total = $opt['total'];
+                                ?>
+                                <div class="dur-btn" data-mins="<?= $opt['paid'] ?>" data-cost="<?= $opt['cost'] ?>" data-bonus="<?= $opt['bonus'] ?>" data-total="<?= $opt['total'] ?>" onclick="selectDuration(<?= $opt['paid'] ?>)">
+                                    <?= $opt['label_paid'] ?>
+                                    <span class="dur-price">&#8369;<?= number_format($opt['cost'], 0) ?></span>
+                                    <?php if ($opt['bonus'] > 0): ?>
+                                    <span style="display:block;font-size:9px;color:#20c8a1;font-weight:700;margin-top:3px;letter-spacing:.3px;"><?= $opt['label_bonus'] ?></span>
+                                    <span style="display:block;font-size:9px;color:#888;font-weight:600;margin-top:1px;">&rarr; <?= $opt['label_total'] ?> total</span>
+                                    <?php endif; ?>
                                 </div>
                                 <?php endforeach; ?>
+                            </div>
+                            <div style="margin-top:10px;font-size:11px;color:#555;background:rgba(32,200,161,.05);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                                <i class="fas fa-gift" style="color:#20c8a1;"></i>
+                                <?php $pr = getPricingRules(); ?>
+                                <span>Bonus: every <strong style="color:#20c8a1;"><?= $pr['bonus_paid_minutes'] / 60 ?> paid hours</strong> = <strong style="color:#20c8a1;"><?= $pr['bonus_free_minutes'] ?> min free</strong> added to your session.</span>
                             </div>
                         </div>
                     </div>
 
+                    <!-- ── Step 4: Payment ── -->
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
                         <h2><i class="fas fa-peso-sign"></i> Step 4 — Payment <span id="dpCardMode" style="font-size:13px;font-weight:500;color:#888;"></span></h2>
-                        <p style="color:#888;font-size:13px;margin-bottom:18px;">
+                        <p id="dpDesc" style="color:#888;font-size:13px;margin-bottom:18px;">
                             Full payment is required to confirm your hourly reservation.
                         </p>
-                        <div class="dp-box">
+
+                        <!-- Open Time: no upfront payment notice (shown/hidden by JS) -->
+                        <div id="dpOpenTimeNotice" style="display:none;
+                            background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.25);
+                            border-radius:14px;padding:18px;text-align:center;">
+                            <i class="fas fa-clock" style="font-size:2rem;color:#5f85da;margin-bottom:10px;display:block;"></i>
+                            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:6px;">No Upfront Payment Needed</div>
+                            <div style="font-size:12px;color:#888;line-height:1.6;">
+                                Pay bracket pricing at the end of your session.<br>
+                                <strong style="color:#5f85da;">Free 30 mins</strong> every 2 paid hours!
+                            </div>
+                        </div>
+
+                        <!-- Amount + method box (hidden for open_time) -->
+                        <div id="dpPaymentBox" class="dp-box">
                             <div class="dp-title" style="justify-content:space-between;">
                                 <span><i class="fas fa-coins"></i> Payment Amount</span>
                                 <span id="dpHint" style="font-size:12px;font-weight:600;color:#20c8a1;"></span>
@@ -829,19 +851,19 @@ if (!empty($_GET['console'])) {
                                    readonly
                                    style="cursor:not-allowed;background:rgba(32,200,161,.06);border-color:rgba(32,200,161,.3);color:#20c8a1;font-size:16px;font-weight:700;"
                                    value="<?= htmlspecialchars($_POST['downpayment_amount'] ?? '') ?>">
-                            <p style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.</p>
+                            <p id="dpNote" style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.</p>
 
                             <div id="dpMethodSection" style="display:none;">
                                 <div class="sec-label">Payment Method *</div>
                                 <div class="dp-method-grid">
                                     <div class="pm-card" id="pm-cash" onclick="selectDpMethod('cash')">
-                                        <span class="pm-icon">💵</span>Cash
+                                        <span class="pm-icon">&#x1F4B5;</span>Cash
                                     </div>
                                     <div class="pm-card" id="pm-gcash" onclick="selectDpMethod('gcash')">
-                                        <span class="pm-icon">📱</span>GCash
+                                        <span class="pm-icon">&#x1F4F1;</span>GCash
                                     </div>
                                     <div class="pm-card" id="pm-credit_card" onclick="selectDpMethod('credit_card')">
-                                        <span class="pm-icon">💳</span>Credit Card
+                                        <span class="pm-icon">&#x1F4B3;</span>Credit Card
                                     </div>
                                 </div>
                                 <p style="font-size:11px;color:#888;margin-bottom:0;">
@@ -851,7 +873,6 @@ if (!empty($_GET['console'])) {
                             </div>
                         </div>
                     </div>
-
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-sticky-note"></i> Step 5 — Notes (Optional)</h2>
                         <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
@@ -1223,25 +1244,84 @@ function selectMode(mode) {
         document.getElementById('hiddenPlannedMinutes').value = '';
         document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     }
+
+    // ── Update the Step 4 payment card to reflect the selected mode ──
+    const dpDesc        = document.getElementById('dpDesc');
+    const dpNote        = document.getElementById('dpNote');
+    const dpHint        = document.getElementById('dpHint');
+    const dpAmount      = document.getElementById('dpAmount');
+    const dpPaymentBox  = document.getElementById('dpPaymentBox');
+    const dpOpenNotice  = document.getElementById('dpOpenTimeNotice');
+    const dpMethodSec   = document.getElementById('dpMethodSection');
+
+    if (mode === 'open_time') {
+        dpDesc.textContent = 'No upfront payment needed — pay bracket pricing at the end of your session.';
+        dpOpenNotice.style.display  = 'block';
+        dpPaymentBox.style.display  = 'none';
+        // Zero out hidden amount so backend ignores it
+        dpAmount.value = '0';
+        selectedDpMethod = '';
+        document.getElementById('hiddenDpMethod').value = '';
+        document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
+
+    } else if (mode === 'unlimited') {
+        dpDesc.textContent = `A flat rate of \u20b1${unlimitedRate} is required upfront for unlimited play.`;
+        dpOpenNotice.style.display  = 'none';
+        dpPaymentBox.style.display  = 'block';
+        dpAmount.value              = unlimitedRate;
+        dpHint.textContent          = `Flat rate: \u20b1${unlimitedRate}`;
+        dpNote.innerHTML            = '<i class="fas fa-lock" style="margin-right:4px;"></i>Fixed flat rate — no duration to select.';
+        dpMethodSec.style.display   = 'block';
+
+    } else {
+        // hourly — reset to waiting-for-duration state
+        dpDesc.textContent          = 'Full payment is required to confirm your hourly reservation.';
+        dpOpenNotice.style.display  = 'none';
+        dpPaymentBox.style.display  = 'block';
+        dpAmount.value              = '';
+        dpHint.textContent          = '';
+        dpNote.innerHTML            = '<i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.';
+        dpMethodSec.style.display   = 'none';
+        selectedDpMethod = '';
+        document.getElementById('hiddenDpMethod').value = '';
+        document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
+    }
+
     updateSummary();
 }
 
 /* ── Duration ───────────────────────────────────────── */
 function selectDuration(mins) {
+    // Guard: never accept more than 4 hours (240 min)
+    if (mins > 240) { alert('Hourly reservations are limited to 4 hours maximum.'); return; }
+
     selectedDuration = mins;
     document.getElementById('hiddenPlannedMinutes').value = mins;
     document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
-    // Auto-calculate 100% payment (read-only field)
-    const fullCost = mins <= 30 ? 50 : (mins / 60 * 80);
-    const dp       = fullCost;
-    document.getElementById('dpAmount').value = dp;
-    document.getElementById('dpHint').textContent = `Full cost: \u20b1${fullCost.toFixed(0)}`;
+    // Read cost and bonus from data attributes on the button (set by PHP / getHourlyDurationOptions)
+    const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
+    const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? 50 : mins / 60 * 80);
+    const bonusMins= btn ? parseInt(btn.dataset.bonus   || 0) : 0;
+    const totalMins= btn ? parseInt(btn.dataset.total   || mins) : mins;
+
+    document.getElementById('dpAmount').value = fullCost;
+
+    const totalH     = Math.floor(totalMins / 60);
+    const totalM     = totalMins % 60;
+    const totalLabel = (totalH ? totalH + 'h ' : '') + (totalM ? totalM + 'm' : '');
+
+    let hint = `Full cost: \u20b1${fullCost.toFixed(0)}`;
+    if (bonusMins > 0) {
+        hint += ` · Total session: ${totalLabel} (+${bonusMins} min free 🎁)`;
+    }
+    document.getElementById('dpHint').textContent = hint;
     document.getElementById('dpMethodSection').style.display = 'block';
 
     updateSummary();
 }
+
 
 /* ── Downpayment ────────────────────────────────────── */
 /* Read-only field — driven entirely by selectDuration(). No manual input needed. */
@@ -1513,9 +1593,18 @@ function updateSummary() {
         durText = 'Pay at end (bracket pricing)';
     }
     document.getElementById('s-duration').textContent = durText;
-    document.getElementById('s-dp').textContent = dp > 0
-        ? '₱' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' (method required)')
-        : 'None — select a duration above';
+
+    let dpText = 'None';
+    if (selectedMode === 'open_time') {
+        dpText = 'Pay at session end (bracket pricing)';
+    } else if (dp > 0) {
+        dpText = '\u20b1' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' — method required');
+    } else if (selectedMode === 'hourly') {
+        dpText = 'None — select a duration above';
+    } else if (selectedMode === 'unlimited') {
+        dpText = '\u20b1' + unlimitedRate + ' — select payment method';
+    }
+    document.getElementById('s-dp').textContent = dpText;
 }
 
 /* ── Form validation ────────────────────────────────── */

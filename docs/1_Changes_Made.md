@@ -120,4 +120,56 @@ Avatar + Dropdown    Login/Register buttons
 6. Token validated against DB: reset_token = ? AND reset_expires > NOW()
 7. User sets new password → bcrypt hash stored
 8. Token cleared from DB
+7. Password reset complete
+
+---
+
+## Version 1.2 — Session Extension Feature
+
+**Date:** April 25, 2026
+
+### New Files
+
+| File | Description |
+|---|---|
+| `database/migration_extensions.sql` | Adds `session_extensions` table + `extended_minutes` column to `gaming_sessions` |
+| `ajax/extend_session.php` | Staff endpoint: directly extends an active session (AJAX POST) |
+| `ajax/request_extension.php` | Customer endpoint: submits a pending extension request (AJAX POST) |
+| `ajax/approve_extension.php` | Staff endpoint: approves or denies a pending request (AJAX POST + GET) |
+
+### Modified Files
+
+| File | Change |
+|---|---|
+| `includes/db_functions.php` | Added `extendSession()`, `requestExtension()`, `approveExtension()`, `denyExtension()` |
+| `admin_sections/modals.php` | Upgraded Extend Session modal: cost preview, payment fields, pending customer request cards with Approve/Deny buttons |
+| `admin_sections/sessions.php` | Pass `rental_mode` as 5th arg to `openExtendModal()` |
+| `dashboard.php` | Added pending-extension data fetch; "Request More Time" button + Request Extension modal on the live session card |
+| `docs/2_Constraints.md` | Documented new `session_extensions` table |
+
+### Extension Pricing Rule
+
+Extensions use **straight ₱80/hr** — no session-start ₱50 minimum:
+- +30 min = ₱40
+- +60 min = ₱80
+- +90 min = ₱120
+- +120 min = ₱160
+
+`open_time` and `unlimited` sessions have no extra charge for extensions.
+
+### Flow Summary
+
+```
+Staff direct extend:
+  Admin clicks Extend → picks time → sees cost → enters payment → POST extend_session.php
+  → extendSession() → session_extensions (approved) + transaction + updates planned_minutes
+
+Customer requests:
+  Customer clicks "Request More Time" → picks time → POST request_extension.php
+  → session_extensions (pending) — button swaps to pending badge
+
+Staff approves:
+  Admin opens Extend modal → sees pending cards → clicks Approve → enters payment method
+  → POST approve_extension.php (action=approve) → approveExtension() → extendSession()
+  → session_extensions (approved) + transaction + planned_minutes updated
 ```

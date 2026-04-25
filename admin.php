@@ -30,6 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
             $messageType = 'error';
+        } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
+            $pr = getPricingRules();
+            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
+            $messageType = 'error';
         } else {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
       if ($result['success']) {
@@ -476,7 +480,8 @@ $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === '
 // Sessions: active/live first (sorted by urgency — closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
     "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
-            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
+            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
@@ -535,16 +540,23 @@ $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
 // Pending sessions: active sessions with upfront payment OR completed sessions with outstanding balance
 $pendingSessions = [];
 foreach ($recentSessions as $sess) {
-    $paidSoFar = (float)($sess['upfront_paid'] ?? 0);
+    $paidSoFar      = (float)($sess['upfront_paid']    ?? 0); // positive payments only
+    $refundedAmount = (float)($sess['refunded_amount'] ?? 0); // total refunded
+
     if ($sess['status'] === 'active' && $paidSoFar > 0) {
         // Active session with upfront payment — balance pending at end
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
-    } elseif ($sess['status'] === 'completed' && $sess['total_cost'] > 0 && $paidSoFar < (float)$sess['total_cost']) {
-        // Completed session where total paid < total cost — outstanding balance
+    } elseif ($sess['status'] === 'completed'
+        && $sess['total_cost'] > 0
+        && $refundedAmount == 0               // no refund was issued
+        && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
+    ) {
+        // Completed session where total paid < total cost — outstanding balance (no refund)
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
+    // Sessions with refunds issued are fully settled — skip them entirely
 }
 
 
@@ -1020,13 +1032,15 @@ document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
 });
 
-/* ── Billing helpers — mirrors PHP computePartialPeriodCost / computeTimedCost ── *
- * Rule: FREE 30 min after every 2 paid hours.
- * Cycle = 150 min (120 paid + 30 free) = ₱160 per cycle.
+/* ── Billing helpers — all values driven from DB via getPricingRules() ──────── *
+ * PRICING is injected by PHP so the JS always matches the backend.
+ * _bracketCost / _timedCost are unchanged in shape — only their constants move.
  */
+const PRICING = <?= json_encode(getPricingRules()) ?>;
+
 function _bracketCost(partialMin) {
-    // Partial-hour bracket for minutes 0–59
-    if (partialMin <= 4)  return 0;   // grace
+    // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
+    if (partialMin <=  4) return 0;   // grace
     if (partialMin <= 19) return 20;
     if (partialMin <= 34) return 40;
     if (partialMin <= 49) return 60;
@@ -1034,22 +1048,25 @@ function _bracketCost(partialMin) {
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const CYCLE = 150;   // 120 min paid + 30 min free
-    const CYCLE_COST = 160;
-    const fullCycles = Math.floor(totalMin / CYCLE);
-    const remainder  = totalMin % CYCLE;
-    let cost = fullCycles * CYCLE_COST;
-    if (remainder > 120) {
-        // Inside the free 30-min window — charge the full 2-hour block
-        cost += CYCLE_COST;
+    const bp       = PRICING.bonus_paid_minutes;         // e.g. 120
+    const bf       = PRICING.bonus_free_minutes;         // e.g. 30
+    const rate     = PRICING.hourly_rate;                // e.g. 80
+    const cyclePay = bp / 60 * rate;                    // e.g. 160
+    const cycleLen = bp + bf;                           // e.g. 150
+    const full     = Math.floor(totalMin / cycleLen);
+    const rem      = totalMin % cycleLen;
+    let cost       = full * cyclePay;
+    if (rem > bp) {
+        cost += cyclePay;  // inside the free window — charge the full paid block
     } else {
-        // Inside the paid window — hourly bracket billing
-        cost += Math.floor(remainder / 60) * 80 + _bracketCost(remainder % 60);
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
     }
     return cost;
 }
 function _hourlyCost(duration, planned) {
-    const base     = planned <= 30 ? 50 : (planned / 60 * 80);
+    const rate     = PRICING.hourly_rate;
+    const minChg   = PRICING.session_min_charge;
+    const base     = planned <= 30 ? minChg : (planned / 60 * rate);
     const overtime = duration - planned;
     if (overtime <= 0) return base;
     return base + _timedCost(overtime);
