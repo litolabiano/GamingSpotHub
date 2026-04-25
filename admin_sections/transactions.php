@@ -60,7 +60,10 @@
                     };
                 } else {
                     if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
-                        $psExpected = $ps['planned_minutes'] <= 30 ? 50.0 : (float)($ps['planned_minutes'] / 60 * 80);
+                        $pr = getPricingRules();
+                        $psExpected = $ps['planned_minutes'] <= 30
+                            ? $pr['session_min_charge']
+                            : (float)($ps['planned_minutes'] / 60 * $pr['hourly_rate']);
                         $psModeLabel = 'Hourly';
                     } else {
                         $psExpected  = $unlimitedRateVal;

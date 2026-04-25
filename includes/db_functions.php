@@ -41,9 +41,10 @@ function getPricingRules(): array {
         'max_hourly_minutes' => 240,   // cap at 4 paid hrs
         'hourly_rate'        => 80.0,  // ₱80/hr default
         'session_min_charge' => 50.0,  // ₱50 for ≤30 min start
+        'xbox_hourly_rate'   => 80.0,  // Xbox rate (may differ)
     ];
 
-    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate'";
+    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate','xbox_hourly_rate','session_min_charge'";
     $res  = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($keys)");
     if ($res) {
         while ($row = $res->fetch_assoc()) {
@@ -52,6 +53,8 @@ function getPricingRules(): array {
                 case 'bonus_free_minutes': $rules['bonus_free_minutes'] = (int)  $row['setting_value']; break;
                 case 'max_hourly_minutes': $rules['max_hourly_minutes'] = (int)  $row['setting_value']; break;
                 case 'ps5_hourly_rate':    $rules['hourly_rate']        = (float)$row['setting_value']; break;
+                case 'xbox_hourly_rate':   $rules['xbox_hourly_rate']   = (float)$row['setting_value']; break;
+                case 'session_min_charge': $rules['session_min_charge'] = (float)$row['setting_value']; break;
             }
         }
     }

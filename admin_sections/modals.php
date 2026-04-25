@@ -187,6 +187,24 @@
                 </div>
             </div>
 
+            <!-- ── Controller Rental Add-on ── -->
+            <div id="controllerRentalGroup" style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px 14px;">
+                    <input type="checkbox" id="controllerRentalToggle" name="controller_rental" value="1"
+                           onchange="recalcSessionPreview()"
+                           style="width:16px;height:16px;accent-color:#5f85da;cursor:pointer;">
+                    <span style="font-size:13px;font-weight:600;color:#8aa4e8;">
+                        <i class="fas fa-gamepad" style="margin-right:5px;"></i>
+                        Controller Rental
+                        <span style="font-weight:400;color:#888;margin-left:6px;">
+                            +&#8369;<?= number_format((float)($settings['controller_rental_fee'] ?? 20), 0) ?>/session
+                        </span>
+                    </span>
+                </label>
+                <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt"
+                       value="<?= (float)($settings['controller_rental_fee'] ?? 20) ?>">
+            </div>
+
             <!-- ── Optional upfront payment (hourly only) ── -->
             <div id="startPaymentGroup" style="display:none;">
                 <div style="background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.25);border-radius:10px;padding:14px;margin-bottom:16px;">

@@ -53,7 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
 
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
-        $upfront_cost = ($planned_minutes <= 30) ? 50.0 : (float)($planned_minutes / 60 * 80);
+        $pr           = getPricingRules();
+        $upfront_cost = ($planned_minutes <= 30)
+                        ? $pr['session_min_charge']
+                        : (float)($planned_minutes / 60 * $pr['hourly_rate']);
+        // Add controller rental fee if checked
+        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+            $ctrl_fee     = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
+            $upfront_cost += $ctrl_fee;
+        }
         $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
         $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
 
@@ -182,13 +190,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // SAVE SETTINGS
     elseif ($action === 'save_settings') {
         $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
-                 'business_hours_open','business_hours_close','shop_phone'];
+                 'business_hours_open','business_hours_close','shop_phone',
+                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
         foreach ($keys as $key) {
             if (isset($_POST[$key])) {
                 updateSetting($key, trim($_POST[$key]));
             }
         }
-        $message = 'Settings saved successfully.';
+
+        // ── Sync consoles.hourly_rate from system_settings ──────────────────
+        // This ensures the "Console" dropdown in Start Session always shows the
+        // live rate from system settings, not a stale per-row value.
+        $rateMap = [
+            'PS5'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80),
+            'PS4'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80), // PS4 shares PS5 rate
+            'Xbox Series X'=> (float)($_POST['xbox_hourly_rate'] ?? getSetting('xbox_hourly_rate') ?? 80),
+        ];
+        foreach ($rateMap as $type => $rate) {
+            $stmt = $conn->prepare("UPDATE consoles SET hourly_rate = ? WHERE console_type = ?");
+            $stmt->bind_param('ds', $rate, $type);
+            $stmt->execute();
+        }
+
+        $message = 'Settings saved and console rates updated.';
         $messageType = 'success';
     }
 
@@ -565,7 +589,8 @@ $usageReport = getConsoleUsageReport('2020-01-01', $today);
 
 // Settings
 $settingsKeys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
-                 'business_hours_open','business_hours_close','shop_name','shop_address','shop_phone'];
+                 'business_hours_open','business_hours_close','shop_name','shop_address','shop_phone',
+                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
 $settings = [];
 foreach ($settingsKeys as $k) {
     $settings[$k] = getSetting($k);
@@ -976,22 +1001,30 @@ function syncTenderedAndSubmit(e) {
 }
 
 function updateSessionPreview() {
-    const minutes = parseInt(document.getElementById('durationSelect').value);
+    const sel     = document.getElementById('durationSelect');
+    const paid    = parseInt(sel.value);
     const input   = document.getElementById('plannedMinutesInput');
     const preview = document.getElementById('sessionPreview');
-    if (!minutes) { preview.style.display = 'none'; input.value = ''; return; }
+    if (!paid) { preview.style.display = 'none'; input.value = ''; return; }
 
-    input.value = minutes;
+    input.value = paid;
 
-    // Estimated end time
+    // Read cost and total play time from data-* set by PHP (getHourlyDurationOptions — DB-driven)
+    const opt        = sel.options[sel.selectedIndex];
+    let   cost       = parseFloat(opt.dataset.cost  || 0);
+    const totalMin   = parseInt(opt.dataset.total   || paid);   // paid + bonus
+
+    // Controller rental fee (DB-driven, echoed by PHP)
+    const ctrlToggle = document.getElementById('controllerRentalToggle');
+    const ctrlFee    = parseFloat(document.getElementById('controllerFeeAmt')?.value || 0);
+    if (ctrlToggle?.checked) cost += ctrlFee;
+
+    // Scheduled end uses TOTAL play minutes (paid + bonus)
     const now    = new Date();
-    const endAt  = new Date(now.getTime() + minutes * 60000);
+    const endAt  = new Date(now.getTime() + totalMin * 60000);
     const endStr = endAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    // Base cost (mirrors PHP logic)
-    const cost = (minutes <= 30) ? 50 : (minutes / 60 * 80);
-
-    // Populate hidden cost holder for the change calculator
+    // Update the change calculator
     const costHolder = document.getElementById('startCostAmt');
     if (costHolder) costHolder.textContent = cost.toFixed(2);
 
@@ -1000,6 +1033,8 @@ function updateSessionPreview() {
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
 }
+// Alias — called by controller rental checkbox onchange
+const recalcSessionPreview = updateSessionPreview;
 
 // Form validation: require duration for hourly
 document.addEventListener('DOMContentLoaded', function () {

@@ -1458,26 +1458,37 @@ if (mainNav) {
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="reqExtBtns">
                 <?php
-                $extOptions = [
-                    30  => ['₱40',  '+30 min'],
-                    60  => ['₱80',  '+1 hour'],
-                    90  => ['₱120', '+1h 30m'],
-                    120 => ['₱160', '+2 hours'],
-                ];
-                foreach ($extOptions as $mins => [$price, $label]):
+                // DB-driven extension options — reads rate and bonus rule from system_settings
+                $extRules = getPricingRules();
+                $extRate  = $extRules['hourly_rate'];   // ₱/hr for extensions
+                // Extension options: 30 min steps up to 2 hrs (no minimum charge for extensions)
+                $extSteps = [30, 60, 90, 120];
+                foreach ($extSteps as $extMins):
+                    $extCost  = round($extMins / 60 * $extRate, 2);
+                    $extBonus = calcBonusMinutes($extMins, $extRules);
+                    $extLabel = $extMins < 60
+                        ? "+{$extMins} min"
+                        : (($extMins % 60 === 0)
+                            ? '+' . ($extMins / 60) . ' hour' . ($extMins / 60 > 1 ? 's' : '')
+                            : '+' . intdiv($extMins, 60) . 'h ' . ($extMins % 60) . 'm');
                 ?>
                 <button type="button"
                         class="req-ext-opt"
-                        data-mins="<?= $mins ?>"
-                        data-cost="<?= ltrim($price, '₱') ?>"
+                        data-mins="<?= $extMins ?>"
+                        data-cost="<?= $extCost ?>"
                         onclick="selectExtOpt(this)"
                         style="padding:12px;border-radius:10px;
                                background:rgba(95,133,218,.08);
                                border:1px solid rgba(95,133,218,.2);
                                color:#8aa4e8;font-family:inherit;cursor:pointer;
                                transition:.18s;text-align:left;">
-                    <div style="font-weight:700;font-size:14px;"><?= $label ?></div>
-                    <div style="font-size:11px;color:var(--muted);margin-top:2px;"><?= $price ?> estimated</div>
+                    <div style="font-weight:700;font-size:14px;"><?= $extLabel ?></div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+                        &#8369;<?= number_format($extCost, 0) ?> estimated
+                        <?php if ($extBonus > 0): ?>
+                        <span style="color:#20c8a1;font-weight:700;"> +<?= $extBonus ?>m free!</span>
+                        <?php endif; ?>
+                    </div>
                 </button>
                 <?php endforeach; ?>
             </div>
