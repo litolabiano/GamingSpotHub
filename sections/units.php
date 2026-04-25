@@ -48,7 +48,7 @@ $isLoggedIn   = isLoggedIn();
                 $isFeatured = ($type === 'PS5');
             ?>
             <div class="col-md-6 col-lg-4" data-aos="fade-up" data-aos-delay="<?= $delay ?>">
-                <div class="unit-card<?= $isFeatured ? ' featured' : '' ?>">
+                <div class="unit-card<?= $isFeatured ? ' featured' : '' ?>" data-console-id="<?= $con['console_id'] ?>">
                     <?php if ($isFeatured): ?>
                     <div class="featured-badge">POPULAR</div>
                     <?php endif; ?>
@@ -107,3 +107,60 @@ $isLoggedIn   = isLoggedIn();
         </div>
     </div>
 </section>
+
+<script>
+// ── Real-time console status polling ──────────────────────────────────────────
+(function() {
+    const STATUS_MAP = {
+        'available':   { label: 'Available',   cssClass: 'available' },
+        'in_use':      { label: 'In Use',      cssClass: 'occupied' },
+        'maintenance': { label: 'Maintenance', cssClass: 'maintenance' }
+    };
+
+    function updateUnits() {
+        fetch('/GamingSpotHub/api/console_status.php')
+            .then(r => r.json())
+            .then(data => {
+                data.consoles.forEach(c => {
+                    const card = document.querySelector(`[data-console-id="${c.id}"]`);
+                    if (!card) return;
+
+                    const info   = STATUS_MAP[c.status] || STATUS_MAP['available'];
+                    const badge  = card.querySelector('.unit-status');
+                    const btn    = card.querySelector('.unit-book-btn');
+
+                    // Update badge
+                    if (badge) {
+                        badge.textContent = info.label;
+                        badge.className   = 'unit-status ' + info.cssClass;
+                    }
+
+                    // Update button
+                    if (btn) {
+                        if (c.status === 'available') {
+                            btn.classList.remove('disabled');
+                            btn.innerHTML = '<i class="fas fa-calendar-check" style="margin-right:6px;"></i>Book Now';
+                            // Restore href (keep existing or build from type)
+                            if (btn.getAttribute('href') === '#') {
+                                const type = card.querySelector('.unit-type span')?.textContent.trim();
+                                if (type) {
+                                    const isLoggedIn = document.querySelector('.user-dropdown') !== null;
+                                    const reserveUrl = 'reserve.php?console=' + encodeURIComponent(type);
+                                    btn.href = isLoggedIn ? reserveUrl : 'auth/login.php?redirect=' + encodeURIComponent(reserveUrl);
+                                }
+                            }
+                        } else {
+                            btn.classList.add('disabled');
+                            btn.innerHTML = info.label;
+                            btn.setAttribute('href', '#');
+                        }
+                    }
+                });
+            })
+            .catch(() => {}); // silent fail
+    }
+
+    // Poll every 10 seconds
+    setInterval(updateUnits, 10000);
+})();
+</script>

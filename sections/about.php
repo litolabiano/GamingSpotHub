@@ -8,7 +8,7 @@
                     <h2 class="section-title">Welcome to Gspot Gaming Hub</h2>
                 </div>
                 <p class="about-text">
-                    Located in the heart of Dasma, we're more than just a gaming cafe - we're a community hub where gamers come together to play, compete, and connect.
+                    Located in the heart of Dasma, we're more than just a gaming spot - we're a community hub where gamers come together to play, compete, and connect.
                 </p>
                 <p class="about-text">
                     Whether you're into competitive esports, casual gaming with friends, or just looking for a cozy spot to enjoy great food and games, we've got you covered.
@@ -116,7 +116,8 @@
 .feature-icon {
     width: 60px;
     height: 60px;
-    background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+    background: #0a2151;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 15px;
     display: flex;
     align-items: center;
@@ -126,7 +127,7 @@
 
 .feature-icon i {
     font-size: 1.5rem;
-    color: white;
+    color: var(--color-secondary);
 }
 
 .feature-content h4 {

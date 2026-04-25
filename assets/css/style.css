@@ -159,7 +159,7 @@ img {
 
 .btn-primary {
   background: linear-gradient(135deg, var(--color-mint), var(--color-blue));
-  color: white;
+  color: black;
 }
 
 .btn-primary:hover {
@@ -206,6 +206,7 @@ img {
   top: 0;
   left: 0;
   z-index: 1;
+  pointer-events: none;
 }
 
 .hero-content {
@@ -452,14 +453,15 @@ section {
 .service-icon {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+  background: #0a2151;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
   font-size: 2rem;
-  color: white;
+  color: var(--color-secondary);
 }
 
 .service-title {
@@ -542,7 +544,8 @@ section {
 .contact-icon {
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+  background: #0a2151;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -552,7 +555,7 @@ section {
 
 .contact-icon i {
   font-size: 1.5rem;
-  color: white;
+  color: var(--color-secondary);
 }
 
 .contact-details h4 {
@@ -585,7 +588,7 @@ section {
 }
 
 .social-link:hover {
-  background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+  background: #0a2151;
   border-color: transparent;
   color: white;
   transform: translateY(-5px);
@@ -665,12 +668,13 @@ section {
   right: 30px;
   width: 50px;
   height: 50px;
-  background: linear-gradient(135deg, var(--color-mint), var(--color-purple));
+  background: #0a2151;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--color-secondary);
   font-size: 1.2rem;
   opacity: 0;
   visibility: hidden;
@@ -762,6 +766,12 @@ section {
   background: rgba(251, 86, 107, 0.2);
   color: var(--color-coral);
   border: 1px solid var(--color-coral);
+}
+
+.unit-status.maintenance {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f1c40f;
+  border: 1px solid #f1c40f;
 }
 
 .unit-number {

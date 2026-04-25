@@ -580,17 +580,6 @@ function fmtMins(int $m): string {
 
         <div class="cd-nav-spacer"></div>
 
-        <div class="cd-sidebar-bottom">
-            <a href="reserve.php" class="cd-btn cd-btn-primary" style="width:100%;justify-content:center;margin-bottom:10px;">
-                <i class="fas fa-calendar-plus"></i> New Reservation
-            </a>
-            <a href="index.php" class="cd-nav-btn" style="text-decoration:none;">
-                <i class="fas fa-home"></i> Back to Home
-            </a>
-            <a href="auth/logout.php" class="cd-nav-btn" style="color:var(--coral);text-decoration:none;">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
-            </a>
-        </div>
     </aside>
 
     <!-- ══ MAIN ═════════════════════════════════════════════════════════════ -->
@@ -1358,5 +1347,21 @@ document.getElementById('cancelResModal')?.addEventListener('click', function(e)
 <script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="assets/libs/aos/aos.js"></script>
 
-</body>
+<script>
+// ── Navbar scroll effect (same as index.php) ──────────────────────────────
+AOS.init({ duration: 800, once: true, offset: 80 });
+
+const mainNav = document.getElementById('mainNav');
+if (mainNav) {
+    window.addEventListener('scroll', function () {
+        if (window.scrollY > 100) {
+            mainNav.classList.add('scrolled');
+        } else {
+            mainNav.classList.remove('scrolled');
+        }
+    });
+    // Apply immediately in case page is already scrolled on load
+    if (window.scrollY > 100) mainNav.classList.add('scrolled');
+}
+</script></body>
 </html>

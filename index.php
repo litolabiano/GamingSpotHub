@@ -67,8 +67,8 @@
                         <p class="hero-subtitle">PLAY. ENJOY. COMPETE.</p>
                         <p class="hero-description"><?= htmlspecialchars($heroDesc) ?></p>
                         <div class="hero-buttons">
-                            <a href="#booking" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> View Available Units</a>
-                            <a href="#pricing" class="btn btn-secondary btn-lg"><i class="fas fa-peso-sign me-2"></i> See Pricing Plans</a>
+                            <a href="#units" class="btn btn-primary btn-lg me-3"><i class="fas fa-gamepad me-2"></i> View Available Units</a>
+                            <a href="#gaming" class="btn btn-secondary btn-lg"><i class="fas fa-peso-sign me-2"></i> See Pricing Plans</a>
                         </div>
                         <div class="hero-stats mt-5">
                             <div class="stat-item">
