@@ -338,7 +338,8 @@
                                 <?= $sess['session_id'] ?>,
                                 '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
                                 '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
-                                <?= $bookedMinutes ?>
+                                <?= $bookedMinutes ?>,
+                                '<?= $sess['rental_mode'] ?>'
                             )">
                             <i class="fas fa-clock"></i> Extend
                         </button>

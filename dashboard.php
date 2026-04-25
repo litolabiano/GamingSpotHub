@@ -38,6 +38,20 @@ $stmt->bind_param('i', $user_id);
 $stmt->execute();
 $activeSession = $stmt->get_result()->fetch_assoc();
 
+// Pending extension request for the active session (if any)
+$pendingExtension = null;
+if ($activeSession) {
+    $extStmt = $conn->prepare(
+        "SELECT extension_id, extra_minutes, extra_cost, status, requested_at
+           FROM session_extensions
+          WHERE session_id = ? AND requested_by = ? AND status = 'pending'
+          ORDER BY requested_at DESC LIMIT 1"
+    );
+    $extStmt->bind_param('ii', $activeSession['session_id'], $user_id);
+    $extStmt->execute();
+    $pendingExtension = $extStmt->get_result()->fetch_assoc();
+}
+
 // Total spending (sum of transactions)
 $spendStmt = $conn->prepare(
     "SELECT
@@ -646,6 +660,27 @@ function fmtMins(int $m): string {
                         </div>
                     </div>
                 </div>
+
+                <?php if ($activeSession['rental_mode'] === 'hourly'): ?>
+                <!-- Extend Time action row -->
+                <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(32,200,161,0.15);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <?php if ($pendingExtension): ?>
+                    <div style="display:flex;align-items:center;gap:8px;background:rgba(241,168,60,.1);border:1px solid rgba(241,168,60,.3);border-radius:9px;padding:8px 14px;font-size:13px;color:#f1a83c;">
+                        <i class="fas fa-hourglass-half"></i>
+                        Extension request for <strong>+<?= $pendingExtension['extra_minutes'] ?> min</strong> is <strong>pending staff approval</strong>
+                    </div>
+                    <?php else: ?>
+                    <button class="cd-btn" id="reqExtBtn"
+                            style="background:rgba(95,133,218,0.18);border:1px solid rgba(95,133,218,0.4);color:#8aa4e8;"
+                            onclick="openReqExtModal()"
+                            onmouseover="this.style.background='rgba(95,133,218,.3)'"
+                            onmouseout="this.style.background='rgba(95,133,218,.18)'">
+                        <i class="fas fa-clock"></i> Request More Time
+                    </button>
+                    <span style="font-size:12px;color:var(--muted);">Ask staff to approve extra gaming time</span>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
 
@@ -1374,5 +1409,204 @@ if (mainNav) {
     // Apply immediately in case page is already scrolled on load
     if (window.scrollY > 100) mainNav.classList.add('scrolled');
 }
-</script></body>
+</script>
+
+<?php if ($activeSession && $activeSession['rental_mode'] === 'hourly'): ?>
+<!-- ══ REQUEST EXTENSION MODAL ══════════════════════════════════════════════ -->
+<div id="reqExtModal" style="
+    display:none;position:fixed;inset:0;z-index:99999;
+    background:rgba(0,0,0,0.75);backdrop-filter:blur(7px);
+    align-items:center;justify-content:center;">
+    <div style="
+        background:linear-gradient(145deg,#0d1b3e,#08101c);
+        border:1px solid rgba(95,133,218,0.3);
+        border-radius:18px;padding:28px 26px;
+        max-width:420px;width:90%;
+        box-shadow:0 24px 64px rgba(0,0,0,0.6);
+        animation:reqExtIn .22s cubic-bezier(.34,1.56,.64,1);">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(95,133,218,.15);
+                            border:1px solid rgba(95,133,218,.3);display:flex;align-items:center;
+                            justify-content:center;font-size:18px;color:#8aa4e8;">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:15px;color:#fff;">Request More Time</div>
+                    <div style="font-size:12px;color:var(--muted);">Staff will approve &amp; collect payment</div>
+                </div>
+            </div>
+            <button onclick="closeReqExtModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px;">×</button>
+        </div>
+
+        <!-- Current session info -->
+        <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.2);
+                    border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
+            <strong style="color:#fff;">
+                <?= htmlspecialchars($activeSession['console_type']) ?> – <?= htmlspecialchars($activeSession['unit_number']) ?>
+            </strong>
+            <span style="color:var(--muted);margin-left:8px;">
+                Booked: <?= fmtMins((int)($activeSession['planned_minutes'] ?? 0)) ?>
+            </span>
+        </div>
+
+        <!-- Duration picker -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+                How much extra time?
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="reqExtBtns">
+                <?php
+                $extOptions = [
+                    30  => ['₱40',  '+30 min'],
+                    60  => ['₱80',  '+1 hour'],
+                    90  => ['₱120', '+1h 30m'],
+                    120 => ['₱160', '+2 hours'],
+                ];
+                foreach ($extOptions as $mins => [$price, $label]):
+                ?>
+                <button type="button"
+                        class="req-ext-opt"
+                        data-mins="<?= $mins ?>"
+                        data-cost="<?= ltrim($price, '₱') ?>"
+                        onclick="selectExtOpt(this)"
+                        style="padding:12px;border-radius:10px;
+                               background:rgba(95,133,218,.08);
+                               border:1px solid rgba(95,133,218,.2);
+                               color:#8aa4e8;font-family:inherit;cursor:pointer;
+                               transition:.18s;text-align:left;">
+                    <div style="font-weight:700;font-size:14px;"><?= $label ?></div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:2px;"><?= $price ?> estimated</div>
+                </button>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <!-- Cost preview -->
+        <div id="reqExtCostBox" style="display:none;
+             background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.25);
+             border-radius:10px;padding:14px;margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;color:#8aa4e8;">
+                    <i class="fas fa-receipt" style="margin-right:5px;"></i> Estimated Cost
+                </span>
+                <span id="reqExtCostDisplay" style="font-size:20px;font-weight:800;color:#f1e1aa;">₱0</span>
+            </div>
+            <div style="margin-top:6px;font-size:11px;color:var(--muted);">
+                <i class="fas fa-info-circle" style="margin-right:4px;"></i>
+                Final amount collected by staff on approval.
+            </div>
+        </div>
+
+        <input type="hidden" id="reqExtMins" value="">
+
+        <button id="reqExtSubmitBtn" onclick="submitReqExt()"
+                disabled
+                style="width:100%;padding:13px;border-radius:10px;
+                       background:linear-gradient(135deg,rgba(95,133,218,.18),rgba(32,200,161,.1));
+                       border:1px solid rgba(95,133,218,.3);color:#8aa4e8;
+                       font-size:14px;font-weight:700;cursor:pointer;opacity:.5;
+                       display:flex;align-items:center;justify-content:center;gap:8px;
+                       transition:.2s;font-family:inherit;">
+            <i class="fas fa-paper-plane"></i> Send Request to Staff
+        </button>
+    </div>
+</div>
+<style>
+@keyframes reqExtIn {
+    from { opacity:0; transform:scale(.88) translateY(14px); }
+    to   { opacity:1; transform:scale(1)  translateY(0); }
+}
+.req-ext-opt.selected {
+    background: rgba(95,133,218,.25) !important;
+    border-color: rgba(95,133,218,.6) !important;
+    color: #fff !important;
+}
+</style>
+<script>
+const REQ_EXT_SESSION_ID = <?= (int)$activeSession['session_id'] ?>;
+
+function openReqExtModal() {
+    // Reset state
+    document.querySelectorAll('.req-ext-opt').forEach(b => b.classList.remove('selected'));
+    document.getElementById('reqExtMins').value = '';
+    document.getElementById('reqExtCostBox').style.display = 'none';
+    const btn = document.getElementById('reqExtSubmitBtn');
+    btn.disabled = true;
+    btn.style.opacity = '.5';
+
+    const m = document.getElementById('reqExtModal');
+    m.style.display = 'flex';
+    m.firstElementChild.style.animation = 'none';
+    requestAnimationFrame(() => { m.firstElementChild.style.animation = ''; });
+}
+
+function closeReqExtModal() {
+    document.getElementById('reqExtModal').style.display = 'none';
+}
+
+function selectExtOpt(el) {
+    document.querySelectorAll('.req-ext-opt').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    const mins = el.dataset.mins;
+    const cost = el.dataset.cost;
+    document.getElementById('reqExtMins').value = mins;
+    document.getElementById('reqExtCostDisplay').textContent = '₱' + cost;
+    document.getElementById('reqExtCostBox').style.display = 'block';
+    const btn = document.getElementById('reqExtSubmitBtn');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+}
+
+function submitReqExt() {
+    const mins = document.getElementById('reqExtMins').value;
+    if (!mins) return;
+
+    const btn = document.getElementById('reqExtSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
+
+    const fd = new FormData();
+    fd.append('session_id',   REQ_EXT_SESSION_ID);
+    fd.append('extra_minutes', mins);
+
+    fetch('ajax/request_extension.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request to Staff';
+            if (data.success) {
+                closeReqExtModal();
+                showDashToast('Extension request sent! Staff will approve it shortly.', 'success');
+                // Swap button to pending badge
+                document.getElementById('reqExtBtn')?.replaceWith((() => {
+                    const d = document.createElement('div');
+                    d.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(241,168,60,.1);border:1px solid rgba(241,168,60,.3);border-radius:9px;padding:8px 14px;font-size:13px;color:#f1a83c;';
+                    d.innerHTML = '<i class="fas fa-hourglass-half"></i> Extension request for <strong>+' + mins + ' min</strong> is <strong>pending staff approval</strong>';
+                    return d;
+                })());
+            } else {
+                showDashToast(data.message || 'Could not send request.', 'error');
+                btn.style.opacity = '1';
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request to Staff';
+            showDashToast('Network error — please try again.', 'error');
+        });
+}
+
+// Close on backdrop click
+document.getElementById('reqExtModal').addEventListener('click', function(e) {
+    if (e.target === this) closeReqExtModal();
+});
+</script>
+<?php endif; ?>
+
+<!-- Bootstrap JS (navbar mobile toggler) -->
+<script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="assets/libs/aos/aos.js"></script>
+
 </html>

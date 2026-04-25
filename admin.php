@@ -18,18 +18,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id_raw     = (int)($_POST['user_id'] ?? 0);
-        $user_id         = $user_id_raw > 0 ? $user_id_raw : null; // null = walk-in
+        $user_id         = (int)($_POST['user_id'] ?? 0);
         $console_id      = (int)($_POST['console_id'] ?? 0);
         $rental_mode     = $_POST['rental_mode'] ?? '';
         $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
 
-        if (!$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
+        if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
+            $messageType = 'error';
+        } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
+            $pr = getPricingRules();
+            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
@@ -428,7 +431,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
 
-    // EXTEND SESSION
+    // EXTEND SESSION (adds to planned_minutes for hourly sessions)
     elseif ($action === 'extend_session') {
         $session_id    = (int)($_POST['session_id'] ?? 0);
         $extra_minutes = (int)($_POST['extra_minutes'] ?? 0);
@@ -456,112 +459,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-
-    // ── TOURNAMENT: CREATE ────────────────────────────────────────────────────
-    elseif ($action === 'create_tournament') {
-        $tname    = trim($_POST['tournament_name'] ?? '');
-        $game     = trim($_POST['game_name'] ?? '');
-        $ctype    = $_POST['console_type'] ?? '';
-        $sdate    = $_POST['start_date'] ?? '';
-        $edate    = $_POST['end_date'] ?? '';
-        $fee      = (float)($_POST['entry_fee'] ?? 0);
-        $prize    = (float)($_POST['prize_pool'] ?? 0);
-        $maxp     = (int)($_POST['max_participants'] ?? 16);
-        $annc     = trim($_POST['announcement'] ?? '');
-
-        if (!$tname || !$ctype || !$sdate || !$edate) {
-            $message = 'Please fill in all required tournament fields.';
-            $messageType = 'error';
-        } else {
-            // ── Enforce 7-day lead time ──
-            $minAllowed = new DateTime('+7 days');
-            $minAllowed->setTime(0, 0, 0);
-            $startDt = new DateTime($sdate);
-            if ($startDt < $minAllowed) {
-                $earliest = $minAllowed->format('M d, Y');
-                $message = "Start date must be at least 7 days from today (earliest: {$earliest}).";
-                $messageType = 'error';
-            } elseif ($edate < $sdate) {
-                $message = 'End date cannot be before the start date.';
-                $messageType = 'error';
-            } else {
-                $stmt = $conn->prepare(
-                    "INSERT INTO tournaments (tournament_name, game_name, console_type, start_date, end_date, entry_fee, prize_pool, max_participants, status, announcement)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)"
-                );
-                $stmt->bind_param('sssssddis', $tname, $game, $ctype, $sdate, $edate, $fee, $prize, $maxp, $annc);
-                if ($stmt->execute()) {
-                    $message = "Tournament '{$tname}' created. Switch it to Scheduled to open registration.";
-                    $messageType = 'success';
-                } else {
-                    $message = 'Failed to create tournament: ' . $conn->error;
-                    $messageType = 'error';
-                }
-            }
-        }
-    }
-
-    // ── TOURNAMENT: UPDATE STATUS ─────────────────────────────────────────────
-    elseif ($action === 'update_tournament_status') {
-        $tid    = (int)($_POST['tournament_id'] ?? 0);
-        $status = $_POST['new_status'] ?? '';
-        $allowed = ['upcoming','scheduled','ongoing','completed','cancelled'];
-        if ($tid && in_array($status, $allowed)) {
-            $stmt = $conn->prepare("UPDATE tournaments SET status=? WHERE tournament_id=?");
-            $stmt->bind_param('si', $status, $tid);
-            $stmt->execute();
-            $message = 'Tournament status updated to ' . ucfirst($status) . '.';
-            $messageType = 'success';
-        }
-    }
-
-    // ── TOURNAMENT: ADMIN REGISTER PARTICIPANT ────────────────────────────────
-    elseif ($action === 'admin_register_participant') {
-        $tid    = (int)($_POST['tournament_id'] ?? 0);
-        $uid    = (int)($_POST['user_id'] ?? 0);
-        $pstatus = in_array($_POST['payment_status'] ?? '', ['pending','paid']) ? $_POST['payment_status'] : 'pending';
-        if ($tid && $uid) {
-            // Check not already registered
-            $chk = $conn->prepare("SELECT participant_id FROM tournament_participants WHERE tournament_id=? AND user_id=?");
-            $chk->bind_param('ii', $tid, $uid);
-            $chk->execute();
-            if ($chk->get_result()->num_rows > 0) {
-                $message = 'This player is already registered for that tournament.';
-                $messageType = 'error';
-            } else {
-                $stmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, payment_status) VALUES (?,?,?)");
-                $stmt->bind_param('iis', $tid, $uid, $pstatus);
-                $stmt->execute();
-                $message = 'Participant registered successfully.';
-                $messageType = 'success';
-            }
-        }
-    }
-
-    // ── TOURNAMENT: UPDATE PARTICIPANT PAYMENT ────────────────────────────────
-    elseif ($action === 'update_participant_payment') {
-        $pid     = (int)($_POST['participant_id'] ?? 0);
-        $pstatus = in_array($_POST['payment_status'] ?? '', ['pending','paid']) ? $_POST['payment_status'] : 'pending';
-        if ($pid) {
-            $stmt = $conn->prepare("UPDATE tournament_participants SET payment_status=? WHERE participant_id=?");
-            $stmt->bind_param('si', $pstatus, $pid);
-            $stmt->execute();
-            $message = 'Payment status updated to ' . ucfirst($pstatus) . '.';
-            $messageType = 'success';
-        }
-    }
-
-    // ── TOURNAMENT: REMOVE PARTICIPANT ────────────────────────────────────────
-    elseif ($action === 'remove_participant') {
-        $pid = (int)($_POST['participant_id'] ?? 0);
-        if ($pid) {
-            $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id=?");
-            $stmt->bind_param('i', $pid);
-            $stmt->execute();
-            $message = 'Participant removed.';
-            $messageType = 'success';
-        }
-    }
 }
 
 // â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -582,10 +479,11 @@ $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === '
 
 // Sessions: active/live first (sorted by urgency — closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, COALESCE(u.full_name, 'Walk-in') AS customer_name, c.console_name, c.unit_number, c.console_type,
-            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
+    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
+            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
      FROM gaming_sessions gs
-     LEFT JOIN users u ON gs.user_id = u.user_id
+     JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
      ORDER BY
          CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
@@ -642,16 +540,23 @@ $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
 // Pending sessions: active sessions with upfront payment OR completed sessions with outstanding balance
 $pendingSessions = [];
 foreach ($recentSessions as $sess) {
-    $paidSoFar = (float)($sess['upfront_paid'] ?? 0);
+    $paidSoFar      = (float)($sess['upfront_paid']    ?? 0); // positive payments only
+    $refundedAmount = (float)($sess['refunded_amount'] ?? 0); // total refunded
+
     if ($sess['status'] === 'active' && $paidSoFar > 0) {
         // Active session with upfront payment — balance pending at end
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
-    } elseif ($sess['status'] === 'completed' && $sess['total_cost'] > 0 && $paidSoFar < (float)$sess['total_cost']) {
-        // Completed session where total paid < total cost — outstanding balance
+    } elseif ($sess['status'] === 'completed'
+        && $sess['total_cost'] > 0
+        && $refundedAmount == 0               // no refund was issued
+        && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
+    ) {
+        // Completed session where total paid < total cost — outstanding balance (no refund)
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
+    // Sessions with refunds issued are fully settled — skip them entirely
 }
 
 
@@ -853,9 +758,6 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <div class="nav-item" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
     </div>
-    <div class="nav-item" onclick="showPage('tournaments', this)">
-        <i class="fas fa-trophy"></i><span>Tournaments</span>
-    </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
@@ -864,10 +766,6 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <i class="fas fa-arrow-left"></i><span>Back to Site</span>
     </a>
 </div>
-
-<!-- Sidebar overlay — clicking it closes the sidebar -->
-<div id="sidebarOverlay" onclick="toggleSidebar()"
-     style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);"></div>
 
 <!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="topbar">
@@ -898,7 +796,6 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
-<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
@@ -917,7 +814,6 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management',
         financial: 'Financial', reports: 'Analytics & Reports',
-        tournaments: 'Tournament Management',
         settings: 'Settings'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
@@ -935,7 +831,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings','tournaments'];
+    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;
@@ -952,15 +848,10 @@ function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
     const topbar      = document.querySelector('.topbar');
     const mainContent = document.querySelector('.main-content');
-    const overlay     = document.getElementById('sidebarOverlay');
-
-    const isHidden = sidebar.classList.toggle('hidden');
-
-    topbar.style.left            = isHidden ? '0'     : '260px';
-    mainContent.style.marginLeft = isHidden ? '0'     : '260px';
-
-    // Show overlay so clicking outside closes the sidebar
-    if (overlay) overlay.style.display = isHidden ? 'none' : 'block';
+    sidebar.classList.toggle('collapsed');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    topbar.style.left      = isCollapsed ? '70px'  : '260px';
+    mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
 }
 
 // â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1141,13 +1032,15 @@ document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
 });
 
-/* ── Billing helpers — mirrors PHP computePartialPeriodCost / computeTimedCost ── *
- * Rule: FREE 30 min after every 2 paid hours.
- * Cycle = 150 min (120 paid + 30 free) = ₱160 per cycle.
+/* ── Billing helpers — all values driven from DB via getPricingRules() ──────── *
+ * PRICING is injected by PHP so the JS always matches the backend.
+ * _bracketCost / _timedCost are unchanged in shape — only their constants move.
  */
+const PRICING = <?= json_encode(getPricingRules()) ?>;
+
 function _bracketCost(partialMin) {
-    // Partial-hour bracket for minutes 0–59
-    if (partialMin <= 4)  return 0;   // grace
+    // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
+    if (partialMin <=  4) return 0;   // grace
     if (partialMin <= 19) return 20;
     if (partialMin <= 34) return 40;
     if (partialMin <= 49) return 60;
@@ -1155,22 +1048,25 @@ function _bracketCost(partialMin) {
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const CYCLE = 150;   // 120 min paid + 30 min free
-    const CYCLE_COST = 160;
-    const fullCycles = Math.floor(totalMin / CYCLE);
-    const remainder  = totalMin % CYCLE;
-    let cost = fullCycles * CYCLE_COST;
-    if (remainder > 120) {
-        // Inside the free 30-min window — charge the full 2-hour block
-        cost += CYCLE_COST;
+    const bp       = PRICING.bonus_paid_minutes;         // e.g. 120
+    const bf       = PRICING.bonus_free_minutes;         // e.g. 30
+    const rate     = PRICING.hourly_rate;                // e.g. 80
+    const cyclePay = bp / 60 * rate;                    // e.g. 160
+    const cycleLen = bp + bf;                           // e.g. 150
+    const full     = Math.floor(totalMin / cycleLen);
+    const rem      = totalMin % cycleLen;
+    let cost       = full * cyclePay;
+    if (rem > bp) {
+        cost += cyclePay;  // inside the free window — charge the full paid block
     } else {
-        // Inside the paid window — hourly bracket billing
-        cost += Math.floor(remainder / 60) * 80 + _bracketCost(remainder % 60);
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
     }
     return cost;
 }
 function _hourlyCost(duration, planned) {
-    const base     = planned <= 30 ? 50 : (planned / 60 * 80);
+    const rate     = PRICING.hourly_rate;
+    const minChg   = PRICING.session_min_charge;
+    const base     = planned <= 30 ? minChg : (planned / 60 * rate);
     const overtime = duration - planned;
     if (overtime <= 0) return base;
     return base + _timedCost(overtime);

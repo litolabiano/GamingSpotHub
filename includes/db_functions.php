@@ -1,16 +1,121 @@
 <?php
 /**
  * Good Spot Gaming Hub - Database Helper Functions
- * 
+ *
  * Reusable functions for common database operations.
+ *
+ * ─── Bonus Time Rule (Single Source of Truth) ─────────────────────────────
+ * The shop awards free play time after every N paid minutes.
+ * The rule lives ONLY in system_settings:
+ *   bonus_paid_minutes  — every X paid min earns a bonus (default 120 = 2 hrs)
+ *   bonus_free_minutes  — bonus size in minutes           (default 30)
+ *   max_hourly_minutes  — max bookable paid minutes        (default 240 = 4 hrs)
+ *
+ * Use getPricingRules() to read them; use paidToTotalMinutes() everywhere
+ * you need the real play time. Never hardcode 120 / 30 / 240 outside this file.
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 require_once __DIR__ . '/db_config.php';
 
+// ============================================================================
+// PRICING RULES (DB-DRIVEN — single source of truth)
+// ============================================================================
 
-// ============================================================================
-// CONSOLE FUNCTIONS
-// ============================================================================
+/** @var array|null Module-level cache so we only query once per request. */
+$_pricingRulesCache = null;
+
+/**
+ * Read bonus / pricing rules from system_settings.
+ * Returns an array with keys:
+ *   bonus_paid_minutes, bonus_free_minutes, max_hourly_minutes,
+ *   hourly_rate (global default), session_min_charge.
+ */
+function getPricingRules(): array {
+    global $conn, $_pricingRulesCache;
+    if ($_pricingRulesCache !== null) return $_pricingRulesCache;
+
+    $rules = [
+        'bonus_paid_minutes' => 120,   // every 2 paid hrs
+        'bonus_free_minutes' => 30,    // earn 30 min free
+        'max_hourly_minutes' => 240,   // cap at 4 paid hrs
+        'hourly_rate'        => 80.0,  // ₱80/hr default
+        'session_min_charge' => 50.0,  // ₱50 for ≤30 min start
+    ];
+
+    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate'";
+    $res  = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($keys)");
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            switch ($row['setting_key']) {
+                case 'bonus_paid_minutes': $rules['bonus_paid_minutes'] = (int)  $row['setting_value']; break;
+                case 'bonus_free_minutes': $rules['bonus_free_minutes'] = (int)  $row['setting_value']; break;
+                case 'max_hourly_minutes': $rules['max_hourly_minutes'] = (int)  $row['setting_value']; break;
+                case 'ps5_hourly_rate':    $rules['hourly_rate']        = (float)$row['setting_value']; break;
+            }
+        }
+    }
+
+    $_pricingRulesCache = $rules;
+    return $rules;
+}
+
+/**
+ * Calculate bonus free minutes for a given paid duration.
+ * e.g. calcBonusMinutes(120) = 30, calcBonusMinutes(240) = 60
+ */
+function calcBonusMinutes(int $paid_minutes, ?array $rules = null): int {
+    $rules = $rules ?? getPricingRules();
+    return (int) floor($paid_minutes / $rules['bonus_paid_minutes']) * $rules['bonus_free_minutes'];
+}
+
+/**
+ * Convert PAID minutes to TOTAL play minutes (paid + bonus).
+ * This is the only place that applies the bonus.
+ * e.g. paidToTotalMinutes(120) = 150, paidToTotalMinutes(240) = 300
+ */
+function paidToTotalMinutes(int $paid_minutes, ?array $rules = null): int {
+    return $paid_minutes + calcBonusMinutes($paid_minutes, $rules);
+}
+
+/**
+ * Generate the duration option list for hourly booking UIs.
+ * Returns array of ['paid', 'total', 'cost', 'bonus', 'label_paid', 'label_total', 'label_bonus']
+ * Step size is always 30 min; stops at max_hourly_minutes.
+ */
+function getHourlyDurationOptions(?array $rules = null): array {
+    $rules  = $rules ?? getPricingRules();
+    $max    = $rules['max_hourly_minutes'];
+    $rate   = $rules['hourly_rate'];         // ₱/hr
+    $minChg = $rules['session_min_charge'];  // ₱50 for ≤30 min
+
+    $options = [];
+    for ($paid = 30; $paid <= $max; $paid += 30) {
+        $bonus = calcBonusMinutes($paid, $rules);
+        $total = $paid + $bonus;
+        $cost  = ($paid <= 30) ? $minChg : round($paid / 60 * $rate, 2);
+
+        // Human-readable label helpers
+        $fmtMin = function(int $m): string {
+            $h = intdiv($m, 60); $r = $m % 60;
+            if ($h && $r) return "{$h}h {$r}m";
+            if ($h)       return "{$h}" . ($h === 1 ? ' hr' : ' hrs');
+            return "{$r} min";
+        };
+
+        $options[] = [
+            'paid'        => $paid,
+            'total'       => $total,
+            'cost'        => $cost,
+            'bonus'       => $bonus,
+            'label_paid'  => $fmtMin($paid),
+            'label_total' => $fmtMin($total),
+            'label_bonus' => $bonus > 0 ? '+' . $fmtMin($bonus) . ' free' : '',
+        ];
+    }
+    return $options;
+}
+
 
 /**
  * Get all consoles, optionally filtered by status or type.
@@ -87,13 +192,20 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
 
     $conn->begin_transaction();
     try {
-        // Create session (planned_minutes stored for hourly pre-booking)
+        // Apply bonus: convert paid minutes → total play minutes (paid + free bonus)
+        // This is the ONLY place that applies the bonus — all callers pass paid minutes.
+        $stored_minutes = null;
+        if ($rental_mode === 'hourly' && $planned_minutes !== null) {
+            $stored_minutes = paidToTotalMinutes((int)$planned_minutes);
+        }
+
+        // Create session
         $stmt = $conn->prepare(
             "INSERT INTO gaming_sessions (user_id, console_id, rental_mode, planned_minutes, hourly_rate, created_by)
              VALUES (?, ?, ?, ?, ?, ?)"
         );
-        // Use execute() array so NULL user_id is passed correctly (bind_param coerces null→0 for 'i')
-        $stmt->execute([$user_id, $console_id, $rental_mode, $planned_minutes, $rate, $created_by]);
+        $stmt->bind_param("iisidi", $user_id, $console_id, $rental_mode, $stored_minutes, $rate, $created_by);
+        $stmt->execute();
         $session_id = $conn->insert_id;
 
         // Mark console as in use
@@ -101,7 +213,7 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
 
         // Record upfront payment if provided
         if ($tendered !== null && $payment_method !== null) {
-            $session_cost = computeRentalFee($rental_mode, $planned_minutes ?? 0, $rate, 300, $planned_minutes);
+            $session_cost = computeRentalFee($rental_mode, $stored_minutes ?? 0, $rate, 300, $stored_minutes);
             $tendered     = (float) $tendered;
             $shortfall    = $session_cost - $tendered;
 
@@ -185,9 +297,261 @@ function endSession($session_id) {
     }
 }
 
+// ============================================================================
+// SESSION EXTENSION FUNCTIONS
+// ============================================================================
+
 /**
- * Compute cost for a partial portion of an hour.
+ * Directly extend an active session (staff action — no approval step).
+ *
+ * - For 'hourly'    : bumps planned_minutes + extended_minutes, bills extra_cost now.
+ * - For 'open_time' : only bumps extended_minutes (billing continues live at end).
+ * - For 'unlimited' : bumps extended_minutes, no extra charge.
+ *
+ * Records a transaction for the extension payment.
+ *
+ * @return array ['success', 'extra_cost', 'extension_id'] | ['success'=>false, 'message']
+ */
+function extendSession($session_id, $extra_minutes, $payment_method, $processed_by, $tendered = null) {
+    global $conn;
+
+    if ($extra_minutes <= 0) {
+        return ['success' => false, 'message' => 'Extra minutes must be greater than zero.'];
+    }
+
+    // Fetch active session
+    $stmt = $conn->prepare(
+        "SELECT gs.session_id, gs.user_id, gs.rental_mode, gs.planned_minutes,
+                gs.extended_minutes, gs.hourly_rate,
+                s.setting_value AS unlimited_rate
+           FROM gaming_sessions gs
+           LEFT JOIN system_settings s ON s.setting_key = 'unlimited_rate'
+          WHERE gs.session_id = ? AND gs.status = 'active'"
+    );
+    $stmt->bind_param('i', $session_id);
+    $stmt->execute();
+    $session = $stmt->get_result()->fetch_assoc();
+
+    if (!$session) {
+        return ['success' => false, 'message' => 'Session not found or not active.'];
+    }
+
+    $rental_mode  = $session['rental_mode'];
+    $extra_cost   = 0.0;
+
+    // Extensions bill at straight ₱80/hr — no session-start minimum.
+    // (The ₱50 for 30 min only applies when starting a new session.)
+    if ($rental_mode === 'hourly') {
+        $extra_cost = round(($extra_minutes / 60) * (float)$session['hourly_rate'], 2);
+    } elseif ($rental_mode === 'open_time') {
+        $extra_cost = 0.0;   // billed live at session end
+    } elseif ($rental_mode === 'unlimited') {
+        $extra_cost = 0.0;   // flat rate already paid
+    }
+
+    $conn->begin_transaction();
+    try {
+        // Insert approved extension record
+        $stmt = $conn->prepare(
+            "INSERT INTO session_extensions
+                (session_id, requested_by, approved_by, extra_minutes, extra_cost,
+                 payment_method, status, note, resolved_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'approved', 'Direct extension by staff', NOW())"
+        );
+        $stmt->bind_param('iiidss', $session_id, $processed_by, $processed_by,
+                          $extra_minutes, $extra_cost, $payment_method);
+        $stmt->execute();
+        $extension_id = $conn->insert_id;
+
+        // Update session: bump planned_minutes (hourly) and always bump extended_minutes
+        if ($rental_mode === 'hourly') {
+            // Apply bonus to the extension.
+            // planned_minutes already stores total play time (paid + bonus).
+            // Back-calculate current paid time from DB total, then add new paid
+            // and recompute the new bonus delta.
+            $rules    = getPricingRules();
+            $bp       = $rules['bonus_paid_minutes'];
+            $bf       = $rules['bonus_free_minutes'];
+
+            // Reverse: current paid = current total - current bonus
+            // We know: total = paid + floor(paid/bp)*bf
+            // For typical values: approximate paid from total
+            $cur_total  = (int)($session['planned_minutes'] ?? 0);
+            // Iterate to find exact paid (handles edge where multiple cycles apply)
+            $cur_paid   = max(0, $cur_total);  // start guess
+            for ($p = $cur_total; $p >= 0; $p -= $bf) {
+                if ($p + calcBonusMinutes($p, $rules) === $cur_total) { $cur_paid = $p; break; }
+            }
+
+            $new_paid   = $cur_paid + $extra_minutes;
+            $new_total  = paidToTotalMinutes($new_paid, $rules);
+            $total_add  = $new_total - $cur_total;  // net minutes to add (paid + bonus delta)
+            $bonus_delta = $total_add - $extra_minutes;
+
+            $stmt = $conn->prepare(
+                "UPDATE gaming_sessions
+                    SET planned_minutes  = COALESCE(planned_minutes, 0) + ?,
+                        extended_minutes = extended_minutes + ?
+                  WHERE session_id = ?"
+            );
+            $stmt->bind_param('iii', $total_add, $extra_minutes, $session_id);
+        } else {
+            $total_add   = $extra_minutes;
+            $bonus_delta = 0;
+            $stmt = $conn->prepare(
+                "UPDATE gaming_sessions SET extended_minutes = extended_minutes + ?
+                  WHERE session_id = ?"
+            );
+            $stmt->bind_param('ii', $extra_minutes, $session_id);
+        }
+        $stmt->execute();
+
+        // Record transaction if there's a cost to collect
+        if ($extra_cost > 0) {
+            $shortfall = ($tendered !== null && $tendered < $extra_cost)
+                ? $extra_cost - $tendered : null;
+            $actualPaid = ($tendered !== null) ? min((float)$tendered, $extra_cost) : $extra_cost;
+            $note = 'Extension +' . $extra_minutes . ' min via staff (Extension #' . $extension_id . ')';
+            recordTransaction(
+                $session_id, $session['user_id'], $actualPaid,
+                $payment_method, $processed_by,
+                $tendered, $shortfall, $note
+            );
+        }
+
+        $conn->commit();
+        return [
+            'success'      => true,
+            'extra_cost'   => $extra_cost,
+            'extension_id' => $extension_id,
+            'bonus_earned' => $bonus_delta ?? 0,   // extra free minutes gained
+            'total_added'  => $total_add  ?? $extra_minutes,
+        ];
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Customer requests a session extension (creates a 'pending' record).
+ * No payment collected yet — staff collects on approval.
+ *
+ * @return array ['success', 'extension_id', 'estimated_cost'] | ['success'=>false, 'message']
+ */
+function requestExtension($session_id, $user_id, $extra_minutes) {
+    global $conn;
+
+    if ($extra_minutes <= 0) {
+        return ['success' => false, 'message' => 'Extra minutes must be greater than zero.'];
+    }
+
+    // Confirm session is active AND belongs to this user
+    $stmt = $conn->prepare(
+        "SELECT session_id, rental_mode, hourly_rate FROM gaming_sessions
+          WHERE session_id = ? AND user_id = ? AND status = 'active'"
+    );
+    $stmt->bind_param('ii', $session_id, $user_id);
+    $stmt->execute();
+    $session = $stmt->get_result()->fetch_assoc();
+
+    if (!$session) {
+        return ['success' => false, 'message' => 'Active session not found.'];
+    }
+
+    // Check no other pending extension from this user on this session
+    $stmtChk = $conn->prepare(
+        "SELECT extension_id FROM session_extensions
+          WHERE session_id = ? AND status = 'pending' LIMIT 1"
+    );
+    $stmtChk->bind_param('i', $session_id);
+    $stmtChk->execute();
+    if ($stmtChk->get_result()->num_rows > 0) {
+        return ['success' => false, 'message' => 'You already have a pending extension request. Please wait for staff to approve it.'];
+    }
+
+    $rental_mode    = $session['rental_mode'];
+    // Use straight ₱80/hr for extension estimates (no session-start minimum)
+    $estimated_cost = ($rental_mode === 'hourly')
+        ? round(($extra_minutes / 60) * (float)$session['hourly_rate'], 2)
+        : 0.0;
+
+    $stmt = $conn->prepare(
+        "INSERT INTO session_extensions
+            (session_id, requested_by, extra_minutes, extra_cost, status)
+         VALUES (?, ?, ?, ?, 'pending')"
+    );
+    $stmt->bind_param('iiid', $session_id, $user_id, $extra_minutes, $estimated_cost);
+
+    if ($stmt->execute()) {
+        return [
+            'success'        => true,
+            'extension_id'   => $conn->insert_id,
+            'estimated_cost' => $estimated_cost,
+        ];
+    }
+    return ['success' => false, 'message' => 'Failed to save extension request.'];
+}
+
+/**
+ * Staff approves a pending extension request.
+ * Internally calls extendSession() to apply the time + record the transaction.
+ *
+ * @return array ['success', 'extra_cost', 'extension_id'] | ['success'=>false, 'message']
+ */
+function approveExtension($extension_id, $approved_by, $payment_method, $tendered = null) {
+    global $conn;
+
+    $stmt = $conn->prepare(
+        "SELECT * FROM session_extensions WHERE extension_id = ? AND status = 'pending'"
+    );
+    $stmt->bind_param('i', $extension_id);
+    $stmt->execute();
+    $ext = $stmt->get_result()->fetch_assoc();
+
+    if (!$ext) {
+        return ['success' => false, 'message' => 'Pending extension not found.'];
+    }
+
+    // Mark extension as approved before calling extendSession
+    $upd = $conn->prepare(
+        "UPDATE session_extensions
+            SET status = 'approved', approved_by = ?, payment_method = ?, resolved_at = NOW()
+          WHERE extension_id = ?"
+    );
+    $upd->bind_param('isi', $approved_by, $payment_method, $extension_id);
+    $upd->execute();
+
+    // Apply the time + record payment
+    return extendSession($ext['session_id'], $ext['extra_minutes'], $payment_method, $approved_by, $tendered);
+}
+
+/**
+ * Staff denies a pending extension request.
+ *
+ * @return array ['success'] | ['success'=>false, 'message']
+ */
+function denyExtension($extension_id, $denied_by, $note = null) {
+    global $conn;
+
+    $stmt = $conn->prepare(
+        "UPDATE session_extensions
+            SET status = 'denied', approved_by = ?, note = ?, resolved_at = NOW()
+          WHERE extension_id = ? AND status = 'pending'"
+    );
+    $stmt->bind_param('isi', $denied_by, $note, $extension_id);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        return ['success' => true];
+    }
+    return ['success' => false, 'message' => 'Pending extension not found.'];
+}
+
+/**
  * Used for both Open Time billing and Hourly overtime calculation.
+
  *
  * Brackets: 1–4 min = ₱0 (grace), 5–19 min = ₱20,
  *           20–34 min = ₱40, 35–49 min = ₱60, 50–59 min = ₱80.
@@ -202,38 +566,39 @@ function computePartialPeriodCost($minutes) {
 }
 
 /**
- * Compute cost for any duration using bracket billing with a
- * FREE 30-MINUTE BONUS every 2 paid hours.
+ * Compute cost for any duration using DB-driven bracket billing with
+ * a FREE bonus every N paid minutes.
  *
- * Billing cycle = 150 min:
- *   - First 120 min (2 hrs): billed at ₱80/hr with partial brackets
- *   - Next  30 min (free): no charge
- *   - Then repeat
+ * Reads bonus_paid_minutes and bonus_free_minutes from system_settings.
+ * Cycle = (bonus_paid_minutes + bonus_free_minutes) total minutes.
  *
- * Examples: 2:00 = ₱160, 2:30 = ₱160, 2:45 = ₱180, 4:00 = ₱280
+ * Examples (default 120/30 rule):
+ *   2:00 paid = ₱160,  2:30 (free zone) = ₱160,  4:00 paid = ₱320
  */
-function computeTimedCost($minutes) {
-    $minutes = max(0, (int)$minutes);
+function computeTimedCost(int $minutes): float {
+    $minutes = max(0, $minutes);
     if ($minutes === 0) return 0.0;
 
-    $cycleLength = 150;   // 120 min paid + 30 min free
-    $cycleCost   = 160;   // ₱160 per 2-hour paid block
+    $rules    = getPricingRules();
+    $bp       = $rules['bonus_paid_minutes'];   // e.g. 120
+    $bf       = $rules['bonus_free_minutes'];   // e.g. 30
+    $rate     = $rules['hourly_rate'];          // e.g. 80
+    $cyclePay = $bp / 60 * $rate;              // e.g. ₱160 per cycle
+    $cycleLen = $bp + $bf;                     // e.g. 150 total min/cycle
 
-    $fullCycles = (int)floor($minutes / $cycleLength);
-    $cost       = $fullCycles * $cycleCost;
-    $remainder  = $minutes % $cycleLength;
+    $fullCycles = (int) floor($minutes / $cycleLen);
+    $cost       = $fullCycles * $cyclePay;
+    $remainder  = $minutes % $cycleLen;
 
-    if ($remainder > 120) {
-        // Within the free 30-min window — charge the full 2-hour block
-        $cost += $cycleCost;
+    if ($remainder > $bp) {
+        // Inside the free window — charge the full paid block
+        $cost += $cyclePay;
     } else {
-        // Within the paid window — apply hourly bracket billing
-        $fullHours  = (int)floor($remainder / 60);
-        $partialMin = $remainder % 60;
-        $cost      += $fullHours * 80 + computePartialPeriodCost($partialMin);
+        // Inside the paid window — hourly bracket billing
+        $cost += (int) floor($remainder / 60) * $rate + computePartialPeriodCost($remainder % 60);
     }
 
-    return (float)$cost;
+    return (float) $cost;
 }
 
 /**
@@ -277,11 +642,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, COALESCE(u.full_name, 'Walk-in') AS customer_name,
-                   c.console_name, c.console_type, c.unit_number,
-                   COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
+    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number,
+                   COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
+                   COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
             FROM gaming_sessions gs
-            LEFT JOIN users u ON gs.user_id = u.user_id
+            JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id
             WHERE gs.status = 'active'
             ORDER BY gs.start_time DESC";
