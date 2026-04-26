@@ -15,16 +15,12 @@ body {
     padding: 20px;
     overflow-y: auto;
     z-index: 1000;
-    transition: transform .3s ease, box-shadow .3s ease;
+    transition: var(--transition);
     box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: column;
 }
 
-/* Fully hidden — slides completely off-screen to the left */
-.sidebar.hidden {
-    transform: translateX(-100%);
-    box-shadow: none;
+.sidebar.collapsed {
+    width: 70px;
 }
 
 .sidebar-header {
@@ -44,6 +40,10 @@ body {
     font-size: 20px;
     white-space: nowrap;
     font-family: var(--font-heading);
+}
+
+.sidebar.collapsed .sidebar-header h2 {
+    display: none;
 }
 
 .nav-item {
@@ -74,7 +74,9 @@ body {
     width: 20px;
 }
 
-
+.sidebar.collapsed .nav-item span {
+    display: none;
+}
 
 /* Top Bar */
 .topbar {
@@ -91,7 +93,11 @@ body {
     justify-content: space-between;
     padding: 0 30px;
     z-index: 999;
-    transition: left .3s ease;
+    transition: var(--transition);
+}
+
+.sidebar.collapsed + .topbar {
+    left: 70px;
 }
 
 .topbar-left {
@@ -182,7 +188,11 @@ body {
     margin-top: 70px;
     padding: 30px;
     min-height: calc(100vh - 70px);
-    transition: margin-left .3s ease;
+    transition: var(--transition);
+}
+
+.sidebar.collapsed ~ .main-content {
+    margin-left: 70px;
 }
 
 /* Page */
@@ -192,7 +202,7 @@ body {
 
 .page.active {
     display: block;
-    animation: fadeIn 0.5s ease;
+    animation: fadeIn 0.5s ease forwards;
 }
 
 @keyframes fadeIn {
@@ -658,36 +668,23 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
-    /* Sidebar starts hidden on mobile; hamburger reveals it */
     .sidebar {
         transform: translateX(-100%);
     }
-
-    .sidebar:not(.hidden) {
+    
+    .sidebar.mobile-open {
         transform: translateX(0);
     }
-
+    
     .topbar {
-        left: 0 !important;
+        left: 0;
     }
-
+    
     .main-content {
-        margin-left: 0 !important;
+        margin-left: 0;
     }
-
+    
     .stats-grid {
         grid-template-columns: 1fr;
     }
 }
-
-/* ── Select dropdown options — dark theme ──────────────────────────────── */
-select option {
-    background: #0b1a3a;
-    color: #f0f0f0;
-}
-
-select option:checked,
-select option:hover {
-    background: #0a2a5e;
-    color: #20c8a1;
-}

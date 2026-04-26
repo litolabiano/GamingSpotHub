@@ -546,17 +546,21 @@ $finStmt = $conn->query(
         COUNT(CASE WHEN payment_status='completed' THEN 1 END) AS total_transactions
      FROM transactions"
 );
-$finStats = $finStmt->fetch_assoc();
+$finStats = $finStmt ? $finStmt->fetch_assoc() : [];
 
 // Transaction history (last 30)
-$transSessions = $conn->query(
-    "SELECT t.*, u.full_name AS customer_name, c.unit_number, gs.rental_mode
+// NOTE: LEFT JOINs used because session_id can be NULL for reservation refunds.
+$transResult = $conn->query(
+    "SELECT t.*, u.full_name AS customer_name,
+            COALESCE(c.unit_number, '—') AS unit_number,
+            COALESCE(gs.rental_mode, 'refund') AS rental_mode
      FROM transactions t
      JOIN users u ON t.user_id = u.user_id
-     JOIN gaming_sessions gs ON t.session_id = gs.session_id
-     JOIN consoles c ON gs.console_id = c.console_id
+     LEFT JOIN gaming_sessions gs ON t.session_id = gs.session_id
+     LEFT JOIN consoles c ON gs.console_id = c.console_id
      ORDER BY t.transaction_date DESC LIMIT 30"
-)->fetch_all(MYSQLI_ASSOC);
+);
+$transSessions = $transResult ? $transResult->fetch_all(MYSQLI_ASSOC) : [];
 
 // Unlimited rate constant (used by sessions.php pending balance display)
 $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
@@ -630,9 +634,15 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <link href="assets/fonts/outfit/outfit.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/libs/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/admin.css">
+    <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
+        /* Force page visibility — overrides cached animation issue in admin.css */
+        .page.active {
+            display: block !important;
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
         /* Disabled submit buttons inside the end-session form (early-end guard) */
         #endSessionForm button[type="submit"]:disabled {
             opacity: 0.35 !important;
@@ -742,6 +752,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <script>setTimeout(() => document.getElementById('flashMsg')?.remove(), 4500);</script>
 <?php endif; ?>
 
+
 <!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
     <div class="sidebar-header">
@@ -831,13 +842,26 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <script>
 // â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function showPage(page, el) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.opacity = '';
+        p.style.transform = '';
+    });
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.getElementById(page).classList.add('active');
+    const target = document.getElementById(page);
+    if (target) {
+        target.classList.add('active');
+        // Force re-trigger CSS animation by removing and re-adding the element's animation
+        target.style.animation = 'none';
+        target.offsetHeight; // force reflow
+        target.style.animation = '';
+        // Ensure opacity is always 1 after animation
+        setTimeout(() => { target.style.opacity = '1'; target.style.transform = 'translateY(0)'; }, 550);
+    }
     if (el) el.classList.add('active');
     const titles = {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
-        sessions: 'Session Management',
+        sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
         settings: 'Settings'
     };
@@ -856,7 +880,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings'];
+    const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;

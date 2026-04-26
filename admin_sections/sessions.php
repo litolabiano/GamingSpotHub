@@ -614,19 +614,17 @@
         const existing = document.getElementById('sessionsInlineToast');
         if (existing) existing.remove();
 
-        const colors = type === 'error' ?
-            {
-                bg: 'rgba(251,86,107,.15)',
-                border: 'rgba(251,86,107,.4)',
-                color: '#fb566b',
-                icon: 'fa-exclamation-circle'
-            } :
-            {
-                bg: 'rgba(32,200,161,.15)',
-                border: 'rgba(32,200,161,.4)',
-                color: '#20c8a1',
-                icon: 'fa-check-circle'
-            };
+        const colors = type === 'error' ? {
+            bg: 'rgba(251,86,107,.15)',
+            border: 'rgba(251,86,107,.4)',
+            color: '#fb566b',
+            icon: 'fa-exclamation-circle'
+        } : {
+            bg: 'rgba(32,200,161,.15)',
+            border: 'rgba(32,200,161,.4)',
+            color: '#20c8a1',
+            icon: 'fa-check-circle'
+        };
 
         const el = document.createElement('div');
         el.id = 'sessionsInlineToast';
