@@ -411,13 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // PROCESS REFUND for cancelled reservations
-    // Now handled exclusively by ajax/refund.php (action_type=reservation).
-    elseif ($action === 'process_refund') {
-        $message     = 'Reservation refunds must be submitted through the Refund modal (AJAX).';
-        $messageType = 'error';
-    }
-
+    // PROCESS REFUND for cancelled reservations is handled at lines 266–306 above.
 
     // NOTE: Session extension is handled exclusively through ajax/extend_session.php
     // which calls extendSession() — applying bonus minutes and recording a transaction.
@@ -426,6 +420,117 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'extend_session') {
         $message     = 'Session extensions must be processed through the Extend modal.';
         $messageType = 'error';
+    }
+
+    // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
+
+    // CREATE TOURNAMENT
+    elseif ($action === 'create_tournament') {
+        $name         = trim($_POST['tournament_name'] ?? '');
+        $game         = trim($_POST['game_name']       ?? '');
+        $console_type = $_POST['console_type']         ?? '';
+        $start_date   = $_POST['start_date']           ?? '';
+        $end_date     = $_POST['end_date']             ?? '';
+        $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
+        $prize_pool   = (float)($_POST['prize_pool']        ?? 0);
+        $max_part     = (int)  ($_POST['max_participants']  ?? 16);
+        $announcement = trim($_POST['announcement']    ?? '');
+
+        if (!$name || !$game || !$console_type || !$start_date || !$end_date) {
+            $message = 'Please fill in all required tournament fields.';
+            $messageType = 'error';
+        } else {
+            // Normalize datetime-local value to MySQL DATETIME
+            $start_dt = (new DateTime($start_date))->format('Y-m-d H:i:s');
+            $end_dt   = (new DateTime($end_date  ))->format('Y-m-d H:i:s');
+            $stmt = $conn->prepare(
+                "INSERT INTO tournaments
+                    (tournament_name, game_name, console_type, start_date, end_date,
+                     entry_fee, prize_pool, max_participants, announcement, status, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)"
+            );
+            $stmt->bind_param('sssssddisi',
+                $name, $game, $console_type, $start_dt, $end_dt,
+                $entry_fee, $prize_pool, $max_part, $announcement, $user['user_id']
+            );
+            if ($stmt->execute()) {
+                $message = 'Tournament "' . htmlspecialchars($name) . '" created.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to create tournament: ' . $conn->error;
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // UPDATE TOURNAMENT STATUS
+    elseif ($action === 'update_tournament_status') {
+        $tid        = (int)($_POST['tournament_id'] ?? 0);
+        $new_status = $_POST['new_status'] ?? '';
+        $allowed    = ['upcoming', 'scheduled', 'ongoing', 'completed', 'cancelled'];
+        if ($tid && in_array($new_status, $allowed)) {
+            $stmt = $conn->prepare("UPDATE tournaments SET status = ? WHERE tournament_id = ?");
+            $stmt->bind_param('si', $new_status, $tid);
+            $stmt->execute();
+            $message = 'Tournament status updated to ' . ucfirst($new_status) . '.';
+            $messageType = 'success';
+        } else {
+            $message = 'Invalid tournament or status.';
+            $messageType = 'error';
+        }
+    }
+
+    // ADMIN REGISTER PARTICIPANT
+    elseif ($action === 'admin_register_participant') {
+        $tid            = (int)($_POST['tournament_id']  ?? 0);
+        $uid            = (int)($_POST['user_id']        ?? 0);
+        $pay_status     = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                          ? $_POST['payment_status'] : 'pending';
+        if ($tid && $uid) {
+            $stmt = $conn->prepare(
+                "INSERT INTO tournament_participants
+                    (tournament_id, user_id, payment_status, registered_by)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE payment_status = VALUES(payment_status)"
+            );
+            $stmt->bind_param('iisi', $tid, $uid, $pay_status, $user['user_id']);
+            if ($stmt->execute()) {
+                $message = 'Participant registered.';
+                $messageType = 'success';
+            } else {
+                $message = 'Could not register participant: ' . $conn->error;
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Invalid tournament or user.';
+            $messageType = 'error';
+        }
+    }
+
+    // UPDATE PARTICIPANT PAYMENT STATUS
+    elseif ($action === 'update_participant_payment') {
+        $pid        = (int)($_POST['participant_id']  ?? 0);
+        $pay_status = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                      ? $_POST['payment_status'] : 'pending';
+        if ($pid) {
+            $stmt = $conn->prepare("UPDATE tournament_participants SET payment_status = ? WHERE participant_id = ?");
+            $stmt->bind_param('si', $pay_status, $pid);
+            $stmt->execute();
+            $message = 'Payment status updated.';
+            $messageType = 'success';
+        }
+    }
+
+    // REMOVE TOURNAMENT PARTICIPANT
+    elseif ($action === 'remove_participant') {
+        $pid = (int)($_POST['participant_id'] ?? 0);
+        if ($pid) {
+            $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id = ?");
+            $stmt->bind_param('i', $pid);
+            $stmt->execute();
+            $message = 'Participant removed.';
+            $messageType = 'success';
+        }
     }
 }
 
@@ -684,6 +789,21 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
         /* â”€â”€ Responsive form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
+
+        /* ── Topbar hamburger: hidden on desktop (sidebar has its own) ── */
+        @media (min-width:769px) {
+            .menu-toggle { display:none !important; }
+            .sidebar-close-btn { display:none !important; visibility:hidden !important; }
+        }
+
+        /* ── Sidebar hamburger FA icon ──────────────────────────── */
+        .sidebar-hamburger .sidebar-ham-icon {
+            font-size: 14px;
+            color: rgba(255,255,255,0.55);
+            transition: color 0.2s ease;
+            width: auto;
+        }
+        .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
     </style>
 </head>
 <body>
@@ -698,14 +818,23 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
 
 <!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
     <div class="sidebar-header">
-        <a class="navbar-brand" href="index.php">
+        <a class="navbar-brand sidebar-logo" href="index.php">
             <div class="logo-container">
                 <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
                 <span class="logo-text">GAMING HUB</span>
             </div>
         </a>
+        <!-- Hamburger toggle inside sidebar -->
+        <button class="sidebar-hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar" id="sidebarHamburger">
+            <i class="fas fa-bars sidebar-ham-icon"></i>
+        </button>
+        <!-- Mobile X close -->
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" onclick="closeSidebar()" aria-label="Close sidebar">
+            <i class="fas fa-times"></i>
+        </button>
     </div>
     <?php $navBadge = 'style="background:#fb566b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;margin-left:auto;min-width:18px;text-align:center;"'; ?>
     <div class="nav-item active" onclick="showPage('dashboard', this)">
@@ -717,26 +846,36 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <span <?= $navBadge ?>><?= $maintenanceCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('sessions', this)">
+    <div class="nav-item" data-tooltip="Sessions" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
         <?php if ($activeCount > 0): ?>
         <span <?= $navBadge ?>><?= $activeCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('reservations', this)">
+    <div class="nav-item" data-tooltip="Reservations" onclick="showPage('reservations', this)">
         <i class="fas fa-calendar-check"></i><span>Reservations</span>
         <?php if ($pendingResCount > 0): ?>
         <span <?= $navBadge ?>><?= $pendingResCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('transactions', this)">
+    <div class="nav-item" data-tooltip="Transactions" onclick="showPage('transactions', this)">
         <i class="fas fa-exchange-alt"></i><span>Transactions</span>
         <?php if (count($pendingSessions) > 0): ?>
         <span <?= $navBadge ?>><?= count($pendingSessions) ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('reports', this)">
+    <div class="nav-item" data-tooltip="Reports" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
+    </div>
+    <div class="nav-item" data-tooltip="Tournaments" onclick="showPage('tournaments', this)">
+        <i class="fas fa-trophy"></i><span>Tournaments</span>
+        <?php
+        $openTourCount = 0;
+        $tourCountStmt = $conn->query("SELECT COUNT(*) AS n FROM tournaments WHERE status IN ('scheduled','ongoing')");
+        if ($tourCountStmt) $openTourCount = (int)$tourCountStmt->fetch_assoc()['n'];
+        if ($openTourCount > 0): ?>
+        <span <?= $navBadge ?>><?= $openTourCount ?></span>
+        <?php endif; ?>
     </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
@@ -776,6 +915,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
+<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
@@ -807,7 +947,7 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings'
+        settings: 'Settings', tournaments: 'Tournaments'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
@@ -824,7 +964,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings'];
+    const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings','tournaments'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;
@@ -839,13 +979,52 @@ function showPage(page, el) {
 
 function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
-    const topbar      = document.querySelector('.topbar');
-    const mainContent = document.querySelector('.main-content');
-    sidebar.classList.toggle('collapsed');
-    const isCollapsed = sidebar.classList.contains('collapsed');
-    topbar.style.left      = isCollapsed ? '70px'  : '260px';
-    mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
+    const overlay     = document.getElementById('sidebarOverlay');
+    const isMobile    = window.innerWidth <= 768;
+
+    if (isMobile) {
+        // Mobile: slide in/out
+        const isOpen = sidebar.classList.contains('mobile-open');
+        if (isOpen) {
+            closeSidebar();
+        } else {
+            sidebar.classList.add('mobile-open');
+            overlay.classList.add('active');
+        }
+    } else {
+        // Desktop: collapse to icon-only rail
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        // Let CSS sibling selectors handle topbar/main-content shifts;
+        // inline styles override them, so sync manually:
+        document.querySelector('.topbar').style.left             = isCollapsed ? '70px' : '260px';
+        document.querySelector('.main-content').style.marginLeft = isCollapsed ? '70px' : '260px';
+        // Persist preference
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
+    }
 }
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+}
+
+// Restore desktop collapsed state on load
+(function () {
+    if (window.innerWidth > 768 && localStorage.getItem('sidebarCollapsed') === '1') {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('collapsed');
+        document.querySelector('.topbar').style.left             = '70px';
+        document.querySelector('.main-content').style.marginLeft = '70px';
+    }
+})();
+
+// Close sidebar when pressing Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidebar();
+});
 
 // â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function onRentalModeChange() {

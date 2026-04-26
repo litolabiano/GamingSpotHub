@@ -163,6 +163,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     <?php if ($t['status'] === 'upcoming'): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
+                        <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="scheduled">
                         <button type="submit" class="btn btn-sm"
@@ -175,6 +176,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     <?php elseif ($t['status'] === 'scheduled'): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
+                        <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="upcoming">
                         <button type="submit" class="btn btn-sm"
@@ -185,6 +187,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     </form>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
+                        <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="ongoing">
                         <button type="submit" class="btn btn-sm"
@@ -197,6 +200,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     <?php elseif ($t['status'] === 'ongoing'): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
+                        <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="completed">
                         <button type="submit" class="btn btn-sm"
@@ -206,6 +210,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     </form>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
+                        <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="cancelled">
                         <button type="submit" class="btn btn-sm"
@@ -265,6 +270,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
         </div>
         <form method="POST">
             <input type="hidden" name="action" value="create_tournament">
+            <?= csrfField() ?>
             <div style="max-height:65vh;overflow-y:auto;padding-right:4px;">
                 <div class="form-group">
                     <label>Tournament Name *</label>
@@ -345,6 +351,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
         </div>
         <form method="POST">
             <input type="hidden" name="action" value="admin_register_participant">
+            <?= csrfField() ?>
             <input type="hidden" name="tournament_id" id="addParticipantTournamentId">
             <div style="margin-bottom:12px;font-size:13px;color:#888;">
                 Tournament: <strong id="addParticipantTournamentName" style="color:#fff;"></strong>
@@ -374,6 +381,9 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 </div>
 
 <script>
+// ── CSRF token (PHP-rendered) available to JS-generated forms ─────────────────
+const _CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>';
+
 // ── Participants Drawer ────────────────────────────────────────────────────────
 function viewParticipants(tournamentId, tournamentName) {
     document.getElementById('drawerTournamentName').textContent = tournamentName;
@@ -396,6 +406,7 @@ function viewParticipants(tournamentId, tournamentName) {
                 '</tr></thead><tbody>';
             data.participants.forEach((p, i) => {
                 const isPaid = p.payment_status === 'paid';
+                const fid    = 'rmPart_' + p.participant_id;
                 html += `<tr>
                     <td style="color:#888">${i + 1}</td>
                     <td style="font-weight:600;color:#fff">${escHtml(p.full_name)}</td>
@@ -403,6 +414,7 @@ function viewParticipants(tournamentId, tournamentName) {
                     <td style="color:#888;font-size:12px;">${p.registration_date}</td>
                     <td>
                         <form method="POST" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="${escHtml(_CSRF)}">
                             <input type="hidden" name="action" value="update_participant_payment">
                             <input type="hidden" name="participant_id" value="${p.participant_id}">
                             <input type="hidden" name="payment_status" value="${isPaid ? 'pending' : 'paid'}">
@@ -416,11 +428,12 @@ function viewParticipants(tournamentId, tournamentName) {
                         </form>
                     </td>
                     <td>
-                        <form method="POST" style="display:inline;"
-                              onsubmit="return confirm('Remove this participant?')">
+                        <form method="POST" style="display:inline;" id="${fid}">
+                            <input type="hidden" name="csrf_token" value="${escHtml(_CSRF)}">
                             <input type="hidden" name="action" value="remove_participant">
                             <input type="hidden" name="participant_id" value="${p.participant_id}">
-                            <button type="submit"
+                            <button type="button"
+                                onclick="gspotConfirm('Remove this participant?', function(){ document.getElementById('${fid}').submit(); }, {danger:true, yesLabel:'Remove'})"
                                 style="background:rgba(251,86,107,.12);color:#fb566b;
                                        border:1px solid rgba(251,86,107,.3);
                                        padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;">
@@ -454,6 +467,8 @@ function escHtml(str) {
     d.appendChild(document.createTextNode(str || ''));
     return d.innerHTML;
 }
+
+
 
 // ── End date must be >= start date (min is already set via PHP on page load) ──
 document.addEventListener('DOMContentLoaded', function () {

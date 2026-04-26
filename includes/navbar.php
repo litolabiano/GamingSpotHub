@@ -87,20 +87,50 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
 </nav>
 
 <script>
-// User dropdown toggle (inline so it works on every page that includes navbar)
-document.addEventListener('DOMContentLoaded', function() {
+(function () {
+    const nav = document.getElementById('mainNav');
+    if (!nav) return;
+
+    // ── Scroll effect ──────────────────────────────────────────────────────────
+    // On pages that have no #home hero (reserve, faqs, dashboard, etc.),
+    // the navbar should always appear opaque. On index.php it transitions.
+    const hasHero = !!document.getElementById('home');
+
+    function applyScroll() {
+        if (!hasHero || window.scrollY > 60) {
+            nav.classList.add('scrolled');
+        } else {
+            nav.classList.remove('scrolled');
+        }
+    }
+
+    applyScroll(); // apply immediately on page load (no flash of transparent bar)
+    window.addEventListener('scroll', applyScroll, { passive: true });
+
+    // ── Mobile menu: close when clicking outside ───────────────────────────────
+    const toggler  = nav.querySelector('.navbar-toggler');
+    const collapse = nav.querySelector('.navbar-collapse');
+    if (toggler && collapse) {
+        document.addEventListener('click', function (e) {
+            if (!nav.contains(e.target) && collapse.classList.contains('show')) {
+                toggler.click();
+            }
+        });
+    }
+
+    // ── User dropdown toggle ───────────────────────────────────────────────────
     const dropdownBtn = document.getElementById('userDropdownBtn');
-    const dropdown = dropdownBtn?.closest('.user-dropdown');
+    const dropdown    = dropdownBtn?.closest('.user-dropdown');
     if (dropdownBtn && dropdown) {
-        dropdownBtn.addEventListener('click', function(e) {
+        dropdownBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             dropdown.classList.toggle('open');
         });
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (!dropdown.contains(e.target)) {
                 dropdown.classList.remove('open');
             }
         });
     }
-});
+})();
 </script>
