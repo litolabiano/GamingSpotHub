@@ -50,29 +50,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dp_method          = !empty($_POST['downpayment_method']) && $dp_amount > 0
                           ? $_POST['downpayment_method'] : null;
 
+    // ── Reservation ban check (3-strike rule) ──────────────────────────────
+    $banStmt = $conn->prepare(
+        "SELECT reservation_banned_until, consecutive_cancellations FROM users WHERE user_id = ?"
+    );
+    $banStmt->bind_param('i', $user['user_id']);
+    $banStmt->execute();
+    $banRow = $banStmt->get_result()->fetch_assoc();
+    if (!empty($banRow['reservation_banned_until']) && strtotime($banRow['reservation_banned_until']) > time()) {
+        $banExpiry = date('F j, Y \a\t g:i A', strtotime($banRow['reservation_banned_until']));
+        $error = 'Your account is temporarily suspended from making online reservations due to 3 consecutive cancellations. '
+               . 'This restriction is automatically lifted on <strong>' . $banExpiry . '</strong>. '
+               . 'You are still welcome to walk in and use any available unit.';
+    }
+    // ── Max 3 active reservations check ────────────────────────────────────
+    elseif (!$error) {
+        $cntStmt = $conn->prepare(
+            "SELECT COUNT(*) AS cnt FROM reservations WHERE user_id = ? AND status IN ('pending','confirmed')"
+        );
+        $cntStmt->bind_param('i', $user['user_id']);
+        $cntStmt->execute();
+        $activeCount = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
+        if ($activeCount >= 3) {
+            $error = 'You already have ' . $activeCount . ' active reservation(s). The maximum allowed is 3 simultaneous reservations. '
+                   . 'Please cancel or wait for an existing reservation to be processed before booking another.';
+        }
+    }
+
     // Validation
-    if (!in_array($console_type, ['PS5', 'PS4', 'Xbox Series X'])) {
+    if (!$error && !in_array($console_type, ['PS5', 'PS4', 'Xbox Series X'])) {
         $error = 'Please select a valid console type.';
-    } elseif (!in_array($rental_mode, ['hourly', 'open_time', 'unlimited'])) {
+    } elseif (!$error && !in_array($rental_mode, ['hourly', 'open_time', 'unlimited'])) {
         $error = 'Please select a valid rental mode.';
-    } elseif ($rental_mode === 'hourly' && $planned_minutes < 30) {
+    } elseif (!$error && $rental_mode === 'hourly' && $planned_minutes < 30) {
         $error = 'Please select a duration for hourly mode.';
-    } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
+    } elseif (!$error && $rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
         $rules = getPricingRules();
         $error = 'Hourly reservations are limited to a maximum of ' . ($rules['max_hourly_minutes'] / 60) . ' hours.';
-    } elseif (!$reserved_date || !$reserved_time) {
+    } elseif (!$error && (!$reserved_date || !$reserved_time)) {
         $error = 'Please provide both date and time.';
-    } elseif ($reserved_date < date('Y-m-d')) {
+    } elseif (!$error && $reserved_date < date('Y-m-d')) {
         $error = 'Reservation date cannot be in the past.';
-    } elseif (strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
+    } elseif (!$error && strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
         $error = 'Reservation must be at least 1 hour from now.';
-    } elseif ((int)date('H', strtotime($reserved_time)) < 12) {
+    } elseif (!$error && (int)date('H', strtotime($reserved_time)) < 12) {
         $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
-    } elseif ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59') {
+    } elseif (!$error && ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59')) {
         $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
-    } elseif ($dp_amount > 0 && !$dp_method) {
+    } elseif (!$error && $dp_amount > 0 && !$dp_method) {
         $error = 'Please select a payment method for your downpayment.';
-    } else {
+    }
+
+    if (!$error) {
         $result = createReservation(
             $user['user_id'], $console_type, $rental_mode, $planned_minutes,
             $reserved_date, $reserved_time,
@@ -92,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
 
 // Read and clear the flash success message (set after PRG redirect)
 $success = '';

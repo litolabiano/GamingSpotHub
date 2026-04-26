@@ -25,6 +25,15 @@ $sessionHistory = getUserSessionHistory($user_id, 50);
 // My reservations
 $myReservations = getMyReservations($user_id);
 
+// ── Cancellation ban / streak status ────────────────────────────────────────
+$banStmt = $conn->prepare("SELECT consecutive_cancellations, reservation_banned_until FROM users WHERE user_id = ?");
+$banStmt->bind_param('i', $user_id);
+$banStmt->execute();
+$banData = $banStmt->get_result()->fetch_assoc();
+$isBanned  = !empty($banData['reservation_banned_until']) && strtotime($banData['reservation_banned_until']) > time();
+$banExpiry = $isBanned ? date('F j, Y \a\t g:i A', strtotime($banData['reservation_banned_until'])) : '';
+$cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
+
 // Active session for THIS user (if any)
 $activeSession = null;
 $stmt = $conn->prepare(
@@ -890,8 +899,49 @@ function fmtMins(int $m): string {
         <div class="cd-page" id="page-reservations">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
                 <h2 class="cd-section-title" style="margin:0"><i class="fas fa-calendar-check"></i> My Reservations</h2>
+                <?php if (!$isBanned): ?>
                 <a href="reserve.php" class="cd-btn cd-btn-primary"><i class="fas fa-calendar-plus"></i> New Reservation</a>
+                <?php endif; ?>
             </div>
+
+            <?php if ($isBanned): ?>
+            <!-- ── Reservation Ban Alert ───────────────────────────────────── -->
+            <div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.4);border-radius:16px;
+                        padding:18px 22px;margin-bottom:24px;display:flex;align-items:flex-start;gap:16px;">
+                <div style="width:44px;height:44px;border-radius:12px;background:rgba(251,86,107,.2);
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;color:#fb566b;">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div>
+                    <div style="font-weight:800;color:#fb566b;font-size:15px;margin-bottom:4px;">
+                        Online Reservations Suspended
+                    </div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.7;">
+                        Your account has been placed on a temporary <strong>1-week reservation ban</strong> due to 3 consecutive cancellations.
+                        This restriction will be <strong style="color:#fb566b;">automatically lifted on <?= $banExpiry ?></strong>.
+                        <br>You are still welcome to walk in and use any available unit — only online reservations are restricted.
+                    </div>
+                </div>
+            </div>
+            <?php elseif ($cancelStreak === 2): ?>
+            <!-- ── 2nd-Strike Warning ─────────────────────────────────────── -->
+            <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.35);border-radius:16px;
+                        padding:16px 20px;margin-bottom:24px;display:flex;align-items:flex-start;gap:14px;">
+                <div style="width:40px;height:40px;border-radius:12px;background:rgba(241,168,60,.18);
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:#f1a83c;">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <div style="font-weight:800;color:#f1a83c;font-size:14px;margin-bottom:3px;">
+                        ⚠️ Final Warning — 2 of 3 Cancellations Used
+                    </div>
+                    <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;">
+                        You have <strong>2 consecutive cancellations</strong> on record. One more cancellation will result in a
+                        <strong style="color:#fb566b;">7-day reservation ban</strong>. Successfully completing your next reservation will reset this counter.
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php if (empty($myReservations)): ?>
             <div class="cd-card">

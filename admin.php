@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
 
-        if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
-            $message = 'Please fill in all session fields correctly.';
+        if (!$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
+            $message = 'Please select a console and rental mode.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
@@ -113,7 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
     }
     if (!$messageType) $messageType = 'success';
-}else {
+}
+
+  else {
                 $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
             }
@@ -519,7 +521,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Payment status updated.';
             $messageType = 'success';
         }
-    }
 
     // REMOVE TOURNAMENT PARTICIPANT
     elseif ($action === 'remove_participant') {
@@ -532,9 +533,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
         }
     }
+
+    // ── GAMES LIBRARY ACTIONS ────────────────────────────────────────────────
+
+    // ADD GAME
+    elseif ($action === 'add_game') {
+        $game_name    = trim($_POST['game_name']    ?? '');
+        $console_type = trim($_POST['console_type'] ?? '');
+        $genre        = trim($_POST['genre']        ?? 'Other');
+        $description  = trim($_POST['description']  ?? '');
+        if (!$game_name || !$console_type) {
+            $message = 'Game name and platform are required.'; $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare(
+                "INSERT INTO games (game_name, console_type, genre, description) VALUES (?,?,?,?)"
+            );
+            $stmt->bind_param('ssss', $game_name, $console_type, $genre, $description);
+            $message     = $stmt->execute() ? '"' . htmlspecialchars($game_name) . '" added to the library.' : 'Failed: ' . $conn->error;
+            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
+        }
+    }
+
+    // EDIT GAME
+    elseif ($action === 'edit_game') {
+        $game_id      = (int)($_POST['game_id']      ?? 0);
+        $game_name    = trim($_POST['game_name']    ?? '');
+        $console_type = trim($_POST['console_type'] ?? '');
+        $genre        = trim($_POST['genre']        ?? 'Other');
+        if (!$game_id || !$game_name) {
+            $message = 'Invalid game data.'; $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare("UPDATE games SET game_name=?, console_type=?, genre=? WHERE game_id=?");
+            $stmt->bind_param('sssi', $game_name, $console_type, $genre, $game_id);
+            $message     = $stmt->execute() ? 'Game updated.' : 'Failed: ' . $conn->error;
+            $messageType = 'success';
+        }
+    }
+
+    // TOGGLE GAME VISIBILITY
+    elseif ($action === 'toggle_game') {
+        $game_id = (int)($_POST['game_id'] ?? 0);
+        if ($game_id) {
+            $conn->query("UPDATE games SET is_active = 1 - is_active WHERE game_id = $game_id");
+            $message = 'Game visibility toggled.'; $messageType = 'success';
+        }
+    }
+
+    // DELETE GAME
+    elseif ($action === 'delete_game') {
+        $game_id = (int)($_POST['game_id'] ?? 0);
+        if ($game_id) {
+            $stmt = $conn->prepare("DELETE FROM games WHERE game_id = ?");
+            $stmt->bind_param('i', $game_id);
+            $message     = $stmt->execute() ? 'Game deleted.' : 'Failed: ' . $conn->error;
+            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
+        }
+    }
 }
 
-// â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+}
+
+
+// ─── DATA FETCHING ──────────────────────────────────────────────────────────
 
 // Dashboard stats
 $today = date('Y-m-d');
@@ -627,13 +687,15 @@ foreach ($recentSessions as $sess) {
     } elseif ($sess['status'] === 'completed'
         && $sess['total_cost'] > 0
         && $refundedAmount == 0               // no refund was issued
+        && $paidSoFar > 0                     // customer DID pay something upfront
         && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
     ) {
-        // Completed session where total paid < total cost — outstanding balance (no refund)
+        // Completed session where total paid < total cost — genuine short payment
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
-    // Sessions with refunds issued are fully settled — skip them entirely
+    // Early-end with nothing paid (walk-in, no upfront): fully settled, skip.
+    // Sessions with refunds issued are also fully settled — skip them entirely
 }
 
 
@@ -707,7 +769,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
             cursor: pointer !important;
         }
 
-        /* â”€â”€ Extra admin overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Extra admin overrides ── */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
             padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
@@ -730,11 +792,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .console-type-badge.ps4  { background:rgba(241,168,60,.15); color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
         .console-type-badge.xbox { background:rgba(32,200,161,.2); color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
-        /* â”€â”€ Session timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Session timer ── */
         .session-timer { font-family: monospace; font-size: 13px; color: #f1e1aa; font-weight: 600; }
         .session-timer.stale { color: #fb566b; font-size:11px; font-weight:500; }
 
-        /* â”€â”€ Form layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Form layout ── */
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
         .form-group { margin-bottom:16px; }
         .form-group label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; font-weight:600; }
@@ -749,7 +811,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .form-check { display:flex; align-items:center; gap:8px; margin-top:6px; }
         .form-check input { width:auto; accent-color:#20c8a1; }
 
-        /* â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Stat cards ── */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
         .stat-change.up { color:#20c8a1; }
         .stat-icon.revenue  { background:rgba(32,200,161,.15); color:#20c8a1; }
@@ -757,7 +819,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .stat-icon.bookings { background:rgba(179,123,236,.15); color:#b37bec; }
         .stat-icon.consoles { background:rgba(241,225,170,.15); color:#f1e1aa; }
 
-        /* â”€â”€ Console cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Console cards ── */
         .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
         .console-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.15);
             border-radius:12px; padding:18px; position:relative; transition:.2s; }
@@ -772,7 +834,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
 
 
-        /* â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Badge ── */
         .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
         .badge.active     { background:rgba(95,133,218,.2);  color:#5f85da; }
         .badge.completed  { background:rgba(32,200,161,.2);  color:#20c8a1; }
@@ -783,11 +845,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .badge.maintenance{ background:rgba(251,86,107,.2);  color:#fb566b; }
         .badge.installed  { background:rgba(179,123,236,.2); color:#b37bec; }
 
-        /* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Empty state ── */
         .empty-state { text-align:center; padding:40px; color:#555; }
         .empty-state i { font-size:36px; margin-bottom:12px; display:block; }
 
-        /* â”€â”€ Responsive form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Responsive form ── */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
 
         /* ── Topbar hamburger: hidden on desktop (sidebar has its own) ── */
@@ -796,7 +858,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
             .sidebar-close-btn { display:none !important; visibility:hidden !important; }
         }
 
-        /* ── Sidebar hamburger FA icon ──────────────────────────── */
+        /* ── Sidebar hamburger FA icon ── */
         .sidebar-hamburger .sidebar-ham-icon {
             font-size: 14px;
             color: rgba(255,255,255,0.55);
@@ -817,9 +879,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php endif; ?>
 
 
-<!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
-<div class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <a class="navbar-brand sidebar-logo" href="index.php">
             <div class="logo-container">
@@ -827,11 +889,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
                 <span class="logo-text">GAMING HUB</span>
             </div>
         </a>
-        <!-- Hamburger toggle inside sidebar -->
         <button class="sidebar-hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar" id="sidebarHamburger">
             <i class="fas fa-bars sidebar-ham-icon"></i>
         </button>
-        <!-- Mobile X close -->
         <button class="sidebar-close-btn" id="sidebarCloseBtn" onclick="closeSidebar()" aria-label="Close sidebar">
             <i class="fas fa-times"></i>
         </button>
@@ -877,6 +937,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <span <?= $navBadge ?>><?= $openTourCount ?></span>
         <?php endif; ?>
     </div>
+    <div class="nav-item" data-tooltip="Games Library" onclick="showPage('games', this)">
+        <i class="fas fa-gamepad"></i><span>Games</span>
+    </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
@@ -886,7 +949,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </a>
 </div>
 
-<!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-left">
         <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
@@ -906,7 +969,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Main Content ──────────────────────────────────────────────────────────── -->
 <div class="main-content">
 
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
@@ -916,11 +979,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
+<?php include __DIR__ . '/admin_sections/games.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
-
 <!-- â”€â”€ JavaScript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
@@ -1400,9 +1463,17 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 document.getElementById('refundActionField').value  = 'early_end';
                 document.getElementById('refundEarlyEndFlag').value = '1';
 
-                // Pre-fill refund amount
+                // Pre-fill refund amount (lock at 0 when nothing to refund)
                 const amtEl = document.getElementById('refundAmount');
-                if (amtEl) amtEl.value = _pendingRefundArgs.refundAmt.toFixed(0);
+                if (amtEl) {
+                    amtEl.value    = _pendingRefundArgs.refundAmt.toFixed(0);
+                    amtEl.readOnly = (_pendingRefundArgs.refundAmt <= 0);
+                    amtEl.style.opacity = _pendingRefundArgs.refundAmt <= 0 ? '0.5' : '1';
+                }
+
+                // Clear stale errors
+                const errMsg = document.getElementById('refundErrorMsg');
+                if (errMsg) errMsg.style.display = 'none';
 
                 // Pre-fill reason
                 const reasonEl = document.getElementById('refundReason');
@@ -1761,8 +1832,10 @@ function _submitRefundAjax() {
     let action_type = actionField; // 'standard' | 'reservation'
     if (isEarlyEnd) action_type = 'early_end';
 
-    if (action_type !== 'reservation' && refundAmt <= 0) {
-        _showRefundError('Please enter a refund amount greater than \u20b10.');
+    // Standard/manual refunds require a positive amount.
+    // early_end with ₱0 is allowed — the session ends with no refund transaction.
+    if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
+        _showRefundError('Please enter a refund amount greater than ₱0.');
         return;
     }
 

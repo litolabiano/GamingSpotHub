@@ -115,6 +115,7 @@
             <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
         </div>
         <form method="POST" id="startSessionForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="start_session">
             <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
             <div class="form-group">
@@ -377,6 +378,7 @@
         </div>
 
         <form method="POST" id="endSessionForm" onsubmit="return syncTenderedAndSubmit(event)">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="end_session">
             <input type="hidden" name="session_id" id="endSessionId">
             <!-- Synced with the visible endTendered input on submit -->
@@ -464,6 +466,7 @@
         </div>
 
         <form method="POST" id="paySessionForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="collect_payment">
             <input type="hidden" name="session_id" id="paySessionId">
 
@@ -513,6 +516,7 @@
         </div>
 
         <form method="POST" id="refundSessionForm">
+            <?= csrfField() ?>
             <!-- action is overridden to 'early_end_session' when coming from early-end flow -->
             <input type="hidden" name="action" id="refundActionField" value="issue_refund">
             <input type="hidden" name="session_id" id="refundSessionId">
@@ -681,6 +685,7 @@
             <button class="modal-close" onclick="closeModal('addReservation')">&times;</button>
         </div>
         <form method="POST" id="addReservationForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="add_reservation">
             <div class="form-group">
                 <label>Customer *</label>
@@ -781,6 +786,7 @@
         </div>
         <div id="convertResInfo" style="background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#aaa;"></div>
         <form method="POST" id="convertReservationForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="convert_reservation">
             <input type="hidden" name="reservation_id" id="convertResId">
             <div class="form-group">
