@@ -7,11 +7,8 @@
             $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
             $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
             $resToday     = count(array_filter($upcomingReservations, fn($r) => $r['reserved_date'] === date('Y-m-d')));
-<<<<<<< Updated upstream
-=======
             // $resNeedRefund is computed below after $cancelledReservations is populated
             $resNeedRefund = 0;
->>>>>>> Stashed changes
         ?>
         <div class="stat-card">
             <div class="stat-card-header">
