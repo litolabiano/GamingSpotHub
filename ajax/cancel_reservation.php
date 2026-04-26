@@ -2,7 +2,6 @@
 /**
  * ajax/cancel_reservation.php
  * Customer-side reservation cancellation.
-<<<<<<< HEAD
  *
  * POST: reservation_id
  * Returns JSON {success, message, had_payment, amount, is_late_cancel}
@@ -12,10 +11,6 @@
  *  - Cancel AFTER  reserved start time → flagged as late; staff applies inconvenience fee
  *  - 3 consecutive user-cancels → 1-week reservation ban (automatically lifted)
  *  - Cancelling when reservation is not pending/confirmed → error
-=======
- * POST: reservation_id
- * Returns JSON {success, message}
->>>>>>> main
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
@@ -33,16 +28,10 @@ if (!$res_id) {
     exit;
 }
 
-<<<<<<< HEAD
 // ── Fetch the reservation — must belong to this user ─────────────────────────
 $stmt = $conn->prepare(
     "SELECT reservation_id, status, downpayment_amount, refund_issued,
             reserved_date, reserved_time
-=======
-// Fetch the reservation — must belong to this user and be cancellable
-$stmt = $conn->prepare(
-    "SELECT reservation_id, status, downpayment_amount, refund_issued
->>>>>>> main
        FROM reservations
       WHERE reservation_id = ? AND user_id = ?"
 );
@@ -55,7 +44,6 @@ if (!$r) {
     exit;
 }
 if (!in_array($r['status'], ['pending', 'confirmed'])) {
-<<<<<<< HEAD
     echo json_encode([
         'success' => false,
         'message' => 'This reservation cannot be cancelled (status: ' . $r['status'] . ').',
@@ -69,20 +57,12 @@ $now         = time();
 $isLateCancel = ($now >= $reservedAt);   // true = inconvenience fee applies
 
 // ── Cancel the reservation ───────────────────────────────────────────────────
-=======
-    echo json_encode(['success' => false, 'message' => 'This reservation cannot be cancelled (status: ' . $r['status'] . ').']);
-    exit;
-}
-
-// Cancel it — mark cancelled_by = 'user'
->>>>>>> main
 $stmt2 = $conn->prepare(
     "UPDATE reservations SET status = 'cancelled', cancelled_by = 'user' WHERE reservation_id = ?"
 );
 $stmt2->bind_param('i', $res_id);
 $stmt2->execute();
 
-<<<<<<< HEAD
 // ── Update cancellation streak on the user ───────────────────────────────────
 // Fetch current streak
 $su = $conn->prepare("SELECT consecutive_cancellations FROM users WHERE user_id = ?");
@@ -156,17 +136,3 @@ echo json_encode([
     'banned_until'      => $banUntil,
 ]);
 
-=======
-$hadPayment = (float)$r['downpayment_amount'] > 0;
-$msg = 'Reservation #' . $res_id . ' has been cancelled.';
-if ($hadPayment) {
-    $msg .= ' A refund of ₱' . number_format((float)$r['downpayment_amount'], 2) . ' will be processed by staff.';
-}
-
-echo json_encode([
-    'success'     => true,
-    'message'     => $msg,
-    'had_payment' => $hadPayment,
-    'amount'      => (float)$r['downpayment_amount'],
-]);
->>>>>>> main

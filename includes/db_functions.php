@@ -19,7 +19,6 @@
 require_once __DIR__ . '/db_config.php';
 
 // ============================================================================
-<<<<<<< HEAD
 // WALK-IN CUSTOMER SYSTEM USER
 // ============================================================================
 // The walk-in user is a real row in `users` with role='walkin' and status='inactive'
@@ -44,105 +43,6 @@ function getWalkinUserId(): int {
 // ============================================================================
 // PRICING RULES (DB-DRIVEN — single source of truth)
 // ============================================================================
-=======
-// PRICING RULES (DB-DRIVEN — single source of truth)
-// ============================================================================
-
-/** @var array|null Module-level cache so we only query once per request. */
-$_pricingRulesCache = null;
-
-/**
- * Read bonus / pricing rules from system_settings.
- * Returns an array with keys:
- *   bonus_paid_minutes, bonus_free_minutes, max_hourly_minutes,
- *   hourly_rate (global default), session_min_charge.
- */
-function getPricingRules(): array {
-    global $conn, $_pricingRulesCache;
-    if ($_pricingRulesCache !== null) return $_pricingRulesCache;
-
-    $rules = [
-        'bonus_paid_minutes' => 120,   // every 2 paid hrs
-        'bonus_free_minutes' => 30,    // earn 30 min free
-        'max_hourly_minutes' => 240,   // cap at 4 paid hrs
-        'hourly_rate'        => 80.0,  // ₱80/hr default
-        'session_min_charge' => 50.0,  // ₱50 for ≤30 min start
-    ];
-
-    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate'";
-    $res  = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($keys)");
-    if ($res) {
-        while ($row = $res->fetch_assoc()) {
-            switch ($row['setting_key']) {
-                case 'bonus_paid_minutes': $rules['bonus_paid_minutes'] = (int)  $row['setting_value']; break;
-                case 'bonus_free_minutes': $rules['bonus_free_minutes'] = (int)  $row['setting_value']; break;
-                case 'max_hourly_minutes': $rules['max_hourly_minutes'] = (int)  $row['setting_value']; break;
-                case 'ps5_hourly_rate':    $rules['hourly_rate']        = (float)$row['setting_value']; break;
-            }
-        }
-    }
-
-    $_pricingRulesCache = $rules;
-    return $rules;
-}
-
-/**
- * Calculate bonus free minutes for a given paid duration.
- * e.g. calcBonusMinutes(120) = 30, calcBonusMinutes(240) = 60
- */
-function calcBonusMinutes(int $paid_minutes, ?array $rules = null): int {
-    $rules = $rules ?? getPricingRules();
-    return (int) floor($paid_minutes / $rules['bonus_paid_minutes']) * $rules['bonus_free_minutes'];
-}
-
-/**
- * Convert PAID minutes to TOTAL play minutes (paid + bonus).
- * This is the only place that applies the bonus.
- * e.g. paidToTotalMinutes(120) = 150, paidToTotalMinutes(240) = 300
- */
-function paidToTotalMinutes(int $paid_minutes, ?array $rules = null): int {
-    return $paid_minutes + calcBonusMinutes($paid_minutes, $rules);
-}
-
-/**
- * Generate the duration option list for hourly booking UIs.
- * Returns array of ['paid', 'total', 'cost', 'bonus', 'label_paid', 'label_total', 'label_bonus']
- * Step size is always 30 min; stops at max_hourly_minutes.
- */
-function getHourlyDurationOptions(?array $rules = null): array {
-    $rules  = $rules ?? getPricingRules();
-    $max    = $rules['max_hourly_minutes'];
-    $rate   = $rules['hourly_rate'];         // ₱/hr
-    $minChg = $rules['session_min_charge'];  // ₱50 for ≤30 min
-
-    $options = [];
-    for ($paid = 30; $paid <= $max; $paid += 30) {
-        $bonus = calcBonusMinutes($paid, $rules);
-        $total = $paid + $bonus;
-        $cost  = ($paid <= 30) ? $minChg : round($paid / 60 * $rate, 2);
-
-        // Human-readable label helpers
-        $fmtMin = function(int $m): string {
-            $h = intdiv($m, 60); $r = $m % 60;
-            if ($h && $r) return "{$h}h {$r}m";
-            if ($h)       return "{$h}" . ($h === 1 ? ' hr' : ' hrs');
-            return "{$r} min";
-        };
-
-        $options[] = [
-            'paid'        => $paid,
-            'total'       => $total,
-            'cost'        => $cost,
-            'bonus'       => $bonus,
-            'label_paid'  => $fmtMin($paid),
-            'label_total' => $fmtMin($total),
-            'label_bonus' => $bonus > 0 ? '+' . $fmtMin($bonus) . ' free' : '',
-        ];
-    }
-    return $options;
-}
-
->>>>>>> main
 
 /** @var array|null Module-level cache so we only query once per request. */
 $_pricingRulesCache = null;

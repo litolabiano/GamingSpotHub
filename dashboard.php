@@ -1508,7 +1508,6 @@ if (mainNav) {
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="reqExtBtns">
                 <?php
-<<<<<<< HEAD
                 // DB-driven extension options — reads rate and bonus rule from system_settings
                 $extRules = getPricingRules();
                 $extRate  = $extRules['hourly_rate'];   // ₱/hr for extensions
@@ -1527,27 +1526,12 @@ if (mainNav) {
                         class="req-ext-opt"
                         data-mins="<?= $extMins ?>"
                         data-cost="<?= $extCost ?>"
-=======
-                $extOptions = [
-                    30  => ['₱40',  '+30 min'],
-                    60  => ['₱80',  '+1 hour'],
-                    90  => ['₱120', '+1h 30m'],
-                    120 => ['₱160', '+2 hours'],
-                ];
-                foreach ($extOptions as $mins => [$price, $label]):
-                ?>
-                <button type="button"
-                        class="req-ext-opt"
-                        data-mins="<?= $mins ?>"
-                        data-cost="<?= ltrim($price, '₱') ?>"
->>>>>>> main
                         onclick="selectExtOpt(this)"
                         style="padding:12px;border-radius:10px;
                                background:rgba(95,133,218,.08);
                                border:1px solid rgba(95,133,218,.2);
                                color:#8aa4e8;font-family:inherit;cursor:pointer;
                                transition:.18s;text-align:left;">
-<<<<<<< HEAD
                     <div style="font-weight:700;font-size:14px;"><?= $extLabel ?></div>
                     <div style="font-size:11px;color:var(--muted);margin-top:2px;">
                         &#8369;<?= number_format($extCost, 0) ?> estimated
@@ -1555,10 +1539,6 @@ if (mainNav) {
                         <span style="color:#20c8a1;font-weight:700;"> +<?= $extBonus ?>m free!</span>
                         <?php endif; ?>
                     </div>
-=======
-                    <div style="font-weight:700;font-size:14px;"><?= $label ?></div>
-                    <div style="font-size:11px;color:var(--muted);margin-top:2px;"><?= $price ?> estimated</div>
->>>>>>> main
                 </button>
                 <?php endforeach; ?>
             </div>

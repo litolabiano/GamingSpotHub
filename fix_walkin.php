@@ -1,22 +1,50 @@
 <?php
 /**
- * Quick patch: add games to showPage titles map in admin.php
+ * resolve_all_conflicts.php
+ * Scans all PHP files in the project and resolves git conflict markers (keeps HEAD).
  */
-$file = __DIR__ . '/admin.php';
-$content = file_get_contents($file);
+function resolveConflicts(string $file): array {
+    $raw = file_get_contents($file);
+    $content = str_replace("\r\n", "\n", $raw);
 
-$old = "        settings: 'Settings', tournaments: 'Tournaments'";
-$new = "        settings: 'Settings', tournaments: 'Tournaments', games: 'Games Library'";
+    preg_match_all('/^<<<<<<</m', $content, $m);
+    $count = count($m[0]);
+    if ($count === 0) return ['conflicts' => 0, 'status' => 'clean'];
 
-if (strpos($content, $new) !== false) {
-    echo "Already patched.\n";
-} elseif (strpos($content, $old) !== false) {
-    $content = str_replace($old, $new, $content);
-    file_put_contents($file, $content);
-    echo "Patched showPage titles map.\n";
-} else {
-    echo "Target string not found — no change made.\n";
+    $pattern = '/^<<<<<<< [^\n]+\n(.*?)^=======\n.*?^>>>>>>> [^\n]+\n/ms';
+    $resolved = preg_replace($pattern, '$1', $content);
+    if ($resolved === null) return ['conflicts' => $count, 'status' => 'REGEX_FAIL'];
+
+    // Restore original line endings
+    $useCrlf = (strpos($raw, "\r\n") !== false);
+    if ($useCrlf) $resolved = str_replace("\n", "\r\n", $resolved);
+
+    file_put_contents($file, $resolved);
+
+    preg_match_all('/^<<<<<<</m', str_replace("\r\n","\n",file_get_contents($file)), $m2);
+    return ['conflicts' => $count, 'status' => count($m2[0]) === 0 ? 'fixed' : 'partial'];
 }
 
-$out = shell_exec('c:\\xampp\\php\\php.exe -l "' . $file . '" 2>&1');
-echo "Syntax: $out";
+$dir = __DIR__;
+$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+$fixed = $errors = $clean = 0;
+
+foreach ($iterator as $file) {
+    if ($file->getExtension() !== 'php') continue;
+    $path = $file->getPathname();
+    // Skip vendor/libs
+    if (strpos($path, 'assets') !== false) continue;
+    if (strpos($path, 'fix_walkin') !== false) continue;
+
+    $r = resolveConflicts($path);
+    if ($r['conflicts'] > 0) {
+        $rel = str_replace($dir . DIRECTORY_SEPARATOR, '', $path);
+        echo sprintf("%-50s %d conflict(s) → %s\n", $rel, $r['conflicts'], $r['status']);
+        if ($r['status'] === 'fixed') $fixed++;
+        else $errors++;
+    } else {
+        $clean++;
+    }
+}
+
+echo "\nDone. Fixed: $fixed  Errors: $errors  Clean: $clean\n";
