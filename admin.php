@@ -687,6 +687,7 @@ foreach ($recentSessions as $sess) {
     } elseif ($sess['status'] === 'completed'
         && $sess['total_cost'] > 0
         && $refundedAmount == 0               // no refund was issued
+<<<<<<< HEAD
         && $paidSoFar > 0                     // customer DID pay something upfront
         && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
     ) {
@@ -696,6 +697,15 @@ foreach ($recentSessions as $sess) {
     }
     // Early-end with nothing paid (walk-in, no upfront): fully settled, skip.
     // Sessions with refunds issued are also fully settled — skip them entirely
+=======
+        && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
+    ) {
+        // Completed session where total paid < total cost — outstanding balance (no refund)
+        $sess['paid_so_far'] = $paidSoFar;
+        $pendingSessions[] = $sess;
+    }
+    // Sessions with refunds issued are fully settled — skip them entirely
+>>>>>>> main
 }
 
 
@@ -1784,8 +1794,12 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     // Hidden control fields
     document.getElementById('refundSessionId').value     = sessionId || '';
     document.getElementById('refundReservationId').value = reservationId || '';
+<<<<<<< HEAD
     // Map to ajax/refund.php action_type values
     document.getElementById('refundActionField').value   = isRes ? 'reservation' : 'standard';
+=======
+    document.getElementById('refundActionField').value   = isRes ? 'process_refund' : 'issue_refund';
+>>>>>>> main
     document.getElementById('refundEarlyEndFlag').value  = '0';
 
     // Summary banner text

@@ -3,7 +3,11 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
+<<<<<<< HEAD
 -- Generation Time: Apr 26, 2026 at 10:34 AM
+=======
+-- Generation Time: Apr 25, 2026 at 06:12 PM
+>>>>>>> main
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -59,7 +63,7 @@ CREATE TABLE `consoles` (
 
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
 (1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'in_use', 80.00, '2026-02-21 19:55:41'),
 (3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
 (4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
@@ -106,7 +110,11 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (54, 21, 2, 'hourly', 240, '2026-04-25 23:21:55', '2026-04-25 23:35:59', 14, 80.00, 320.00, 'completed', NULL, 12, '2026-04-25 23:21:55', 0),
 (55, 17, 2, 'hourly', 300, '2026-04-26 00:04:14', '2026-04-26 00:06:09', 2, 80.00, 400.00, 'completed', NULL, 12, '2026-04-26 00:04:14', 180),
 (56, 17, 3, 'hourly', 300, '2026-04-26 00:06:01', '2026-04-26 00:06:26', 0, 80.00, 400.00, 'completed', NULL, 12, '2026-04-26 00:06:01', 0),
+<<<<<<< HEAD
 (57, 21, 2, 'hourly', 300, '2026-04-26 00:09:10', '2026-04-26 09:43:17', 574, 80.00, 560.00, 'completed', NULL, 12, '2026-04-26 00:09:10', 0);
+=======
+(57, 21, 2, 'hourly', 300, '2026-04-26 00:09:10', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-04-26 00:09:10', 0);
+>>>>>>> main
 
 -- --------------------------------------------------------
 
@@ -355,8 +363,12 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (216, 55, 17, -320.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 01m (₱0.00), refunding unused time (₱320.00)', '', 'completed', '2026-04-26 00:06:09', 12, '2026-04-26 00:06:09'),
 (217, 56, 17, -200.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱200.00)', '', 'completed', '2026-04-26 00:06:26', 12, '2026-04-26 00:06:26'),
 (218, NULL, 21, 160.00, 160.00, NULL, 'Downpayment for reservation #56', 'cash', 'completed', '2026-04-26 00:08:48', 21, '2026-04-26 00:08:48'),
+<<<<<<< HEAD
 (219, 57, 21, 160.00, 160.00, NULL, 'Downpayment transferred from reservation #56', 'cash', 'completed', '2026-04-26 00:09:10', 12, '2026-04-26 00:09:10'),
 (220, 57, 21, 200.00, 200.00, 200.00, 'Short payment — collected ₱200.00, short by ₱200.00', 'cash', 'completed', '2026-04-26 09:43:17', 12, '2026-04-26 09:43:17');
+=======
+(219, 57, 21, 160.00, 160.00, NULL, 'Downpayment transferred from reservation #56', 'cash', 'completed', '2026-04-26 00:09:10', 12, '2026-04-26 00:09:10');
+>>>>>>> main
 
 -- --------------------------------------------------------
 
@@ -564,7 +576,11 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
+<<<<<<< HEAD
   MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=221;
+=======
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=220;
+>>>>>>> main
 
 --
 -- AUTO_INCREMENT for table `users`

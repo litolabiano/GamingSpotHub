@@ -45,7 +45,14 @@
         <div class="footer-bottom">
             <p>&copy; 2026 Gspot Gaming Hub. All rights reserved.</p>
             <div class="footer-social">
+<<<<<<< HEAD
                 <a href="https://www.facebook.com/gspotgaminghub" target="_blank" rel="noopener noreferrer"><i class="fab fa-facebook-f"></i></a>
+=======
+                <a href="#"><i class="fab fa-facebook-f"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-discord"></i></a>
+>>>>>>> main
             </div>
         </div>
     </div>

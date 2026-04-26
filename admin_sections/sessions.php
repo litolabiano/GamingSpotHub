@@ -347,6 +347,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 2) : '—' ?>
                         </td>
 
+<<<<<<< HEAD
                         <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
                         <td>
                             <?php if ($sess['status'] === 'active'): ?>
@@ -354,6 +355,15 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     <button class="btn btn-danger btn-sm" title="End Session"
                                         style="justify-content:center;flex:1 1 70px;"
                                         onclick="openEndSessionModal(
+=======
+                <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
+                <td>
+                <?php if ($sess['status'] === 'active'): ?>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;min-width:170px;">
+                        <button class="btn btn-danger btn-sm" title="End Session"
+                            style="justify-content:center;flex:1 1 70px;"
+                            onclick="openEndSessionModal(
+>>>>>>> main
                             <?= $sess['session_id'] ?>,
                             '<?= sessionCustomerLabel($sess, true) ?>',
                             '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
@@ -363,21 +373,56 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?= (float)($sess['upfront_paid'] ?? 0) ?>,
                             <?= (float)($settings['unlimited_rate'] ?? 300) ?>
                         )">
+<<<<<<< HEAD
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
                                     <button class="btn btn-sm" title="Extend Session"
                                         style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(
+=======
+                            <i class="fas fa-stop"></i> End
+                        </button>
+                        <button class="btn btn-sm" title="Collect Payment"
+                            style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;justify-content:center;flex:1 1 70px;"
+                            onclick="openPayModal(
+>>>>>>> main
                                 <?= $sess['session_id'] ?>,
                                 '<?= sessionCustomerLabel($sess, true) ?>',
                                 '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                                 <?= $bookedMinutes ?>,
                                 '<?= $sess['rental_mode'] ?>'
                             )">
+<<<<<<< HEAD
                                         <i class="fas fa-clock"></i> Extend
                                     </button>
                                 </div>
+=======
+                            <i class="fas fa-peso-sign"></i> Pay
+                        </button>
+                        <button class="btn btn-sm" title="Issue Refund"
+                            style="background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;justify-content:center;flex:1 1 70px;"
+                            onclick="openRefundModal(
+                                <?= $sess['session_id'] ?>,
+                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                                <?= (float)($sess['upfront_paid'] ?? 0) ?>
+                            )">
+                            <i class="fas fa-undo-alt"></i> Refund
+                        </button>
+                        <button class="btn btn-sm" title="Extend Session"
+                            style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
+                            onclick="openExtendModal(
+                                <?= $sess['session_id'] ?>,
+                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
+                                <?= $bookedMinutes ?>,
+                                '<?= $sess['rental_mode'] ?>'
+                            )">
+                            <i class="fas fa-clock"></i> Extend
+                        </button>
+                    </div>
+>>>>>>> main
 
                                 <?php else: ?>—<?php endif; ?>
                         </td>

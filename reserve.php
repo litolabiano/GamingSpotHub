@@ -84,13 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please select a valid rental mode.';
     } elseif (!$error && $rental_mode === 'hourly' && $planned_minutes < 30) {
         $error = 'Please select a duration for hourly mode.';
+<<<<<<< HEAD
     } elseif (!$error && $rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
         $rules = getPricingRules();
         $error = 'Hourly reservations are limited to a maximum of ' . ($rules['max_hourly_minutes'] / 60) . ' hours.';
     } elseif (!$error && (!$reserved_date || !$reserved_time)) {
+=======
+    } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
+        $rules = getPricingRules();
+        $error = 'Hourly reservations are limited to a maximum of ' . ($rules['max_hourly_minutes'] / 60) . ' hours.';
+    } elseif (!$reserved_date || !$reserved_time) {
+>>>>>>> main
         $error = 'Please provide both date and time.';
     } elseif (!$error && $reserved_date < date('Y-m-d')) {
         $error = 'Reservation date cannot be in the past.';
+<<<<<<< HEAD
     } elseif (!$error && strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
         $error = 'Reservation must be at least 1 hour from now.';
     } elseif (!$error && (int)date('H', strtotime($reserved_time)) < 12) {
@@ -98,6 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!$error && ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59')) {
         $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
     } elseif (!$error && $dp_amount > 0 && !$dp_method) {
+=======
+    } elseif (strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
+        $error = 'Reservation must be at least 1 hour from now.';
+    } elseif ((int)date('H', strtotime($reserved_time)) < 12) {
+        $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
+    } elseif ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59') {
+        $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
+    } elseif ($dp_amount > 0 && !$dp_method) {
+>>>>>>> main
         $error = 'Please select a payment method for your downpayment.';
     }
 
@@ -122,7 +139,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
 // Read and clear the flash success message (set after PRG redirect)
 $success = '';
 if (!empty($_SESSION['reserve_success'])) {
@@ -1056,7 +1076,10 @@ let selectedUnitId      = null;
 let selectedUnitLabel   = '';
 
 const unlimitedRate   = <?= (int)$unlimitedRate ?>;
+<<<<<<< HEAD
 const PRICING         = <?= json_encode(getPricingRules()) ?>;
+=======
+>>>>>>> main
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 
 /* ── Console type ───────────────────────────────────── */
@@ -1333,7 +1356,11 @@ function selectDuration(mins) {
 
     // Read cost and bonus from data attributes on the button (set by PHP / getHourlyDurationOptions)
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
+<<<<<<< HEAD
     const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? PRICING.session_min_charge : mins / 60 * PRICING.hourly_rate);
+=======
+    const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? 50 : mins / 60 * 80);
+>>>>>>> main
     const bonusMins= btn ? parseInt(btn.dataset.bonus   || 0) : 0;
     const totalMins= btn ? parseInt(btn.dataset.total   || mins) : mins;
 

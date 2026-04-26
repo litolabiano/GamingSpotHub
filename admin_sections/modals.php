@@ -151,6 +151,7 @@
             <div class="form-group" id="durationPickerGroup">
                 <label>Duration *</label>
                 <select id="durationSelect" onchange="updateSessionPreview()">
+<<<<<<< HEAD
                     <option value="" disabled selected>— Select duration —</option>
                     <?php foreach (getHourlyDurationOptions() as $opt): ?>
                     <option value="<?= $opt['paid'] ?>"
@@ -158,9 +159,25 @@
                             data-total="<?= $opt['total'] ?>">
                         <?= $opt['label_paid'] ?> — ₱<?= number_format($opt['cost'], 0) ?>
                         <?= $opt['bonus'] > 0 ? '(+' . $opt['label_bonus'] . ')' : '' ?>
+=======
+                    <option value="">— Select duration —</option>
+                    <?php foreach (getHourlyDurationOptions() as $opt): ?>
+                    <option value="<?= $opt['paid'] ?>" data-cost="<?= $opt['cost'] ?>" data-bonus="<?= $opt['bonus'] ?>" data-total="<?= $opt['total'] ?>">
+                        <?php
+                        echo $opt['label_paid'] . ' paid';
+                        if ($opt['bonus'] > 0) echo ' → ' . $opt['label_total'] . ' play';
+                        echo ' — ₱' . number_format($opt['cost'], 0);
+                        if ($opt['bonus'] > 0) echo ' ★ ' . $opt['label_bonus'];
+                        ?>
+>>>>>>> main
                     </option>
                     <?php endforeach; ?>
                 </select>
+                <?php $pr = getPricingRules(); ?>
+                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:center;gap:5px;">
+                    <i class="fas fa-info-circle"></i>
+                    Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly. For longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).
+                </div>
             </div>
 
             <!-- Preview card -->
@@ -569,6 +586,7 @@
             <button class="modal-close" onclick="closeModal('extendSession')">&times;</button>
         </div>
 
+        <!-- Session info -->
         <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
             <strong id="extendSessionSummary">—</strong>
             <div style="margin-top:8px;font-size:13px;color:#888;">
@@ -576,6 +594,7 @@
             </div>
         </div>
 
+<<<<<<< HEAD
         <form id="extendSessionForm">
             <input type="hidden" name="action" value="extend_session">
             <input type="hidden" name="session_id" id="extendSessionId">
@@ -672,8 +691,254 @@
             });
         })();
         </script>
+=======
+        <!-- Pending customer requests (shown when any exist) -->
+        <div id="extendPendingSection" style="display:none;margin-bottom:16px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#f1a83c;margin-bottom:8px;">
+                <i class="fas fa-bell" style="margin-right:5px;"></i> Pending Customer Requests
+            </div>
+            <div id="extendPendingList"></div>
+        </div>
+
+        <!-- ── Add time form ── -->
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#8aa4e8;margin-bottom:8px;">
+            <i class="fas fa-plus" style="margin-right:5px;"></i> Add Time Directly
+        </div>
+        <div class="form-group">
+            <label>Add Time *</label>
+            <select id="extendMinutes" onchange="updateExtendCost()" required>
+                <option value="">— Select additional time —</option>
+                <option value="30">+30 min — ₱40</option>
+                <option value="60">+1 hour — ₱80</option>
+                <option value="90">+1h 30m — ₱120</option>
+                <option value="120">+2 hours — ₱160</option>
+                <option value="180">+3 hours — ₱240</option>
+                <option value="240">+4 hours — ₱320</option>
+            </select>
+            <div style="margin-top:6px;font-size:11px;color:rgba(241,168,60,.75);display:flex;align-items:center;gap:4px;">
+                <i class="fas fa-star"></i> Every 2 hrs paid = +30 min free bonus (applied automatically)
+            </div>
+        </div>
+
+        <!-- Cost preview -->
+        <div id="extendCostPreview" style="display:none;background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.25);border-radius:10px;padding:14px;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;color:#8aa4e8;"><i class="fas fa-receipt" style="margin-right:5px;"></i> Extension Cost</span>
+                <span id="extendCostAmt" style="font-size:22px;font-weight:800;color:#f1e1aa;">₱0</span>
+            </div>
+            <div id="extendFreeNote" style="display:none;margin-top:6px;font-size:12px;color:#20c8a1;">
+                <i class="fas fa-check-circle"></i> No extra charge for this session mode.
+            </div>
+        </div>
+
+        <!-- Payment fields (shown only when extra_cost > 0) -->
+        <div id="extendPaymentFields" style="display:none;">
+            <div class="form-group">
+                <label>Payment Method *</label>
+                <select id="extendPayMethod">
+                    <option value="cash">💵 Cash</option>
+                    <option value="gcash">📱 GCash</option>
+                    <option value="credit_card">💳 Credit Card</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:6px;">
+                <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱)</label>
+                <input type="number" id="extendTendered" min="0" step="1" placeholder="e.g. 80"
+                       style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;font-weight:700;"
+                       oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                <input type="hidden" id="extendCostHolder" value="0">
+            </div>
+            <div id="extendChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:8px;"></div>
+        </div>
+
+        <input type="hidden" id="extendSessionId" value="">
+        <input type="hidden" id="extendSessionMode" value="">
+
+        <button type="button" id="extendSubmitBtn"
+                style="width:100%;padding:13px;border-radius:10px;
+                       background:linear-gradient(135deg,rgba(95,133,218,.3),rgba(32,200,161,.15));
+                       border:1px solid #5f85da;color:#8aa4e8;
+                       font-size:15px;font-weight:700;cursor:pointer;
+                       display:flex;align-items:center;justify-content:center;gap:8px;transition:.2s;font-family:inherit;"
+                onmouseover="this.style.background='linear-gradient(135deg,rgba(95,133,218,.45),rgba(32,200,161,.25))'"
+                onmouseout="this.style.background='linear-gradient(135deg,rgba(95,133,218,.3),rgba(32,200,161,.15))'"
+                onclick="submitExtendSession()">
+            <i class="fas fa-clock"></i> Apply Extension
+        </button>
+>>>>>>> main
     </div>
 </div>
+
+<script>
+/* ── Extend Session Modal ──────────────────────────────────────────── */
+function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, rentalMode) {
+    document.getElementById('extendSessionId').value   = sessionId;
+    document.getElementById('extendSessionMode').value = rentalMode || 'hourly';
+    document.getElementById('extendSessionSummary').textContent =
+        customerName + ' — ' + unitNumber;
+
+    const h = Math.floor(bookedMinutes / 60), m = bookedMinutes % 60;
+    document.getElementById('extendCurrentDuration').textContent =
+        bookedMinutes ? (h ? h+'h ' : '') + (m ? m+'m' : '') : '—';
+
+    // Reset fields
+    document.getElementById('extendMinutes').value = '';
+    document.getElementById('extendCostPreview').style.display = 'none';
+    document.getElementById('extendPaymentFields').style.display = 'none';
+    document.getElementById('extendTendered').value = '';
+    document.getElementById('extendChangeDisplay').style.display = 'none';
+
+    // Load pending requests for this session
+    loadPendingExtensions(sessionId);
+
+    openModal('extendSession');
+}
+
+function loadPendingExtensions(sessionId) {
+    const section = document.getElementById('extendPendingSection');
+    const list    = document.getElementById('extendPendingList');
+    section.style.display = 'none';
+    list.innerHTML = '';
+
+    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`)
+        .then(r => r.json())
+        .then(function(data) {
+            if (!data.pending || data.pending.length === 0) return;
+            section.style.display = 'block';
+            data.pending.forEach(function(req) {
+                const cost = parseFloat(req.extra_cost);
+                const costLabel = cost > 0 ? ` — ₱${cost.toFixed(0)}` : ' — Free';
+                const card = document.createElement('div');
+                card.style.cssText = 'background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;';
+                card.innerHTML =
+                    `<span><i class="fas fa-user" style="color:#f1a83c;margin-right:5px;"></i>` +
+                    `+${req.extra_minutes} min${costLabel}</span>` +
+                    `<div style="display:flex;gap:6px;">` +
+                    `<button onclick="approveExt(${req.extension_id})" style="padding:5px 10px;border-radius:6px;background:rgba(32,200,161,.2);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-size:12px;font-weight:700;cursor:pointer;">` +
+                    `<i class="fas fa-check"></i> Approve</button>` +
+                    `<button onclick="denyExt(${req.extension_id})" style="padding:5px 10px;border-radius:6px;background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:12px;font-weight:700;cursor:pointer;">` +
+                    `<i class="fas fa-times"></i> Deny</button></div>`;
+                list.appendChild(card);
+            });
+        })
+        .catch(function() {});
+}
+
+function updateExtendCost() {
+    const mins    = parseInt(document.getElementById('extendMinutes').value) || 0;
+    const mode    = document.getElementById('extendSessionMode').value;
+    const preview = document.getElementById('extendCostPreview');
+    const payFlds = document.getElementById('extendPaymentFields');
+    const freeNote = document.getElementById('extendFreeNote');
+    const costEl  = document.getElementById('extendCostAmt');
+    const holder  = document.getElementById('extendCostHolder');
+
+    if (!mins) { preview.style.display = 'none'; payFlds.style.display = 'none'; return; }
+    preview.style.display = 'block';
+
+    if (mode === 'open_time' || mode === 'unlimited') {
+        costEl.textContent = '₱0';
+        freeNote.style.display = 'block';
+        payFlds.style.display  = 'none';
+        holder.value = '0';
+    } else {
+        // Hourly: bracket billing (mirror computeTimedCost)
+        const cost = computeExtCost(mins);
+        costEl.textContent = '₱' + cost;
+        freeNote.style.display = 'none';
+        payFlds.style.display  = 'block';
+        holder.value = cost;
+        document.getElementById('extendTendered').value = '';
+        document.getElementById('extendChangeDisplay').style.display = 'none';
+    }
+}
+
+// JS mirror of extension pricing: straight ₱80/hr, no session-start minimum
+function computeExtCost(mins) {
+    // ₱80/hr straight — 30 min = ₱40, 60 min = ₱80, etc.
+    return Math.round((mins / 60) * 80);
+}
+
+function submitExtendSession() {
+    const sessionId = document.getElementById('extendSessionId').value;
+    const mins      = document.getElementById('extendMinutes').value;
+    const mode      = document.getElementById('extendSessionMode').value;
+    const method    = document.getElementById('extendPayMethod').value;
+    const tendered  = document.getElementById('extendTendered').value;
+
+    if (!mins) { showInlineToast('Please select how much time to add.', 'error'); return; }
+
+    const btn = document.getElementById('extendSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+    const fd = new FormData();
+    fd.append('session_id',     sessionId);
+    fd.append('extra_minutes',  mins);
+    fd.append('payment_method', method);
+    if (tendered) fd.append('tendered', tendered);
+
+    fetch('ajax/extend_session.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            if (data.success) {
+                closeModal('extendSession');
+                const toastMsg = data.message
+                    ? data.message
+                    : 'Session extended! ₱' + (data.extra_cost || 0) + ' charged.';
+                showInlineToast(toastMsg, 'success');
+                setTimeout(() => location.reload(), 2200);
+            } else {
+                showInlineToast(data.message || 'Extension failed.', 'error');
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            showInlineToast('Network error — please try again.', 'error');
+        });
+}
+
+function approveExt(extId) {
+    const method = prompt('Payment method (cash / gcash / credit_card):', 'cash') || 'cash';
+    if (!method) return;
+    const fd = new FormData();
+    fd.append('action', 'approve');
+    fd.append('extension_id', extId);
+    fd.append('payment_method', method);
+    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(d) {
+            if (d.success) {
+                showInlineToast('Extension approved!', 'success');
+                loadPendingExtensions(document.getElementById('extendSessionId').value);
+                setTimeout(() => location.reload(), 1800);
+            } else {
+                showInlineToast(d.message || 'Failed to approve.', 'error');
+            }
+        });
+}
+
+function denyExt(extId) {
+    const fd = new FormData();
+    fd.append('action', 'deny');
+    fd.append('extension_id', extId);
+    fd.append('note', 'Denied by staff');
+    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(d) {
+            if (d.success) {
+                showInlineToast('Extension denied.', 'success');
+                loadPendingExtensions(document.getElementById('extendSessionId').value);
+            } else {
+                showInlineToast(d.message || 'Failed to deny.', 'error');
+            }
+        });
+}
+</script>
+
 
 <!-- ════ ADD RESERVATION MODAL (admin) ══════════════════════════════════ -->
 <div class="modal" id="addReservationModal">
