@@ -35,6 +35,7 @@
                 <?php if ($con['status'] !== 'available'): ?>
                 <form method="POST" style="display:inline">
                     <input type="hidden" name="action" value="update_console_status">
+                    <?= csrfField() ?>
                     <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                     <input type="hidden" name="status" value="available">
                     <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Set Available</button>
@@ -43,6 +44,7 @@
                 <?php if ($con['status'] !== 'maintenance'): ?>
                 <form method="POST" style="display:inline">
                     <input type="hidden" name="action" value="update_console_status">
+                    <?= csrfField() ?>
                     <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                     <input type="hidden" name="status" value="maintenance">
                     <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-wrench"></i> Maintenance</button>

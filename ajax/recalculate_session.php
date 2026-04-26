@@ -94,33 +94,50 @@ if (!$upd->execute()) {
     exit;
 }
 
-// Sum all upfront/partial transactions BEFORE the last one — those must not be changed.
+// Bug #2 fix: only touch the last POSITIVE transaction (never a refund row).
+// If no positive transaction exists yet (edge case: open-time session just ended),
+// insert a new one rather than silently doing nothing.
 $prevTxStmt = $conn->prepare(
     "SELECT COALESCE(SUM(amount), 0) AS paid_before_last
      FROM transactions
-     WHERE session_id = ? AND payment_status = 'completed'
+     WHERE session_id = ? AND payment_status = 'completed' AND amount > 0
        AND transaction_id < (
            SELECT MAX(transaction_id) FROM transactions
-           WHERE session_id = ? AND payment_status = 'completed'
+           WHERE session_id = ? AND payment_status = 'completed' AND amount > 0
        )"
 );
 $prevTxStmt->bind_param('ii', $session_id, $session_id);
 $prevTxStmt->execute();
 $paidBeforeLast = (float)$prevTxStmt->get_result()->fetch_assoc()['paid_before_last'];
 
-// Last transaction = remaining due after recalculation
+// Amount the last positive transaction should represent
 $lastTxAmount = max(0, $total_cost - $paidBeforeLast);
 
-// Update only the LAST transaction to reflect the recalculated cost.
-// Upfront/partial rows before it are never touched.
+// Try to update the last positive transaction
 $txn = $conn->prepare(
     "UPDATE transactions SET amount = ?
-     WHERE session_id = ? AND payment_status = 'completed'
+     WHERE session_id = ? AND payment_status = 'completed' AND amount > 0
      ORDER BY transaction_id DESC
      LIMIT 1"
 );
 $txn->bind_param('di', $lastTxAmount, $session_id);
 $txn->execute();
+
+// If no positive transaction existed (e.g. open-time session with no upfront), insert one
+if ($txn->affected_rows === 0 && $lastTxAmount > 0) {
+    $sessUserStmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
+    $sessUserStmt->bind_param('i', $session_id);
+    $sessUserStmt->execute();
+    $sessUser = $sessUserStmt->get_result()->fetch_assoc();
+    if ($sessUser) {
+        $ins = $conn->prepare(
+            "INSERT INTO transactions (session_id, user_id, amount, payment_method, payment_status, notes)
+             VALUES (?, ?, ?, 'cash', 'completed', 'Balance from end-time correction')"
+        );
+        $ins->bind_param('iid', $session_id, $sessUser['user_id'], $lastTxAmount);
+        $ins->execute();
+    }
+}
 
 echo json_encode([
     'success'          => true,

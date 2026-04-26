@@ -142,6 +142,7 @@
                                         <?php if ($r['status'] === 'pending'): ?>
                                             <form method="POST" style="display:inline;" onsubmit="return false" id="formConfirmRes<?= $r['reservation_id'] ?>">
                                                 <input type="hidden" name="action" value="confirm_reservation">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
                                                 <button type="button" class="btn btn-primary btn-sm" title="Confirm"
                                                     onclick="gspotConfirm('Confirm this reservation?', function(){ document.getElementById('formConfirmRes<?= $r['reservation_id'] ?>').submit(); }, {yesLabel:'Yes, Confirm'})">
@@ -158,6 +159,7 @@
                                             </button>
                                             <form method="POST" style="display:inline;" onsubmit="return false" id="formNoshowRes<?= $r['reservation_id'] ?>">
                                                 <input type="hidden" name="action" value="noshow_reservation">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
                                                 <button type="button" class="btn btn-secondary btn-sm" title="No-show"
                                                     onclick="gspotConfirm('Mark this reservation as no-show?', function(){ document.getElementById('formNoshowRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Mark No-Show'})">
@@ -166,6 +168,7 @@
                                             </form>
                                             <form method="POST" style="display:inline;" onsubmit="return false" id="formCancelRes<?= $r['reservation_id'] ?>">
                                                 <input type="hidden" name="action" value="cancel_reservation">
+                                                <?= csrfField() ?>
                                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
                                                 <button type="button" class="btn btn-danger btn-sm" title="Cancel"
                                                     onclick="gspotConfirm('Cancel this reservation?', function(){ document.getElementById('formCancelRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Yes, Cancel'})">

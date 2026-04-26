@@ -928,7 +928,7 @@ if (!empty($_GET['console'])) {
                     <h2><i class="fas fa-tags"></i> Pricing</h2>
                     <div style="font-size:13px;color:#aaa;line-height:1.8;">
                         <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-                            <span>30 minutes (Hourly)</span><span style="color:#f1e1aa;font-weight:700;">₱50</span>
+                            <span>30 minutes (Hourly)</span><span style="color:#f1e1aa;font-weight:700;">₱<?= number_format($pr['session_min_charge'], 0) ?></span>
                         </div>
                         <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
                             <span>Per hour (Hourly)</span><span style="color:#f1e1aa;font-weight:700;">₱80</span>
@@ -1026,6 +1026,7 @@ let selectedUnitId      = null;
 let selectedUnitLabel   = '';
 
 const unlimitedRate   = <?= (int)$unlimitedRate ?>;
+const PRICING         = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 
 /* ── Console type ───────────────────────────────────── */
@@ -1302,7 +1303,7 @@ function selectDuration(mins) {
 
     // Read cost and bonus from data attributes on the button (set by PHP / getHourlyDurationOptions)
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
-    const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? 50 : mins / 60 * 80);
+    const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? PRICING.session_min_charge : mins / 60 * PRICING.hourly_rate);
     const bonusMins= btn ? parseInt(btn.dataset.bonus   || 0) : 0;
     const totalMins= btn ? parseInt(btn.dataset.total   || mins) : mins;
 

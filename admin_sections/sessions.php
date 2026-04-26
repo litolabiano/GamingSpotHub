@@ -355,30 +355,6 @@
                         )">
                                         <i class="fas fa-stop"></i> End
                                     </button>
-                                    <button class="btn btn-sm" title="Collect Payment"
-                                        style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;justify-content:center;flex:1 1 70px;"
-                                        onclick="openPayModal(
-                                <?= $sess['session_id'] ?>,
-                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
-                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
-                                '<?= $sess['rental_mode'] ?>',
-                                <?= $startTs ?>,
-                                <?= $bookedMinutes ?>,
-                                <?= (float)($sess['upfront_paid'] ?? 0) ?>,
-                                <?= (float)($settings['unlimited_rate'] ?? 300) ?>
-                            )">
-                                        <i class="fas fa-peso-sign"></i> Pay
-                                    </button>
-                                    <button class="btn btn-sm" title="Issue Refund"
-                                        style="background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;justify-content:center;flex:1 1 70px;"
-                                        onclick="openRefundModal(
-                                <?= $sess['session_id'] ?>,
-                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
-                                '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
-                                <?= (float)($sess['upfront_paid'] ?? 0) ?>
-                            )">
-                                        <i class="fas fa-undo-alt"></i> Refund
-                                    </button>
                                     <button class="btn btn-sm" title="Extend Session"
                                         style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(

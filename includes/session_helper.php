@@ -1,8 +1,8 @@
 <?php
 /**
  * Good Spot Gaming Hub - Session Helper
- * 
- * Centralized session management and authentication functions.
+ *
+ * Centralized session management, authentication, and CSRF protection.
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -85,4 +85,39 @@ function getBaseUrl() {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     return $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
 }
-?>
+
+// ============================================================================
+// CSRF PROTECTION
+// ============================================================================
+
+/**
+ * Return (and lazily create) the per-session CSRF token.
+ */
+function csrfToken(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Render a hidden <input> carrying the CSRF token.
+ * Place inside every <form> that posts to admin.php.
+ */
+function csrfField(): string {
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrfToken()) . '">';
+}
+
+/**
+ * Validate the CSRF token from the current POST request.
+ * Returns true on success. On failure, populates $message/$messageType and returns false.
+ */
+function verifyCsrf(string &$message, string &$messageType): bool {
+    $token = $_POST['csrf_token'] ?? '';
+    if (!hash_equals(csrfToken(), $token)) {
+        $message     = 'Security check failed — please reload the page and try again.';
+        $messageType = 'error';
+        return false;
+    }
+    return true;
+}

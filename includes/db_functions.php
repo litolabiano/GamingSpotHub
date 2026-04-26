@@ -613,13 +613,14 @@ function computeTimedCost(int $minutes): float {
  * Unlimited – flat rate.
  */
 function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimited_rate = 300, $planned_minutes = null) {
+    $rules = getPricingRules();
     switch ($rental_mode) {
         case 'hourly':
             if ($planned_minutes !== null && $planned_minutes > 0) {
                 // Base cost for pre-booked duration
                 $base_cost = ($planned_minutes <= 30)
-                    ? 50.0
-                    : (float) ($planned_minutes / 60 * 80);
+                    ? $rules['session_min_charge']          // DB-driven — not hardcoded
+                    : (float) ($planned_minutes / 60 * $rules['hourly_rate']);
 
                 // Overtime beyond booked time
                 $overtime = $duration_minutes - $planned_minutes;
@@ -898,8 +899,13 @@ function getSetting($key) {
  */
 function updateSetting($key, $value) {
     global $conn;
-    $stmt = $conn->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
-    $stmt->bind_param("ss", $value, $key);
+    // Upsert — works whether the row already exists or not.
+    $stmt = $conn->prepare(
+        "INSERT INTO system_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+    );
+    $stmt->bind_param("ss", $key, $value);
     return $stmt->execute();
 }
 

@@ -2,6 +2,7 @@
 <div class="page" id="settings">
     <form method="POST">
         <input type="hidden" name="action" value="save_settings">
+        <?= csrfField() ?>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
 
             <!-- ── Pricing ── -->

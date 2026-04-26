@@ -16,6 +16,12 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
+    // ── CSRF guard — all admin POST actions require a valid token ──────────
+    if (!verifyCsrf($message, $messageType)) {
+        // verifyCsrf() has already populated $message/$messageType; skip all actions
+        $action = '';
+    }
+
     // START SESSION
     if ($action === 'start_session') {
         $user_id         = (int)($_POST['user_id'] ?? 0);
@@ -37,6 +43,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
       if ($result['success']) {
+
+        // ── Persist controller rental fee to additional_requests (always, ──────
+        // ── regardless of whether upfront was collected). endSession()    ──────
+        // ── and the End Session modal both read from this table.          ──────
+        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+            $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
+            if ($ctrl_fee > 0) {
+                $arStmt = $conn->prepare(
+                    "INSERT INTO additional_requests
+                        (session_id, request_type, description, extra_cost, status)
+                     VALUES (?, 'controller_rental', 'Controller rental fee', ?, 'approved')"
+                );
+                $arStmt->bind_param('id', $result['session_id'], $ctrl_fee);
+                $arStmt->execute();
+            }
+        }
+
     if ($rental_mode === 'unlimited') {
         $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
         $upfront_cost      = (float)(getSetting('unlimited_rate') ?? 300);
@@ -57,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upfront_cost = ($planned_minutes <= 30)
                         ? $pr['session_min_charge']
                         : (float)($planned_minutes / 60 * $pr['hourly_rate']);
-        // Add controller rental fee if checked
+        // Add controller rental fee to upfront total if checked
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee     = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
             $upfront_cost += $ctrl_fee;
@@ -98,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // END SESSION + RECORD OUTSTANDING BALANCE
+
     elseif ($action === 'end_session') {
         $session_id      = (int)($_POST['session_id'] ?? 0);
         $payment_method  = $_POST['payment_method'] ?? 'cash';
@@ -379,109 +403,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ISSUE REFUND
-    elseif ($action === 'issue_refund') {
-        $session_id    = (int)($_POST['session_id'] ?? 0);
-        $refund_amount = (float)($_POST['refund_amount'] ?? 0);
-        $refund_reason = trim($_POST['refund_reason'] ?? '');
-
-        if (!$session_id || $refund_amount <= 0) {
-            $message = 'Invalid refund — amount must be greater than ₱0.';
-            $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
-            $stmt->bind_param('i', $session_id);
-            $stmt->execute();
-            $sess_row = $stmt->get_result()->fetch_assoc();
-            if ($sess_row) {
-                $note = 'Refund issued' . ($refund_reason ? ': ' . $refund_reason : '');
-                recordTransaction(
-                    $session_id, $sess_row['user_id'], -abs($refund_amount), 'refund',
-                    $user['user_id'], null, null, $note
-                );
-                $message = 'Refund of ₱' . number_format($refund_amount, 2) . ' issued.' .
-                           ($refund_reason ? ' Reason: ' . htmlspecialchars($refund_reason) : '');
-                $messageType = 'success';
-            } else {
-                $message = 'Session not found.';
-                $messageType = 'error';
-            }
-        }
+    // ISSUE REFUND and EARLY END SESSION
+    // These actions are now handled exclusively by ajax/refund.php.
+    // Direct POST to these actions is rejected to prevent bypassing the AJAX layer.
+    elseif ($action === 'issue_refund' || $action === 'early_end_session') {
+        $message     = 'Refunds must be submitted through the Refund modal (AJAX).';
+        $messageType = 'error';
     }
 
-    // EARLY END — refund unused time AND end the session in one step
-    elseif ($action === 'early_end_session') {
-        $session_id    = (int)($_POST['session_id'] ?? 0);
-        $refund_amount = (float)($_POST['refund_amount'] ?? 0);
-        $refund_reason = trim($_POST['refund_reason'] ?? '');
-
-        if (!$session_id) {
-            $message = 'Invalid session ID.';
-            $messageType = 'error';
-        } else {
-            // 1) Record refund transaction if there is anything to refund
-            if ($refund_amount > 0) {
-                $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
-                $stmt->bind_param('i', $session_id);
-                $stmt->execute();
-                $sess_row = $stmt->get_result()->fetch_assoc();
-                if ($sess_row) {
-                    $note = 'Early end – refund for unused time' .
-                            ($refund_reason ? ': ' . $refund_reason : '');
-                    recordTransaction(
-                        $session_id, $sess_row['user_id'], -abs($refund_amount), 'refund',
-                        $user['user_id'], null, null, $note
-                    );
-                }
-            }
-
-            // 2) End the session
-            $result = endSession($session_id);
-            if ($result['success']) {
-                $mins  = $result['duration_minutes'];
-                $total = number_format($result['total_cost'], 2);
-                $refFmt = number_format($refund_amount, 2);
-                if ($refund_amount > 0) {
-                    $message = "Session ended early after {$mins} min. Refund of ₱{$refFmt} issued for unused time.";
-                } else {
-                    $message = "Session ended early after {$mins} min. No refund needed — consumed time covered the full payment.";
-                }
-                $messageType = 'success';
-            } else {
-                $message = 'Could not end session: ' . $result['message'];
-                $messageType = 'error';
-            }
-        }
+    // PROCESS REFUND for cancelled reservations
+    // Now handled exclusively by ajax/refund.php (action_type=reservation).
+    elseif ($action === 'process_refund') {
+        $message     = 'Reservation refunds must be submitted through the Refund modal (AJAX).';
+        $messageType = 'error';
     }
 
 
-    // EXTEND SESSION (adds to planned_minutes for hourly sessions)
+    // NOTE: Session extension is handled exclusively through ajax/extend_session.php
+    // which calls extendSession() — applying bonus minutes and recording a transaction.
+    // The old direct form-POST handler has been removed (Bug #4 fix) to prevent
+    // bypassing the billing engine with a raw planned_minutes UPDATE.
     elseif ($action === 'extend_session') {
-        $session_id    = (int)($_POST['session_id'] ?? 0);
-        $extra_minutes = (int)($_POST['extra_minutes'] ?? 0);
-
-        if (!$session_id || $extra_minutes <= 0) {
-            $message = 'Invalid extend — please select additional time.';
-            $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare("SELECT planned_minutes FROM gaming_sessions WHERE session_id = ? AND status = 'active'");
-            $stmt->bind_param('i', $session_id);
-            $stmt->execute();
-            $sess_row = $stmt->get_result()->fetch_assoc();
-            if ($sess_row !== false && $sess_row !== null) {
-                $new_planned = ((int)($sess_row['planned_minutes'] ?? 0)) + $extra_minutes;
-                $stmt2 = $conn->prepare("UPDATE gaming_sessions SET planned_minutes = ? WHERE session_id = ?");
-                $stmt2->bind_param('ii', $new_planned, $session_id);
-                $stmt2->execute();
-                $h = intdiv($new_planned, 60); $m = $new_planned % 60;
-                $dStr = $h ? ($m ? "{$h}h {$m}m" : "{$h}h") : "{$m}m";
-                $message = "Session #{$session_id} extended by {$extra_minutes} min. New booked duration: {$dStr}.";
-                $messageType = 'success';
-            } else {
-                $message = 'Session not found or already ended.';
-                $messageType = 'error';
-            }
-        }
+        $message     = 'Session extensions must be processed through the Extend modal.';
+        $messageType = 'error';
     }
 }
 
@@ -1140,6 +1084,23 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
     upfrontPaid = upfrontPaid || 0;
     document.getElementById('endSessionId').value = sessionId;
 
+    // Fetch approved extras (controller rental etc.) FIRST, then render modal
+    fetch('ajax/session_extras.php?session_id=' + sessionId)
+        .then(function(r){ return r.json(); })
+        .then(function(ex){
+            _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate,
+                ex.extras || 0, ex.items || []);
+        })
+        .catch(function(){
+            _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate, 0, []);
+        });
+}
+
+function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate, extras, extraItems) {
+    extras = extras || 0;
+
     // ── Early-end guard (hourly only) ────────────────────────────────────
     const earlyWarning    = document.getElementById('endEarlyWarning');
     const earlyRemStr     = document.getElementById('endEarlyRemainingStr');
@@ -1151,6 +1112,20 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
     confirmBtn.disabled        = false;
     confirmBtn.style.opacity   = '1';
     confirmBtn.style.cursor    = 'pointer';
+
+    // ── Helper: drive the extras pill badge below the big cost number ─────
+    function updateExtrasTag(extrasVal, items) {
+        const tag     = document.getElementById('endExtrasTag');
+        const tagText = document.getElementById('endExtrasTagText');
+        if (!tag) return;
+        if (extrasVal > 0) {
+            const names = (items || []).map(function(i){ return i.description; }).join(', ');
+            tagText.textContent = (names || 'extras') + ' +\u20b1' + extrasVal.toFixed(2);
+            tag.style.display = 'block';
+        } else {
+            tag.style.display = 'none';
+        }
+    }
 
     if (mode === 'hourly' && plannedMinutes && startTs) {
         const nowSec    = Math.floor(Date.now() / 1000);
@@ -1171,23 +1146,54 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
             const elM           = elapsedMin % 60;
             const elapsedLabel  = (elH ? elH + 'h ' : '') + String(elM).padStart(2,'0') + 'm';
 
-            // Customer only pays for actual time used (open-time bracket billing)
-            const consumedCost  = _timedCost(elapsedMin);
-            // Refund = what they paid upfront minus what they owe for consumed time
+            // Time cost alone (no extras — extras are a fixed charge, not time-based)
+            const timeCost      = _timedCost(elapsedMin);
+            const consumedCost  = timeCost + extras;   // total owed = time + fixed fees
+            // Refund = upfront paid minus total owed
             const refundAmt     = Math.max(0, upfrontPaid - consumedCost);
             const hasRefund     = refundAmt > 0;
 
             // ── Populate breakdown display ───────────────────────────────
             document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
-            document.getElementById('endEarlyConsumedCost').textContent = '₱' + consumedCost.toFixed(2);
+            // Time Used row: show time-only cost (not extras)
+            document.getElementById('endEarlyConsumedCost').textContent = '₱' + timeCost.toFixed(2);
             document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
             document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
             document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
 
-            const noRefundNote = document.getElementById('endEarlyNoRefundNote');
-            if (noRefundNote) noRefundNote.style.display = hasRefund ? 'none' : 'block';
+            // ── Show / hide Additional Fees row ──────────────────────────
+            const extrasRow   = document.getElementById('endEarlyExtrasRow');
+            const extrasAmt   = document.getElementById('endEarlyExtrasAmt');
+            const extrasLabel = document.getElementById('endEarlyExtrasLabel');
+            if (extrasRow) {
+                if (extras > 0) {
+                    extrasRow.style.display  = 'flex';
+                    extrasAmt.textContent    = '+₱' + extras.toFixed(2);
+                    // Build a compact label from extra items if available
+                    const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
+                    extrasLabel.textContent  = itemNames ? '(' + itemNames + ')' : '';
+                } else {
+                    extrasRow.style.display = 'none';
+                }
+            }
 
-            // Colour the refund amount green if 0 (no refund), red if positive
+            // ── No-refund note: context-aware message ────────────────────
+            const noRefundNote   = document.getElementById('endEarlyNoRefundNote');
+            const noRefundReason = document.getElementById('endEarlyNoRefundReason');
+            if (noRefundNote) {
+                noRefundNote.style.display = hasRefund ? 'none' : 'block';
+                if (noRefundReason) {
+                    if (upfrontPaid === 0) {
+                        noRefundReason.textContent = 'Nothing was paid upfront — balance will be collected at check-out.';
+                    } else if (timeCost >= upfrontPaid) {
+                        noRefundReason.textContent = 'Time used already covers the upfront payment — no refund needed.';
+                    } else {
+                        noRefundReason.textContent = 'Additional fees consume the remaining balance — no refund needed.';
+                    }
+                }
+            }
+
+            // Colour the refund amount: green if 0, red if positive
             const refundEl = document.getElementById('endEarlyRefundAmt');
             refundEl.style.color = hasRefund ? '#fb566b' : '#888';
 
@@ -1199,6 +1205,7 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
 
             // ── Wire up "Refund & End" button ────────────────────────────
             _pendingRefundArgs = { sessionId, customerName, unitNumber, upfrontPaid, refundAmt, consumedCost, elapsedLabel };
+
             earlyRefundBtn.onclick = function () {
                 closeModal('endSession');
 
@@ -1210,8 +1217,8 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
                     _pendingRefundArgs.upfrontPaid
                 );
 
-                // Switch form action to early_end_session (refund + end in one step)
-                document.getElementById('refundActionField').value  = 'early_end_session';
+                // Set action_type for ajax/refund.php
+                document.getElementById('refundActionField').value  = 'early_end';
                 document.getElementById('refundEarlyEndFlag').value = '1';
 
                 // Pre-fill refund amount
@@ -1305,8 +1312,9 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
             const secs    = elapsed % 60;
             const h = Math.floor(minutes / 60), m = minutes % 60;
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
-            const dueCost = _timedCost(minutes);
-            costEl.textContent = '₱' + dueCost.toFixed(2);
+            const dueCost = _timedCost(minutes) + extras;
+            costEl.textContent = '\u20b1' + dueCost.toFixed(2);
+            updateExtrasTag(extras, extraItems);
             const remaining = Math.max(0, dueCost - upfrontPaid);
             // Sync cost holder + big display
             if (remaining > 0) {
@@ -1322,17 +1330,18 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
 
     /* ── HOURLY: prepaid base, overtime may apply ── */
     } else if (mode === 'hourly' && plannedMinutes) {
-        const base    = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
+        const base    = plannedMinutes <= 30 ? PRICING.session_min_charge : (plannedMinutes / 60 * PRICING.hourly_rate);
         const elapsed = Math.floor((Date.now() / 1000) - startTs);
         const minutes = Math.floor(elapsed / 60);
         const overtime = minutes - plannedMinutes;
-        const cost    = _hourlyCost(minutes, plannedMinutes);
+        const cost    = _hourlyCost(minutes, plannedMinutes) + extras;
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? `${ph}h ${pm}m` : `${ph}h`) : `${pm}m`;
 
         panel.style.display = 'block';
         elapsedEl.textContent = String(Math.floor(minutes/60)).padStart(2,'0') + 'h ' + String(minutes%60).padStart(2,'0') + 'm';
-        costEl.textContent    = '₱' + cost.toFixed(2);
+        costEl.textContent    = '\u20b1' + cost.toFixed(2);
+        updateExtrasTag(extras, extraItems);
 
         const remaining = Math.max(0, cost - upfrontPaid);
 
@@ -1525,7 +1534,8 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     // Hidden control fields
     document.getElementById('refundSessionId').value     = sessionId || '';
     document.getElementById('refundReservationId').value = reservationId || '';
-    document.getElementById('refundActionField').value   = isRes ? 'process_refund' : 'issue_refund';
+    // Map to ajax/refund.php action_type values
+    document.getElementById('refundActionField').value   = isRes ? 'reservation' : 'standard';
     document.getElementById('refundEarlyEndFlag').value  = '0';
 
     // Summary banner text
@@ -1559,26 +1569,76 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     openModal('refundSession');
 }
 
-/* ── Refund form submission helper ───────────────────────────────────── */
-function submitRefundForm() {
-    const isEarlyEnd = document.getElementById('refundEarlyEndFlag').value === '1';
-    const refundAmt  = parseFloat(document.getElementById('refundAmount').value) || 0;
+/* ── Centralized Refund AJAX Submission ──────────────────────────────── */
+function _submitRefundAjax() {
+    const sessionId     = document.getElementById('refundSessionId').value;
+    const reservationId = document.getElementById('refundReservationId').value;
+    const actionField   = document.getElementById('refundActionField').value;
+    const isEarlyEnd    = document.getElementById('refundEarlyEndFlag').value === '1';
+    const refundAmt     = parseFloat(document.getElementById('refundAmount').value) || 0;
+    const reason        = document.getElementById('refundReason').value.trim();
 
-    if (isEarlyEnd) {
-        const msg = refundAmt > 0
+    // Determine action_type for refund.php
+    let action_type = actionField; // 'standard' | 'reservation'
+    if (isEarlyEnd) action_type = 'early_end';
+
+    if (action_type !== 'reservation' && refundAmt <= 0) {
+        _showRefundError('Please enter a refund amount greater than \u20b10.');
+        return;
+    }
+
+    const confirmMsg = isEarlyEnd
+        ? (refundAmt > 0
             ? 'Issue a refund of \u20b1' + refundAmt.toFixed(2) + ' and end the session? This cannot be undone.'
-            : 'End the session now? No refund will be issued. This cannot be undone.';
-        gspotConfirm(msg, function () {
-            document.getElementById('refundSessionForm').submit();
-        }, { danger: true, yesLabel: refundAmt > 0 ? 'Yes, Refund & End' : 'Yes, End Session' });
+            : 'End the session now? No refund will be issued. This cannot be undone.')
+        : 'Issue this refund of \u20b1' + refundAmt.toFixed(2) + '? This cannot be undone.';
+
+    gspotConfirm(confirmMsg, function () {
+        const btn = document.getElementById('refundConfirmBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+
+        const body = new URLSearchParams({
+            session_id:     sessionId     || '0',
+            reservation_id: reservationId || '0',
+            refund_amount:  refundAmt.toFixed(2),
+            refund_reason:  reason,
+            action_type:    action_type,
+        });
+
+        fetch('ajax/refund.php', { method: 'POST', body })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    closeModal('refundSession');
+                    // Show success banner then reload
+                    if (window.showToast) {
+                        window.showToast(data.message, 'success');
+                    }
+                    setTimeout(function(){ location.reload(); }, 1200);
+                } else {
+                    _showRefundError(data.message || 'An unknown error occurred.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>';
+                }
+            })
+            .catch(function() {
+                _showRefundError('Network error — please try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>';
+            });
+    }, { danger: true, yesLabel: isEarlyEnd && refundAmt > 0 ? 'Yes, Refund & End' : (isEarlyEnd ? 'Yes, End Session' : 'Yes, Refund') });
+}
+
+function _showRefundError(msg) {
+    const box  = document.getElementById('refundErrorMsg');
+    const text = document.getElementById('refundErrorText');
+    if (box && text) {
+        text.textContent = msg;
+        box.style.display = 'block';
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
-        if (refundAmt <= 0) {
-            alert('Please enter a refund amount greater than \u20b10.');
-            return;
-        }
-        gspotConfirm('Issue this refund of \u20b1' + refundAmt.toFixed(2) + '? This cannot be undone.',
-            function () { document.getElementById('refundSessionForm').submit(); },
-            { danger: true, yesLabel: 'Yes, Refund' });
+        alert(msg);
     }
 }
 
