@@ -284,12 +284,13 @@ $categories = [
         'title' => 'Tournaments & Games Library',
         'icon'  => 'fa-trophy', 'color' => 'gold',
         'items' => [
-            ['status'=>'missing', 'title'=>'Admin Tournament Management',                         'desc'=>'tournaments table exists. No admin section to create/manage tournaments.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Customer Tournament Registration',                    'desc'=>'tournament_participants table exists. No public-facing UI to browse or register.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Games Library Admin UI',                              'desc'=>'games table exists. No admin UI to add/edit/remove games from the library.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Customer Game Library View',                          'desc'=>'No public page listing available games per console type.', 'tag'=>'Not Started'],
+            ['status'=>'done',    'title'=>'Admin Tournament Management',                         'desc'=>'admin_sections/tournaments.php — full CRUD: create tournament, update status (upcoming/scheduled/ongoing/completed/cancelled), register/remove participants. Wired into admin sidebar with badge counter. Schema fixed: game_name, created_by, expanded status + console_type enums. (Confirmed working this session.)'],
+            ['status'=>'partial', 'title'=>'Customer Tournament Registration',                    'desc'=>'tournament_register.php exists with a styled registration form. However, it uses a separate tournament_registrations table instead of the proper tournament_participants table and does not dynamically list admin-created tournaments.', 'tag'=>'Needs Integration'],
+            ['status'=>'done',    'title'=>'Games Library Admin UI',                              'desc'=>'admin_sections/games.php built this session — CRUD table grouped by platform with search filter, Add/Edit/Hide/Delete actions (POST handlers in admin.php). games table created with 12 seeded titles. Wired into admin sidebar as "Games" nav item.'],
+            ['status'=>'missing', 'title'=>'Customer Game Library View',                          'desc'=>'No public page listing available games per console type. games table now exists with data — a public games.php browse page still needs to be built.', 'tag'=>'Not Started'],
         ],
     ],
+
 
 ];
 
