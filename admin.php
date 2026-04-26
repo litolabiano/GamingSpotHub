@@ -1010,7 +1010,7 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings', tournaments: 'Tournaments'
+        settings: 'Settings', tournaments: 'Tournaments', games: 'Games Library'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
