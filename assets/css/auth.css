@@ -399,7 +399,7 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.2);
+    color: #000;
     cursor: pointer;
     font-size: 0.85rem;
     padding: 4px;

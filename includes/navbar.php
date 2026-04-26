@@ -36,7 +36,6 @@ $base_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/reserve.php">Reserve</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#events">Events</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/#contact">Contact</a></li>
-                <li class="nav-item"><a class="nav-link" href="<?= $base_url ?>/faqs.php">FAQs</a></li>
             </ul>
 
             <?php if (isLoggedIn()): ?>

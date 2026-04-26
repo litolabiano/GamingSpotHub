@@ -16,6 +16,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const navbarHeight = navbar.offsetHeight;
 
     window.addEventListener('scroll', function () {
+        if (document.body.dataset.navbarFixed === 'true') {
+            navbar.classList.add('scrolled');
+            return;
+        }
         if (window.scrollY > 100) {
             navbar.classList.add('scrolled');
         } else {

@@ -19,6 +19,7 @@
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About</a></li>
                     <li><a href="faqs.php">FAQs</a></li>
+                    <li><a href="terms.php">Terms &amp; Conditions</a></li>
                 </ul>
             </div>
             <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">

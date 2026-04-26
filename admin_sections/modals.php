@@ -118,9 +118,9 @@
             <input type="hidden" name="action" value="start_session">
             <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
             <div class="form-group">
-                <label>Customer *</label>
-                <select name="user_id" required>
-                    <option value="">— Select customer —</option>
+                <label>Customer <span style="color:#888;font-size:11px;font-weight:400;">(optional — leave blank for walk-in)</span></label>
+                <select name="user_id">
+                    <option value="">— Walk-in / No account —</option>
                     <?php foreach ($customers as $c): ?>
                     <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
                     <?php endforeach; ?>
@@ -130,7 +130,7 @@
                 <div class="form-group">
                     <label>Console *</label>
                     <select name="console_id" required>
-                        <option value="">— Select console —</option>
+                        <option value="" disabled selected>— Select console —</option>
                         <?php foreach ($availableConsoles as $con): ?>
                         <option value="<?= $con['console_id'] ?>"><?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)</option>
                         <?php endforeach; ?>
@@ -150,7 +150,7 @@
             <div class="form-group" id="durationPickerGroup">
                 <label>Duration *</label>
                 <select id="durationSelect" onchange="updateSessionPreview()">
-                    <option value="">— Select duration —</option>
+                    <option value="" disabled selected>— Select duration —</option>
                     <option value="30">30 minutes — ₱50</option>
                     <option value="60">1 hour — ₱80</option>
                     <option value="90">1 hr 30 min — ₱120</option>
@@ -204,7 +204,6 @@
                             <select name="start_payment_method" id="startPaymentMethodSelect">
                                 <option value="cash">💵 Cash</option>
                                 <option value="gcash">📱 GCash</option>
-                                <option value="credit_card">💳 Credit Card</option>
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom:6px">
@@ -234,7 +233,6 @@
                         <select name="unlimited_payment_method" id="unlimitedPaymentMethodSelect">
                             <option value="cash">💵 Cash</option>
                             <option value="gcash">📱 GCash</option>
-                            <option value="credit_card">💳 Credit Card</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom:6px">
@@ -378,7 +376,6 @@
                 <select name="payment_method">
                     <option value="cash">💵 Cash</option>
                     <option value="gcash">📱 GCash</option>
-                    <option value="credit_card">💳 Credit Card</option>
                 </select>
 
                 <!-- Tendered amount -->
@@ -453,7 +450,6 @@
                 <select name="payment_method">
                     <option value="cash">💵 Cash</option>
                     <option value="gcash">📱 GCash</option>
-                    <option value="credit_card">💳 Credit Card</option>
                 </select>
             </div>
 
@@ -553,7 +549,7 @@
             <div class="form-group">
                 <label>Add Time *</label>
                 <select name="extra_minutes" id="extendMinutes" required>
-                    <option value="">— Select additional time —</option>
+                    <option value="" disabled selected>— Select additional time —</option>
                     <option value="15">+ 15 minutes</option>
                     <option value="30">+ 30 minutes — ₱50</option>
                     <option value="60">+ 1 hour — ₱80</option>
@@ -587,7 +583,7 @@
             <div class="form-group">
                 <label>Customer *</label>
                 <select name="user_id" required>
-                    <option value="">— Select customer —</option>
+                    <option value="" disabled selected>— Select customer —</option>
                     <?php foreach ($customers as $c): ?>
                     <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
                     <?php endforeach; ?>
@@ -597,7 +593,7 @@
                 <div class="form-group">
                     <label>Console Type *</label>
                     <select name="console_type" required>
-                        <option value="">— Select —</option>
+                        <option value="" disabled selected>— Select —</option>
                         <option value="PS4">PS4</option>
                         <option value="PS5">PS5</option>
                         <option value="Xbox Series X">Xbox Series X</option>
@@ -615,7 +611,7 @@
             <div id="adminResDurGroup" class="form-group">
                 <label>Duration *</label>
                 <select name="planned_minutes" id="adminResPlannedMins" onchange="adminResCalcDownpayment()">
-                    <option value="">— Select —</option>
+                    <option value="" disabled selected>— Select —</option>
                     <option value="30">30 min — ₱50</option>
                     <option value="60">1 hr — ₱80</option>
                     <option value="90">1h 30m — ₱120</option>
@@ -657,7 +653,6 @@
                 <select name="downpayment_method" id="adminDpMethodSelect">
                     <option value="cash">💵 Cash</option>
                     <option value="gcash">📱 GCash</option>
-                    <option value="credit_card">💳 Credit Card</option>
                 </select>
             </div>
             <div class="form-group">
@@ -689,7 +684,7 @@
             <div class="form-group">
                 <label>Assign Console Unit *</label>
                 <select name="console_id" id="convertConsoleSelect" required>
-                    <option value="">— Select available console —</option>
+                    <option value="" disabled selected>— Select available console —</option>
                     <?php foreach ($availableConsoles as $con): ?>
                     <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
                         <?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)

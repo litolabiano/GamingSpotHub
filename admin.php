@@ -18,13 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // START SESSION
     if ($action === 'start_session') {
-        $user_id         = (int)($_POST['user_id'] ?? 0);
+        $user_id_raw     = (int)($_POST['user_id'] ?? 0);
+        $user_id         = $user_id_raw > 0 ? $user_id_raw : null; // null = walk-in
         $console_id      = (int)($_POST['console_id'] ?? 0);
         $rental_mode     = $_POST['rental_mode'] ?? '';
         $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
 
-        if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
+        if (!$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please fill in all session fields correctly.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
@@ -383,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
 
-    // EXTEND SESSION (adds to planned_minutes for hourly sessions)
+    // EXTEND SESSION
     elseif ($action === 'extend_session') {
         $session_id    = (int)($_POST['session_id'] ?? 0);
         $extra_minutes = (int)($_POST['extra_minutes'] ?? 0);
@@ -411,6 +412,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+
+    // ── TOURNAMENT: CREATE ────────────────────────────────────────────────────
+    elseif ($action === 'create_tournament') {
+        $tname    = trim($_POST['tournament_name'] ?? '');
+        $game     = trim($_POST['game_name'] ?? '');
+        $ctype    = $_POST['console_type'] ?? '';
+        $sdate    = $_POST['start_date'] ?? '';
+        $edate    = $_POST['end_date'] ?? '';
+        $fee      = (float)($_POST['entry_fee'] ?? 0);
+        $prize    = (float)($_POST['prize_pool'] ?? 0);
+        $maxp     = (int)($_POST['max_participants'] ?? 16);
+        $annc     = trim($_POST['announcement'] ?? '');
+
+        if (!$tname || !$ctype || !$sdate || !$edate) {
+            $message = 'Please fill in all required tournament fields.';
+            $messageType = 'error';
+        } else {
+            // ── Enforce 7-day lead time ──
+            $minAllowed = new DateTime('+7 days');
+            $minAllowed->setTime(0, 0, 0);
+            $startDt = new DateTime($sdate);
+            if ($startDt < $minAllowed) {
+                $earliest = $minAllowed->format('M d, Y');
+                $message = "Start date must be at least 7 days from today (earliest: {$earliest}).";
+                $messageType = 'error';
+            } elseif ($edate < $sdate) {
+                $message = 'End date cannot be before the start date.';
+                $messageType = 'error';
+            } else {
+                $stmt = $conn->prepare(
+                    "INSERT INTO tournaments (tournament_name, game_name, console_type, start_date, end_date, entry_fee, prize_pool, max_participants, status, announcement)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)"
+                );
+                $stmt->bind_param('sssssddis', $tname, $game, $ctype, $sdate, $edate, $fee, $prize, $maxp, $annc);
+                if ($stmt->execute()) {
+                    $message = "Tournament '{$tname}' created. Switch it to Scheduled to open registration.";
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to create tournament: ' . $conn->error;
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
+
+    // ── TOURNAMENT: UPDATE STATUS ─────────────────────────────────────────────
+    elseif ($action === 'update_tournament_status') {
+        $tid    = (int)($_POST['tournament_id'] ?? 0);
+        $status = $_POST['new_status'] ?? '';
+        $allowed = ['upcoming','scheduled','ongoing','completed','cancelled'];
+        if ($tid && in_array($status, $allowed)) {
+            $stmt = $conn->prepare("UPDATE tournaments SET status=? WHERE tournament_id=?");
+            $stmt->bind_param('si', $status, $tid);
+            $stmt->execute();
+            $message = 'Tournament status updated to ' . ucfirst($status) . '.';
+            $messageType = 'success';
+        }
+    }
+
+    // ── TOURNAMENT: ADMIN REGISTER PARTICIPANT ────────────────────────────────
+    elseif ($action === 'admin_register_participant') {
+        $tid    = (int)($_POST['tournament_id'] ?? 0);
+        $uid    = (int)($_POST['user_id'] ?? 0);
+        $pstatus = in_array($_POST['payment_status'] ?? '', ['pending','paid']) ? $_POST['payment_status'] : 'pending';
+        if ($tid && $uid) {
+            // Check not already registered
+            $chk = $conn->prepare("SELECT participant_id FROM tournament_participants WHERE tournament_id=? AND user_id=?");
+            $chk->bind_param('ii', $tid, $uid);
+            $chk->execute();
+            if ($chk->get_result()->num_rows > 0) {
+                $message = 'This player is already registered for that tournament.';
+                $messageType = 'error';
+            } else {
+                $stmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, payment_status) VALUES (?,?,?)");
+                $stmt->bind_param('iis', $tid, $uid, $pstatus);
+                $stmt->execute();
+                $message = 'Participant registered successfully.';
+                $messageType = 'success';
+            }
+        }
+    }
+
+    // ── TOURNAMENT: UPDATE PARTICIPANT PAYMENT ────────────────────────────────
+    elseif ($action === 'update_participant_payment') {
+        $pid     = (int)($_POST['participant_id'] ?? 0);
+        $pstatus = in_array($_POST['payment_status'] ?? '', ['pending','paid']) ? $_POST['payment_status'] : 'pending';
+        if ($pid) {
+            $stmt = $conn->prepare("UPDATE tournament_participants SET payment_status=? WHERE participant_id=?");
+            $stmt->bind_param('si', $pstatus, $pid);
+            $stmt->execute();
+            $message = 'Payment status updated to ' . ucfirst($pstatus) . '.';
+            $messageType = 'success';
+        }
+    }
+
+    // ── TOURNAMENT: REMOVE PARTICIPANT ────────────────────────────────────────
+    elseif ($action === 'remove_participant') {
+        $pid = (int)($_POST['participant_id'] ?? 0);
+        if ($pid) {
+            $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id=?");
+            $stmt->bind_param('i', $pid);
+            $stmt->execute();
+            $message = 'Participant removed.';
+            $messageType = 'success';
+        }
+    }
 }
 
 // â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -431,10 +538,10 @@ $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === '
 
 // Sessions: active/live first (sorted by urgency — closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
+    "SELECT gs.*, COALESCE(u.full_name, 'Walk-in') AS customer_name, c.console_name, c.unit_number, c.console_type,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
      FROM gaming_sessions gs
-     JOIN users u ON gs.user_id = u.user_id
+     LEFT JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
      ORDER BY
          CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
@@ -701,6 +808,9 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <div class="nav-item" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
     </div>
+    <div class="nav-item" onclick="showPage('tournaments', this)">
+        <i class="fas fa-trophy"></i><span>Tournaments</span>
+    </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
@@ -709,6 +819,10 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <i class="fas fa-arrow-left"></i><span>Back to Site</span>
     </a>
 </div>
+
+<!-- Sidebar overlay — clicking it closes the sidebar -->
+<div id="sidebarOverlay" onclick="toggleSidebar()"
+     style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);"></div>
 
 <!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="topbar">
@@ -739,6 +853,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
+<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
@@ -757,6 +872,7 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management',
         financial: 'Financial', reports: 'Analytics & Reports',
+        tournaments: 'Tournament Management',
         settings: 'Settings'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
@@ -774,7 +890,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings'];
+    const validPages = ['dashboard','consoles','sessions','reservations','financial','reports','settings','tournaments'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;
@@ -791,10 +907,15 @@ function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
     const topbar      = document.querySelector('.topbar');
     const mainContent = document.querySelector('.main-content');
-    sidebar.classList.toggle('collapsed');
-    const isCollapsed = sidebar.classList.contains('collapsed');
-    topbar.style.left      = isCollapsed ? '70px'  : '260px';
-    mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
+    const overlay     = document.getElementById('sidebarOverlay');
+
+    const isHidden = sidebar.classList.toggle('hidden');
+
+    topbar.style.left            = isHidden ? '0'     : '260px';
+    mainContent.style.marginLeft = isHidden ? '0'     : '260px';
+
+    // Show overlay so clicking outside closes the sidebar
+    if (overlay) overlay.style.display = isHidden ? 'none' : 'block';
 }
 
 // â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

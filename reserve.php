@@ -414,11 +414,22 @@ if (!empty($_GET['console'])) {
                                 <div class="ct-avail" id="avail-ps5"></div>
                             </div>
                             <?php if ($ps4Count > 0): ?>
-                            <div class="console-type-card" id="ct-ps4" onclick="selectConsoleType('PS4')">
+                            <div class="console-type-card" id="ct-ps4"
+                                 style="pointer-events:none;cursor:not-allowed;opacity:.45;position:relative;overflow:hidden;">
+                                <!-- Maintenance ribbon -->
+                                <div style="position:absolute;top:0;left:0;right:0;bottom:0;
+                                            background:repeating-linear-gradient(45deg,rgba(251,86,107,.06) 0,rgba(251,86,107,.06) 10px,transparent 10px,transparent 20px);
+                                            border-radius:12px;pointer-events:none;"></div>
+                                <div style="position:absolute;top:6px;right:6px;
+                                            background:rgba(251,86,107,.85);color:#fff;
+                                            font-size:9px;font-weight:800;letter-spacing:.6px;
+                                            padding:2px 7px;border-radius:20px;text-transform:uppercase;">
+                                    🔧 Maintenance
+                                </div>
                                 <div class="ct-icon"><i class="fab fa-playstation" style="color:#f1a83c;"></i></div>
                                 <div class="ct-name">PlayStation 4</div>
                                 <div class="ct-count"><?= $ps4Count ?> units</div>
-                                <div class="ct-avail" id="avail-ps4"></div>
+                                <div class="ct-avail" style="color:#fb566b;font-size:10px;font-weight:700;">Currently unavailable</div>
                             </div>
                             <?php endif; ?>
                             <div class="console-type-card" id="ct-xbox" onclick="selectConsoleType('Xbox Series X')">
@@ -524,9 +535,6 @@ if (!empty($_GET['console'])) {
                                     </div>
                                     <div class="pm-card" id="pm-gcash" onclick="selectDpMethod('gcash')">
                                         <span class="pm-icon">📱</span>GCash
-                                    </div>
-                                    <div class="pm-card" id="pm-credit_card" onclick="selectDpMethod('credit_card')">
-                                        <span class="pm-icon">💳</span>Credit Card
                                     </div>
                                 </div>
                                 <p style="font-size:11px;color:#888;margin-bottom:0;">

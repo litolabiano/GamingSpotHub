@@ -2,7 +2,7 @@
 require_once __DIR__ . '/includes/session_helper.php';
 require_once __DIR__ . '/includes/db_config.php';
 
-// ── Auto-create registrations table if it doesn't exist ──────────────────────
+// ── Run one-time schema fixes if needed ──────────────────────────────────────
 $conn->query("
     CREATE TABLE IF NOT EXISTS `tournament_registrations` (
         `reg_id`         INT(11)      NOT NULL AUTO_INCREMENT,
@@ -17,57 +17,73 @@ $conn->query("
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
 
+// ── Load active/scheduled tournament from DB ─────────────────────────────────
+// Prefer the first 'scheduled' tournament; fall back to first 'upcoming'
+$activeTournament = null;
+$tRes = $conn->query("
+    SELECT * FROM tournaments
+    WHERE status IN ('scheduled','upcoming','ongoing')
+    ORDER BY
+        CASE status WHEN 'scheduled' THEN 0 WHEN 'ongoing' THEN 1 ELSE 2 END ASC,
+        start_date ASC
+    LIMIT 1
+");
+if ($tRes) $activeTournament = $tRes->fetch_assoc();
+
+// Is registration currently open?
+$registrationOpen = $activeTournament && $activeTournament['status'] === 'scheduled';
+
 $success = false;
 $error   = '';
 
 // ── Handle form submission ────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $full_name      = trim($_POST['full_name']      ?? '');
-    $ign            = trim($_POST['ign']            ?? '');
-    $contact_number = trim($_POST['contact_number'] ?? '');
-    $tournament     = 'Tekken 8 Tournament';
-
-    // Basic validation
-    if (!$full_name || !$ign || !$contact_number) {
-        $error = 'Please fill in all required fields.';
-    } elseif (!isset($_FILES['gcash_proof']) || $_FILES['gcash_proof']['error'] !== UPLOAD_ERR_OK) {
-        $error = 'Please upload your GCash proof of payment.';
+    if (!$registrationOpen) {
+        $error = 'Registration is currently closed. Please check back later.';
     } else {
-        // Validate file type
-        $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        $ftype    = mime_content_type($_FILES['gcash_proof']['tmp_name']);
-        $fsize    = $_FILES['gcash_proof']['size'];
+        $full_name      = trim($_POST['full_name']      ?? '');
+        $ign            = trim($_POST['ign']            ?? '');
+        $contact_number = trim($_POST['contact_number'] ?? '');
+        $tournament     = $activeTournament['tournament_name'] ?? 'Tournament';
 
-        if (!in_array($ftype, $allowed)) {
-            $error = 'Invalid file type. Please upload a JPG, PNG, or WebP image.';
-        } elseif ($fsize > 5 * 1024 * 1024) {
-            $error = 'File is too large. Maximum size is 5 MB.';
+        // Basic validation
+        if (!$full_name || !$ign || !$contact_number) {
+            $error = 'Please fill in all required fields.';
+        } elseif (!isset($_FILES['gcash_proof']) || $_FILES['gcash_proof']['error'] !== UPLOAD_ERR_OK) {
+            $error = 'Please upload your GCash proof of payment.';
         } else {
-            // Save file
-            $uploadDir = __DIR__ . '/uploads/gcash_proofs/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
+            $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            $ftype    = mime_content_type($_FILES['gcash_proof']['tmp_name']);
+            $fsize    = $_FILES['gcash_proof']['size'];
 
-            $ext      = pathinfo($_FILES['gcash_proof']['name'], PATHINFO_EXTENSION);
-            $filename = 'gcash_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($ext);
-            $destPath = $uploadDir . $filename;
-
-            if (move_uploaded_file($_FILES['gcash_proof']['tmp_name'], $destPath)) {
-                $stmt = $conn->prepare(
-                    "INSERT INTO tournament_registrations (full_name, ign, contact_number, gcash_proof, tournament)
-                     VALUES (?, ?, ?, ?, ?)"
-                );
-                $stmt->bind_param('sssss', $full_name, $ign, $contact_number, $filename, $tournament);
-                if ($stmt->execute()) {
-                    $success = true;
-                } else {
-                    $error = 'Registration failed. Please try again.';
-                    @unlink($destPath); // clean up orphaned file
-                }
+            if (!in_array($ftype, $allowed)) {
+                $error = 'Invalid file type. Please upload a JPG, PNG, or WebP image.';
+            } elseif ($fsize > 5 * 1024 * 1024) {
+                $error = 'File is too large. Maximum size is 5 MB.';
             } else {
-                $error = 'Failed to upload file. Please try again.';
+                $uploadDir = __DIR__ . '/uploads/gcash_proofs/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                $ext      = pathinfo($_FILES['gcash_proof']['name'], PATHINFO_EXTENSION);
+                $filename = 'gcash_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($ext);
+                $destPath = $uploadDir . $filename;
+
+                if (move_uploaded_file($_FILES['gcash_proof']['tmp_name'], $destPath)) {
+                    $stmt = $conn->prepare(
+                        "INSERT INTO tournament_registrations (full_name, ign, contact_number, gcash_proof, tournament)
+                         VALUES (?, ?, ?, ?, ?)"
+                    );
+                    $stmt->bind_param('sssss', $full_name, $ign, $contact_number, $filename, $tournament);
+                    if ($stmt->execute()) {
+                        $success = true;
+                    } else {
+                        $error = 'Registration failed. Please try again.';
+                        @unlink($destPath);
+                    }
+                } else {
+                    $error = 'Failed to upload file. Please try again.';
+                }
             }
         }
     }
@@ -363,30 +379,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Hero -->
         <div class="reg-hero" data-aos="fade-up">
             <span class="section-tag">Tournaments</span>
+            <?php if ($activeTournament): ?>
             <h1 class="reg-title">
-                Tekken 8 <span class="gradient-text">Tournament</span>
+                <?= htmlspecialchars($activeTournament['game_name'] ?? $activeTournament['tournament_name']) ?>
+                <span class="gradient-text">Tournament</span>
             </h1>
             <p class="reg-subtitle">
-                Show off your fighting skills and compete for glory!
-                Register below and submit your GCash proof of payment to confirm your slot.
+                <?php if ($activeTournament['announcement']): ?>
+                    <?= htmlspecialchars($activeTournament['announcement']) ?>
+                <?php else: ?>
+                    Show off your skills and compete for glory!
+                    Register below and submit your GCash proof of payment to confirm your slot.
+                <?php endif; ?>
             </p>
+            <?php else: ?>
+            <h1 class="reg-title">Tournament <span class="gradient-text">Registration</span></h1>
+            <p class="reg-subtitle">No upcoming tournament at the moment. Check back soon!</p>
+            <?php endif; ?>
         </div>
 
         <!-- Info chips -->
+        <?php if ($activeTournament): ?>
         <div class="tournament-info-strip" data-aos="fade-up" data-aos-delay="100">
             <div class="info-chip">
                 <i class="fas fa-peso-sign"></i>
-                <span>₱250 Registration Fee</span>
+                <span>₱<?= number_format($activeTournament['entry_fee'], 0) ?> Registration Fee</span>
             </div>
             <div class="info-chip">
                 <i class="fab fa-playstation"></i>
-                <span>Platform: PS5</span>
+                <span>Platform: <?= htmlspecialchars($activeTournament['console_type']) ?></span>
             </div>
             <div class="info-chip">
-                <i class="fas fa-map-marker-alt"></i>
-                <span>Gspot Gaming Hub, Dasmariñas</span>
+                <i class="fas fa-users"></i>
+                <span>Max <?= $activeTournament['max_participants'] ?> Players</span>
+            </div>
+            <?php if ($activeTournament['prize_pool'] > 0): ?>
+            <div class="info-chip">
+                <i class="fas fa-trophy"></i>
+                <span>Prize Pool: ₱<?= number_format($activeTournament['prize_pool'], 0) ?></span>
+            </div>
+            <?php endif; ?>
+            <div class="info-chip">
+                <i class="fas fa-calendar"></i>
+                <span><?= date('M d, Y', strtotime($activeTournament['start_date'])) ?></span>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Form card -->
         <div class="reg-card" data-aos="fade-up" data-aos-delay="150">
@@ -399,7 +437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 <h3>Registration Submitted! 🎮</h3>
                 <p>
-                    Your registration for the <strong>Tekken 8 Tournament</strong> has been received.<br>
+                    Your registration for the <strong><?= htmlspecialchars($activeTournament['tournament_name'] ?? 'Tournament') ?></strong> has been received.<br>
                     We'll review your GCash proof and confirm your slot soon.<br><br>
                     See you on the battlefield!
                 </p>
@@ -412,14 +450,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </a>
             </div>
 
+            <?php elseif (!$activeTournament): ?>
+            <!-- ── NO TOURNAMENT STATE ── -->
+            <div class="success-card">
+                <div class="success-icon-wrap" style="border-color:#f1a83c;color:#f1a83c;background:rgba(241,168,60,.1);">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                <h3>No Tournament Open</h3>
+                <p style="color:rgba(255,255,255,.6);">There are no tournaments with open registration right now.<br>Check back soon or follow our Facebook page for announcements!</p>
+                <hr class="form-divider">
+                <a href="index.php#events" class="btn btn-primary mt-2"><i class="fas fa-arrow-left me-2"></i>Back to Events</a>
+            </div>
+
+            <?php elseif (!$registrationOpen): ?>
+            <!-- ── REGISTRATION CLOSED STATE ── -->
+            <div class="success-card">
+                <div class="success-icon-wrap" style="border-color:#fb566b;color:#fb566b;background:rgba(251,86,107,.1);">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <h3>Registration Not Yet Open</h3>
+                <p style="color:rgba(255,255,255,.6);">
+                    The <strong style="color:#fff;"><?= htmlspecialchars($activeTournament['tournament_name']) ?></strong> tournament
+                    is currently <strong style="color:#f1a83c;">upcoming</strong>.<br>
+                    Registration will open soon. Stay tuned!
+                </p>
+                <?php if ($activeTournament['start_date']): ?>
+                <div style="margin:16px 0;background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);border-radius:10px;padding:12px 18px;display:inline-block;">
+                    <i class="fas fa-calendar" style="color:#f1a83c;margin-right:8px;"></i>
+                    <strong style="color:#f1e1aa;">Tournament Date:</strong>
+                    <span style="color:rgba(255,255,255,.8);margin-left:6px;"><?= date('F d, Y \a\t h:i A', strtotime($activeTournament['start_date'])) ?></span>
+                </div>
+                <?php endif; ?>
+                <hr class="form-divider">
+                <a href="index.php#events" class="btn btn-primary mt-2"><i class="fas fa-arrow-left me-2"></i>Back to Events</a>
+            </div>
+
             <?php else: ?>
             <!-- ── FORM STATE ── -->
-
-            <h4 class="mb-1" style="font-family:var(--font-heading);font-size:1.4rem;">
-                Player Registration
-            </h4>
+            <h4 class="mb-1" style="font-family:var(--font-heading);font-size:1.4rem;">Player Registration</h4>
             <p style="color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:2rem;">
-                All fields are required. Make sure your GCash payment of <strong style="color:var(--color-secondary);">₱250</strong> is sent before submitting.
+                All fields are required. Make sure your GCash payment of <strong style="color:var(--color-secondary);">₱<?= number_format($activeTournament['entry_fee'], 0) ?></strong> is sent before submitting.
             </p>
 
             <?php if ($error): ?>

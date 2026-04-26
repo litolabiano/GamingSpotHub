@@ -531,8 +531,19 @@ function fmtMins(int $m): string {
         ::-webkit-scrollbar-thumb { background: rgba(95,133,218,0.3); border-radius: 3px; }
     </style>
 </head>
-<body>
+<body data-navbar-fixed="true">
 <?php include __DIR__ . '/includes/navbar.php'; ?>
+
+<script>
+    /* Dashboard: keep navbar in its "scrolled" state at all times,
+       matching the home page scroll-triggered background */
+    (function () {
+        var nav = document.getElementById('mainNav');
+        if (nav) {
+            nav.classList.add('scrolled');
+        }
+    })();
+</script>
 
 <div class="cd-wrapper">
 

@@ -92,8 +92,8 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
             "INSERT INTO gaming_sessions (user_id, console_id, rental_mode, planned_minutes, hourly_rate, created_by)
              VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("iisidi", $user_id, $console_id, $rental_mode, $planned_minutes, $rate, $created_by);
-        $stmt->execute();
+        // Use execute() array so NULL user_id is passed correctly (bind_param coerces null→0 for 'i')
+        $stmt->execute([$user_id, $console_id, $rental_mode, $planned_minutes, $rate, $created_by]);
         $session_id = $conn->insert_id;
 
         // Mark console as in use
@@ -277,10 +277,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number,
+    $sql = "SELECT gs.*, COALESCE(u.full_name, 'Walk-in') AS customer_name,
+                   c.console_name, c.console_type, c.unit_number,
                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id), 0) AS upfront_paid
             FROM gaming_sessions gs
-            JOIN users u ON gs.user_id = u.user_id
+            LEFT JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id
             WHERE gs.status = 'active'
             ORDER BY gs.start_time DESC";
