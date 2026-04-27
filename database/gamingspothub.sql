@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 27, 2026 at 02:34 PM
+-- Generation Time: Apr 27, 2026 at 05:24 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -77,9 +77,9 @@ CREATE TABLE `consoles` (
 --
 
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
-(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
+(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'in_use', 80.00, '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'in_use', 80.00, '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'in_use', 80.00, '2026-02-21 19:55:41'),
 (4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
 (6, 'PS4 Unit 6', 'PS4', 'PS4-07', 'maintenance', 80.00, '2026-02-21 19:55:41'),
@@ -134,7 +134,10 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (76, 0, 2, 'hourly', 60, '2026-04-27 01:16:53', '2026-04-27 01:24:08', 7, 80.00, 40.00, 'completed', NULL, 12, '2026-04-27 01:16:53'),
 (77, 0, 2, 'hourly', 150, '2026-04-27 01:24:25', '2026-04-27 01:24:43', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:24:25'),
 (78, 0, 3, 'hourly', 30, '2026-04-27 01:25:07', '2026-04-27 01:25:12', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:25:07'),
-(79, 0, 4, 'hourly', 30, '2026-04-27 19:45:47', '2026-04-27 19:49:30', 4, 80.00, 0.00, 'completed', NULL, 12, '2026-04-27 19:45:47');
+(79, 0, 4, 'hourly', 30, '2026-04-27 19:45:47', '2026-04-27 19:49:30', 4, 80.00, 0.00, 'completed', NULL, 12, '2026-04-27 19:45:47'),
+(80, 0, 2, 'hourly', 90, '2026-04-27 20:50:17', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-04-27 20:50:17'),
+(81, 0, 3, 'hourly', 240, '2026-04-27 20:51:08', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-04-27 20:51:08'),
+(82, 0, 1, 'hourly', 240, '2026-04-27 20:51:55', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-04-27 20:51:55');
 
 -- --------------------------------------------------------
 
@@ -176,26 +179,31 @@ CREATE TABLE `reservations` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `cancelled_by` enum('user','admin') DEFAULT NULL,
-  `refund_issued` tinyint(1) NOT NULL DEFAULT 0
+  `cancellation_reason` varchar(300) DEFAULT NULL,
+  `refund_issued` tinyint(1) NOT NULL DEFAULT 0,
+  `cancel_reason_type` enum('schedule_change','found_alternative','budget_issue','technical_issue','emergency','other') DEFAULT NULL,
+  `cancel_reason_detail` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `reservations`
 --
 
-INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `refund_issued`) VALUES
-(42, 21, NULL, 'PS5', 'hourly', 420, '2026-04-19', '23:30:00', NULL, 560.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:29:56', '2026-04-19 22:30:28', 'user', 1),
-(43, 21, NULL, 'PS5', 'hourly', 240, '2026-04-19', '23:37:00', NULL, 320.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:36:37', '2026-04-19 22:37:55', 'user', 1),
-(44, 21, NULL, 'PS5', 'hourly', 180, '2026-04-19', '23:40:00', NULL, 240.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:38:22', '2026-04-19 22:39:24', 'user', 1),
-(45, 21, NULL, 'PS5', 'hourly', 150, '2026-05-07', '13:23:00', 'stellar blade best game', 200.00, 'cash', 1, 'no_show', 21, '2026-04-20 09:25:47', '2026-04-20 09:29:22', NULL, 0),
-(46, 21, NULL, 'PS5', 'hourly', 150, '2026-04-20', '12:00:00', NULL, 200.00, 'cash', 1, 'cancelled', 21, '2026-04-20 09:32:58', '2026-04-20 09:34:00', 'user', 1),
-(47, 12, NULL, 'PS5', 'hourly', 120, '2026-04-20', '12:00:00', NULL, 160.00, 'gcash', 1, 'cancelled', 12, '2026-04-20 09:35:36', '2026-04-20 09:41:24', 'admin', 0),
-(48, 12, NULL, 'PS5', 'hourly', 360, '2026-04-21', '14:00:00', NULL, 480.00, 'cash', 1, 'cancelled', 12, '2026-04-21 08:06:27', '2026-04-21 08:10:25', 'admin', 0),
-(49, 21, NULL, 'PS4', 'hourly', 60, '2026-04-21', '12:00:00', NULL, 80.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:13:48', '2026-04-21 08:17:03', 'user', 1),
-(50, 21, NULL, 'PS5', 'hourly', 180, '2026-04-21', '12:00:00', NULL, 240.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:14:54', '2026-04-21 08:36:55', 'user', 1),
-(51, 21, NULL, 'PS5', 'hourly', 150, '2026-04-21', '20:33:00', NULL, 200.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:34:14', '2026-04-21 08:36:45', 'user', 1),
-(52, 21, NULL, 'PS5', 'hourly', 240, '2026-04-21', '12:00:00', NULL, 320.00, 'cash', 1, 'pending', 21, '2026-04-21 08:37:53', '2026-04-21 08:37:53', NULL, 0),
-(57, 21, 1, 'PS5', 'hourly', 30, '2026-04-27', '12:00:00', NULL, 20.00, 'cash', 1, 'cancelled', 21, '2026-04-27 01:18:17', '2026-04-27 01:18:28', 'user', 0);
+INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`, `cancel_reason_type`, `cancel_reason_detail`) VALUES
+(42, 21, NULL, 'PS5', 'hourly', 420, '2026-04-19', '23:30:00', NULL, 560.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:29:56', '2026-04-19 22:30:28', 'user', NULL, 1, NULL, NULL),
+(43, 21, NULL, 'PS5', 'hourly', 240, '2026-04-19', '23:37:00', NULL, 320.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:36:37', '2026-04-19 22:37:55', 'user', NULL, 1, NULL, NULL),
+(44, 21, NULL, 'PS5', 'hourly', 180, '2026-04-19', '23:40:00', NULL, 240.00, 'cash', 1, 'cancelled', 21, '2026-04-19 22:38:22', '2026-04-19 22:39:24', 'user', NULL, 1, NULL, NULL),
+(45, 21, NULL, 'PS5', 'hourly', 150, '2026-05-07', '13:23:00', 'stellar blade best game', 200.00, 'cash', 1, 'no_show', 21, '2026-04-20 09:25:47', '2026-04-20 09:29:22', NULL, NULL, 0, NULL, NULL),
+(46, 21, NULL, 'PS5', 'hourly', 150, '2026-04-20', '12:00:00', NULL, 200.00, 'cash', 1, 'cancelled', 21, '2026-04-20 09:32:58', '2026-04-20 09:34:00', 'user', NULL, 1, NULL, NULL),
+(47, 12, NULL, 'PS5', 'hourly', 120, '2026-04-20', '12:00:00', NULL, 160.00, 'gcash', 1, 'cancelled', 12, '2026-04-20 09:35:36', '2026-04-20 09:41:24', 'admin', NULL, 0, NULL, NULL),
+(48, 12, NULL, 'PS5', 'hourly', 360, '2026-04-21', '14:00:00', NULL, 480.00, 'cash', 1, 'cancelled', 12, '2026-04-21 08:06:27', '2026-04-21 08:10:25', 'admin', NULL, 0, NULL, NULL),
+(49, 21, NULL, 'PS4', 'hourly', 60, '2026-04-21', '12:00:00', NULL, 80.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:13:48', '2026-04-21 08:17:03', 'user', NULL, 1, NULL, NULL),
+(50, 21, NULL, 'PS5', 'hourly', 180, '2026-04-21', '12:00:00', NULL, 240.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:14:54', '2026-04-21 08:36:55', 'user', NULL, 1, NULL, NULL),
+(51, 21, NULL, 'PS5', 'hourly', 150, '2026-04-21', '20:33:00', NULL, 200.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:34:14', '2026-04-21 08:36:45', 'user', NULL, 1, NULL, NULL),
+(52, 21, NULL, 'PS5', 'hourly', 240, '2026-04-21', '12:00:00', NULL, 320.00, 'cash', 1, 'cancelled', 21, '2026-04-21 08:37:53', '2026-04-27 21:33:18', 'user', 'ANO PO KASI, NAG BREAK KAMI NG GF KO  :', 0, NULL, NULL),
+(57, 21, 1, 'PS5', 'hourly', 30, '2026-04-27', '12:00:00', NULL, 20.00, 'cash', 1, 'cancelled', 21, '2026-04-27 01:18:17', '2026-04-27 01:18:28', 'user', NULL, 0, NULL, NULL),
+(58, 21, 2, 'PS5', 'hourly', 240, '2026-04-28', '12:00:00', NULL, 320.00, 'cash', 1, 'cancelled', 21, '2026-04-27 23:03:41', '2026-04-27 23:10:54', 'user', NULL, 0, 'found_alternative', NULL),
+(59, 26, 1, 'PS5', 'unlimited', NULL, '2026-04-28', '12:00:00', NULL, 400.00, 'cash', 1, 'confirmed', 26, '2026-04-27 23:20:31', '2026-04-27 23:23:38', 'user', NULL, 0, 'found_alternative', 'mwehehehhe');
 
 -- --------------------------------------------------------
 
@@ -262,8 +270,7 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (21, 'bonus_paid_minutes', '120', NULL, '2026-04-26 16:47:16'),
 (22, 'bonus_free_minutes', '30', NULL, '2026-04-26 16:47:16'),
 (23, 'max_hourly_minutes', '240', NULL, '2026-04-26 16:47:16'),
-(24, 'session_min_charge', '20', NULL, '2026-04-26 23:21:14'),
-(151, 'inconvenience_fee', '50.00', 'Fee deducted from downpayment refund when customer cancels after their reserved start time.', '2026-04-27 01:02:48');
+(24, 'session_min_charge', '20', NULL, '2026-04-26 23:21:14');
 
 -- --------------------------------------------------------
 
@@ -378,7 +385,11 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (238, 77, 0, 80.00, 80.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-27 01:24:33', 12, '2026-04-27 01:24:33'),
 (239, 77, 0, -180.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱180.00)', '', 'completed', '2026-04-27 01:24:43', 12, '2026-04-27 01:24:43'),
 (240, 79, 0, 20.00, 50.00, NULL, NULL, 'gcash', 'completed', '2026-04-27 19:45:47', 12, '2026-04-27 19:45:47'),
-(241, 79, 0, -20.00, NULL, NULL, 'Early end – refund for unused time: early end', '', 'completed', '2026-04-27 19:49:30', 12, '2026-04-27 19:49:30');
+(241, 79, 0, -20.00, NULL, NULL, 'Early end – refund for unused time: early end', '', 'completed', '2026-04-27 19:49:30', 12, '2026-04-27 19:49:30'),
+(242, 80, 0, 120.00, 200.00, NULL, NULL, 'gcash', 'completed', '2026-04-27 20:50:17', 12, '2026-04-27 20:50:17'),
+(243, 82, 0, 0.00, 0.00, 280.00, 'Short payment at session start — short by ₱280.00', 'cash', 'completed', '2026-04-27 20:51:55', 12, '2026-04-27 20:51:55'),
+(244, NULL, 21, 320.00, 320.00, NULL, 'Downpayment for reservation #58', 'cash', 'completed', '2026-04-27 23:03:41', 21, '2026-04-27 23:03:41'),
+(245, NULL, 26, 400.00, 400.00, NULL, 'Downpayment for reservation #59', 'cash', 'completed', '2026-04-27 23:20:31', 26, '2026-04-27 23:20:31');
 
 -- --------------------------------------------------------
 
@@ -412,10 +423,11 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 (0, 'walkin@system.local', '', 'Walk-in Customer', NULL, 'walkin', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 00:33:18', 0, NULL),
 (12, 'ljlabianao@gmail.com', '$2y$10$nEuBy0VoWqtbRETOnAD99eurxRHdLaGpxROWA//NGpziKgIG1CmmS', 'lito', '09916310227', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 20:45:06', 0, NULL),
 (17, 'llabianojr@kld.edu.ph', '$2y$10$N97t4MFGjElD3iM.nlpn3uZ/hy1zNC/Lfqi/YozlBB6BG1VWkL.Oe', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-12 19:54:25', 0, NULL),
-(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29', 1, NULL),
+(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29', 0, '2026-05-04 23:10:54'),
 (22, 'admin@gmail.com', '$2y$10$kZCF21cxNKIxXE99XNGyF.nGfT94FZeDaGtbH4YTBOxrpumQLDvIK', 'Admin User', '', 'customer', 'active', 0, '9ad4e0d4b2004d75a763bd2e6e9af695cdb053e39c7cadd65db419783c75b54f', '2026-04-20 16:02:24', NULL, NULL, '2026-04-19 16:02:24', 0, NULL),
 (23, 'customer@example.com', '$2y$10$8mmAlQ1UknZorTRMn6NVneRRA5JrVSOO8oMAuDEVll.pICMikYieO', 'Test Customer', '', 'customer', 'active', 0, '5337f25a858a79327c9001f982e6629f2f64be6579986d9da00c816159a6a75c', '2026-04-20 20:49:05', NULL, NULL, '2026-04-19 20:49:05', 0, NULL),
-(24, 'lito@example.com', '$2y$10$b1z6jAajQr5NjOyHWkU5kOJ7kx/BdeM6HbUg/qLWdElsilx20bLta', 'Lito Test', '', 'customer', 'active', 0, '10512cc414ac02ff1b961698a17863ad87e3e55d976dc1e14d92a2af161ee3bd', '2026-04-20 20:52:01', NULL, NULL, '2026-04-19 20:52:01', 0, NULL);
+(24, 'lito@example.com', '$2y$10$b1z6jAajQr5NjOyHWkU5kOJ7kx/BdeM6HbUg/qLWdElsilx20bLta', 'Lito Test', '', 'customer', 'active', 0, '10512cc414ac02ff1b961698a17863ad87e3e55d976dc1e14d92a2af161ee3bd', '2026-04-20 20:52:01', NULL, NULL, '2026-04-19 20:52:01', 0, NULL),
+(26, 'hbernesto@kld.edu.ph', '$2y$10$tS7MGOXvsgcjV7DcP99UyuoGk6l4XgtEwyeWTREjw4PrrIu/7381G', 'Harvie Bernesto', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 23:19:32', 1, NULL);
 
 --
 -- Indexes for dumped tables
@@ -547,7 +559,7 @@ ALTER TABLE `consoles`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=83;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -559,7 +571,7 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT for table `session_extensions`
@@ -589,13 +601,13 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=242;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=246;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- Constraints for dumped tables
