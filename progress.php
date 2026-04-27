@@ -199,7 +199,8 @@ $categories = [
             ['status'=>'done',    'title'=>'Forgot Password (anti-enumeration)',                    'desc'=>'Always shows same success message. Reset token stored with 1hr expiry using MySQL NOW().'],
             ['status'=>'done',    'title'=>'Role-based Access Control',                            'desc'=>'requireRole() enforces owner/shopkeeper on admin.php. requireLogin() on all customer pages.'],
             ['status'=>'done',    'title'=>'Universal Navbar',                                     'desc'=>'navbar.php reused across all pages. Absolute $base_url links work from any directory depth.'],
-            ['status'=>'missing', 'title'=>'3-Strike Cancellation Ban Enforcement',                'desc'=>'FAQs describe a 1-week reservation ban after 3 consecutive cancels. No column, no check in reserve.php or createReservation().', 'tag'=>'FAQ Mismatch'],
+            ['status'=>'done',    'title'=>'3-Strike Cancellation Ban Enforcement',                'desc'=>'Fully implemented. ajax/cancel_reservation.php increments consecutive_cancellations per customer-cancel, applies a 7-day reservation_banned_until at streak=3 (resets streak to 0), and warns at streak=2. reserve.php blocks new reservations during the ban window with an expiry date message. dashboard.php hides the Reserve button and shows the ban notice. convertReservationToSession() resets the streak to 0 when the customer honours a booking. Only customer-initiated cancellations increment the streak — admin cancellations do not (by design).'],
+            ['status'=>'warn',    'title'=>'Admin Cancellation Does Not Affect Streak',            'desc'=>'When admin cancels a reservation in admin.php, the customer\'s consecutive_cancellations counter is NOT incremented. This is intentional (customer should not be penalised for a staff-side cancel) but undocumented. Consider adding an optional admin toggle if policy changes.', 'tag'=>'Policy Gap'],
             ['status'=>'missing', 'title'=>'Email Notification on Reservation Confirmed',          'desc'=>'Admin confirms a reservation, but no email is sent to the customer. FAQs imply a confirmation notification.', 'tag'=>'Missing'],
         ],
     ],
@@ -217,6 +218,8 @@ $categories = [
             ['status'=>'done',    'title'=>'Availability Check on Reserve Form',                   'desc'=>'ajax/check_unit_availability.php checks reservations table for overlapping slots.'],
             ['status'=>'done',    'title'=>'Preferred Unit Pre-selection',                         'desc'=>'createReservation() now accepts $preferred_unit_id as 10th param and stores it in reservations.console_id. The preferred unit selected by the customer is correctly persisted. (Fixed this session.)'],
             ['status'=>'done',    'title'=>'Inconvenience Fee on Late Cancellation',              'desc'=>'cancel_reservation.php deducts configurable inconvenience_fee (\u20b150, from system_settings) when customer cancels after reserved start time. Net refund shown in message and returned as amount field. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Cancellation Reason Tracking (cancel_reason_type)',   'desc'=>'Customers and admins must select a structured reason (schedule_change, found_alternative, budget_issue, technical_issue, emergency, other, admin_decision) when cancelling. Stored in reservations.cancel_reason_type + cancel_reason_detail.'],
+            ['status'=>'done',    'title'=>'Dedicated Cancellation Audit Log (reservation_cancellations)', 'desc'=>'reservation_cancellations table created via migration_cancellations_log.sql. Auto-populated by both ajax/cancel_reservation.php (customer) and admin.php cancel_reservation action (admin). Backfilled 12 existing cancelled reservations. Supports full stats reporting.'],
         ],
     ],
 
@@ -230,7 +233,8 @@ $categories = [
             ['status'=>'done',    'title'=>'transactions.session_id Nullable',                     'desc'=>'ALTER TABLE transactions MODIFY session_id INT NULL. Allows reservation-only refunds without a session. (Fixed this session.)'],
             ['status'=>'done',    'title'=>'NULL cancelled_by Handled',                            'desc'=>'Old cancelled rows have cancelled_by=NULL. Both UI and PHP now accept NULL to show/process refund button.'],
             ['status'=>'done',    'title'=>'Cancelled Reservations Table in Admin',                'desc'=>'admin_sections/reservations.php — second table showing all cancelled reservations with refund status.'],
-            ['status'=>'missing', 'title'=>'Refund Status on Customer Dashboard',                  'desc'=>'Customer can see cancelled reservations but has no visibility into whether admin has issued the refund (refund_issued column not surfaced on dashboard).', 'tag'=>'Missing'],
+            ['status'=>'done',    'title'=>'Refund Status on Customer Dashboard',                  'desc'=>'Cancelled reservations on dashboard.php show either a green "Refunded" badge or amber "Refund pending" badge based on refund_issued column. Confirmed implemented.'],
+            ['status'=>'done',    'title'=>'reservation_cancellations Log Stays in Sync',         'desc'=>'When admin issues a refund via process_refund action, admin.php now also runs UPDATE reservation_cancellations SET refund_issued=1 to keep the audit table consistent.'],
         ],
     ],
 
@@ -264,6 +268,7 @@ $categories = [
             ['status'=>'missing', 'title'=>'PDF/CSV Report Export',                               'desc'=>'reports table exists in schema. No report generation code found (no PDF library, no export handler).', 'tag'=>'Missing'],
             ['status'=>'missing', 'title'=>'Tournament Revenue Tracking',                         'desc'=>'tournament_participants has entry_fee but no transaction recorded when someone registers for a tournament.', 'tag'=>'Missing'],
             ['status'=>'partial', 'title'=>'Reservation Downpayment in Financial Reports',        'desc'=>'Now recorded via recordTransaction() but session_id=NULL may cause some report queries to miss these rows if they JOIN on session_id.', 'tag'=>'Check Required'],
+            ['status'=>'done',    'title'=>'Cancellation Analytics in Admin Reports',             'desc'=>'admin_sections/reports.php extended with full cancellation stats section: 5 stat cards (total, user %, admin %, refund rate, total refunded), Reasons Breakdown doughnut, Cancellations Last 30 Days line chart, Cancellations by Console Type bar chart, Cancelled By doughnut, and Top Cancellation Reasons table with progress bars. Data sourced from reservation_cancellations table.'],
         ],
     ],
 
@@ -275,7 +280,8 @@ $categories = [
             ['status'=>'done',    'title'=>'Active Session Live Tracker',                         'desc'=>'Shows current session unit, elapsed time, estimated cost in real-time.'],
             ['status'=>'done',    'title'=>'Upcoming & Past Reservations',                        'desc'=>'getMyReservations() lists all reservations with status badges.'],
             ['status'=>'done',    'title'=>'Reservation Cancellation (AJAX)',                     'desc'=>'Cancel button triggers confirmation modal → AJAX call → toast notification → row removal.'],
-            ['status'=>'missing', 'title'=>'Refund Status Visibility',                            'desc'=>'Customer cannot see whether their cancelled reservation has been refunded yet (refund_issued not shown).'],
+            ['status'=>'done',    'title'=>'Refund Status Visibility',                            'desc'=>'Cancelled reservations show green "Refunded" or amber "Refund pending" badge based on refund_issued. Confirmed implemented in dashboard.php.'],
+            ['status'=>'done',    'title'=>'My Cancellations Tab',                               'desc'=>'New dedicated page in dashboard.php sidebar. Shows 4 stat cards (total, self-cancelled, admin-cancelled, refunds received), a reasons doughnut chart, a live cancellation streak/ban progress bar with warning, and a full paginated cancellation history table with reason tags, free-text detail, downpayment, and refund status per row.'],
             ['status'=>'missing', 'title'=>'Game Request UI',                                     'desc'=>'game_requests table exists. No customer-facing UI to submit or track game requests.', 'tag'=>'Missing'],
         ],
     ],
@@ -313,6 +319,7 @@ $issues = [
     ['status'=>'fixed',   'title'=>'Inconvenience fee on late cancellations not calculated',       'file'=>'ajax/cancel_reservation.php', 'desc'=>'$isLateCancel was detected but amount was not reduced — full downpayment reported, with vague "staff will deduct" message.', 'fix'=>'Added inconvenience_fee setting (₱50 default) to system_settings. cancel_reservation.php now auto-deducts the fee and returns precise gross_amount, inconvenience_fee, and net amount fields.'],
     ['status'=>'fixed',   'title'=>'Refund status not visible to customer',                       'file'=>'dashboard.php',       'desc'=>'Confirmed as already implemented. Cancelled reservations show either a green "Refunded" or amber "Refund pending" badge based on refund_issued column.', 'fix'=>'No change needed — feature was already built.'],
     ['status'=>'fixed',   'title'=>'Financial report queries may miss session_id=NULL transactions','file'=>'admin.php',           'desc'=>'Main $finStats query goes FROM transactions directly (no gaming_sessions JOIN). Transaction history already uses LEFT JOIN gaming_sessions. No INNER JOINs on transactions table found.', 'fix'=>'Confirmed as already correct — all transaction-based queries use LEFT JOIN or no join at all.'],
+    ['status'=>'fixed',   'title'=>'No dedicated table for cancellation stats reporting',         'file'=>'database + admin.php + ajax/cancel_reservation.php', 'desc'=>'Cancellation reason data was embedded in the reservations table only, making analytics queries complex and fragile. No audit trail existed per cancellation event.', 'fix'=>'Created reservation_cancellations table (migration_cancellations_log.sql) with full audit fields. Both cancel flows (customer AJAX + admin POST) now INSERT a row on every cancellation. Backfilled 12 existing records. Admin reports.php extended with 4 charts + summary table. Customer dashboard gets a new My Cancellations tab.'],
 ];
 
 /* ══ Compute stats ══ */

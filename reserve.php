@@ -174,33 +174,160 @@ if (!empty($_GET['console'])) {
 
     /* ── Hero ───────────────────────────────────────────── */
     .reserve-hero {
-        background: linear-gradient(135deg, #0a0f1c 0%, #0d1b3e 50%, #0a1225 100%);
-        padding: 120px 0 60px;
+        background: #060d1a;
+        padding: 120px 0 70px;
         position: relative;
         overflow: hidden;
     }
-    .reserve-hero::before {
+    /* Animated mesh canvas — matches homepage */
+    .reserve-hero-canvas {
+        position: absolute; inset: 0;
+        background:
+            radial-gradient(ellipse 70% 60% at 75% 30%, rgba(32,200,161,.12) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 70% at 15% 75%, rgba(95,133,218,.1) 0%, transparent 55%),
+            radial-gradient(ellipse 55% 40% at 50% 110%, rgba(179,123,236,.07) 0%, transparent 55%);
+        pointer-events: none;
+    }
+    /* Grid lines */
+    .reserve-hero-canvas::before {
         content:'';
         position: absolute; inset: 0;
-        background: radial-gradient(ellipse 60% 50% at 70% 40%, rgba(32,200,161,.1), transparent),
-                    radial-gradient(ellipse 40% 60% at 20% 70%, rgba(95,133,218,.08), transparent);
-        pointer-events: none;
+        background-image:
+            linear-gradient(rgba(95,133,218,.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(95,133,218,.05) 1px, transparent 1px);
+        background-size: 60px 60px;
+    }
+    /* Glowing orb */
+    .reserve-hero-canvas::after {
+        content:'';
+        position: absolute;
+        top: -15%; right: -8%;
+        width: 500px; height: 500px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(32,200,161,.12) 0%, transparent 70%);
+        animation: reserveOrb 8s ease-in-out infinite;
+    }
+    @keyframes reserveOrb {
+        0%,100%{transform:translateY(0) scale(1);}
+        50%{transform:translateY(-30px) scale(1.04);}
     }
     .reserve-hero h1 { font-family: 'Outfit', sans-serif; font-weight: 900; color: #fff; }
     .reserve-hero p  { color: rgba(255,255,255,.65); }
+    /* Hero badge */
+    .reserve-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(32,200,161,.1);
+        border: 1px solid rgba(32,200,161,.3);
+        color: #20c8a1;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 6px 14px;
+        border-radius: 50px;
+        margin-bottom: 20px;
+    }
+    .reserve-hero-badge-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #20c8a1;
+        animation: reservePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes reservePulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.35;transform:scale(1.6);} }
+    /* Hero stat pills */
+    .reserve-hero-stats {
+        display: flex;
+        gap: 0;
+        margin-top: 32px;
+        flex-wrap: wrap;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 14px;
+        padding: 16px 20px;
+        max-width: 420px;
+    }
+    .reserve-hero-stat {
+        flex: 1;
+        text-align: center;
+        padding: 0 16px;
+        border-right: 1px solid rgba(255,255,255,.07);
+    }
+    .reserve-hero-stat:first-child { padding-left: 0; }
+    .reserve-hero-stat:last-child  { padding-right: 0; border-right: none; }
+    .rhs-val {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 900;
+        line-height: 1;
+        margin-bottom: 3px;
+    }
+    .rhs-lbl {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .7px;
+        text-transform: uppercase;
+        color: rgba(255,255,255,.35);
+    }
+    /* Hero right: console cards with float animations */
+    .rhero-console-wrap {
+        display: flex;
+        gap: 14px;
+        align-items: stretch;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .rhero-con-card {
+        background: rgba(10,18,42,.75);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        padding: 22px 18px;
+        text-align: center;
+        min-width: 110px;
+        flex: 1;
+        max-width: 140px;
+        backdrop-filter: blur(10px);
+        transition: transform .3s, border-color .3s;
+    }
+    .rhero-con-card:hover { transform: translateY(-6px); }
+    .rhero-con-card.ps5  { border-color: rgba(95,133,218,.3);  animation: rcFloat1 7s ease-in-out infinite; }
+    .rhero-con-card.ps4  { border-color: rgba(241,168,60,.3);  animation: rcFloat2 6s ease-in-out infinite 1s; }
+    .rhero-con-card.xbox { border-color: rgba(32,200,161,.35); animation: rcFloat3 8s ease-in-out infinite .5s; }
+    @keyframes rcFloat1 { 0%,100%{transform:translateY(0) rotate(-1deg);} 50%{transform:translateY(-14px) rotate(1deg);} }
+    @keyframes rcFloat2 { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+    @keyframes rcFloat3 { 0%,100%{transform:translateY(0) rotate(2deg);} 50%{transform:translateY(-16px) rotate(-1deg);} }
 
     /* ── Form card ──────────────────────────────────────── */
     .reserve-card {
-        background: rgba(10,20,50,.7);
-        border: 1px solid rgba(95,133,218,.2);
-        border-radius: 20px;
+        background: rgba(8,16,38,.75);
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 22px;
         padding: 28px;
-        backdrop-filter: blur(12px);
+        backdrop-filter: blur(14px);
+        position: relative;
+        overflow: hidden;
+        transition: border-color .3s, box-shadow .3s;
     }
+    .reserve-card:hover {
+        border-color: rgba(95,133,218,.25);
+        box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    }
+    /* Step number accent line */
+    .reserve-card::before {
+        content:'';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #20c8a1, #5f85da, #b37bec);
+        opacity: 0;
+        transition: opacity .3s;
+    }
+    .reserve-card:hover::before { opacity: 1; }
     .reserve-card h2 {
         font-family: 'Outfit', sans-serif;
         font-weight: 800;
-        font-size: 1.25rem;
+        font-size: 1.2rem;
         color: #fff;
         margin-bottom: 20px;
         display: flex;
@@ -569,66 +696,82 @@ if (!empty($_GET['console'])) {
 
 <!-- ── Hero ─────────────────────────────────────────────────────────── -->
 <section class="reserve-hero">
-    <div class="container">
+    <div class="reserve-hero-canvas"></div>
+    <div class="container" style="position:relative;z-index:2;">
         <div class="row align-items-center">
-            <div class="col-lg-6" data-aos="fade-right">
-                <p style="color:#20c8a1;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">
-                    <i class="fas fa-calendar-check"></i> Advance Booking
-                </p>
-                <h1 style="font-size: clamp(2rem,5vw,3.2rem);margin-bottom:16px;">
-                    Reserve Your<br><span style="color:#20c8a1;">Gaming Session</span>
+
+            <!-- Left: copy -->
+            <div class="col-lg-6" data-aos="fade-right" data-aos-duration="750">
+                <div class="reserve-hero-badge">
+                    <span class="reserve-hero-badge-dot"></span>
+                    Advance Booking
+                </div>
+                <h1 style="font-size:clamp(2.2rem,5.5vw,3.6rem);line-height:1.1;margin-bottom:16px;letter-spacing:-.5px;">
+                    Reserve Your<br>
+                    <span style="background:linear-gradient(135deg,#20c8a1,#5f85da);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Gaming Session</span>
                 </h1>
-                <p style="font-size:1.05rem;max-width:480px;">
-                    Secure your PS5, PS4 or Xbox Series X slot in advance. Pick your date, time, and rental mode — and optionally pay a downpayment to lock it in.
+                <p style="font-size:1.05rem;max-width:480px;line-height:1.8;">
+                    Secure your <?= htmlspecialchars($consoleList ?? 'PS5, PS4 &amp; Xbox Series X') ?> slot in advance.
+                    Pick your date, time, and rental mode — and optionally pay a downpayment to lock it in.
                 </p>
-                <div style="display:flex;gap:20px;margin-top:28px;flex-wrap:wrap;">
-                    <div style="text-align:center;">
-                        <div style="font-size:2rem;font-weight:900;color:#20c8a1;"><?= $ps5Count ?></div>
-                        <div style="font-size:12px;color:#888;">PS5 Units</div>
+
+                <!-- Stat pill strip -->
+                <div class="reserve-hero-stats">
+                    <div class="reserve-hero-stat">
+                        <div class="rhs-val" style="color:#5f85da;"><?= $ps5Count ?></div>
+                        <div class="rhs-lbl">PS5 Units</div>
                     </div>
                     <?php if ($ps4Count > 0): ?>
-                    <div style="text-align:center;">
-                        <div style="font-size:2rem;font-weight:900;color:#f1a83c;"><?= $ps4Count ?></div>
-                        <div style="font-size:12px;color:#888;">PS4 Units</div>
+                    <div class="reserve-hero-stat">
+                        <div class="rhs-val" style="color:#f1a83c;"><?= $ps4Count ?></div>
+                        <div class="rhs-lbl">PS4 Units</div>
                     </div>
                     <?php endif; ?>
-                    <div style="text-align:center;">
-                        <div style="font-size:2rem;font-weight:900;color:#5f85da;"><?= $xboxCount ?></div>
-                        <div style="font-size:12px;color:#888;">Xbox Units</div>
+                    <div class="reserve-hero-stat">
+                        <div class="rhs-val" style="color:#20c8a1;"><?= $xboxCount ?></div>
+                        <div class="rhs-lbl">Xbox Units</div>
                     </div>
-                    <div style="text-align:center;">
-                        <div style="font-size:2rem;font-weight:900;color:#b37bec;">∞</div>
-                        <div style="font-size:12px;color:#888;">Future Dates</div>
+                    <div class="reserve-hero-stat">
+                        <div class="rhs-val" style="color:#b37bec;">∞</div>
+                        <div class="rhs-lbl">Future Dates</div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6 d-none d-lg-flex justify-content-end" data-aos="fade-left">
-                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-                    <div style="background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);border-radius:16px;padding:20px;text-align:center;width:120px;">
-                        <i class="fab fa-playstation" style="font-size:2.5rem;color:#5f85da;"></i>
-                        <div style="color:#fff;font-weight:700;margin-top:8px;">PS5</div>
-                        <div style="color:#888;font-size:11px;">₱80/hr</div>
+
+            <!-- Right: floating console cards -->
+            <div class="col-lg-6 d-none d-lg-block" data-aos="fade-left" data-aos-delay="150" data-aos-duration="800">
+                <div class="rhero-console-wrap">
+                    <div class="rhero-con-card ps5">
+                        <i class="fab fa-playstation" style="font-size:2.8rem;color:#5f85da;"></i>
+                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">PS5</div>
+                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
+                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#5f85da;background:rgba(95,133,218,.12);border-radius:8px;padding:3px 8px;"><?= $ps5Count ?> units</div>
                     </div>
                     <?php if ($ps4Count > 0): ?>
-                    <div style="background:rgba(10,33,81,.6);border:1px solid rgba(241,168,60,.25);border-radius:16px;padding:20px;text-align:center;width:120px;">
-                        <i class="fab fa-playstation" style="font-size:2.5rem;color:#f1a83c;"></i>
-                        <div style="color:#fff;font-weight:700;margin-top:8px;">PS4</div>
-                        <div style="color:#888;font-size:11px;">₱80/hr</div>
+                    <div class="rhero-con-card ps4">
+                        <i class="fab fa-playstation" style="font-size:2.8rem;color:#f1a83c;"></i>
+                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">PS4</div>
+                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
+                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#f1a83c;background:rgba(241,168,60,.12);border-radius:8px;padding:3px 8px;"><?= $ps4Count ?> unit<?= $ps4Count>1?'s':'' ?></div>
                     </div>
                     <?php endif; ?>
-                    <div style="background:rgba(10,33,81,.6);border:1px solid rgba(32,200,161,.25);border-radius:16px;padding:20px;text-align:center;width:120px;">
-                        <i class="fab fa-xbox" style="font-size:2.5rem;color:#20c8a1;"></i>
-                        <div style="color:#fff;font-weight:700;margin-top:8px;">Xbox</div>
-                        <div style="color:#888;font-size:11px;">₱80/hr</div>
+                    <div class="rhero-con-card xbox">
+                        <i class="fab fa-xbox" style="font-size:2.8rem;color:#20c8a1;"></i>
+                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">Xbox</div>
+                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
+                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#20c8a1;background:rgba(32,200,161,.12);border-radius:8px;padding:3px 8px;"><?= $xboxCount ?> units</div>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </section>
 
 <!-- ── Main Content ──────────────────────────────────────────────────── -->
-<section style="padding: clamp(32px, 6vw, 60px) 0 clamp(48px, 8vw, 80px); background: #07101f;">
+<section style="padding: clamp(32px, 6vw, 60px) 0 clamp(48px, 8vw, 80px); background: linear-gradient(180deg, #07101f 0%, #060d1a 100%);
+    position:relative;overflow:hidden;"
+    data-aos-anchor-placement="top-bottom">
     <div class="container">
 
         <?php if ($success): ?>
