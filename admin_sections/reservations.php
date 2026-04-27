@@ -166,15 +166,10 @@
                                                     <i class="fas fa-ghost"></i>
                                                 </button>
                                             </form>
-                                            <form method="POST" style="display:inline;" onsubmit="return false" id="formCancelRes<?= $r['reservation_id'] ?>">
-                                                <input type="hidden" name="action" value="cancel_reservation">
-                                                <?= csrfField() ?>
-                                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                                <button type="button" class="btn btn-danger btn-sm" title="Cancel"
-                                                    onclick="gspotConfirm('Cancel this reservation?', function(){ document.getElementById('formCancelRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Yes, Cancel'})">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-danger btn-sm" title="Cancel"
+                                                onclick="openAdminCancelModal(<?= $r['reservation_id'] ?>)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -185,11 +180,18 @@
             </div>
         <?php endif; ?>
     </div>
-    <!-- ── Cancelled Reservations + Refund Queue ─────────────────────────── -->
+    <!-- ── Cancelled Reservations table ── -->
     <?php
     $cancelledReservations = $cancelledReservations ?? [];
-    $resNeedRefund = count(array_filter($cancelledReservations, fn($r) =>
-    $r['cancelled_by'] === 'user' && (float)$r['downpayment_amount'] > 0 && !$r['refund_issued']));
+    $cancelReasonLabels = [
+        'schedule_change'   => 'Schedule changed',
+        'found_alternative' => 'Found alternative',
+        'budget_issue'      => 'Budget / financial',
+        'technical_issue'   => 'Technical issue',
+        'emergency'         => 'Personal emergency',
+        'other'             => 'Other',
+        'admin_decision'    => 'Admin decision',
+    ];
     ?>
     <?php if (!empty($cancelledReservations)): ?>
         <div class="card" style="border-left:3px solid #fb566b;">
@@ -198,11 +200,6 @@
                     <h3 class="card-title" style="margin:0;">
                         <i class="fas fa-ban" style="color:#fb566b;margin-right:8px;"></i>Cancelled Reservations
                     </h3>
-                    <?php if ($resNeedRefund > 0): ?>
-                        <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
-                            <?= $resNeedRefund ?> need refund
-                        </span>
-                    <?php endif; ?>
                 </div>
             </div>
             <div style="overflow-x:auto;">
@@ -216,19 +213,12 @@
                             <th>Mode</th>
                             <th>Payment</th>
                             <th>Cancelled By</th>
-                            <th>Refund</th>
+                            <th>Reason</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($cancelledReservations as $r):
-                            // Eligible for refund: cancelled by user OR NULL (pre-migration rows)
-                            //   AND a payment was made AND not yet refunded
-                            $needsRefund    = in_array($r['cancelled_by'], ['user', null], true)
-                                && ((float)$r['downpayment_amount'] > 0)
-                                && !$r['refund_issued'];
-                            $alreadyRefunded = (int)$r['refund_issued'] === 1;
-                        ?>
-                            <tr style="opacity:<?= $alreadyRefunded ? '.5' : '1' ?>;">
+                        <?php foreach ($cancelledReservations as $r): ?>
+                            <tr>
                                 <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
                                 <td style="white-space:nowrap;">
                                     <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
@@ -255,10 +245,11 @@
                                 </td>
                                 <td>
                                     <?php if ((float)$r['downpayment_amount'] > 0): ?>
-                                        <span style="color:#20c8a1;font-weight:700;">₱<?= number_format((float)$r['downpayment_amount'], 2) ?></span>
+                                        <span style="color:#20c8a1;font-weight:700;">&#8369;<?= number_format((float)$r['downpayment_amount'], 2) ?></span>
                                         <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
+                                        <span style="color:#fb566b;font-size:10px;font-weight:700;display:block;margin-top:2px;">Non-refundable</span>
                                     <?php else: ?>
-                                        <span style="color:#555;">—</span>
+                                        <span style="color:#555;">&#8212;</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -275,26 +266,18 @@
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($alreadyRefunded): ?>
-                                        <span style="color:#20c8a1;font-size:12px;font-weight:700;">
-                                            <i class="fas fa-check-circle"></i> Refunded
+                                    <?php
+                                    $rt = $r['cancel_reason_type'] ?? null;
+                                    $rd = $r['cancel_reason_detail'] ?? null;
+                                    if ($rt): ?>
+                                        <span style="font-size:12px;color:#d0d8f0;font-weight:600;">
+                                            <?= htmlspecialchars($cancelReasonLabels[$rt] ?? ucfirst(str_replace('_', ' ', $rt))) ?>
                                         </span>
-                                    <?php elseif ($needsRefund): ?>
-                                        <!-- Uses the shared refundSessionModal via openRefundModal() — 5th arg = reservationId -->
-                                        <button
-                                            style="padding:5px 12px;border-radius:8px;border:1px solid rgba(241,168,60,.5);
-                                   background:rgba(241,168,60,.12);color:#f1a83c;font-size:11px;font-weight:700;cursor:pointer;"
-                                            onclick="openRefundModal(
-                                null,
-                                '<?= addslashes(htmlspecialchars($r['customer_name'])) ?>',
-                                '<?= addslashes(htmlspecialchars($r['console_type'])) ?>',
-                                <?= (float)$r['downpayment_amount'] ?>,
-                                <?= $r['reservation_id'] ?>
-                            )">
-                                            <i class="fas fa-coins"></i> Refund ₱<?= number_format((float)$r['downpayment_amount'], 2) ?>
-                                        </button>
+                                        <?php if ($rd): ?>
+                                            <br><span style="font-size:11px;color:#888;"><?= htmlspecialchars($rd) ?></span>
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                        <span style="color:#555;font-size:12px;">—</span>
+                                        <span style="color:#555;font-size:12px;">&#8212;</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -305,3 +288,111 @@
         </div>
     <?php endif; ?>
 </div>
+
+<!-- ── Admin Cancel Reservation Reason Modal ── -->
+<div id="adminCancelResModal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
+     align-items:center;justify-content:center;">
+    <div style="background:#0e1d36;border:1px solid rgba(251,86,107,.4);border-radius:18px;
+                padding:28px 28px 24px;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:rgba(251,86,107,.15);
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-ban" style="color:#fb566b;"></i>
+            </div>
+            <div>
+                <div style="font-weight:800;color:#fff;font-size:15px;">Cancel Reservation (Admin)</div>
+                <div style="font-size:12px;color:#888;" id="adminCancelResSubtitle">Reservation #...</div>
+            </div>
+        </div>
+
+        <form method="POST" id="adminCancelResForm" onsubmit="return adminCancelSubmit(event)">
+            <input type="hidden" name="action" value="cancel_reservation">
+            <?= csrfField() ?>
+            <input type="hidden" name="reservation_id" id="adminCancelResId" value="">
+
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Reason for Cancellation *</label>
+                <select name="cancel_reason_type" id="adminCancelReasonType" required style="
+                    width:100%;background:rgba(10,33,81,.7);
+                    border:1px solid rgba(95,133,218,.3);
+                    color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                    font-size:14px;font-family:inherit;outline:none;">
+                    <option value="" disabled selected>-- Select a reason --</option>
+                    <option value="schedule_change">Customer's schedule changed</option>
+                    <option value="found_alternative">Customer found alternative</option>
+                    <option value="budget_issue">Budget / financial reason</option>
+                    <option value="technical_issue">Technical or system issue</option>
+                    <option value="emergency">Customer emergency</option>
+                    <option value="admin_decision">Admin / operational decision</option>
+                    <option value="other">Other reason&hellip;</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;"
+                       id="adminCancelDetailLabel">Additional Details (Optional)</label>
+                <textarea name="cancel_reason_detail" id="adminCancelReasonDetail" rows="3"
+                    placeholder="Add any relevant notes..." style="
+                    width:100%;background:rgba(10,33,81,.7);
+                    border:1px solid rgba(95,133,218,.3);
+                    color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                    font-size:13px;font-family:inherit;outline:none;
+                    resize:vertical;box-sizing:border-box;"></textarea>
+            </div>
+
+            <div style="display:flex;gap:10px;">
+                <button type="submit" style="flex:1;padding:11px;border-radius:10px;border:none;
+                        background:linear-gradient(135deg,#fb566b,#e03050);color:#fff;
+                        font-weight:700;font-size:13px;cursor:pointer;">
+                    <i class="fas fa-ban"></i> Confirm Cancellation
+                </button>
+                <button type="button" onclick="closeAdminCancelModal()"
+                    style="flex:1;padding:11px;border-radius:10px;
+                           border:1px solid rgba(255,255,255,.15);background:transparent;
+                           color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
+                    Keep Reservation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAdminCancelModal(resId) {
+    document.getElementById('adminCancelResId').value       = resId;
+    document.getElementById('adminCancelResSubtitle').textContent = 'Reservation #' + resId;
+    document.getElementById('adminCancelReasonType').value  = '';
+    document.getElementById('adminCancelReasonDetail').value = '';
+    document.getElementById('adminCancelDetailLabel').textContent = 'Additional Details (Optional)';
+    document.getElementById('adminCancelResModal').style.display = 'flex';
+}
+function closeAdminCancelModal() {
+    document.getElementById('adminCancelResModal').style.display = 'none';
+}
+document.getElementById('adminCancelReasonType')?.addEventListener('change', function() {
+    const isOther = this.value === 'other';
+    document.getElementById('adminCancelDetailLabel').textContent =
+        isOther ? 'Please describe the reason *' : 'Additional Details (Optional)';
+});
+function adminCancelSubmit(e) {
+    const type   = document.getElementById('adminCancelReasonType').value;
+    const detail = document.getElementById('adminCancelReasonDetail').value.trim();
+    if (!type) {
+        e.preventDefault();
+        alert('Please select a reason for cancellation.');
+        return false;
+    }
+    if (type === 'other' && !detail) {
+        e.preventDefault();
+        alert('Please describe the reason for cancellation.');
+        document.getElementById('adminCancelReasonDetail').focus();
+        return false;
+    }
+    return true;
+}
+document.getElementById('adminCancelResModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeAdminCancelModal();
+});
+</script>

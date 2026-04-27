@@ -3,14 +3,14 @@
  * ajax/cancel_reservation.php
  * Customer-side reservation cancellation.
  *
- * POST: reservation_id
- * Returns JSON {success, message, had_payment, amount, is_late_cancel}
+ * POST: reservation_id, cancel_reason_type, cancel_reason_detail (optional)
+ * Returns JSON {success, message, streak, banned_until}
  *
- * Business rules (per FAQ):
- *  - Cancel BEFORE reserved start time → full refund flagged
- *  - Cancel AFTER  reserved start time → flagged as late; staff applies inconvenience fee
- *  - 3 consecutive user-cancels → 1-week reservation ban (automatically lifted)
- *  - Cancelling when reservation is not pending/confirmed → error
+ * Business rules:
+ *  - Cancellation reason is MANDATORY.
+ *  - All payments are NON-REFUNDABLE — no refund logic executed here.
+ *  - 3 consecutive user-cancels → 1-week reservation ban (automatically lifted).
+ *  - Cancelling when reservation is not pending/confirmed → error.
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
@@ -23,10 +23,31 @@ $user   = getCurrentUser();
 $uid    = (int)$user['user_id'];
 $res_id = (int)($_POST['reservation_id'] ?? 0);
 
+// ── Allowed reason types (must match the DB ENUM) ────────────────────────────
+$allowedReasons = ['schedule_change', 'found_alternative', 'budget_issue',
+                   'technical_issue', 'emergency', 'other'];
+
+$reasonType   = trim($_POST['cancel_reason_type']   ?? '');
+$reasonDetail = trim($_POST['cancel_reason_detail'] ?? '');
+
 if (!$res_id) {
     echo json_encode(['success' => false, 'message' => 'Invalid reservation.']);
     exit;
 }
+
+if (!in_array($reasonType, $allowedReasons)) {
+    echo json_encode(['success' => false, 'message' => 'Please select a valid reason for cancellation.']);
+    exit;
+}
+
+// "Other" requires a written detail
+if ($reasonType === 'other' && $reasonDetail === '') {
+    echo json_encode(['success' => false, 'message' => 'Please describe your reason for cancellation.']);
+    exit;
+}
+
+// Sanitize detail
+$reasonDetail = $reasonDetail !== '' ? htmlspecialchars(strip_tags($reasonDetail), ENT_QUOTES, 'UTF-8') : null;
 
 // ── Fetch the reservation — must belong to this user ─────────────────────────
 $stmt = $conn->prepare(
@@ -51,24 +72,23 @@ if (!in_array($r['status'], ['pending', 'confirmed'])) {
     exit;
 }
 
-// ── Timing check: before or after reserved slot start? ───────────────────────
-$reservedAt  = strtotime($r['reserved_date'] . ' ' . $r['reserved_time']);
-$now         = time();
-$isLateCancel = ($now >= $reservedAt);   // true = inconvenience fee applies
-
-// ── Cancel the reservation ───────────────────────────────────────────────────
+// ── Cancel the reservation and record the reason ─────────────────────────────
 $stmt2 = $conn->prepare(
-    "UPDATE reservations SET status = 'cancelled', cancelled_by = 'user' WHERE reservation_id = ?"
+    "UPDATE reservations
+        SET status             = 'cancelled',
+            cancelled_by       = 'user',
+            cancel_reason_type = ?,
+            cancel_reason_detail = ?
+      WHERE reservation_id = ?"
 );
-$stmt2->bind_param('i', $res_id);
+$stmt2->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
 $stmt2->execute();
 
 // ── Update cancellation streak on the user ───────────────────────────────────
-// Fetch current streak
 $su = $conn->prepare("SELECT consecutive_cancellations FROM users WHERE user_id = ?");
 $su->bind_param('i', $uid);
 $su->execute();
-$uData = $su->get_result()->fetch_assoc();
+$uData  = $su->get_result()->fetch_assoc();
 $streak = (int)($uData['consecutive_cancellations'] ?? 0) + 1;
 
 $banUntil = null;
@@ -77,7 +97,7 @@ $banMsg   = '';
 if ($streak >= 3) {
     // Apply 7-day reservation ban and reset streak
     $banUntil = date('Y-m-d H:i:s', strtotime('+7 days'));
-    $streak   = 0;   // reset after ban is applied
+    $streak   = 0;
     $banMsg   = ' Your account has been placed on a 7-day reservation ban due to 3 consecutive cancellations. You can still walk in — only online reservations are suspended.';
 
     $ub = $conn->prepare(
@@ -94,28 +114,7 @@ if ($streak >= 3) {
 }
 
 // ── Build response ───────────────────────────────────────────────────────────
-$hadPayment   = (float)$r['downpayment_amount'] > 0;
-$grossAmount  = (float)$r['downpayment_amount'];
-
-// Resolve inconvenience fee from settings (default ₱50 if not set)
-require_once __DIR__ . '/../includes/db_functions.php';
-$inconvenienceFee = (float)(getSetting('inconvenience_fee') ?? 50);
-$netAmount        = $hadPayment && $isLateCancel
-    ? max(0, $grossAmount - $inconvenienceFee)
-    : $grossAmount;
-
 $msg = 'Reservation #' . $res_id . ' has been cancelled.';
-
-if ($hadPayment) {
-    if ($isLateCancel) {
-        $feeStr  = '₱' . number_format($inconvenienceFee, 2);
-        $netStr  = '₱' . number_format($netAmount, 2);
-        $msg .= ' You cancelled after your reserved start time. An inconvenience fee of ' . $feeStr
-              . ' has been deducted. Your refund will be ' . $netStr . ' — processed by staff.';
-    } else {
-        $msg .= ' A full refund of ₱' . number_format($grossAmount, 2) . ' will be processed by staff.';
-    }
-}
 
 // Streak warning (only if not banned yet)
 if ($streak === 2 && !$banUntil) {
@@ -125,14 +124,8 @@ if ($streak === 2 && !$banUntil) {
 }
 
 echo json_encode([
-    'success'           => true,
-    'message'           => $msg,
-    'had_payment'       => $hadPayment,
-    'gross_amount'      => $grossAmount,
-    'inconvenience_fee' => $isLateCancel ? $inconvenienceFee : 0,
-    'amount'            => $netAmount,        // net refund due to customer
-    'is_late_cancel'    => $isLateCancel,
-    'streak'            => $streak,
-    'banned_until'      => $banUntil,
+    'success'      => true,
+    'message'      => $msg,
+    'streak'       => $streak,
+    'banned_until' => $banUntil,
 ]);
-

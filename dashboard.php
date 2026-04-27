@@ -1045,14 +1045,6 @@ function fmtMins(int $m): string {
                             <div style="font-size:10px;color:#888;margin-top:3px;">
                                 <?php if ($r['cancelled_by'] === 'user'): ?>
                                     <i class="fas fa-user" style="margin-right:3px;"></i>Cancelled by you
-                                    <?php if ((float)$r['downpayment_amount'] > 0): ?>
-                                    &middot;
-                                    <?php if ($r['refund_issued']): ?>
-                                        <span style="color:#20c8a1;"><i class="fas fa-check-circle"></i> Refunded</span>
-                                    <?php else: ?>
-                                        <span style="color:#f1a83c;"><i class="fas fa-hourglass-half"></i> Refund pending</span>
-                                    <?php endif; ?>
-                                    <?php endif; ?>
                                 <?php else: ?>
                                     <i class="fas fa-user-shield" style="margin-right:3px;"></i>Cancelled by staff
                                 <?php endif; ?>
@@ -1069,12 +1061,14 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </div>
 
-        <!-- ── Cancel Reservation Modal ──────────────────────────── -->
+        <!-- ── Cancel Reservation Modal (two-step: Reason → Confirm) ── -->
         <div id="cancelResModal" style="display:none;position:fixed;inset:0;z-index:9999;
-             background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+             background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
              align-items:center;justify-content:center;">
             <div style="background:#0e1d36;border:1px solid rgba(251,86,107,.35);border-radius:18px;
-                        padding:28px 28px 24px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+                        padding:28px 28px 24px;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+
+                <!-- Modal header -->
                 <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
                     <div style="width:40px;height:40px;border-radius:12px;background:rgba(251,86,107,.15);
                                 display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -1085,31 +1079,104 @@ function fmtMins(int $m): string {
                         <div style="font-size:12px;color:#888;" id="cancelResSubtitle">Reservation #...</div>
                     </div>
                 </div>
-                <p style="color:#ccc;font-size:13px;line-height:1.6;margin-bottom:8px;" id="cancelResMsg">
-                    Are you sure you want to cancel this reservation?
-                </p>
-                <div id="cancelResRefundNote" style="display:none;padding:10px 14px;border-radius:10px;
-                     background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);margin-bottom:16px;
-                     font-size:12px;color:#f1a83c;">
-                    <i class="fas fa-coins" style="margin-right:6px;"></i>
-                    You have a payment of <strong id="cancelResAmt"></strong> on this reservation.
-                    A refund will be processed by staff.
+
+                <!-- STEP 1: Reason picker -->
+                <div id="cancelStep1">
+                    <p style="color:#ccc;font-size:13px;line-height:1.6;margin-bottom:14px;">
+                        Please tell us why you want to cancel. A reason is required.
+                    </p>
+
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Reason *</label>
+                        <select id="cancelReasonType" style="
+                            width:100%;background:rgba(10,33,81,.7);
+                            border:1px solid rgba(95,133,218,.3);
+                            color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                            font-size:14px;font-family:inherit;outline:none;">
+                            <option value="" disabled selected>-- Select a reason --</option>
+                            <option value="schedule_change">My schedule changed</option>
+                            <option value="found_alternative">Found a better alternative</option>
+                            <option value="budget_issue">Budget / financial reason</option>
+                            <option value="technical_issue">Technical or system issue</option>
+                            <option value="emergency">Personal emergency</option>
+                            <option value="other">Other reason&hellip;</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;"
+                               id="cancelDetailLabel">Additional Details (Optional)</label>
+                        <textarea id="cancelReasonDetail" rows="3" placeholder="Describe your reason..." style="
+                            width:100%;background:rgba(10,33,81,.7);
+                            border:1px solid rgba(95,133,218,.3);
+                            color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                            font-size:13px;font-family:inherit;outline:none;
+                            resize:vertical;box-sizing:border-box;"></textarea>
+                    </div>
+
+                    <!-- No-refund reminder -->
+                    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;
+                                border-radius:10px;background:rgba(251,86,107,.07);
+                                border:1px solid rgba(251,86,107,.2);margin-bottom:16px;">
+                        <i class="fas fa-ban" style="color:#fb566b;margin-top:2px;flex-shrink:0;"></i>
+                        <span style="font-size:12px;color:#e0a0a8;line-height:1.5;">
+                            <strong style="color:#fb566b;">No-Refund Policy:</strong>
+                            Payments are non-refundable. No refund will be issued for this cancellation.
+                        </span>
+                    </div>
+
+                    <div style="display:flex;gap:10px;">
+                        <button id="cancelNextBtn"
+                            onclick="cancelStep1Next()"
+                            style="flex:1;padding:11px;border-radius:10px;border:none;
+                                   background:linear-gradient(135deg,#fb566b,#e03050);color:#fff;
+                                   font-weight:700;font-size:13px;cursor:pointer;transition:.2s;">
+                            <i class="fas fa-arrow-right"></i> Next
+                        </button>
+                        <button onclick="closeCancelModal()"
+                            style="flex:1;padding:11px;border-radius:10px;
+                                   border:1px solid rgba(255,255,255,.15);background:transparent;
+                                   color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
+                            Keep Reservation
+                        </button>
+                    </div>
                 </div>
-                <div style="display:flex;gap:10px;margin-top:16px;">
-                    <button id="cancelResConfirmBtn" style="flex:1;padding:11px;border-radius:10px;border:none;
-                            background:linear-gradient(135deg,#fb566b,#e03050);color:#fff;font-weight:700;
-                            font-size:13px;cursor:pointer;transition:.2s;"
-                            onclick="submitCancelReservation()">
-                        <i class="fas fa-times"></i> Yes, Cancel It
-                    </button>
-                    <button onclick="closeCancelModal()" style="flex:1;padding:11px;border-radius:10px;
-                            border:1px solid rgba(255,255,255,.15);background:transparent;color:#aaa;
-                            font-weight:700;font-size:13px;cursor:pointer;">
-                        Keep Reservation
-                    </button>
+
+                <!-- STEP 2: Confirmation -->
+                <div id="cancelStep2" style="display:none;">
+                    <p style="color:#ccc;font-size:13px;line-height:1.6;margin-bottom:14px;">
+                        Are you sure you want to cancel this reservation?
+                    </p>
+
+                    <!-- Selected reason display -->
+                    <div style="padding:12px 14px;border-radius:10px;
+                                background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
+                                margin-bottom:12px;">
+                        <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Reason for Cancellation</div>
+                        <div id="cancelReasonDisplay" style="font-size:13px;color:#d0d8f0;font-weight:600;"></div>
+                        <div id="cancelDetailDisplay" style="font-size:12px;color:#888;margin-top:4px;display:none;"></div>
+                    </div>
+
+                    <div style="display:flex;gap:10px;margin-top:16px;">
+                        <button id="cancelResConfirmBtn"
+                            onclick="submitCancelReservation()"
+                            style="flex:1;padding:11px;border-radius:10px;border:none;
+                                   background:linear-gradient(135deg,#fb566b,#e03050);color:#fff;
+                                   font-weight:700;font-size:13px;cursor:pointer;transition:.2s;">
+                            <i class="fas fa-times"></i> Yes, Cancel It
+                        </button>
+                        <button onclick="cancelStep2Back()"
+                            style="flex:1;padding:11px;border-radius:10px;
+                                   border:1px solid rgba(255,255,255,.15);background:transparent;
+                                   color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                    </div>
                 </div>
+
             </div>
         </div>
+
 
         <!-- Toast notification -->
         <div id="dashToast" style="display:none;position:fixed;bottom:24px;right:24px;z-index:10000;
@@ -1361,18 +1428,28 @@ new Chart(document.getElementById('chartSpend'), {
 });
 
 /* ═══════════════════════════════════════════════════════════
-   CANCEL RESERVATION LOGIC
+   CANCEL RESERVATION LOGIC (two-step: reason → confirm)
 ═══════════════════════════════════════════════════════════ */
 let _cancelResId = null;
 
+const CANCEL_REASON_LABELS = {
+    schedule_change:    'My schedule changed',
+    found_alternative:  'Found a better alternative',
+    budget_issue:       'Budget / financial reason',
+    technical_issue:    'Technical or system issue',
+    emergency:          'Personal emergency',
+    other:              'Other reason',
+};
+
 function openCancelModal(btn) {
     _cancelResId = btn.dataset.id;
-    const paid   = btn.dataset.paid === '1';
-    const amount = btn.dataset.amount;
     document.getElementById('cancelResSubtitle').textContent = 'Reservation #' + _cancelResId;
-    const refundNote = document.getElementById('cancelResRefundNote');
-    refundNote.style.display = paid ? 'block' : 'none';
-    if (paid) document.getElementById('cancelResAmt').textContent = '₱' + amount;
+    // Reset modal to step 1
+    document.getElementById('cancelReasonType').value   = '';
+    document.getElementById('cancelReasonDetail').value = '';
+    document.getElementById('cancelDetailLabel').textContent = 'Additional Details (Optional)';
+    document.getElementById('cancelStep1').style.display = 'block';
+    document.getElementById('cancelStep2').style.display = 'none';
     const modal = document.getElementById('cancelResModal');
     modal.style.display = 'flex';
 }
@@ -1382,21 +1459,61 @@ function closeCancelModal() {
     _cancelResId = null;
 }
 
+// Toggle "Other" detail label/required
+document.getElementById('cancelReasonType')?.addEventListener('change', function() {
+    const isOther = this.value === 'other';
+    const lbl = document.getElementById('cancelDetailLabel');
+    lbl.textContent = isOther ? 'Please describe your reason *' : 'Additional Details (Optional)';
+});
+
+function cancelStep1Next() {
+    const reasonType   = document.getElementById('cancelReasonType').value;
+    const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
+
+    if (!reasonType) {
+        showDashToast('Please select a reason for cancellation.', 'error');
+        return;
+    }
+    if (reasonType === 'other' && !reasonDetail) {
+        showDashToast('Please describe your reason for cancellation.', 'error');
+        document.getElementById('cancelReasonDetail').focus();
+        return;
+    }
+
+    // Populate step 2 display
+    document.getElementById('cancelReasonDisplay').textContent = CANCEL_REASON_LABELS[reasonType] || reasonType;
+    document.getElementById('cancelDetailDisplay').textContent = reasonDetail || '';
+    document.getElementById('cancelDetailDisplay').style.display = reasonDetail ? 'block' : 'none';
+
+    document.getElementById('cancelStep1').style.display = 'none';
+    document.getElementById('cancelStep2').style.display = 'block';
+}
+
+function cancelStep2Back() {
+    document.getElementById('cancelStep1').style.display = 'block';
+    document.getElementById('cancelStep2').style.display = 'none';
+}
+
 function submitCancelReservation() {
     if (!_cancelResId) return;
+
+    const reasonType   = document.getElementById('cancelReasonType').value;
+    const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
+
     const btn = document.getElementById('cancelResConfirmBtn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling…';
 
     const fd = new FormData();
-    fd.append('reservation_id', _cancelResId);
+    fd.append('reservation_id',     _cancelResId);
+    fd.append('cancel_reason_type', reasonType);
+    fd.append('cancel_reason_detail', reasonDetail);
 
     fetch('ajax/cancel_reservation.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             closeCancelModal();
             if (data.success) {
-                // Fade out the row
                 const row = document.querySelector(`[data-cancel-row="${_cancelResId || data.reservation_id}"]`)
                          || document.querySelector(`button[data-id="${_cancelResId}"]`)?.closest('tr');
                 if (row) {
@@ -1406,7 +1523,6 @@ function submitCancelReservation() {
                     setTimeout(() => { row.remove(); }, 420);
                 }
                 showDashToast(data.message, 'success');
-                // Reload after short delay so Past table updates
                 setTimeout(() => location.reload(), 2200);
             } else {
                 showDashToast(data.message || 'Could not cancel reservation.', 'error');

@@ -99,6 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
     } elseif (!$error && $dp_amount > 0 && !$dp_method) {
         $error = 'Please select a payment method for your downpayment.';
+    } elseif (!$error && $dp_amount > 0 && ($_POST['no_refund_agreed'] ?? '') !== '1') {
+        $error = 'You must read and agree to the No-Refund Policy before submitting a payment.';
     }
 
     if (!$error) {
@@ -870,7 +872,6 @@ if (!empty($_GET['console'])) {
                             </div>
                         </div>
 
-                        <!-- Amount + method box (hidden for open_time) -->
                         <div id="dpPaymentBox" class="dp-box">
                             <div class="dp-title" style="justify-content:space-between;">
                                 <span><i class="fas fa-coins"></i> Payment Amount</span>
@@ -908,19 +909,60 @@ if (!empty($_GET['console'])) {
                         <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
                     </div>
 
+                    <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
+                    <div id="noRefundPolicyBox" style="
+                        background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
+                        border:1px solid rgba(251,86,107,.35);
+                        border-radius:16px;
+                        padding:20px 22px;
+                        margin-bottom:20px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                            <div style="width:38px;height:38px;border-radius:10px;
+                                background:rgba(251,86,107,.15);
+                                display:flex;align-items:center;justify-content:center;
+                                flex-shrink:0;color:#fb566b;font-size:1rem;">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
+                        </div>
+                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
+                            <li>All payments made for reservations are <strong style="color:#fff;">non-refundable</strong> under any circumstances.</li>
+                            <li>No refunds will be issued regardless of the cancellation reason.</li>
+                            <li>No store credit or GC will be given in place of a refund.</li>
+                            <li>No partial refunds will be processed.</li>
+                            <li>This policy applies to all cancellations — whether initiated by you or by staff on your behalf.</li>
+                        </ul>
+                        <label id="noRefundLabel" style="
+                            display:flex;align-items:flex-start;gap:12px;
+                            cursor:pointer;
+                            background:rgba(255,255,255,.04);
+                            border:1px solid rgba(255,255,255,.1);
+                            border-radius:10px;
+                            padding:12px 14px;
+                            transition:border-color .2s,background .2s;">
+                            <input type="checkbox" id="noRefundCheck" name="no_refund_agreed" value="1"
+                                   onchange="handleNoRefundCheck(this)"
+                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#fb566b;cursor:pointer;">
+                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
+                                I have read, understood, and agreed to the <strong style="color:#fb566b;">No-Refund Policy</strong> above.
+                                I acknowledge that any payment I make for this reservation will not be refunded for any reason.
+                            </span>
+                        </label>
+                    </div>
+
                     <!-- Summary preview -->
                     <div class="reserve-summary" id="summaryBox" style="display:none;">
                         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#20c8a1;margin-bottom:14px;">
                             <i class="fas fa-receipt"></i> Reservation Summary
                         </div>
                         <div class="rs-row"><span class="rs-label">Console</span><span class="rs-value" id="s-console">—</span></div>
-                        <div class="rs-row"><span class="rs-label">Date & Time</span><span class="rs-value" id="s-datetime">—</span></div>
+                        <div class="rs-row"><span class="rs-label">Date &amp; Time</span><span class="rs-value" id="s-datetime">—</span></div>
                         <div class="rs-row"><span class="rs-label">Mode</span><span class="rs-value" id="s-mode">—</span></div>
                         <div class="rs-row"><span class="rs-label">Duration</span><span class="rs-value" id="s-duration">—</span></div>
                         <div class="rs-row"><span class="rs-label">Payment</span><span class="rs-value" id="s-dp">None</span></div>
                     </div>
 
-                    <button type="submit" class="res-submit-btn" id="submitBtn">
+                    <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
                         <i class="fas fa-calendar-check"></i> Submit Reservation
                     </button>
                 </form>
@@ -1364,6 +1406,23 @@ function selectDpMethod(method) {
     document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('pm-' + method).classList.add('selected');
     updateSummary();
+}
+
+/* ── No-Refund Policy checkbox ──────────────────────── */
+function handleNoRefundCheck(checkbox) {
+    const btn   = document.getElementById('submitBtn');
+    const label = document.getElementById('noRefundLabel');
+    if (checkbox.checked) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        label.style.borderColor = 'rgba(251,86,107,.6)';
+        label.style.background  = 'rgba(251,86,107,.08)';
+    } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        label.style.borderColor = 'rgba(255,255,255,.1)';
+        label.style.background  = 'rgba(255,255,255,.04)';
+    }
 }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */

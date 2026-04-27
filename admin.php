@@ -255,12 +255,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // CANCEL RESERVATION (admin-initiated → cancelled_by = 'admin')
     elseif ($action === 'cancel_reservation') {
-        $res_id = (int)($_POST['reservation_id'] ?? 0);
-        if ($res_id) {
-            $stmt = $conn->prepare("UPDATE reservations SET status='cancelled', cancelled_by='admin' WHERE reservation_id=?");
-            $stmt->bind_param('i', $res_id);
+        $res_id       = (int)($_POST['reservation_id'] ?? 0);
+        $allowedCancelReasons = ['schedule_change','found_alternative','budget_issue',
+                                  'technical_issue','emergency','other','admin_decision'];
+        $reasonType   = trim($_POST['cancel_reason_type']   ?? '');
+        $reasonDetail = trim($_POST['cancel_reason_detail'] ?? '') ?: null;
+
+        if (!$res_id) {
+            $message     = 'Invalid reservation ID.';
+            $messageType = 'error';
+        } elseif (!in_array($reasonType, $allowedCancelReasons)) {
+            $message     = 'Please select a valid reason for cancellation.';
+            $messageType = 'error';
+        } elseif ($reasonType === 'other' && empty($reasonDetail)) {
+            $message     = 'Please describe the reason for cancellation.';
+            $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare(
+                "UPDATE reservations
+                    SET status               = 'cancelled',
+                        cancelled_by         = 'admin',
+                        cancel_reason_type   = ?,
+                        cancel_reason_detail = ?
+                  WHERE reservation_id = ?"
+            );
+            $stmt->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
             $stmt->execute();
-            $message = 'Reservation cancelled.';
+            $message     = 'Reservation #' . $res_id . ' cancelled.';
             $messageType = 'success';
         }
     }
