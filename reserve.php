@@ -101,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please select a payment method for your downpayment.';
     } elseif (!$error && $dp_amount > 0 && ($_POST['no_refund_agreed'] ?? '') !== '1') {
         $error = 'You must read and agree to the No-Refund Policy before submitting a payment.';
+    } elseif (!$error && ($_POST['unit_transfer_agreed'] ?? '') !== '1') {
+        $error = 'You must acknowledge the Unit Transfer Policy before submitting your reservation.';
     }
 
     if (!$error) {
@@ -950,7 +952,44 @@ if (!empty($_GET['console'])) {
                         </label>
                     </div>
 
-                    <!-- Summary preview -->
+                    <!-- ── Unit Transfer Policy Acknowledgment ─────────────── -->
+                    <div id="unitTransferPolicyBox" style="
+                        background:linear-gradient(135deg,rgba(95,133,218,.08),rgba(32,200,161,.05));
+                        border:1px solid rgba(95,133,218,.35);
+                        border-radius:16px;
+                        padding:20px 22px;
+                        margin-bottom:20px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                            <div style="width:38px;height:38px;border-radius:10px;
+                                background:rgba(95,133,218,.15);
+                                display:flex;align-items:center;justify-content:center;
+                                flex-shrink:0;color:#5f85da;font-size:1rem;">
+                                <i class="fas fa-shuffle"></i>
+                            </div>
+                            <div style="font-weight:800;color:#5f85da;font-size:14px;letter-spacing:.3px;">Unit Transfer Policy</div>
+                        </div>
+                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
+                            <li>By making a reservation, you agree to be transferred to a <strong style="color:#fff;">different available unit</strong> if your originally reserved unit becomes unavailable at the time of your reservation.</li>
+                            <li>Staff will assign the best available alternative unit of the same console type.</li>
+                            <li>You will not be entitled to a cancellation or refund solely on the basis of a unit transfer.</li>
+                        </ul>
+                        <label id="unitTransferLabel" style="
+                            display:flex;align-items:flex-start;gap:12px;
+                            cursor:pointer;
+                            background:rgba(255,255,255,.04);
+                            border:1px solid rgba(255,255,255,.1);
+                            border-radius:10px;
+                            padding:12px 14px;
+                            transition:border-color .2s,background .2s;">
+                            <input type="checkbox" id="unitTransferCheck" name="unit_transfer_agreed" value="1"
+                                   onchange="handlePolicyChecks()"
+                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#5f85da;cursor:pointer;">
+                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
+                                I understand and agree that I may be <strong style="color:#5f85da;">transferred to a different unit</strong>
+                                if my reserved unit becomes unavailable. I will not dispute or request a refund on this basis.
+                            </span>
+                        </label>
+                    </div>
                     <div class="reserve-summary" id="summaryBox" style="display:none;">
                         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#20c8a1;margin-bottom:14px;">
                             <i class="fas fa-receipt"></i> Reservation Summary
@@ -1408,22 +1447,35 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
-/* ── No-Refund Policy checkbox ──────────────────────── */
-function handleNoRefundCheck(checkbox) {
-    const btn   = document.getElementById('submitBtn');
-    const label = document.getElementById('noRefundLabel');
-    if (checkbox.checked) {
-        btn.disabled = false;
-        btn.style.opacity = '1';
-        label.style.borderColor = 'rgba(251,86,107,.6)';
-        label.style.background  = 'rgba(251,86,107,.08)';
-    } else {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        label.style.borderColor = 'rgba(255,255,255,.1)';
-        label.style.background  = 'rgba(255,255,255,.04)';
+/* ── Policy checkboxes — both must be ticked to enable Submit ──────── */
+function handlePolicyChecks() {
+    const btn           = document.getElementById('submitBtn');
+    const noRefund      = document.getElementById('noRefundCheck');
+    const unitTransfer  = document.getElementById('unitTransferCheck');
+    const noRefundLabel = document.getElementById('noRefundLabel');
+    const transferLabel = document.getElementById('unitTransferLabel');
+
+    // Highlight each label based on its own state
+    if (noRefundLabel) {
+        noRefundLabel.style.borderColor = noRefund?.checked ? 'rgba(251,86,107,.6)' : 'rgba(255,255,255,.1)';
+        noRefundLabel.style.background  = noRefund?.checked ? 'rgba(251,86,107,.08)' : 'rgba(255,255,255,.04)';
     }
+    if (transferLabel) {
+        transferLabel.style.borderColor = unitTransfer?.checked ? 'rgba(95,133,218,.6)' : 'rgba(255,255,255,.1)';
+        transferLabel.style.background  = unitTransfer?.checked ? 'rgba(95,133,218,.08)' : 'rgba(255,255,255,.04)';
+    }
+
+    // Both must be checked — unit transfer is always required; no-refund only if paying
+    const noRefundOk  = noRefund   ? noRefund.checked   : true;
+    const transferOk  = unitTransfer ? unitTransfer.checked : false;
+    const allAgreed   = noRefundOk && transferOk;
+
+    btn.disabled      = !allAgreed;
+    btn.style.opacity = allAgreed ? '1' : '0.5';
 }
+
+/* Alias — the no-refund checkbox calls this by name */
+function handleNoRefundCheck() { handlePolicyChecks(); }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour
