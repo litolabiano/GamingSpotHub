@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 27, 2026 at 01:26 PM
+-- Generation Time: Apr 27, 2026 at 02:36 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,41 +20,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `gamingspothub`
 --
-
--- --------------------------------------------------------
-
---
--- Table structure for table `additional_requests`
---
-
-CREATE TABLE `additional_requests` (
-  `request_id` int(11) NOT NULL,
-  `session_id` int(11) NOT NULL,
-  `request_type` enum('extra_hours','controller_rental','other') NOT NULL,
-  `description` text DEFAULT NULL,
-  `extra_cost` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `status` enum('pending','approved','denied') NOT NULL DEFAULT 'pending',
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `additional_requests`
---
-
-INSERT INTO `additional_requests` (`request_id`, `session_id`, `request_type`, `description`, `extra_cost`, `status`, `created_at`) VALUES
-(1, 61, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-26 18:29:01'),
-(2, 62, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-26 19:31:00'),
-(3, 63, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-26 23:38:19'),
-(4, 64, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 00:32:48'),
-(5, 65, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 00:40:14'),
-(6, 71, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 00:51:37'),
-(7, 72, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:07:58'),
-(8, 73, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:08:29'),
-(9, 74, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:16:30'),
-(10, 75, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:16:41'),
-(11, 76, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:16:53'),
-(12, 77, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:24:25'),
-(13, 78, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-04-27 01:25:07');
 
 -- --------------------------------------------------------
 
@@ -79,7 +44,7 @@ CREATE TABLE `consoles` (
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
 (1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
 (2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'in_use', 80.00, '2026-02-21 19:55:41'),
 (4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
 (6, 'PS4 Unit 6', 'PS4', 'PS4-07', 'maintenance', 80.00, '2026-02-21 19:55:41'),
@@ -168,7 +133,8 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (75, 0, 2, 'hourly', 60, '2026-04-27 01:16:41', '2026-04-27 01:16:52', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:16:41'),
 (76, 0, 2, 'hourly', 60, '2026-04-27 01:16:53', '2026-04-27 01:24:08', 7, 80.00, 40.00, 'completed', NULL, 12, '2026-04-27 01:16:53'),
 (77, 0, 2, 'hourly', 150, '2026-04-27 01:24:25', '2026-04-27 01:24:43', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:24:25'),
-(78, 0, 3, 'hourly', 30, '2026-04-27 01:25:07', '2026-04-27 01:25:12', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:25:07');
+(78, 0, 3, 'hourly', 30, '2026-04-27 01:25:07', '2026-04-27 01:25:12', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:25:07'),
+(79, 0, 3, 'hourly', 60, '2026-04-27 19:31:50', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-04-27 19:31:50');
 
 -- --------------------------------------------------------
 
@@ -410,7 +376,8 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (236, NULL, 21, 20.00, 20.00, NULL, 'Downpayment for reservation #57', 'cash', 'completed', '2026-04-27 01:18:17', 21, '2026-04-27 01:18:17'),
 (237, 77, 0, 120.00, 120.00, 60.00, 'Short payment at session start — short by ₱60.00', 'cash', 'completed', '2026-04-27 01:24:25', 12, '2026-04-27 01:24:25'),
 (238, 77, 0, 80.00, 80.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-27 01:24:33', 12, '2026-04-27 01:24:33'),
-(239, 77, 0, -180.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱180.00)', '', 'completed', '2026-04-27 01:24:43', 12, '2026-04-27 01:24:43');
+(239, 77, 0, -180.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱180.00)', '', 'completed', '2026-04-27 01:24:43', 12, '2026-04-27 01:24:43'),
+(240, 79, 0, 20.00, 20.00, 80.00, 'Short payment at session start — short by ₱80.00', 'cash', 'completed', '2026-04-27 19:31:50', 12, '2026-04-27 19:31:50');
 
 -- --------------------------------------------------------
 
@@ -452,14 +419,6 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 --
 -- Indexes for dumped tables
 --
-
---
--- Indexes for table `additional_requests`
---
-ALTER TABLE `additional_requests`
-  ADD PRIMARY KEY (`request_id`),
-  ADD KEY `idx_addreq_session` (`session_id`),
-  ADD KEY `idx_addreq_status` (`status`);
 
 --
 -- Indexes for table `consoles`
@@ -570,12 +529,6 @@ ALTER TABLE `users`
 --
 
 --
--- AUTO_INCREMENT for table `additional_requests`
---
-ALTER TABLE `additional_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
-
---
 -- AUTO_INCREMENT for table `consoles`
 --
 ALTER TABLE `consoles`
@@ -591,7 +544,7 @@ ALTER TABLE `games`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -633,7 +586,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=240;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=241;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -644,12 +597,6 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
-
---
--- Constraints for table `additional_requests`
---
-ALTER TABLE `additional_requests`
-  ADD CONSTRAINT `fk_addreq_session` FOREIGN KEY (`session_id`) REFERENCES `gaming_sessions` (`session_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `gaming_sessions`

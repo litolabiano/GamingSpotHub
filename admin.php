@@ -534,61 +534,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── GAMES LIBRARY ACTIONS ────────────────────────────────────────────────
-
-    // ADD GAME
-    elseif ($action === 'add_game') {
-        $game_name    = trim($_POST['game_name']    ?? '');
-        $console_type = trim($_POST['console_type'] ?? '');
-        $genre        = trim($_POST['genre']        ?? 'Other');
-        $description  = trim($_POST['description']  ?? '');
-        if (!$game_name || !$console_type) {
-            $message = 'Game name and platform are required.'; $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare(
-                "INSERT INTO games (game_name, console_type, genre, description) VALUES (?,?,?,?)"
-            );
-            $stmt->bind_param('ssss', $game_name, $console_type, $genre, $description);
-            $message     = $stmt->execute() ? '"' . htmlspecialchars($game_name) . '" added to the library.' : 'Failed: ' . $conn->error;
-            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
-        }
-    }
-
-    // EDIT GAME
-    elseif ($action === 'edit_game') {
-        $game_id      = (int)($_POST['game_id']      ?? 0);
-        $game_name    = trim($_POST['game_name']    ?? '');
-        $console_type = trim($_POST['console_type'] ?? '');
-        $genre        = trim($_POST['genre']        ?? 'Other');
-        if (!$game_id || !$game_name) {
-            $message = 'Invalid game data.'; $messageType = 'error';
-        } else {
-            $stmt = $conn->prepare("UPDATE games SET game_name=?, console_type=?, genre=? WHERE game_id=?");
-            $stmt->bind_param('sssi', $game_name, $console_type, $genre, $game_id);
-            $message     = $stmt->execute() ? 'Game updated.' : 'Failed: ' . $conn->error;
-            $messageType = 'success';
-        }
-    }
-
-    // TOGGLE GAME VISIBILITY
-    elseif ($action === 'toggle_game') {
-        $game_id = (int)($_POST['game_id'] ?? 0);
-        if ($game_id) {
-            $conn->query("UPDATE games SET is_active = 1 - is_active WHERE game_id = $game_id");
-            $message = 'Game visibility toggled.'; $messageType = 'success';
-        }
-    }
-
-    // DELETE GAME
-    elseif ($action === 'delete_game') {
-        $game_id = (int)($_POST['game_id'] ?? 0);
-        if ($game_id) {
-            $stmt = $conn->prepare("DELETE FROM games WHERE game_id = ?");
-            $stmt->bind_param('i', $game_id);
-            $message     = $stmt->execute() ? 'Game deleted.' : 'Failed: ' . $conn->error;
-            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
-        }
-    }
 }
 
 }
@@ -937,9 +882,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <span <?= $navBadge ?>><?= $openTourCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" data-tooltip="Games Library" onclick="showPage('games', this)">
-        <i class="fas fa-gamepad"></i><span>Games</span>
-    </div>
+
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
@@ -979,7 +922,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
-<?php include __DIR__ . '/admin_sections/games.php'; ?>
+
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
@@ -1010,7 +953,7 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings', tournaments: 'Tournaments', games: 'Games Library'
+        settings: 'Settings', tournaments: 'Tournaments'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 

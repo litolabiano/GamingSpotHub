@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 27, 2026 at 01:26 PM
+-- Generation Time: Apr 27, 2026 at 02:34 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -89,41 +89,6 @@ INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_numb
 -- --------------------------------------------------------
 
 --
--- Table structure for table `games`
---
-
-CREATE TABLE `games` (
-  `game_id` int(11) NOT NULL,
-  `game_name` varchar(150) NOT NULL,
-  `genre` varchar(80) NOT NULL DEFAULT 'Action',
-  `console_type` enum('PS5','Xbox Series X','PS4','PC','Multi') NOT NULL DEFAULT 'Multi',
-  `platform` varchar(100) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `games`
---
-
-INSERT INTO `games` (`game_id`, `game_name`, `genre`, `console_type`, `platform`, `description`, `is_active`, `created_at`) VALUES
-(1, 'FIFA 24', 'Sports', 'PS5', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(2, 'God of War Ragnarok', 'Action', 'PS5', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(3, 'Spider-Man 2', 'Action', 'PS5', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(4, 'Call of Duty: MW3', 'Shooter', 'Multi', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(5, 'Tekken 8', 'Fighting', 'PS5', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(6, 'Mortal Kombat 1', 'Fighting', 'PS5', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(7, 'Forza Horizon 5', 'Racing', 'Xbox Series X', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(8, 'Halo Infinite', 'Shooter', 'Xbox Series X', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(9, 'GTA V', 'Open World', 'Multi', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(10, 'Minecraft', 'Sandbox', 'Multi', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(11, 'NBA 2K24', 'Sports', 'Multi', NULL, NULL, 1, '2026-04-27 01:10:34'),
-(12, 'Elden Ring', 'RPG', 'Multi', NULL, NULL, 1, '2026-04-27 01:10:34');
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `gaming_sessions`
 --
 
@@ -168,7 +133,8 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (75, 0, 2, 'hourly', 60, '2026-04-27 01:16:41', '2026-04-27 01:16:52', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:16:41'),
 (76, 0, 2, 'hourly', 60, '2026-04-27 01:16:53', '2026-04-27 01:24:08', 7, 80.00, 40.00, 'completed', NULL, 12, '2026-04-27 01:16:53'),
 (77, 0, 2, 'hourly', 150, '2026-04-27 01:24:25', '2026-04-27 01:24:43', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:24:25'),
-(78, 0, 3, 'hourly', 30, '2026-04-27 01:25:07', '2026-04-27 01:25:12', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:25:07');
+(78, 0, 3, 'hourly', 30, '2026-04-27 01:25:07', '2026-04-27 01:25:12', 0, 80.00, 20.00, 'completed', NULL, 12, '2026-04-27 01:25:07'),
+(79, 0, 4, 'hourly', 30, '2026-04-27 19:45:47', '2026-04-27 19:49:30', 4, 80.00, 0.00, 'completed', NULL, 12, '2026-04-27 19:45:47');
 
 -- --------------------------------------------------------
 
@@ -410,7 +376,9 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (236, NULL, 21, 20.00, 20.00, NULL, 'Downpayment for reservation #57', 'cash', 'completed', '2026-04-27 01:18:17', 21, '2026-04-27 01:18:17'),
 (237, 77, 0, 120.00, 120.00, 60.00, 'Short payment at session start — short by ₱60.00', 'cash', 'completed', '2026-04-27 01:24:25', 12, '2026-04-27 01:24:25'),
 (238, 77, 0, 80.00, 80.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-04-27 01:24:33', 12, '2026-04-27 01:24:33'),
-(239, 77, 0, -180.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱180.00)', '', 'completed', '2026-04-27 01:24:43', 12, '2026-04-27 01:24:43');
+(239, 77, 0, -180.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱180.00)', '', 'completed', '2026-04-27 01:24:43', 12, '2026-04-27 01:24:43'),
+(240, 79, 0, 20.00, 50.00, NULL, NULL, 'gcash', 'completed', '2026-04-27 19:45:47', 12, '2026-04-27 19:45:47'),
+(241, 79, 0, -20.00, NULL, NULL, 'Early end – refund for unused time: early end', '', 'completed', '2026-04-27 19:49:30', 12, '2026-04-27 19:49:30');
 
 -- --------------------------------------------------------
 
@@ -469,12 +437,6 @@ ALTER TABLE `consoles`
   ADD UNIQUE KEY `unit_number` (`unit_number`),
   ADD KEY `idx_consoles_status` (`status`),
   ADD KEY `idx_consoles_type` (`console_type`);
-
---
--- Indexes for table `games`
---
-ALTER TABLE `games`
-  ADD PRIMARY KEY (`game_id`);
 
 --
 -- Indexes for table `gaming_sessions`
@@ -582,16 +544,10 @@ ALTER TABLE `consoles`
   MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3212;
 
 --
--- AUTO_INCREMENT for table `games`
---
-ALTER TABLE `games`
-  MODIFY `game_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
-
---
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -633,7 +589,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=240;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=242;
 
 --
 -- AUTO_INCREMENT for table `users`
