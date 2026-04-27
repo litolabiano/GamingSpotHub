@@ -333,7 +333,15 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     <button class="btn-cancel-edit" type="button">✕</button>
                                 </span>
                             <?php elseif ($sess['status'] === 'active'): ?>
-                                <span style="color:#20c8a1">Live</span>
+                                <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']): ?>
+                                    <?php $projectedEndTs = $startTs + ($sess['planned_minutes'] * 60); ?>
+                                    <span style="color:#20c8a1;font-weight:600;" title="Projected end: start + booked time">
+                                        <?= date('h:i A', $projectedEndTs) ?>
+                                    </span>
+                                    <span style="font-size:10px;color:#5f85da;display:block;margin-top:2px;">Projected</span>
+                                <?php else: ?>
+                                    <span style="color:#20c8a1">Live</span>
+                                <?php endif; ?>
                                 <?php else: ?>—<?php endif; ?>
                         </td>
 

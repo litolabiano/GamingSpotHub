@@ -130,10 +130,12 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Console *</label>
-                    <select name="console_id" required>
+                    <select name="console_id" id="consoleSelect" required onchange="onConsoleChange()">
                         <option value="" disabled selected>— Select console —</option>
                         <?php foreach ($availableConsoles as $con): ?>
-                        <option value="<?= $con['console_id'] ?>"><?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)</option>
+                        <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
+                            <?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)
+                        </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -535,6 +537,10 @@
                        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:20px;font-weight:700;box-sizing:border-box;"
                        placeholder="Enter amount to refund">
                 <div id="refundMaxNote" style="font-size:11px;color:#888;margin-top:4px;"></div>
+                <!-- Auto-calc breakdown (shown only for early-end flow) -->
+                <div id="refundAutoCalcHint" style="display:none;margin-top:8px;font-size:12px;color:#f1e1aa;
+                     background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);
+                     border-radius:8px;padding:10px 12px;line-height:1.5;"></div>
             </div>
             <div class="form-group">
                 <label>Reason (optional)</label>
