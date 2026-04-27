@@ -43,7 +43,9 @@ if (!in_array($action_type, ['standard', 'early_end', 'reservation'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid action_type.']);
     exit;
 }
-if ($refund_amount <= 0) {
+// Require positive refund amount for standard and reservation refunds.
+// early_end with ₱0 is valid — the session is ended with no transaction recorded.
+if ($refund_amount <= 0 && $action_type !== 'early_end') {
     echo json_encode(['success' => false, 'message' => 'Refund amount must be greater than ₱0.']);
     exit;
 }
@@ -205,7 +207,9 @@ if ($refund_amount > 0) {
 }
 
 $msg = $action_type === 'early_end'
-    ? 'Session ended. Refund of ₱' . number_format($refund_amount, 2) . ' issued.'
+    ? ($refund_amount > 0
+        ? 'Session ended. Refund of ₱' . number_format($refund_amount, 2) . ' issued.'
+        : 'Session ended. No refund — nothing was paid upfront.')
     : 'Refund of ₱' . number_format($refund_amount, 2) . ' issued successfully.';
 
 if ($refund_reason) {

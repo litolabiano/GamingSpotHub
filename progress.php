@@ -215,8 +215,8 @@ $categories = [
             ['status'=>'done',    'title'=>'Convert Reservation → Active Session',                 'desc'=>'convertReservationToSession() assigns a console, starts the session, marks reservation as converted.'],
             ['status'=>'done',    'title'=>'Customer Cancellation (Dashboard)',                    'desc'=>'dashboard.php AJAX cancel flow. Sets status=cancelled, cancelled_by=user. Shows confirmation modal.'],
             ['status'=>'done',    'title'=>'Availability Check on Reserve Form',                   'desc'=>'ajax/check_unit_availability.php checks reservations table for overlapping slots.'],
-            ['status'=>'partial', 'title'=>'Preferred Unit Pre-selection',                         'desc'=>'reserve.php passes $preferred_unit_id as 10th arg to createReservation(), but the function signature only accepts 9 args — the preferred_unit_id is silently ignored.', 'tag'=>'Bug'],
-            ['status'=>'missing', 'title'=>'Inconvenience Fee on Late Cancellation',              'desc'=>'FAQs state: if cancelled AFTER session starts, an inconvenience fee is deducted. No such logic exists — full refund is always issued.', 'tag'=>'FAQ Mismatch'],
+            ['status'=>'done',    'title'=>'Preferred Unit Pre-selection',                         'desc'=>'createReservation() now accepts $preferred_unit_id as 10th param and stores it in reservations.console_id. The preferred unit selected by the customer is correctly persisted. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Inconvenience Fee on Late Cancellation',              'desc'=>'cancel_reservation.php deducts configurable inconvenience_fee (\u20b150, from system_settings) when customer cancels after reserved start time. Net refund shown in message and returned as amount field. (Fixed this session.)'],
         ],
     ],
 
@@ -242,11 +242,15 @@ $categories = [
             ['status'=>'done',    'title'=>'End Session (auto cost calculation)',                  'desc'=>'endSession() computes duration + totalCost via computeRentalFee(). Marks console available.'],
             ['status'=>'done',    'title'=>'Extend Session (planned_minutes)',                     'desc'=>'extend_session action adds extra minutes to planned_minutes for hourly sessions.'],
             ['status'=>'done',    'title'=>'Collect Mid-Session Payment',                          'desc'=>'collect_payment action records partial payment without ending session. Shows balance due.'],
-            ['status'=>'done',    'title'=>'Early End + Refund',                                   'desc'=>'early_end_session action calls recordTransaction(-amount) then endSession(). One-step operation.'],
-            ['status'=>'done',    'title'=>'Session Refund Button (all 4 buttons visible)',       'desc'=>'Flex-wrap layout fix — End, Pay, Refund, Extend now all visible and clickable. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Early End + Refund (including ₱0 case)',               'desc'=>'early_end action calls endSession() then records refund. ₱0-paid sessions end cleanly with no transaction — the guard now allows zero-refund early_end. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Walk-in / No Account Sessions',                        'desc'=>'System user (user_id=0, role=walkin) satisfies NOT NULL FK constraints. Admin selects Walk-in from dropdown → session starts with user_id=0. Styled badge shown in session list. (Added this session.)'],
+            ['status'=>'done',    'title'=>'Correct Billing for Early-Ended Sessions',             'desc'=>'computeRentalFee() now charges ACTUAL elapsed time for early-ended hourly sessions (not planned duration). A 1h45m booking ended after 2min costs ₱20, not ₱140. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Pending Payments — No False Positives',                'desc'=>'Walk-in / early-end sessions with ₱0 paid no longer appear as outstanding balances. Filter requires paidSoFar > 0 for completed sessions. (Fixed this session.)'],
+            ['status'=>'done',    'title'=>'Session Refund Button (all 4 buttons visible)',       'desc'=>'Flex-wrap layout fix — End, Pay, Refund, Extend now all visible and clickable. (Fixed previous session.)'],
             ['status'=>'done',    'title'=>'Edit End Time (inline editor)',                        'desc'=>'Completed session rows allow click-to-edit end time via AJAX, recalculates cost server-side.'],
             ['status'=>'partial', 'title'=>'Live Session Timer',                                  'desc'=>'JS timer counts up in Sessions admin. Timer resets if page is hard-refreshed — server state is authoritative.'],
             ['status'=>'done',    'title'=>'Rental Fee Calculation (₱50 first 30min / ₱80/hr)',  'desc'=>'computeRentalFee() handles open_time, hourly, unlimited modes with correct tier logic.'],
+            ['status'=>'done',    'title'=>'CSRF Protection on All Admin Modal Forms',             'desc'=>'All 6 POST forms in admin_sections/modals.php now include <?= csrfField() ?>. Resolves "Security check failed" error. (Fixed this session.)'],
         ],
     ],
 
@@ -280,16 +284,38 @@ $categories = [
         'title' => 'Tournaments & Games Library',
         'icon'  => 'fa-trophy', 'color' => 'gold',
         'items' => [
-            ['status'=>'missing', 'title'=>'Admin Tournament Management',                         'desc'=>'tournaments table exists. No admin section to create/manage tournaments.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Customer Tournament Registration',                    'desc'=>'tournament_participants table exists. No public-facing UI to browse or register.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Games Library Admin UI',                              'desc'=>'games table exists. No admin UI to add/edit/remove games from the library.', 'tag'=>'Not Started'],
-            ['status'=>'missing', 'title'=>'Customer Game Library View',                          'desc'=>'No public page listing available games per console type.', 'tag'=>'Not Started'],
+            ['status'=>'done',    'title'=>'Admin Tournament Management',                         'desc'=>'admin_sections/tournaments.php — full CRUD: create tournament, update status (upcoming/scheduled/ongoing/completed/cancelled), register/remove participants. Wired into admin sidebar with badge counter. Schema fixed: game_name, created_by, expanded status + console_type enums. (Confirmed working this session.)'],
+            ['status'=>'partial', 'title'=>'Customer Tournament Registration',                    'desc'=>'tournament_register.php exists with a styled registration form. However, it uses a separate tournament_registrations table instead of the proper tournament_participants table and does not dynamically list admin-created tournaments.', 'tag'=>'Needs Integration'],
+            ['status'=>'done',    'title'=>'Games Library Admin UI',                              'desc'=>'admin_sections/games.php built this session — CRUD table grouped by platform with search filter, Add/Edit/Hide/Delete actions (POST handlers in admin.php). games table created with 12 seeded titles. Wired into admin sidebar as "Games" nav item.'],
+            ['status'=>'missing', 'title'=>'Customer Game Library View',                          'desc'=>'No public page listing available games per console type. games table now exists with data — a public games.php browse page still needs to be built.', 'tag'=>'Not Started'],
         ],
     ],
 
+
 ];
 
-/* ── Compute stats ── */
+
+
+$issues = [
+    ['status'=>'fixed',   'title'=>'Downpayment not recorded in transactions',                      'file'=>'db_functions.php',   'desc'=>'createReservation() only saved to reservations table. Financial ledger had no record of payment.', 'fix'=>'Added recordTransaction() call inside createReservation() after successful INSERT.'],
+    ['status'=>'fixed',   'title'=>'transactions.session_id NOT NULL blocked reservation refunds',  'file'=>'MySQL schema',        'desc'=>'Refund for reservation (no session) passed NULL → DB rejected with column cannot be null fatal error.', 'fix'=>'ALTER TABLE transactions MODIFY session_id INT NULL.'],
+    ['status'=>'fixed',   'title'=>'Session Refund button unclickable (grid overflow)',              'file'=>'sessions.php',        'desc'=>'4 buttons in grid-template-columns:1fr 1fr caused Refund and Extend to be cut off and unreachable.', 'fix'=>'Changed to display:flex; flex-wrap:wrap with flex:1 1 70px per button.'],
+    ['status'=>'fixed',   'title'=>'Two disconnected refund systems',                               'file'=>'admin.php + modals',  'desc'=>'Session refunds used openRefundModal(). Reservation refunds used a completely separate form+gspotConfirm.', 'fix'=>'Extended openRefundModal() with 5th param reservationId. One modal now handles both modes.'],
+    ['status'=>'fixed',   'title'=>'process_refund used raw INSERT with wrong column names',        'file'=>'admin.php',           'desc'=>'Raw INSERT used notes and transaction_date columns that don\'t exist. Should use payment_note.', 'fix'=>'Replaced raw INSERT with recordTransaction() which uses the correct schema.'],
+    ['status'=>'fixed',   'title'=>'cancelled_by NULL causes refund button to be hidden',           'file'=>'reservations.php',    'desc'=>'Old cancelled rows have cancelled_by=NULL. Strict === \'user\' check excluded all pre-migration rows.', 'fix'=>'Changed to in_array($r[\'cancelled_by\'], [\'user\', null], true) in UI and SQL uses OR IS NULL.'],
+    ['status'=>'fixed',   'title'=>'getCancelledReservations() undefined',                          'file'=>'db_functions.php',    'desc'=>'Function was not present in db_functions.php. Earlier edit silently failed.', 'fix'=>'Added function correctly with full JOIN and ORDER BY.'],
+    ['status'=>'fixed',   'title'=>'"Security check failed" on all admin modal form submissions',   'file'=>'admin_sections/modals.php', 'desc'=>'All 6 POST forms (Start Session, End Session, Collect Payment, Issue Refund, Add Reservation, Convert Reservation) were missing <?= csrfField() ?> tokens.', 'fix'=>'Injected csrfField() into each POST form. AJAX endpoints already use role-based auth instead.'],
+    ['status'=>'fixed',   'title'=>'Early-end ₱0 refund blocked by dual guard',                    'file'=>'ajax/refund.php + admin.php', 'desc'=>'Walk-in sessions with ₱0 paid triggered both JS and PHP refund_amount <= 0 guards, preventing early-end.', 'fix'=>'Both guards now allow refund_amount=0 when action_type=early_end. Amount field locked read-only at 0 in modal.'],
+    ['status'=>'fixed',   'title'=>'Pending Payments shows false ₱140 due on ended walk-in session','file'=>'admin.php + db_functions.php', 'desc'=>'Hourly sessions ended early still had planned total_cost in DB. Sessions with ₱0 paid + no refund showed as outstanding.', 'fix'=>'computeRentalFee() now charges actual elapsed time for early-end. Pending Payments filter adds paidSoFar > 0 guard.'],
+    ['status'=>'fixed',   'title'=>'Walk-in session FK constraint failure',                         'file'=>'db_functions.php',    'desc'=>'Walk-in user existed with user_id=0 but constant was set to 25 (non-existent). FK on gaming_sessions rejected INSERT.', 'fix'=>'WALKIN_USER_ID updated to 0 to match actual DB row. admin.php handler no longer requires user_id in validation.'],
+    ['status'=>'fixed',   'title'=>'createReservation() ignores $preferred_unit_id',               'file'=>'db_functions.php',    'desc'=>'reserve.php passed preferred_unit_id as 10th argument but function signature only had 9 params. The preferred unit was silently dropped.', 'fix'=>'Added $preferred_unit_id = null as 10th param, included console_id in INSERT, fixed bind_param type string to iississsdsii (12 params).'],
+    ['status'=>'fixed',   'title'=>'3-Strike cancellation ban not enforced on reserve form',      'file'=>'reserve.php + cancel_reservation.php', 'desc'=>'Ban columns existed but ban check and streak increment were both already implemented across both files.', 'fix'=>'Confirmed as already implemented: cancel_reservation.php increments streak + sets 7-day ban; reserve.php blocks new reservations during ban window.'],
+    ['status'=>'fixed',   'title'=>'Inconvenience fee on late cancellations not calculated',       'file'=>'ajax/cancel_reservation.php', 'desc'=>'$isLateCancel was detected but amount was not reduced — full downpayment reported, with vague "staff will deduct" message.', 'fix'=>'Added inconvenience_fee setting (₱50 default) to system_settings. cancel_reservation.php now auto-deducts the fee and returns precise gross_amount, inconvenience_fee, and net amount fields.'],
+    ['status'=>'fixed',   'title'=>'Refund status not visible to customer',                       'file'=>'dashboard.php',       'desc'=>'Confirmed as already implemented. Cancelled reservations show either a green "Refunded" or amber "Refund pending" badge based on refund_issued column.', 'fix'=>'No change needed — feature was already built.'],
+    ['status'=>'fixed',   'title'=>'Financial report queries may miss session_id=NULL transactions','file'=>'admin.php',           'desc'=>'Main $finStats query goes FROM transactions directly (no gaming_sessions JOIN). Transaction history already uses LEFT JOIN gaming_sessions. No INNER JOINs on transactions table found.', 'fix'=>'Confirmed as already correct — all transaction-based queries use LEFT JOIN or no join at all.'],
+];
+
+/* ══ Compute stats ══ */
 $totDone = $totPartial = $totWarn = $totMissing = 0;
 foreach ($categories as $cat) {
     foreach ($cat['items'] as $it) {
@@ -302,25 +328,9 @@ foreach ($categories as $cat) {
         };
     }
 }
-$totAll   = $totDone + $totPartial + $totWarn + $totMissing;
-$pctDone  = $totAll ? round(($totDone / $totAll) * 100) : 0;
-$pctPart  = $totAll ? round((($totDone + $totPartial) / $totAll) * 100) : 0;
-
-/* ── issues log ── */
-$issues = [
-    ['status'=>'fixed',   'title'=>'Downpayment not recorded in transactions',                      'file'=>'db_functions.php',   'desc'=>'createReservation() only saved to reservations table. Financial ledger had no record of payment.', 'fix'=>'Added recordTransaction() call inside createReservation() after successful INSERT.'],
-    ['status'=>'fixed',   'title'=>'transactions.session_id NOT NULL blocked reservation refunds',  'file'=>'MySQL schema',        'desc'=>'Refund for reservation (no session) passed NULL → DB rejected with column cannot be null fatal error.', 'fix'=>'ALTER TABLE transactions MODIFY session_id INT NULL.'],
-    ['status'=>'fixed',   'title'=>'Session Refund button unclickable (grid overflow)',              'file'=>'sessions.php',        'desc'=>'4 buttons in grid-template-columns:1fr 1fr caused Refund and Extend to be cut off and unreachable.', 'fix'=>'Changed to display:flex; flex-wrap:wrap with flex:1 1 70px per button.'],
-    ['status'=>'fixed',   'title'=>'Two disconnected refund systems',                               'file'=>'admin.php + modals',  'desc'=>'Session refunds used openRefundModal(). Reservation refunds used a completely separate form+gspotConfirm.', 'fix'=>'Extended openRefundModal() with 5th param reservationId. One modal now handles both modes.'],
-    ['status'=>'fixed',   'title'=>'process_refund used raw INSERT with wrong column names',        'file'=>'admin.php',           'desc'=>'Raw INSERT used notes and transaction_date columns that don\'t exist. Should use payment_note.', 'fix'=>'Replaced raw INSERT with recordTransaction() which uses the correct schema.'],
-    ['status'=>'fixed',   'title'=>'cancelled_by NULL causes refund button to be hidden',           'file'=>'reservations.php',    'desc'=>'Old cancelled rows have cancelled_by=NULL. Strict === \'user\' check excluded all pre-migration rows.', 'fix'=>'Changed to in_array($r[\'cancelled_by\'], [\'user\', null], true) in UI and SQL uses OR IS NULL.'],
-    ['status'=>'fixed',   'title'=>'getCancelledReservations() undefined',                          'file'=>'db_functions.php',    'desc'=>'Function was not present in db_functions.php. Earlier edit silently failed.', 'fix'=>'Added function correctly with full JOIN and ORDER BY.'],
-    ['status'=>'open',    'title'=>'createReservation() ignores $preferred_unit_id',               'file'=>'db_functions.php',    'desc'=>'reserve.php passes preferred_unit_id as 10th argument but function signature only has 9 params. The preferred unit is silently dropped.', 'fix'=>'Need to add $preferred_unit_id = null param and store it in reservations.console_id.'],
-    ['status'=>'open',    'title'=>'3-Strike cancellation rule not implemented',                    'file'=>'reserve.php',         'desc'=>'FAQs describe: 3 consecutive cancels → 1-week reservation ban. No ban column in users table, no check before creating reservation.', 'fix'=>'Add consecutive_cancels INT + reservation_banned_until DATETIME columns. Check in createReservation() and reserve.php.'],
-    ['status'=>'open',    'title'=>'Inconvenience fee on post-start cancellations not enforced',    'file'=>'ajax/cancel_res.php',  'desc'=>'FAQs say: cancel AFTER session start = inconvenience fee deducted from refund. Current code always issues full refund regardless of timing.', 'fix'=>'Compare cancel time vs reserved_time. If cancelled_after_start, deduct configurable inconvenience fee before refund.'],
-    ['status'=>'open',    'title'=>'Refund status not visible to customer',                        'file'=>'dashboard.php',       'desc'=>'Customer can cancel a reservation and see it as Cancelled. But refund_issued column is never surfaced — they can\'t tell if they\'ve been refunded.', 'fix'=>'Show "Refund Pending" / "Refunded ✓" badge on Past Reservations in dashboard.php based on refund_issued column.'],
-    ['status'=>'open',    'title'=>'Financial report queries may miss session_id=NULL transactions', 'file'=>'financial.php',       'desc'=>'Reservation downpayments now have session_id=NULL. Report queries that JOIN gaming_sessions (INNER JOIN) will miss these rows.', 'fix'=>'Audit all financial queries — change INNER JOIN gaming_sessions to LEFT JOIN or use session_id IS NULL OR session_id IN (...).'],
-];
+$totAll  = $totDone + $totPartial + $totWarn + $totMissing;
+$pctDone = $totAll ? round(($totDone / $totAll) * 100) : 0;
+$pctPart = $totAll ? round((($totDone + $totPartial) / $totAll) * 100) : 0;
 ?>
 
     <!-- ── Stats bar ── -->

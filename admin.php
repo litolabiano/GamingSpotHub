@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
 
-        if (!$user_id || !$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
-            $message = 'Please fill in all session fields correctly.';
+        if (!$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
+            $message = 'Please select a console and rental mode.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
@@ -113,7 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
     }
     if (!$messageType) $messageType = 'success';
-}else {
+}
+
+  else {
                 $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
             }
@@ -411,13 +413,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // PROCESS REFUND for cancelled reservations
-    // Now handled exclusively by ajax/refund.php (action_type=reservation).
-    elseif ($action === 'process_refund') {
-        $message     = 'Reservation refunds must be submitted through the Refund modal (AJAX).';
-        $messageType = 'error';
-    }
-
+    // PROCESS REFUND for cancelled reservations is handled at lines 266–306 above.
 
     // NOTE: Session extension is handled exclusively through ajax/extend_session.php
     // which calls extendSession() — applying bonus minutes and recording a transaction.
@@ -427,9 +423,178 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message     = 'Session extensions must be processed through the Extend modal.';
         $messageType = 'error';
     }
+
+    // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
+
+    // CREATE TOURNAMENT
+    elseif ($action === 'create_tournament') {
+        $name         = trim($_POST['tournament_name'] ?? '');
+        $game         = trim($_POST['game_name']       ?? '');
+        $console_type = $_POST['console_type']         ?? '';
+        $start_date   = $_POST['start_date']           ?? '';
+        $end_date     = $_POST['end_date']             ?? '';
+        $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
+        $prize_pool   = (float)($_POST['prize_pool']        ?? 0);
+        $max_part     = (int)  ($_POST['max_participants']  ?? 16);
+        $announcement = trim($_POST['announcement']    ?? '');
+
+        if (!$name || !$game || !$console_type || !$start_date || !$end_date) {
+            $message = 'Please fill in all required tournament fields.';
+            $messageType = 'error';
+        } else {
+            // Normalize datetime-local value to MySQL DATETIME
+            $start_dt = (new DateTime($start_date))->format('Y-m-d H:i:s');
+            $end_dt   = (new DateTime($end_date  ))->format('Y-m-d H:i:s');
+            $stmt = $conn->prepare(
+                "INSERT INTO tournaments
+                    (tournament_name, game_name, console_type, start_date, end_date,
+                     entry_fee, prize_pool, max_participants, announcement, status, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'upcoming', ?)"
+            );
+            $stmt->bind_param('sssssddisi',
+                $name, $game, $console_type, $start_dt, $end_dt,
+                $entry_fee, $prize_pool, $max_part, $announcement, $user['user_id']
+            );
+            if ($stmt->execute()) {
+                $message = 'Tournament "' . htmlspecialchars($name) . '" created.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to create tournament: ' . $conn->error;
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // UPDATE TOURNAMENT STATUS
+    elseif ($action === 'update_tournament_status') {
+        $tid        = (int)($_POST['tournament_id'] ?? 0);
+        $new_status = $_POST['new_status'] ?? '';
+        $allowed    = ['upcoming', 'scheduled', 'ongoing', 'completed', 'cancelled'];
+        if ($tid && in_array($new_status, $allowed)) {
+            $stmt = $conn->prepare("UPDATE tournaments SET status = ? WHERE tournament_id = ?");
+            $stmt->bind_param('si', $new_status, $tid);
+            $stmt->execute();
+            $message = 'Tournament status updated to ' . ucfirst($new_status) . '.';
+            $messageType = 'success';
+        } else {
+            $message = 'Invalid tournament or status.';
+            $messageType = 'error';
+        }
+    }
+
+    // ADMIN REGISTER PARTICIPANT
+    elseif ($action === 'admin_register_participant') {
+        $tid            = (int)($_POST['tournament_id']  ?? 0);
+        $uid            = (int)($_POST['user_id']        ?? 0);
+        $pay_status     = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                          ? $_POST['payment_status'] : 'pending';
+        if ($tid && $uid) {
+            $stmt = $conn->prepare(
+                "INSERT INTO tournament_participants
+                    (tournament_id, user_id, payment_status, registered_by)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE payment_status = VALUES(payment_status)"
+            );
+            $stmt->bind_param('iisi', $tid, $uid, $pay_status, $user['user_id']);
+            if ($stmt->execute()) {
+                $message = 'Participant registered.';
+                $messageType = 'success';
+            } else {
+                $message = 'Could not register participant: ' . $conn->error;
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Invalid tournament or user.';
+            $messageType = 'error';
+        }
+    }
+
+    // UPDATE PARTICIPANT PAYMENT STATUS
+    elseif ($action === 'update_participant_payment') {
+        $pid        = (int)($_POST['participant_id']  ?? 0);
+        $pay_status = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                      ? $_POST['payment_status'] : 'pending';
+        if ($pid) {
+            $stmt = $conn->prepare("UPDATE tournament_participants SET payment_status = ? WHERE participant_id = ?");
+            $stmt->bind_param('si', $pay_status, $pid);
+            $stmt->execute();
+            $message = 'Payment status updated.';
+            $messageType = 'success';
+        }
+
+    // REMOVE TOURNAMENT PARTICIPANT
+    elseif ($action === 'remove_participant') {
+        $pid = (int)($_POST['participant_id'] ?? 0);
+        if ($pid) {
+            $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id = ?");
+            $stmt->bind_param('i', $pid);
+            $stmt->execute();
+            $message = 'Participant removed.';
+            $messageType = 'success';
+        }
+    }
+
+    // ── GAMES LIBRARY ACTIONS ────────────────────────────────────────────────
+
+    // ADD GAME
+    elseif ($action === 'add_game') {
+        $game_name    = trim($_POST['game_name']    ?? '');
+        $console_type = trim($_POST['console_type'] ?? '');
+        $genre        = trim($_POST['genre']        ?? 'Other');
+        $description  = trim($_POST['description']  ?? '');
+        if (!$game_name || !$console_type) {
+            $message = 'Game name and platform are required.'; $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare(
+                "INSERT INTO games (game_name, console_type, genre, description) VALUES (?,?,?,?)"
+            );
+            $stmt->bind_param('ssss', $game_name, $console_type, $genre, $description);
+            $message     = $stmt->execute() ? '"' . htmlspecialchars($game_name) . '" added to the library.' : 'Failed: ' . $conn->error;
+            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
+        }
+    }
+
+    // EDIT GAME
+    elseif ($action === 'edit_game') {
+        $game_id      = (int)($_POST['game_id']      ?? 0);
+        $game_name    = trim($_POST['game_name']    ?? '');
+        $console_type = trim($_POST['console_type'] ?? '');
+        $genre        = trim($_POST['genre']        ?? 'Other');
+        if (!$game_id || !$game_name) {
+            $message = 'Invalid game data.'; $messageType = 'error';
+        } else {
+            $stmt = $conn->prepare("UPDATE games SET game_name=?, console_type=?, genre=? WHERE game_id=?");
+            $stmt->bind_param('sssi', $game_name, $console_type, $genre, $game_id);
+            $message     = $stmt->execute() ? 'Game updated.' : 'Failed: ' . $conn->error;
+            $messageType = 'success';
+        }
+    }
+
+    // TOGGLE GAME VISIBILITY
+    elseif ($action === 'toggle_game') {
+        $game_id = (int)($_POST['game_id'] ?? 0);
+        if ($game_id) {
+            $conn->query("UPDATE games SET is_active = 1 - is_active WHERE game_id = $game_id");
+            $message = 'Game visibility toggled.'; $messageType = 'success';
+        }
+    }
+
+    // DELETE GAME
+    elseif ($action === 'delete_game') {
+        $game_id = (int)($_POST['game_id'] ?? 0);
+        if ($game_id) {
+            $stmt = $conn->prepare("DELETE FROM games WHERE game_id = ?");
+            $stmt->bind_param('i', $game_id);
+            $message     = $stmt->execute() ? 'Game deleted.' : 'Failed: ' . $conn->error;
+            $messageType = $stmt->affected_rows > 0 ? 'success' : 'error';
+        }
+    }
 }
 
-// â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+}
+
+
+// ─── DATA FETCHING ──────────────────────────────────────────────────────────
 
 // Dashboard stats
 $today = date('Y-m-d');
@@ -522,13 +687,15 @@ foreach ($recentSessions as $sess) {
     } elseif ($sess['status'] === 'completed'
         && $sess['total_cost'] > 0
         && $refundedAmount == 0               // no refund was issued
+        && $paidSoFar > 0                     // customer DID pay something upfront
         && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
     ) {
-        // Completed session where total paid < total cost — outstanding balance (no refund)
+        // Completed session where total paid < total cost — genuine short payment
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
-    // Sessions with refunds issued are fully settled — skip them entirely
+    // Early-end with nothing paid (walk-in, no upfront): fully settled, skip.
+    // Sessions with refunds issued are also fully settled — skip them entirely
 }
 
 
@@ -602,7 +769,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
             cursor: pointer !important;
         }
 
-        /* â”€â”€ Extra admin overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Extra admin overrides ── */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
             padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
@@ -625,11 +792,11 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .console-type-badge.ps4  { background:rgba(241,168,60,.15); color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
         .console-type-badge.xbox { background:rgba(32,200,161,.2); color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
-        /* â”€â”€ Session timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Session timer ── */
         .session-timer { font-family: monospace; font-size: 13px; color: #f1e1aa; font-weight: 600; }
         .session-timer.stale { color: #fb566b; font-size:11px; font-weight:500; }
 
-        /* â”€â”€ Form layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Form layout ── */
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
         .form-group { margin-bottom:16px; }
         .form-group label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; font-weight:600; }
@@ -644,7 +811,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .form-check { display:flex; align-items:center; gap:8px; margin-top:6px; }
         .form-check input { width:auto; accent-color:#20c8a1; }
 
-        /* â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Stat cards ── */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
         .stat-change.up { color:#20c8a1; }
         .stat-icon.revenue  { background:rgba(32,200,161,.15); color:#20c8a1; }
@@ -652,7 +819,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .stat-icon.bookings { background:rgba(179,123,236,.15); color:#b37bec; }
         .stat-icon.consoles { background:rgba(241,225,170,.15); color:#f1e1aa; }
 
-        /* â”€â”€ Console cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Console cards ── */
         .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
         .console-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.15);
             border-radius:12px; padding:18px; position:relative; transition:.2s; }
@@ -667,7 +834,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 
 
 
-        /* â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Badge ── */
         .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
         .badge.active     { background:rgba(95,133,218,.2);  color:#5f85da; }
         .badge.completed  { background:rgba(32,200,161,.2);  color:#20c8a1; }
@@ -678,12 +845,27 @@ $typeCounts = array_column($typeUsage, 'cnt');
         .badge.maintenance{ background:rgba(251,86,107,.2);  color:#fb566b; }
         .badge.installed  { background:rgba(179,123,236,.2); color:#b37bec; }
 
-        /* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Empty state ── */
         .empty-state { text-align:center; padding:40px; color:#555; }
         .empty-state i { font-size:36px; margin-bottom:12px; display:block; }
 
-        /* â”€â”€ Responsive form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /* ── Responsive form ── */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
+
+        /* ── Topbar hamburger: hidden on desktop (sidebar has its own) ── */
+        @media (min-width:769px) {
+            .menu-toggle { display:none !important; }
+            .sidebar-close-btn { display:none !important; visibility:hidden !important; }
+        }
+
+        /* ── Sidebar hamburger FA icon ── */
+        .sidebar-hamburger .sidebar-ham-icon {
+            font-size: 14px;
+            color: rgba(255,255,255,0.55);
+            transition: color 0.2s ease;
+            width: auto;
+        }
+        .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
     </style>
 </head>
 <body>
@@ -697,15 +879,22 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php endif; ?>
 
 
-<!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-<div class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        <a class="navbar-brand" href="index.php">
+        <a class="navbar-brand sidebar-logo" href="index.php">
             <div class="logo-container">
                 <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
                 <span class="logo-text">GAMING HUB</span>
             </div>
         </a>
+        <button class="sidebar-hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar" id="sidebarHamburger">
+            <i class="fas fa-bars sidebar-ham-icon"></i>
+        </button>
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" onclick="closeSidebar()" aria-label="Close sidebar">
+            <i class="fas fa-times"></i>
+        </button>
     </div>
     <?php $navBadge = 'style="background:#fb566b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;margin-left:auto;min-width:18px;text-align:center;"'; ?>
     <div class="nav-item active" onclick="showPage('dashboard', this)">
@@ -717,26 +906,39 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <span <?= $navBadge ?>><?= $maintenanceCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('sessions', this)">
+    <div class="nav-item" data-tooltip="Sessions" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
         <?php if ($activeCount > 0): ?>
         <span <?= $navBadge ?>><?= $activeCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('reservations', this)">
+    <div class="nav-item" data-tooltip="Reservations" onclick="showPage('reservations', this)">
         <i class="fas fa-calendar-check"></i><span>Reservations</span>
         <?php if ($pendingResCount > 0): ?>
         <span <?= $navBadge ?>><?= $pendingResCount ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('transactions', this)">
+    <div class="nav-item" data-tooltip="Transactions" onclick="showPage('transactions', this)">
         <i class="fas fa-exchange-alt"></i><span>Transactions</span>
         <?php if (count($pendingSessions) > 0): ?>
         <span <?= $navBadge ?>><?= count($pendingSessions) ?></span>
         <?php endif; ?>
     </div>
-    <div class="nav-item" onclick="showPage('reports', this)">
+    <div class="nav-item" data-tooltip="Reports" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
+    </div>
+    <div class="nav-item" data-tooltip="Tournaments" onclick="showPage('tournaments', this)">
+        <i class="fas fa-trophy"></i><span>Tournaments</span>
+        <?php
+        $openTourCount = 0;
+        $tourCountStmt = $conn->query("SELECT COUNT(*) AS n FROM tournaments WHERE status IN ('scheduled','ongoing')");
+        if ($tourCountStmt) $openTourCount = (int)$tourCountStmt->fetch_assoc()['n'];
+        if ($openTourCount > 0): ?>
+        <span <?= $navBadge ?>><?= $openTourCount ?></span>
+        <?php endif; ?>
+    </div>
+    <div class="nav-item" data-tooltip="Games Library" onclick="showPage('games', this)">
+        <i class="fas fa-gamepad"></i><span>Games</span>
     </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
@@ -747,7 +949,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </a>
 </div>
 
-<!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-left">
         <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
@@ -767,7 +969,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
     </div>
 </div>
 
-<!-- â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Main Content ──────────────────────────────────────────────────────────── -->
 <div class="main-content">
 
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
@@ -776,11 +978,12 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
+<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
+<?php include __DIR__ . '/admin_sections/games.php'; ?>
 <?php include __DIR__ . '/admin_sections/settings.php'; ?>
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
-
 <!-- â”€â”€ JavaScript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
@@ -807,7 +1010,7 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings'
+        settings: 'Settings', tournaments: 'Tournaments', games: 'Games Library'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
@@ -824,7 +1027,7 @@ function showPage(page, el) {
 // ── Restore active page from URL hash on load ──
 (function () {
     const hash = window.location.hash.replace('#', '');
-    const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings'];
+    const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings','tournaments'];
     if (hash && validPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;
@@ -839,13 +1042,52 @@ function showPage(page, el) {
 
 function toggleSidebar() {
     const sidebar     = document.getElementById('sidebar');
-    const topbar      = document.querySelector('.topbar');
-    const mainContent = document.querySelector('.main-content');
-    sidebar.classList.toggle('collapsed');
-    const isCollapsed = sidebar.classList.contains('collapsed');
-    topbar.style.left      = isCollapsed ? '70px'  : '260px';
-    mainContent.style.marginLeft = isCollapsed ? '70px'  : '260px';
+    const overlay     = document.getElementById('sidebarOverlay');
+    const isMobile    = window.innerWidth <= 768;
+
+    if (isMobile) {
+        // Mobile: slide in/out
+        const isOpen = sidebar.classList.contains('mobile-open');
+        if (isOpen) {
+            closeSidebar();
+        } else {
+            sidebar.classList.add('mobile-open');
+            overlay.classList.add('active');
+        }
+    } else {
+        // Desktop: collapse to icon-only rail
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        // Let CSS sibling selectors handle topbar/main-content shifts;
+        // inline styles override them, so sync manually:
+        document.querySelector('.topbar').style.left             = isCollapsed ? '70px' : '260px';
+        document.querySelector('.main-content').style.marginLeft = isCollapsed ? '70px' : '260px';
+        // Persist preference
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
+    }
 }
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+}
+
+// Restore desktop collapsed state on load
+(function () {
+    if (window.innerWidth > 768 && localStorage.getItem('sidebarCollapsed') === '1') {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('collapsed');
+        document.querySelector('.topbar').style.left             = '70px';
+        document.querySelector('.main-content').style.marginLeft = '70px';
+    }
+})();
+
+// Close sidebar when pressing Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidebar();
+});
 
 // â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function onRentalModeChange() {
@@ -1221,9 +1463,17 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 document.getElementById('refundActionField').value  = 'early_end';
                 document.getElementById('refundEarlyEndFlag').value = '1';
 
-                // Pre-fill refund amount
+                // Pre-fill refund amount (lock at 0 when nothing to refund)
                 const amtEl = document.getElementById('refundAmount');
-                if (amtEl) amtEl.value = _pendingRefundArgs.refundAmt.toFixed(0);
+                if (amtEl) {
+                    amtEl.value    = _pendingRefundArgs.refundAmt.toFixed(0);
+                    amtEl.readOnly = (_pendingRefundArgs.refundAmt <= 0);
+                    amtEl.style.opacity = _pendingRefundArgs.refundAmt <= 0 ? '0.5' : '1';
+                }
+
+                // Clear stale errors
+                const errMsg = document.getElementById('refundErrorMsg');
+                if (errMsg) errMsg.style.display = 'none';
 
                 // Pre-fill reason
                 const reasonEl = document.getElementById('refundReason');
@@ -1582,8 +1832,10 @@ function _submitRefundAjax() {
     let action_type = actionField; // 'standard' | 'reservation'
     if (isEarlyEnd) action_type = 'early_end';
 
-    if (action_type !== 'reservation' && refundAmt <= 0) {
-        _showRefundError('Please enter a refund amount greater than \u20b10.');
+    // Standard/manual refunds require a positive amount.
+    // early_end with ₱0 is allowed — the session ends with no refund transaction.
+    if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
+        _showRefundError('Please enter a refund amount greater than ₱0.');
         return;
     }
 

@@ -1,5 +1,15 @@
 <!-- ════ SESSIONS ══════════════════════════════════════════════════════════ -->
-
+<?php
+// Helper: display a styled Walk-in badge or the real customer name.
+function sessionCustomerLabel(array $sess, bool $forJs = false): string {
+    if ((int)($sess['user_id'] ?? 0) === WALKIN_USER_ID) {
+        return $forJs ? 'Walk-in' : '<span style="background:rgba(138,164,232,.18);color:#8aa4e8;border:1px solid rgba(138,164,232,.35);border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;letter-spacing:.3px;">&#128694; Walk-in</span>';
+    }
+    return $forJs
+        ? htmlspecialchars(addslashes($sess['customer_name']))
+        : htmlspecialchars($sess['customer_name']);
+}
+?>
 
 <style>
     /* ── Sortable table headers ─────────────────────────────────────────── */
@@ -196,7 +206,7 @@
                     ?>
                         <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
                             <td>#<?= $ps['session_id'] ?></td>
-                            <td><?= htmlspecialchars($ps['customer_name']) ?></td>
+                            <td><?= sessionCustomerLabel($ps) ?></td>
                             <td><?= htmlspecialchars($ps['unit_number']) ?></td>
                             <td><?= $psModeLabel ?></td>
                             <td><?= date('h:i A', $psStart) ?></td>
@@ -224,7 +234,7 @@
                                         style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
                                         onclick="openPayModal(
                             <?= $ps['session_id'] ?>,
-                            '<?= htmlspecialchars(addslashes($ps['customer_name'])) ?>',
+                            '<?= sessionCustomerLabel($ps, true) ?>',
                             '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>',
                             '<?= $ps['rental_mode'] ?>',
                             <?= $psStart ?>,
@@ -285,7 +295,7 @@
                     ?>
                     <tr
                         data-id="<?= $sess['session_id'] ?>"
-                        data-customer="<?= htmlspecialchars(strtolower($sess['customer_name'])) ?>"
+                        data-customer="<?= htmlspecialchars(strtolower((int)($sess['user_id'] ?? 0) === WALKIN_USER_ID ? 'walk-in' : $sess['customer_name'])) ?>"
                         data-console="<?= htmlspecialchars(strtolower($sess['unit_number'])) ?>"
                         data-mode="<?= htmlspecialchars($sess['rental_mode']) ?>"
                         data-booked="<?= $bookedMinutes ?>"
@@ -295,7 +305,7 @@
                         data-cost="<?= $costVal ?>"
                         data-status="<?= $isLive ?>">
                         <td>#<?= $sess['session_id'] ?></td>
-                        <td><?= htmlspecialchars($sess['customer_name']) ?></td>
+                        <td><?= sessionCustomerLabel($sess) ?></td>
                         <td><?= htmlspecialchars($sess['unit_number']) ?></td>
                         <td><?= match ($sess['rental_mode']) {
                                 'open_time' => 'Open Time',
@@ -345,7 +355,7 @@
                                         style="justify-content:center;flex:1 1 70px;"
                                         onclick="openEndSessionModal(
                             <?= $sess['session_id'] ?>,
-                            '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                            '<?= sessionCustomerLabel($sess, true) ?>',
                             '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                             '<?= $sess['rental_mode'] ?>',
                             <?= $startTs ?>,
@@ -355,11 +365,12 @@
                         )">
                                         <i class="fas fa-stop"></i> End
                                     </button>
+
                                     <button class="btn btn-sm" title="Extend Session"
                                         style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(
                                 <?= $sess['session_id'] ?>,
-                                '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
+                                '<?= sessionCustomerLabel($sess, true) ?>',
                                 '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                                 <?= $bookedMinutes ?>,
                                 '<?= $sess['rental_mode'] ?>'

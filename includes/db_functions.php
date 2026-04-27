@@ -19,6 +19,28 @@
 require_once __DIR__ . '/db_config.php';
 
 // ============================================================================
+// WALK-IN CUSTOMER SYSTEM USER
+// ============================================================================
+// The walk-in user is a real row in `users` with role='walkin' and status='inactive'
+// (cannot log in). All sessions/transactions for anonymous customers reference
+// this ID so that NOT NULL foreign-key constraints and JOINs work correctly.
+// Run migration_walkin.php once to create this user if it doesn't exist.
+define('WALKIN_USER_ID', 0);
+
+/**
+ * Return the walk-in system user's ID.
+ * Falls back to querying the DB in case the constant needs updating.
+ */
+function getWalkinUserId(): int {
+    global $conn;
+    if (!defined('WALKIN_USER_ID')) {
+        $r = $conn->query("SELECT user_id FROM users WHERE role='walkin' LIMIT 1");
+        return $r && $r->num_rows ? (int)$r->fetch_assoc()['user_id'] : 0;
+    }
+    return WALKIN_USER_ID;
+}
+
+// ============================================================================
 // PRICING RULES (DB-DRIVEN — single source of truth)
 // ============================================================================
 
@@ -180,6 +202,11 @@ function updateConsoleStatus($console_id, $status) {
 function startSession($user_id, $console_id, $rental_mode, $created_by, $planned_minutes = null,
                       $tendered = null, $payment_method = null) {
     global $conn;
+
+    // Resolve walk-in: empty / 0 user_id maps to the system walk-in user.
+    if (!$user_id || $user_id <= 0) {
+        $user_id = getWalkinUserId();
+    }
 
     // Get the console's hourly rate
     $stmt = $conn->prepare("SELECT hourly_rate FROM consoles WHERE console_id = ? AND status = 'available'");
@@ -617,18 +644,24 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
     switch ($rental_mode) {
         case 'hourly':
             if ($planned_minutes !== null && $planned_minutes > 0) {
-                // Base cost for pre-booked duration
-                $base_cost = ($planned_minutes <= 30)
-                    ? $rules['session_min_charge']          // DB-driven — not hardcoded
-                    : (float) ($planned_minutes / 60 * $rules['hourly_rate']);
-
                 // Overtime beyond booked time
                 $overtime = $duration_minutes - $planned_minutes;
-                if ($overtime <= 0) return $base_cost; // ended on time or early
+
+                if ($overtime <= 0) {
+                    // Ended on time or early — charge for ACTUAL time used, not planned duration.
+                    // This prevents a 1h45m booking ended after 2 minutes from billing ₱140.
+                    return computeTimedCost($duration_minutes);
+                }
+
+                // Overtime: charge base planned cost + overtime surcharge
+                $base_cost = ($planned_minutes <= 30)
+                    ? $rules['session_min_charge']
+                    : (float) ($planned_minutes / 60 * $rules['hourly_rate']);
                 return $base_cost + computeTimedCost($overtime);
             }
             // No pre-booking data: fall back to open-time bracket pricing
             return computeTimedCost($duration_minutes);
+
 
         case 'open_time':
             return computeTimedCost($duration_minutes);
@@ -931,7 +964,8 @@ function updateSetting($key, $value) {
 function createReservation(
     $user_id, $console_type, $rental_mode, $planned_minutes,
     $reserved_date, $reserved_time, $notes = null,
-    $downpayment_amount = 0.0, $downpayment_method = null
+    $downpayment_amount = 0.0, $downpayment_method = null,
+    $preferred_unit_id = null   // optional: specific console the customer wants
 ) {
     global $conn;
 
@@ -942,20 +976,23 @@ function createReservation(
     }
 
     $downpayment_paid = ($downpayment_amount > 0 && $downpayment_method !== null) ? 1 : 0;
+    $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
 
     $stmt = $conn->prepare(
         "INSERT INTO reservations
-            (user_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
+            (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
              notes, downpayment_amount, downpayment_method, downpayment_paid, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
     );
     $stmt->bind_param(
-        'ississsdsii',
-        $user_id, $console_type, $rental_mode, $planned_minutes,
+        'iississsdsii',
+        $user_id, $preferred_unit_id, $console_type, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
         $user_id   // created_by = the customer themselves
     );
+
+
 
     if ($stmt->execute()) {
         $reservation_id = $conn->insert_id;
@@ -1104,6 +1141,13 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
 
         // Mark reservation as converted
         updateReservationStatus($reservation_id, 'converted', $console_id);
+
+        // ── Reset 3-strike cancellation counter (player honoured their booking) ──
+        $reset = $conn->prepare(
+            "UPDATE users SET consecutive_cancellations = 0, reservation_banned_until = NULL WHERE user_id = ?"
+        );
+        $reset->bind_param('i', $res['user_id']);
+        $reset->execute();
     }
 
     return $result;

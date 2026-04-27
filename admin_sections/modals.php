@@ -115,6 +115,7 @@
             <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
         </div>
         <form method="POST" id="startSessionForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="start_session">
             <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
             <div class="form-group">
@@ -151,23 +152,20 @@
                 <label>Duration *</label>
                 <select id="durationSelect" onchange="updateSessionPreview()">
                     <option value="" disabled selected>— Select duration —</option>
-                    <option value="30">30 minutes — ₱50</option>
-                    <option value="60">1 hour — ₱80</option>
-                    <option value="90">1 hr 30 min — ₱120</option>
-                    <option value="120">2 hours — ₱160</option>
-                    <option value="150">2 hrs 30 min — ₱200</option>
-                    <option value="180">3 hours — ₱240</option>
-                    <option value="210">3 hrs 30 min — ₱280</option>
-                    <option value="240">4 hours — ₱320</option>
-                    <option value="270">4 hrs 30 min — ₱360</option>
-                    <option value="300">5 hours — ₱400</option>
-                    <option value="330">5 hrs 30 min — ₱440</option>
-                    <option value="360">6 hours — ₱480</option>
-                    <option value="390">6 hrs 30 min — ₱520</option>
-                    <option value="420">7 hours — ₱560</option>
-                    <option value="450">7 hrs 30 min — ₱600</option>
-                    <option value="480">8 hours — ₱640</option>
+                    <?php foreach (getHourlyDurationOptions() as $opt): ?>
+                    <option value="<?= $opt['paid'] ?>"
+                            data-cost="<?= $opt['cost'] ?>"
+                            data-total="<?= $opt['total'] ?>">
+                        <?= $opt['label_paid'] ?> — ₱<?= number_format($opt['cost'], 0) ?>
+                        <?= $opt['bonus'] > 0 ? '(+' . $opt['label_bonus'] . ')' : '' ?>
+                    </option>
+                    <?php endforeach; ?>
                 </select>
+                <?php $pr = getPricingRules(); ?>
+                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:center;gap:5px;">
+                    <i class="fas fa-info-circle"></i>
+                    Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly. For longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).
+                </div>
             </div>
 
             <!-- Preview card -->
@@ -315,6 +313,14 @@
                     </span>
                     <span style="font-weight:700;color:#20c8a1;" id="endEarlyConsumedCost">₱0.00</span>
                 </div>
+                <!-- Row: Additional Fees (controller rental etc.) -->
+                <div id="endEarlyExtrasRow" style="display:none;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;">
+                    <span style="color:#aaa;">
+                        <i class="fas fa-gamepad" style="color:#8aa4e8;margin-right:6px;font-size:11px;"></i>
+                        Additional Fees <span id="endEarlyExtrasLabel" style="color:#8aa4e8;font-size:11px;"></span>
+                    </span>
+                    <span style="font-weight:700;color:#8aa4e8;" id="endEarlyExtrasAmt">+₱0.00</span>
+                </div>
                 <!-- Row: Paid -->
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);">
                     <span style="color:#aaa;">
@@ -332,7 +338,7 @@
                     <span style="font-size:20px;font-weight:900;color:#fb566b;font-family:'Outfit',monospace;" id="endEarlyRefundAmt">₱0.00</span>
                 </div>
                 <div id="endEarlyNoRefundNote" style="display:none;margin-top:8px;font-size:12px;color:#888;text-align:right;">
-                    <i class="fas fa-info-circle"></i> No refund — consumed cost covers or exceeds amount paid.
+                    <i class="fas fa-info-circle"></i> <span id="endEarlyNoRefundReason">No refund — consumed cost covers or exceeds amount paid.</span>
                 </div>
             </div>
 
@@ -367,12 +373,17 @@
                 <div style="text-align:right;">
                     <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Estimated Cost</div>
                     <div id="endEstCost" style="font-size:26px;font-weight:800;color:#20c8a1;">—</div>
+                    <!-- Extras pill badge (controller rental etc.) -->
+                    <div id="endExtrasTag" style="display:none;margin-top:4px;font-size:11px;background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.3);color:#8aa4e8;border-radius:20px;padding:2px 8px;display:inline-block;">
+                        <i class="fas fa-gamepad" style="margin-right:3px;"></i><span id="endExtrasTagText"></span>
+                    </div>
                 </div>
             </div>
             <div id="endCostNote" style="margin-top:10px;font-size:12px;color:#aaa;"></div>
         </div>
 
         <form method="POST" id="endSessionForm" onsubmit="return syncTenderedAndSubmit(event)">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="end_session">
             <input type="hidden" name="session_id" id="endSessionId">
             <!-- Synced with the visible endTendered input on submit -->
@@ -460,6 +471,7 @@
         </div>
 
         <form method="POST" id="paySessionForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="collect_payment">
             <input type="hidden" name="session_id" id="paySessionId">
 
@@ -509,6 +521,7 @@
         </div>
 
         <form method="POST" id="refundSessionForm">
+            <?= csrfField() ?>
             <!-- action is overridden to 'early_end_session' when coming from early-end flow -->
             <input type="hidden" name="action" id="refundActionField" value="issue_refund">
             <input type="hidden" name="session_id" id="refundSessionId">
@@ -537,8 +550,13 @@
                 <i class="fas fa-stop-circle" style="margin-right:5px;"></i>
                 <strong>Early End:</strong> Confirming will issue the refund above <strong>and immediately end the session</strong>.
             </div>
+            <!-- Inline error display (populated by _showRefundError()) -->
+            <div id="refundErrorMsg" style="display:none;background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.35);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fb566b;">
+                <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
+                <span id="refundErrorText"></span>
+            </div>
             <button type="button" id="refundConfirmBtn" class="btn btn-danger" style="width:100%;justify-content:center;"
-                    onclick="submitRefundForm()">
+                    onclick="_submitRefundAjax()">
                 <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
             </button>
         </form>
@@ -556,6 +574,7 @@
             <button class="modal-close" onclick="closeModal('extendSession')">&times;</button>
         </div>
 
+        <!-- Session info -->
         <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
             <strong id="extendSessionSummary">—</strong>
             <div style="margin-top:8px;font-size:13px;color:#888;">
@@ -563,7 +582,7 @@
             </div>
         </div>
 
-        <form method="POST" id="extendSessionForm">
+        <form id="extendSessionForm">
             <input type="hidden" name="action" value="extend_session">
             <input type="hidden" name="session_id" id="extendSessionId">
             <div class="form-group">
@@ -579,15 +598,259 @@
                     <option value="240">+ 4 hours — ₱320</option>
                 </select>
             </div>
-            <div style="background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#8aa4e8;">
-                <i class="fas fa-info-circle"></i> This extends the <strong>booked duration</strong> only. Use the <strong>Pay</strong> button to collect the additional fee from the customer.
+            <div class="form-group">
+                <label>Payment Method</label>
+                <select name="payment_method" id="extendPaymentMethod">
+                    <option value="cash">💵 Cash</option>
+                    <option value="gcash">📱 GCash</option>
+                </select>
             </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;background:rgba(95,133,218,.25);border:1px solid #5f85da;color:#8aa4e8;">
-                <i class="fas fa-clock"></i> Extend Session
+            <div class="form-group" style="margin-bottom:6px">
+                <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱) <span style="font-weight:400;color:#666;">(optional)</span></label>
+                <input type="number" id="extendTendered" name="tendered" min="0" step="1" placeholder="e.g. 100"
+                       style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;">
+            </div>
+            <div style="background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#8aa4e8;">
+                <i class="fas fa-info-circle"></i> Extension cost is collected immediately for hourly sessions. Open Time and Unlimited sessions have no extension charge.
+            </div>
+            <div id="extendErrorMsg" style="display:none;background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.35);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fb566b;">
+                <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
+                <span id="extendErrorText"></span>
+            </div>
+            <button type="submit" id="extendConfirmBtn" class="btn btn-primary" style="width:100%;justify-content:center;background:rgba(95,133,218,.25);border:1px solid #5f85da;color:#8aa4e8;">
+                <i class="fas fa-clock"></i> <span id="extendConfirmLabel">Extend Session</span>
             </button>
         </form>
+        <script>
+        (function() {
+            document.getElementById('extendSessionForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const sessionId    = document.getElementById('extendSessionId').value;
+                const extraMinutes = document.getElementById('extendMinutes').value;
+                const payMethod    = document.getElementById('extendPaymentMethod').value;
+                const tendered     = document.getElementById('extendTendered').value;
+                const errBox       = document.getElementById('extendErrorMsg');
+                const errText      = document.getElementById('extendErrorText');
+                const btn          = document.getElementById('extendConfirmBtn');
+                const lbl          = document.getElementById('extendConfirmLabel');
+
+                if (!extraMinutes) {
+                    errText.textContent = 'Please select additional time.';
+                    errBox.style.display = 'block';
+                    return;
+                }
+                errBox.style.display = 'none';
+                btn.disabled = true;
+                lbl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+
+                const body = new URLSearchParams({
+                    session_id:     sessionId,
+                    extra_minutes:  extraMinutes,
+                    payment_method: payMethod,
+                });
+                if (tendered) body.append('tendered', tendered);
+
+                fetch('ajax/extend_session.php', { method: 'POST', body })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            closeModal('extendSession');
+                            // Show toast then reload
+                            const toastMsg = data.message || ('Session extended by ' + extraMinutes + ' min.');
+                            const toast = document.createElement('div');
+                            toast.className = 'flash-msg success';
+                            toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + toastMsg;
+                            document.body.appendChild(toast);
+                            setTimeout(function() { location.reload(); }, 1400);
+                        } else {
+                            errText.textContent = data.message || 'Failed to extend session.';
+                            errBox.style.display = 'block';
+                            btn.disabled = false;
+                            lbl.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
+                        }
+                    })
+                    .catch(function() {
+                        errText.textContent = 'Network error — please try again.';
+                        errBox.style.display = 'block';
+                        btn.disabled = false;
+                        lbl.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
+                    });
+            });
+        })();
+        </script>
     </div>
 </div>
+
+<script>
+/* ── Extend Session Modal ──────────────────────────────────────────── */
+function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, rentalMode) {
+    document.getElementById('extendSessionId').value   = sessionId;
+    document.getElementById('extendSessionMode').value = rentalMode || 'hourly';
+    document.getElementById('extendSessionSummary').textContent =
+        customerName + ' — ' + unitNumber;
+
+    const h = Math.floor(bookedMinutes / 60), m = bookedMinutes % 60;
+    document.getElementById('extendCurrentDuration').textContent =
+        bookedMinutes ? (h ? h+'h ' : '') + (m ? m+'m' : '') : '—';
+
+    // Reset fields
+    document.getElementById('extendMinutes').value = '';
+    document.getElementById('extendCostPreview').style.display = 'none';
+    document.getElementById('extendPaymentFields').style.display = 'none';
+    document.getElementById('extendTendered').value = '';
+    document.getElementById('extendChangeDisplay').style.display = 'none';
+
+    // Load pending requests for this session
+    loadPendingExtensions(sessionId);
+
+    openModal('extendSession');
+}
+
+function loadPendingExtensions(sessionId) {
+    const section = document.getElementById('extendPendingSection');
+    const list    = document.getElementById('extendPendingList');
+    section.style.display = 'none';
+    list.innerHTML = '';
+
+    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`)
+        .then(r => r.json())
+        .then(function(data) {
+            if (!data.pending || data.pending.length === 0) return;
+            section.style.display = 'block';
+            data.pending.forEach(function(req) {
+                const cost = parseFloat(req.extra_cost);
+                const costLabel = cost > 0 ? ` — ₱${cost.toFixed(0)}` : ' — Free';
+                const card = document.createElement('div');
+                card.style.cssText = 'background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;';
+                card.innerHTML =
+                    `<span><i class="fas fa-user" style="color:#f1a83c;margin-right:5px;"></i>` +
+                    `+${req.extra_minutes} min${costLabel}</span>` +
+                    `<div style="display:flex;gap:6px;">` +
+                    `<button onclick="approveExt(${req.extension_id})" style="padding:5px 10px;border-radius:6px;background:rgba(32,200,161,.2);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-size:12px;font-weight:700;cursor:pointer;">` +
+                    `<i class="fas fa-check"></i> Approve</button>` +
+                    `<button onclick="denyExt(${req.extension_id})" style="padding:5px 10px;border-radius:6px;background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:12px;font-weight:700;cursor:pointer;">` +
+                    `<i class="fas fa-times"></i> Deny</button></div>`;
+                list.appendChild(card);
+            });
+        })
+        .catch(function() {});
+}
+
+function updateExtendCost() {
+    const mins    = parseInt(document.getElementById('extendMinutes').value) || 0;
+    const mode    = document.getElementById('extendSessionMode').value;
+    const preview = document.getElementById('extendCostPreview');
+    const payFlds = document.getElementById('extendPaymentFields');
+    const freeNote = document.getElementById('extendFreeNote');
+    const costEl  = document.getElementById('extendCostAmt');
+    const holder  = document.getElementById('extendCostHolder');
+
+    if (!mins) { preview.style.display = 'none'; payFlds.style.display = 'none'; return; }
+    preview.style.display = 'block';
+
+    if (mode === 'open_time' || mode === 'unlimited') {
+        costEl.textContent = '₱0';
+        freeNote.style.display = 'block';
+        payFlds.style.display  = 'none';
+        holder.value = '0';
+    } else {
+        // Hourly: bracket billing (mirror computeTimedCost)
+        const cost = computeExtCost(mins);
+        costEl.textContent = '₱' + cost;
+        freeNote.style.display = 'none';
+        payFlds.style.display  = 'block';
+        holder.value = cost;
+        document.getElementById('extendTendered').value = '';
+        document.getElementById('extendChangeDisplay').style.display = 'none';
+    }
+}
+
+// JS mirror of extension pricing: straight ₱80/hr, no session-start minimum
+function computeExtCost(mins) {
+    // ₱80/hr straight — 30 min = ₱40, 60 min = ₱80, etc.
+    return Math.round((mins / 60) * 80);
+}
+
+function submitExtendSession() {
+    const sessionId = document.getElementById('extendSessionId').value;
+    const mins      = document.getElementById('extendMinutes').value;
+    const mode      = document.getElementById('extendSessionMode').value;
+    const method    = document.getElementById('extendPayMethod').value;
+    const tendered  = document.getElementById('extendTendered').value;
+
+    if (!mins) { showInlineToast('Please select how much time to add.', 'error'); return; }
+
+    const btn = document.getElementById('extendSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+    const fd = new FormData();
+    fd.append('session_id',     sessionId);
+    fd.append('extra_minutes',  mins);
+    fd.append('payment_method', method);
+    if (tendered) fd.append('tendered', tendered);
+
+    fetch('ajax/extend_session.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            if (data.success) {
+                closeModal('extendSession');
+                const toastMsg = data.message
+                    ? data.message
+                    : 'Session extended! ₱' + (data.extra_cost || 0) + ' charged.';
+                showInlineToast(toastMsg, 'success');
+                setTimeout(() => location.reload(), 2200);
+            } else {
+                showInlineToast(data.message || 'Extension failed.', 'error');
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            showInlineToast('Network error — please try again.', 'error');
+        });
+}
+
+function approveExt(extId) {
+    const method = prompt('Payment method (cash / gcash / credit_card):', 'cash') || 'cash';
+    if (!method) return;
+    const fd = new FormData();
+    fd.append('action', 'approve');
+    fd.append('extension_id', extId);
+    fd.append('payment_method', method);
+    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(d) {
+            if (d.success) {
+                showInlineToast('Extension approved!', 'success');
+                loadPendingExtensions(document.getElementById('extendSessionId').value);
+                setTimeout(() => location.reload(), 1800);
+            } else {
+                showInlineToast(d.message || 'Failed to approve.', 'error');
+            }
+        });
+}
+
+function denyExt(extId) {
+    const fd = new FormData();
+    fd.append('action', 'deny');
+    fd.append('extension_id', extId);
+    fd.append('note', 'Denied by staff');
+    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(function(d) {
+            if (d.success) {
+                showInlineToast('Extension denied.', 'success');
+                loadPendingExtensions(document.getElementById('extendSessionId').value);
+            } else {
+                showInlineToast(d.message || 'Failed to deny.', 'error');
+            }
+        });
+}
+</script>
+
 
 <!-- ════ ADD RESERVATION MODAL (admin) ══════════════════════════════════ -->
 <div class="modal" id="addReservationModal">
@@ -599,6 +862,7 @@
             <button class="modal-close" onclick="closeModal('addReservation')">&times;</button>
         </div>
         <form method="POST" id="addReservationForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="add_reservation">
             <div class="form-group">
                 <label>Customer *</label>
@@ -699,6 +963,7 @@
         </div>
         <div id="convertResInfo" style="background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#aaa;"></div>
         <form method="POST" id="convertReservationForm">
+            <?= csrfField() ?>
             <input type="hidden" name="action" value="convert_reservation">
             <input type="hidden" name="reservation_id" id="convertResId">
             <div class="form-group">

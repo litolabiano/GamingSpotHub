@@ -1,14 +1,14 @@
-﻿<!-- ΓòÉΓòÉΓòÉΓòÉ RESERVATIONS ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+<!-- ════ RESERVATIONS ════════════════════════════════════════════════════ -->
 <div class="page" id="reservations">
 
     <!-- Stats summary -->
     <div class="stats-grid" style="margin-bottom:24px;">
         <?php
-            $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
-            $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
-            $resToday     = count(array_filter($upcomingReservations, fn($r) => $r['reserved_date'] === date('Y-m-d')));
-            // $resNeedRefund is computed below after $cancelledReservations is populated
-            $resNeedRefund = 0;
+        $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
+        $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
+        $resToday     = count(array_filter($upcomingReservations, fn($r) => $r['reserved_date'] === date('Y-m-d')));
+        $resNeedRefund = count(array_filter($cancelledReservations ?? [], fn($r) =>
+        $r['cancelled_by'] === 'user' && (float)$r['downpayment_amount'] > 0 && !$r['refund_issued']));
         ?>
         <div class="stat-card">
             <div class="stat-card-header">
@@ -40,25 +40,25 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value"><?= $resToday ?></div>
-                    <div class="stat-label">Today</div>
+                    <div class="stat-value"><?= $resNeedRefund ?></div>
+                    <div class="stat-label">Refunds Pending</div>
                 </div>
-                <div class="stat-icon" style="background:rgba(179,123,236,.15);color:#b37bec;"><i class="fas fa-calendar-day"></i></div>
+                <div class="stat-icon" style="background:rgba(251,86,107,.15);color:#fb566b;"><i class="fas fa-coins"></i></div>
             </div>
         </div>
     </div>
 
     <!-- Upcoming Reservations Table -->
-    <div class="card" style="border-left:3px solid #20c8a1;">
+    <div class="card" style="border-left:3px solid #20c8a1;margin-bottom:24px;">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <h3 class="card-title" style="margin:0;">
                     <i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:8px;"></i>All Upcoming Reservations
                 </h3>
                 <?php if ($resPending > 0): ?>
-                <span style="background:rgba(241,168,60,.2);color:#f1a83c;border:1px solid rgba(241,168,60,.35);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
-                    <?= $resPending ?> Pending
-                </span>
+                    <span style="background:rgba(241,168,60,.2);color:#f1a83c;border:1px solid rgba(241,168,60,.35);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
+                        <?= $resPending ?> Pending
+                    </span>
                 <?php endif; ?>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openModal('addReservation')">
@@ -67,362 +67,241 @@
         </div>
 
         <?php if (empty($upcomingReservations)): ?>
-        <div style="padding:50px;text-align:center;color:#555;">
-            <i class="fas fa-calendar-xmark" style="font-size:2.5rem;display:block;margin-bottom:12px;"></i>
-            <p style="font-size:15px;margin:0;">No upcoming reservations.</p>
-            <p style="font-size:12px;color:#444;margin-top:4px;">New reservations will appear here once added.</p>
-        </div>
+            <div style="padding:50px;text-align:center;color:#555;">
+                <i class="fas fa-calendar-xmark" style="font-size:2.5rem;display:block;margin-bottom:12px;"></i>
+                <p style="font-size:15px;margin:0;">No upcoming reservations.</p>
+                <p style="font-size:12px;color:#444;margin-top:4px;">New reservations will appear here once added.</p>
+            </div>
         <?php else: ?>
-        <div style="overflow-x:auto;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Date & Time</th>
-                        <th>Customer</th>
-                        <th>Console</th>
-                        <th>Mode</th>
-                        <th>Downpayment</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($upcomingReservations as $r):
-                    $isToday = ($r['reserved_date'] === date('Y-m-d'));
-                    $statusColors = [
-                        'pending'   => ['bg'=>'rgba(241,168,60,.12)',  'text'=>'#f1a83c',  'border'=>'rgba(241,168,60,.3)'],
-                        'confirmed' => ['bg'=>'rgba(32,200,161,.12)',  'text'=>'#20c8a1',  'border'=>'rgba(32,200,161,.3)'],
-                    ];
-                    $sc = $statusColors[$r['status']] ?? ['bg'=>'rgba(100,100,100,.1)','text'=>'#888','border'=>'rgba(100,100,100,.2)'];
-                ?>
-                <tr style="<?= $isToday ? 'background:rgba(32,200,161,.03);' : '' ?>">
-                    <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
-                    <td style="white-space:nowrap;">
-                        <?php if ($isToday): ?>
-                        <span style="color:#20c8a1;font-size:10px;font-weight:700;display:block;">TODAY</span>
-                        <?php endif; ?>
-                        <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
-                        <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
-                    </td>
-                    <td>
-                        <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
-                        <?php if ($r['customer_phone']): ?>
-                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?= htmlspecialchars($r['console_type']) ?>
-                        <?php if ($r['unit_number']): ?>
-                        <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="color:#aaa;">
-                        <?= match($r['rental_mode']) {
-                            'open_time' => 'Open Time',
-                            'unlimited' => 'Unlimited',
-                            default => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes']/60) . 'h)' : '')
-                        } ?>
-                    </td>
-                    <td>
-                        <?php if ($r['downpayment_amount'] > 0): ?>
-                        <span style="color:#20c8a1;font-weight:700;">Γé▒<?= number_format($r['downpayment_amount'], 2) ?></span>
-                        <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
-                        <?php else: ?>
-                        <span style="color:#555;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <span style="background:<?= $sc['bg'] ?>;color:<?= $sc['text'] ?>;border:1px solid <?= $sc['border'] ?>;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:uppercase;">
-                            <?= ucfirst($r['status']) ?>
-                        </span>
-                    </td>
-                    <td>
-                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                            <?php if ($r['status'] === 'pending'): ?>
-                            <form method="POST" style="display:inline;" onsubmit="return false" id="formConfirmRes<?= $r['reservation_id'] ?>">
-                                <input type="hidden" name="action" value="confirm_reservation">
-                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="button" class="btn btn-primary btn-sm" title="Confirm"
-                                        onclick="gspotConfirm('Confirm this reservation?', function(){ document.getElementById('formConfirmRes<?= $r['reservation_id'] ?>').submit(); }, {yesLabel:'Yes, Confirm'})">
-                                    <i class="fas fa-check"></i> Confirm
-                                </button>
-                            </form>
-                            <?php endif; ?>
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date &amp; Time</th>
+                            <th>Customer</th>
+                            <th>Console</th>
+                            <th>Mode</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($upcomingReservations as $r):
+                            $isToday = ($r['reserved_date'] === date('Y-m-d'));
+                            $statusColors = [
+                                'pending'   => ['bg' => 'rgba(241,168,60,.12)',  'text' => '#f1a83c',  'border' => 'rgba(241,168,60,.3)'],
+                                'confirmed' => ['bg' => 'rgba(32,200,161,.12)',  'text' => '#20c8a1',  'border' => 'rgba(32,200,161,.3)'],
+                            ];
+                            $sc = $statusColors[$r['status']] ?? ['bg' => 'rgba(100,100,100,.1)', 'text' => '#888', 'border' => 'rgba(100,100,100,.2)'];
+                        ?>
+                            <tr style="<?= $isToday ? 'background:rgba(32,200,161,.03);' : '' ?>">
+                                <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
+                                <td style="white-space:nowrap;">
+                                    <?php if ($isToday): ?>
+                                        <span style="color:#20c8a1;font-size:10px;font-weight:700;display:block;">TODAY</span>
+                                    <?php endif; ?>
+                                    <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
+                                    <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
+                                </td>
+                                <td>
+                                    <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
+                                    <?php if ($r['customer_phone']): ?>
+                                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?= htmlspecialchars($r['console_type']) ?>
+                                    <?php if ($r['unit_number']): ?>
+                                        <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="color:#aaa;">
+                                    <?= match ($r['rental_mode']) {
+                                        'open_time' => 'Open Time',
+                                        'unlimited' => 'Unlimited',
+                                        default => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes'] / 60) . 'h)' : '')
+                                    } ?>
+                                </td>
+                                <td>
+                                    <?php if ($r['downpayment_amount'] > 0): ?>
+                                        <span style="color:#20c8a1;font-weight:700;">₱<?= number_format($r['downpayment_amount'], 2) ?></span>
+                                        <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
+                                    <?php else: ?>
+                                        <span style="color:#555;">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <span style="background:<?= $sc['bg'] ?>;color:<?= $sc['text'] ?>;border:1px solid <?= $sc['border'] ?>;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:uppercase;">
+                                        <?= ucfirst($r['status']) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                        <?php if ($r['status'] === 'pending'): ?>
+                                            <form method="POST" style="display:inline;" onsubmit="return false" id="formConfirmRes<?= $r['reservation_id'] ?>">
+                                                <input type="hidden" name="action" value="confirm_reservation">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                                                <button type="button" class="btn btn-primary btn-sm" title="Confirm"
+                                                    onclick="gspotConfirm('Confirm this reservation?', function(){ document.getElementById('formConfirmRes<?= $r['reservation_id'] ?>').submit(); }, {yesLabel:'Yes, Confirm'})">
+                                                    <i class="fas fa-check"></i> Confirm
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
 
-                            <?php if (in_array($r['status'], ['pending','confirmed'])): ?>
-                            <button class="btn btn-success btn-sm"
-                                    onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
-                                    title="Convert to Session">
-                                <i class="fas fa-play"></i> Start
-                            </button>
-                            <form method="POST" style="display:inline;" onsubmit="return false" id="formNoshowRes<?= $r['reservation_id'] ?>">
-                                <input type="hidden" name="action" value="noshow_reservation">
-                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="button" class="btn btn-secondary btn-sm" title="No-show"
-                                        onclick="gspotConfirm('Mark this reservation as no-show?', function(){ document.getElementById('formNoshowRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Mark No-Show'})">
-                                    <i class="fas fa-ghost"></i>
-                                </button>
-                            </form>
-                            <form method="POST" style="display:inline;" onsubmit="return false" id="formCancelRes<?= $r['reservation_id'] ?>">
-                                <input type="hidden" name="action" value="cancel_reservation">
-                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="button" class="btn btn-danger btn-sm" title="Cancel"
-                                        onclick="gspotConfirm('Cancel this reservation?', function(){ document.getElementById('formCancelRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Yes, Cancel'})">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </form>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                                        <?php if (in_array($r['status'], ['pending', 'confirmed'])): ?>
+                                            <button class="btn btn-success btn-sm"
+                                                onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
+                                                title="Convert to Session">
+                                                <i class="fas fa-play"></i> Start
+                                            </button>
+                                            <form method="POST" style="display:inline;" onsubmit="return false" id="formNoshowRes<?= $r['reservation_id'] ?>">
+                                                <input type="hidden" name="action" value="noshow_reservation">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                                                <button type="button" class="btn btn-secondary btn-sm" title="No-show"
+                                                    onclick="gspotConfirm('Mark this reservation as no-show?', function(){ document.getElementById('formNoshowRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Mark No-Show'})">
+                                                    <i class="fas fa-ghost"></i>
+                                                </button>
+                                            </form>
+                                            <form method="POST" style="display:inline;" onsubmit="return false" id="formCancelRes<?= $r['reservation_id'] ?>">
+                                                <input type="hidden" name="action" value="cancel_reservation">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
+                                                <button type="button" class="btn btn-danger btn-sm" title="Cancel"
+                                                    onclick="gspotConfirm('Cancel this reservation?', function(){ document.getElementById('formCancelRes<?= $r['reservation_id'] ?>').submit(); }, {danger:true, yesLabel:'Yes, Cancel'})">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </div>
-<<<<<<< Updated upstream
-=======
-    <!-- ΓöÇΓöÇ Cancelled Reservations + Refund Queue ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+    <!-- ── Cancelled Reservations + Refund Queue ─────────────────────────── -->
     <?php
     $cancelledReservations = $cancelledReservations ?? [];
     $resNeedRefund = count(array_filter($cancelledReservations, fn($r) =>
-        in_array($r['cancelled_by'] ?? null, ['user', null], true)
-        && (float)($r['downpayment_amount'] ?? 0) > 0
-        && !($r['refund_issued'] ?? false)));
+    $r['cancelled_by'] === 'user' && (float)$r['downpayment_amount'] > 0 && !$r['refund_issued']));
     ?>
     <?php if (!empty($cancelledReservations)): ?>
-    <div class="card" style="border-left:3px solid #fb566b;">
-        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <h3 class="card-title" style="margin:0;">
-                    <i class="fas fa-ban" style="color:#fb566b;margin-right:8px;"></i>Cancelled Reservations
-                </h3>
-                <?php if ($resNeedRefund > 0): ?>
-                <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
-                    <?= $resNeedRefund ?> need refund
-                </span>
-                <?php endif; ?>
+        <div class="card" style="border-left:3px solid #fb566b;">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <h3 class="card-title" style="margin:0;">
+                        <i class="fas fa-ban" style="color:#fb566b;margin-right:8px;"></i>Cancelled Reservations
+                    </h3>
+                    <?php if ($resNeedRefund > 0): ?>
+                        <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
+                            <?= $resNeedRefund ?> need refund
+                        </span>
+                    <?php endif; ?>
+                </div>
             </div>
-        </div>
-        <div style="overflow-x:auto;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Date &amp; Time</th>
-                        <th>Customer</th>
-                        <th>Console</th>
-                        <th>Mode</th>
-                        <th>Payment</th>
-                        <th>Cancelled By</th>
-                        <th>Refund</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($cancelledReservations as $r):
-                    // Eligible for refund: cancelled by user OR NULL (pre-migration rows)
-                    //   AND a payment was made AND not yet refunded
-                    $needsRefund    = in_array($r['cancelled_by'] ?? null, ['user', null], true)
-                                   && ((float)($r['downpayment_amount'] ?? 0) > 0)
-                                   && !($r['refund_issued'] ?? false);
-                    $alreadyRefunded = (int)($r['refund_issued'] ?? 0) === 1;
-                ?>
-                <tr style="opacity:<?= $alreadyRefunded ? '.5' : '1' ?>;">
-                    <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
-                    <td style="white-space:nowrap;">
-                        <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
-                        <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
-                    </td>
-                    <td>
-                        <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
-                        <?php if (!empty($r['customer_phone'])): ?>
-                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?= htmlspecialchars($r['console_type']) ?>
-                        <?php if (!empty($r['unit_number'])): ?>
-                        <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="color:#aaa;">
-                        <?= match($r['rental_mode']) {
-                            'open_time' => 'Open Time',
-                            'unlimited' => 'Unlimited',
-                            default     => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes']/60) . 'h)' : '')
-                        } ?>
-                    </td>
-                    <td>
-                        <?php if ((float)$r['downpayment_amount'] > 0): ?>
-                        <span style="color:#20c8a1;font-weight:700;">Γé▒<?= number_format((float)$r['downpayment_amount'], 2) ?></span>
-                        <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
-                        <?php else: ?>
-                        <span style="color:#555;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($r['cancelled_by'] === 'user'): ?>
-                        <span style="background:rgba(251,86,107,.1);color:#fb566b;border:1px solid rgba(251,86,107,.25);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
-                            <i class="fas fa-user" style="margin-right:3px;"></i>Customer
-                        </span>
-                        <?php elseif ($r['cancelled_by'] === 'admin'): ?>
-                        <span style="background:rgba(150,150,150,.1);color:#888;border:1px solid rgba(150,150,150,.2);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
-                            <i class="fas fa-user-shield" style="margin-right:3px;"></i>Staff
-                        </span>
-                        <?php else: ?>
-                        <span style="color:#888;font-size:11px;font-style:italic;">Unknown</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($alreadyRefunded): ?>
-                        <span style="color:#20c8a1;font-size:12px;font-weight:700;">
-                            <i class="fas fa-check-circle"></i> Refunded
-                        </span>
-                        <?php elseif ($needsRefund): ?>
-                        <!-- Uses the shared refundSessionModal via openRefundModal() ΓÇö 5th arg = reservationId -->
-                        <button
-                            style="padding:5px 12px;border-radius:8px;border:1px solid rgba(241,168,60,.5);
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date &amp; Time</th>
+                            <th>Customer</th>
+                            <th>Console</th>
+                            <th>Mode</th>
+                            <th>Payment</th>
+                            <th>Cancelled By</th>
+                            <th>Refund</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($cancelledReservations as $r):
+                            // Eligible for refund: cancelled by user OR NULL (pre-migration rows)
+                            //   AND a payment was made AND not yet refunded
+                            $needsRefund    = in_array($r['cancelled_by'], ['user', null], true)
+                                && ((float)$r['downpayment_amount'] > 0)
+                                && !$r['refund_issued'];
+                            $alreadyRefunded = (int)$r['refund_issued'] === 1;
+                        ?>
+                            <tr style="opacity:<?= $alreadyRefunded ? '.5' : '1' ?>;">
+                                <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
+                                <td style="white-space:nowrap;">
+                                    <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
+                                    <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
+                                </td>
+                                <td>
+                                    <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
+                                    <?php if (!empty($r['customer_phone'])): ?>
+                                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?= htmlspecialchars($r['console_type']) ?>
+                                    <?php if (!empty($r['unit_number'])): ?>
+                                        <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="color:#aaa;">
+                                    <?= match ($r['rental_mode']) {
+                                        'open_time' => 'Open Time',
+                                        'unlimited' => 'Unlimited',
+                                        default     => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes'] / 60) . 'h)' : '')
+                                    } ?>
+                                </td>
+                                <td>
+                                    <?php if ((float)$r['downpayment_amount'] > 0): ?>
+                                        <span style="color:#20c8a1;font-weight:700;">₱<?= number_format((float)$r['downpayment_amount'], 2) ?></span>
+                                        <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
+                                    <?php else: ?>
+                                        <span style="color:#555;">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($r['cancelled_by'] === 'user'): ?>
+                                        <span style="background:rgba(251,86,107,.1);color:#fb566b;border:1px solid rgba(251,86,107,.25);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
+                                            <i class="fas fa-user" style="margin-right:3px;"></i>Customer
+                                        </span>
+                                    <?php elseif ($r['cancelled_by'] === 'admin'): ?>
+                                        <span style="background:rgba(150,150,150,.1);color:#888;border:1px solid rgba(150,150,150,.2);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
+                                            <i class="fas fa-user-shield" style="margin-right:3px;"></i>Staff
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="color:#888;font-size:11px;font-style:italic;">Unknown</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($alreadyRefunded): ?>
+                                        <span style="color:#20c8a1;font-size:12px;font-weight:700;">
+                                            <i class="fas fa-check-circle"></i> Refunded
+                                        </span>
+                                    <?php elseif ($needsRefund): ?>
+                                        <!-- Uses the shared refundSessionModal via openRefundModal() — 5th arg = reservationId -->
+                                        <button
+                                            style="padding:5px 12px;border-radius:8px;border:1px solid rgba(241,168,60,.5);
                                    background:rgba(241,168,60,.12);color:#f1a83c;font-size:11px;font-weight:700;cursor:pointer;"
-                            onclick="openRefundModal(
+                                            onclick="openRefundModal(
                                 null,
                                 '<?= addslashes(htmlspecialchars($r['customer_name'])) ?>',
                                 '<?= addslashes(htmlspecialchars($r['console_type'])) ?>',
                                 <?= (float)$r['downpayment_amount'] ?>,
                                 <?= $r['reservation_id'] ?>
                             )">
-                            <i class="fas fa-coins"></i> Refund Γé▒<?= number_format((float)$r['downpayment_amount'], 2) ?>
-                        </button>
-                        <?php else: ?>
-                        <span style="color:#555;font-size:12px;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <?php endif; ?>
-
-    <!-- ΓöÇΓöÇ Cancelled Reservations + Refund Queue ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
-    <?php if (!empty($cancelledReservations)): ?>
-    <div class="card" style="border-left:3px solid #fb566b;">
-        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <h3 class="card-title" style="margin:0;">
-                    <i class="fas fa-ban" style="color:#fb566b;margin-right:8px;"></i>Cancelled Reservations
-                </h3>
-                <?php if ($resNeedRefund > 0): ?>
-                <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
-                    <?= $resNeedRefund ?> need refund
-                </span>
-                <?php endif; ?>
+                                            <i class="fas fa-coins"></i> Refund ₱<?= number_format((float)$r['downpayment_amount'], 2) ?>
+                                        </button>
+                                    <?php else: ?>
+                                        <span style="color:#555;font-size:12px;">—</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div style="overflow-x:auto;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Date &amp; Time</th>
-                        <th>Customer</th>
-                        <th>Console</th>
-                        <th>Mode</th>
-                        <th>Payment</th>
-                        <th>Cancelled By</th>
-                        <th>Refund</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($cancelledReservations as $r):
-                    $needsRefund = in_array($r['cancelled_by'] ?? null, ['user', null], true)
-                                && ((float)($r['downpayment_amount'] ?? 0) > 0)
-                                && !($r['refund_issued'] ?? false);
-                    $alreadyRefunded = ($r['refund_issued'] ?? 0) == 1;
-                ?>
-                <tr style="opacity:<?= $alreadyRefunded ? '.55' : '1' ?>;">
-                    <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
-                    <td style="white-space:nowrap;">
-                        <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
-                        <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
-                    </td>
-                    <td>
-                        <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
-                        <?php if ($r['customer_phone']): ?>
-                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?= htmlspecialchars($r['console_type']) ?>
-                        <?php if ($r['unit_number']): ?>
-                        <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="color:#aaa;">
-                        <?= match($r['rental_mode']) {
-                            'open_time' => 'Open Time',
-                            'unlimited' => 'Unlimited',
-                            default     => 'Hourly' . ($r['planned_minutes'] ? ' (' . ($r['planned_minutes']/60) . 'h)' : '')
-                        } ?>
-                    </td>
-                    <td>
-                        <?php if ((float)$r['downpayment_amount'] > 0): ?>
-                        <span style="color:#20c8a1;font-weight:700;">Γé▒<?= number_format($r['downpayment_amount'], 2) ?></span>
-                        <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
-                        <?php else: ?>
-                        <span style="color:#555;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($r['cancelled_by'] === 'user'): ?>
-                        <span style="background:rgba(251,86,107,.1);color:#fb566b;border:1px solid rgba(251,86,107,.25);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
-                            <i class="fas fa-user" style="margin-right:3px;"></i>Customer
-                        </span>
-                        <?php elseif ($r['cancelled_by'] === 'admin'): ?>
-                        <span style="background:rgba(150,150,150,.1);color:#888;border:1px solid rgba(150,150,150,.2);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
-                            <i class="fas fa-user-shield" style="margin-right:3px;"></i>Staff
-                        </span>
-                        <?php else: ?>
-                        <span style="color:#555;font-size:12px;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($alreadyRefunded): ?>
-                        <span style="color:#20c8a1;font-size:12px;font-weight:700;">
-                            <i class="fas fa-check-circle"></i> Refunded
-                        </span>
-                        <?php elseif ($needsRefund): ?>
-                        <form method="POST" style="display:inline;" onsubmit="return false" id="formRefund<?= $r['reservation_id'] ?>">
-                            <input type="hidden" name="action" value="process_refund">
-                            <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                            <button type="button"
-                                    style="padding:5px 12px;border-radius:8px;border:1px solid rgba(241,168,60,.5);
-                                           background:rgba(241,168,60,.12);color:#f1a83c;font-size:11px;font-weight:700;cursor:pointer;"
-                                    onclick="gspotConfirm(
-                                        'Issue refund of Γé▒<?= number_format($r['downpayment_amount'], 2) ?> to <?= addslashes(htmlspecialchars($r['customer_name'])) ?>?',
-                                        function(){ document.getElementById(\'formRefund<?= $r['reservation_id'] ?>\').submit(); },
-                                        {yesLabel:'Yes, Refund', danger:false}
-                                    )">
-                                <i class="fas fa-coins"></i> Refund Γé▒<?= number_format($r['downpayment_amount'], 2) ?>
-                            </button>
-                        </form>
-                        <?php else: ?>
-                        <span style="color:#555;font-size:12px;">ΓÇö</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
     <?php endif; ?>
-<<<<<<< Updated upstream
 </div>
-=======
->>>>>>> Stashed changes
-
-</div>
->>>>>>> Stashed changes
