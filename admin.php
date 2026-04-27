@@ -811,6 +811,44 @@ $typeCounts = array_column($typeUsage, 'cnt');
             width: auto;
         }
         .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
+
+        /* ── Admin topbar user dropdown ── */
+        .admin-user-dropdown { position:relative; }
+        .admin-user-toggle {
+            display:flex; align-items:center; gap:10px;
+            background:none; border:none; cursor:pointer;
+            color:inherit; padding:6px 10px;
+            border-radius:10px; transition:background .2s;
+        }
+        .admin-user-toggle:hover { background:rgba(255,255,255,.07); }
+        .admin-user-dropdown.open .admin-user-toggle .fa-chevron-down { transform:rotate(180deg); }
+        .admin-user-menu {
+            display:none; position:absolute; right:0; top:calc(100% + 8px);
+            min-width:220px; background:#0d1b3e;
+            border:1px solid rgba(95,133,218,.25); border-radius:14px;
+            box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:9999;
+            overflow:hidden; animation:fadeInDown .18s ease;
+        }
+        .admin-user-dropdown.open .admin-user-menu { display:block; }
+        @keyframes fadeInDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        .admin-dropdown-header {
+            display:flex; align-items:center; gap:12px;
+            padding:16px 16px 12px;
+        }
+        .admin-dropdown-name  { font-weight:700; font-size:14px; color:#f0f0f0; }
+        .admin-dropdown-email { font-size:12px; color:#718096; margin-top:2px; }
+        .admin-dropdown-divider { height:1px; background:rgba(95,133,218,.15); margin:0 12px; }
+        .admin-dropdown-item {
+            display:flex; align-items:center; gap:10px;
+            padding:11px 16px; font-size:14px; color:#ccc;
+            text-decoration:none; transition:background .15s, color .15s;
+        }
+        .admin-dropdown-item:hover { background:rgba(255,255,255,.06); color:#fff; }
+        .admin-dropdown-danger { color:#fb566b !important; }
+        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; color:#fb566b !important; }
+        .user-avatar-lg {
+            width:42px; height:42px; font-size:16px; flex-shrink:0;
+        }
     </style>
 </head>
 <body>
@@ -828,7 +866,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        <a class="navbar-brand sidebar-logo" href="index.php">
+        <a class="navbar-brand sidebar-logo" >
             <div class="logo-container">
                 <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
                 <span class="logo-text">GAMING HUB</span>
@@ -886,10 +924,6 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
-    <div style="flex:1"></div>
-    <a href="index.php" class="nav-item" style="text-decoration:none;color:inherit;border-top:1px solid rgba(255,255,255,.1);padding-top:15px">
-        <i class="fas fa-arrow-left"></i><span>Back to Site</span>
-    </a>
 </div>
 
 <!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
@@ -902,11 +936,28 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
             <i class="fas fa-plus"></i> New Session
         </button>
-        <div class="user-profile" style="margin-left:12px">
-            <div class="user-avatar"><?= getUserInitials() ?></div>
-            <div>
-                <div style="font-weight:600;font-size:14px"><?= htmlspecialchars($user['full_name']) ?></div>
-                <div style="font-size:12px;color:#718096"><?= getRoleBadge() ?></div>
+        <!-- Admin user dropdown -->
+        <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px">
+            <button class="admin-user-toggle" id="adminUserBtn">
+                <div class="user-avatar"><?= getUserInitials() ?></div>
+                <div>
+                    <div style="font-weight:600;font-size:14px;line-height:1.2"><?= htmlspecialchars($user['full_name']) ?></div>
+                    <div style="font-size:11px;color:#718096"><?= getRoleBadge() ?></div>
+                </div>
+                <i class="fas fa-chevron-down" style="font-size:11px;color:#718096;margin-left:6px;transition:transform .2s"></i>
+            </button>
+            <div class="admin-user-menu" id="adminUserMenu">
+                <div class="admin-dropdown-header">
+                    <div class="user-avatar user-avatar-lg"><?= getUserInitials() ?></div>
+                    <div>
+                        <div class="admin-dropdown-name"><?= htmlspecialchars($user['full_name']) ?></div>
+                        <div class="admin-dropdown-email"><?= htmlspecialchars($user['email']) ?></div>
+                    </div>
+                </div>
+                <div class="admin-dropdown-divider"></div>
+                <a href="<?= getBaseUrl() ?>/auth/logout.php" class="admin-dropdown-item admin-dropdown-danger">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </a>
             </div>
         </div>
     </div>
@@ -1951,6 +2002,20 @@ function renderCharts() {
 }
 
 AOS.init({ duration: 600, once: true });
+
+// ── Admin topbar user dropdown ──────────────────────────────────────────────
+(function () {
+    const btn      = document.getElementById('adminUserBtn');
+    const dropdown = document.getElementById('adminUserDropdown');
+    if (!btn || !dropdown) return;
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+})();
 </script>
 </body>
 </html>
