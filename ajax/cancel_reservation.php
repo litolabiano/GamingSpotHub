@@ -84,6 +84,36 @@ $stmt2 = $conn->prepare(
 $stmt2->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
 $stmt2->execute();
 
+// ── Log this cancellation event to reservation_cancellations ─────────────────
+// Fetch the reservation details needed for the log (console_type, rental_mode, reserved_date, downpayment)
+$logFetch = $conn->prepare(
+    "SELECT console_type, rental_mode, reserved_date, downpayment_amount
+       FROM reservations WHERE reservation_id = ?"
+);
+$logFetch->bind_param('i', $res_id);
+$logFetch->execute();
+$logRow = $logFetch->get_result()->fetch_assoc();
+if ($logRow) {
+    $logStmt = $conn->prepare(
+        "INSERT INTO reservation_cancellations
+             (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
+              console_type, rental_mode, reserved_date, downpayment_amount, refund_issued, cancelled_at)
+         VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?, 0, NOW())"
+    );
+    $logStmt->bind_param(
+        'iissssssd',
+        $res_id,
+        $uid,
+        $reasonType,
+        $reasonDetail,
+        $logRow['console_type'],
+        $logRow['rental_mode'],
+        $logRow['reserved_date'],
+        $logRow['downpayment_amount']
+    );
+    $logStmt->execute();
+}
+
 // ── Update cancellation streak on the user ───────────────────────────────────
 $su = $conn->prepare("SELECT consecutive_cancellations FROM users WHERE user_id = ?");
 $su->bind_param('i', $uid);

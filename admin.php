@@ -281,6 +281,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
             $stmt->execute();
+
+            // ── Log to reservation_cancellations audit table ──────────────
+            $logFetch = $conn->prepare(
+                "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount, refund_issued
+                   FROM reservations WHERE reservation_id = ?"
+            );
+            $logFetch->bind_param('i', $res_id);
+            $logFetch->execute();
+            $logRow = $logFetch->get_result()->fetch_assoc();
+            if ($logRow) {
+                $logStmt = $conn->prepare(
+                    "INSERT INTO reservation_cancellations
+                         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
+                          console_type, rental_mode, reserved_date, downpayment_amount, refund_issued, cancelled_at)
+                     VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, ?, NOW())"
+                );
+                $logStmt->bind_param(
+                    'iissssssdi',
+                    $res_id,
+                    $logRow['user_id'],
+                    $reasonType,
+                    $reasonDetail,
+                    $logRow['console_type'],
+                    $logRow['rental_mode'],
+                    $logRow['reserved_date'],
+                    $logRow['downpayment_amount'],
+                    $logRow['refund_issued']
+                );
+                $logStmt->execute();
+            }
+
             $message     = 'Reservation #' . $res_id . ' cancelled.';
             $messageType = 'success';
         }
@@ -315,6 +346,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt2 = $conn->prepare("UPDATE reservations SET refund_issued = 1 WHERE reservation_id = ?");
                 $stmt2->bind_param('i', $res_id);
                 $stmt2->execute();
+
+                // Keep cancellations log in sync
+                $syncStmt = $conn->prepare("UPDATE reservation_cancellations SET refund_issued = 1 WHERE reservation_id = ?");
+                $syncStmt->bind_param('i', $res_id);
+                $syncStmt->execute();
 
                 $message     = '₱' . number_format($refundAmt, 2) . ' refund issued for reservation #' . $res_id . '.';
                 $messageType = 'success';
@@ -667,6 +703,55 @@ foreach ($recentSessions as $sess) {
 
 // Console usage (all time)
 $usageReport = getConsoleUsageReport('2020-01-01', $today);
+
+// ── Cancellation Analytics (for Reports tab) ──────────────────────────────────
+
+// Overall counts
+$cancelStatsRow = $conn->query(
+    "SELECT
+        COUNT(*)                                                      AS total_cancels,
+        SUM(cancelled_by = 'user')                                    AS user_cancels,
+        SUM(cancelled_by = 'admin')                                   AS admin_cancels,
+        SUM(refund_issued = 1)                                        AS refunds_issued,
+        COALESCE(SUM(downpayment_amount),0)                           AS total_downpayments,
+        COALESCE(SUM(CASE WHEN refund_issued=1 THEN downpayment_amount ELSE 0 END),0) AS total_refunded
+     FROM reservation_cancellations"
+)->fetch_assoc();
+
+// Reasons breakdown (for doughnut chart)
+$cancelReasons = $conn->query(
+    "SELECT cancel_reason_type AS reason, COUNT(*) AS cnt
+       FROM reservation_cancellations
+      GROUP BY cancel_reason_type
+      ORDER BY cnt DESC"
+)->fetch_all(MYSQLI_ASSOC);
+
+// Cancellations by console type
+$cancelByConsole = $conn->query(
+    "SELECT console_type, COUNT(*) AS cnt
+       FROM reservation_cancellations
+      GROUP BY console_type
+      ORDER BY cnt DESC"
+)->fetch_all(MYSQLI_ASSOC);
+
+// Cancellations over last 30 days (line chart)
+$cancelTrend = [];
+$cancelTrendLabels = [];
+for ($i = 29; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-{$i} days"));
+    $cancelTrendLabels[] = date('M d', strtotime($d));
+    $cs = $conn->prepare(
+        "SELECT COUNT(*) AS cnt FROM reservation_cancellations WHERE DATE(cancelled_at) = ?"
+    );
+    $cs->bind_param('s', $d);
+    $cs->execute();
+    $cancelTrend[] = (int)$cs->get_result()->fetch_assoc()['cnt'];
+}
+
+// Cancelled-by breakdown (for doughnut)
+$cancelByWho = $conn->query(
+    "SELECT cancelled_by, COUNT(*) AS cnt FROM reservation_cancellations GROUP BY cancelled_by"
+)->fetch_all(MYSQLI_ASSOC);
 
 // Settings
 $settingsKeys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',

@@ -148,6 +148,35 @@ for ($i = 13; $i >= 0; $i--) {
     $spendData[] = (float) $s->get_result()->fetch_assoc()['rev'];
 }
 
+// ── My Cancellations ────────────────────────────────────────────────────────
+$myCancels = [];
+$cancelLog = $conn->prepare(
+    "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
+            rc.cancel_reason_type, rc.cancel_reason_detail,
+            rc.console_type, rc.rental_mode, rc.reserved_date,
+            rc.downpayment_amount, rc.refund_issued, rc.cancelled_at
+       FROM reservation_cancellations rc
+      WHERE rc.user_id = ?
+      ORDER BY rc.cancelled_at DESC
+      LIMIT 50"
+);
+$cancelLog->bind_param('i', $user_id);
+$cancelLog->execute();
+$myCancels = $cancelLog->get_result()->fetch_all(MYSQLI_ASSOC);
+
+$myCancelCount = count($myCancels);
+
+// Reason label map (shared with JS)
+$cancelReasonLabelMap = [
+    'schedule_change'   => 'Schedule Changed',
+    'found_alternative' => 'Found Alternative',
+    'budget_issue'      => 'Budget Issue',
+    'technical_issue'   => 'Technical Issue',
+    'emergency'         => 'Emergency',
+    'other'             => 'Other',
+    'admin_decision'    => 'Admin Decision',
+];
+
 // Helper
 function fmtMins(int $m): string {
     if ($m <= 0) return '0m';
@@ -611,6 +640,15 @@ function fmtMins(int $m): string {
         <button class="cd-nav-btn" onclick="cdShowPage('stats',this)" id="navStats">
             <i class="fas fa-trophy"></i> My Stats
         </button>
+        <button class="cd-nav-btn" onclick="cdShowPage('cancellations',this)" id="navCancellations">
+            <i class="fas fa-ban"></i> My Cancellations
+            <?php if ($myCancelCount > 0): ?>
+            <span style="margin-left:auto;background:rgba(251,86,107,.9);color:#fff;font-size:10px;font-weight:800;
+                padding:1px 7px;border-radius:10px;min-width:18px;text-align:center;">
+                <?= $myCancelCount ?>
+            </span>
+            <?php endif; ?>
+        </button>
 
         <div class="cd-nav-spacer"></div>
 
@@ -625,6 +663,7 @@ function fmtMins(int $m): string {
             <button class="cd-nav-btn" onclick="cdShowPage('sessions',this)" style="white-space:nowrap"><i class="fas fa-play-circle"></i> Sessions</button>
             <button class="cd-nav-btn" onclick="cdShowPage('reservations',this)" style="white-space:nowrap"><i class="fas fa-calendar-check"></i> Reservations</button>
             <button class="cd-nav-btn" onclick="cdShowPage('stats',this)" style="white-space:nowrap"><i class="fas fa-trophy"></i> My Stats</button>
+            <button class="cd-nav-btn" onclick="cdShowPage('cancellations',this)" style="white-space:nowrap"><i class="fas fa-ban"></i> Cancellations</button>
         </div>
 
 
@@ -1312,6 +1351,223 @@ function fmtMins(int $m): string {
             </div>
         </div>
 
+        <!-- ══ PAGE: MY CANCELLATIONS ════════════════════════════════════ -->
+        <?php
+            // Aggregate per-reason counts for mini doughnut
+            $myReasonCounts = [];
+            foreach ($myCancels as $mc) {
+                $rt = $mc['cancel_reason_type'] ?? 'other';
+                $myReasonCounts[$rt] = ($myReasonCounts[$rt] ?? 0) + 1;
+            }
+            $myReasonChartLabels = array_map(fn($k) => $cancelReasonLabelMap[$k] ?? ucfirst($k), array_keys($myReasonCounts));
+            $myReasonChartCounts = array_values($myReasonCounts);
+
+            // Count refunded
+            $myRefundCount    = count(array_filter($myCancels, fn($c) => $c['refund_issued']));
+            $myUserCancelCnt  = count(array_filter($myCancels, fn($c) => $c['cancelled_by'] === 'user'));
+            $myAdminCancelCnt = count(array_filter($myCancels, fn($c) => $c['cancelled_by'] === 'admin'));
+        ?>
+        <div class="cd-page" id="page-cancellations">
+            <h2 class="cd-section-title"><i class="fas fa-ban" style="color:var(--coral)"></i> My Cancellations</h2>
+
+            <!-- Stat cards -->
+            <div class="cd-stats" style="margin-bottom:24px">
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#fb566b"><?= $myCancelCount ?></div>
+                            <div class="cd-stat-label">Total Cancellations</div>
+                        </div>
+                        <div class="cd-stat-icon coral"><i class="fas fa-ban"></i></div>
+                    </div>
+                </div>
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#f1a83c"><?= $myUserCancelCnt ?></div>
+                            <div class="cd-stat-label">You Cancelled</div>
+                        </div>
+                        <div class="cd-stat-icon gold"><i class="fas fa-user-times"></i></div>
+                    </div>
+                </div>
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#b37bec"><?= $myAdminCancelCnt ?></div>
+                            <div class="cd-stat-label">Admin Cancelled</div>
+                        </div>
+                        <div class="cd-stat-icon purple"><i class="fas fa-shield-alt"></i></div>
+                    </div>
+                </div>
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#20c8a1"><?= $myRefundCount ?></div>
+                            <div class="cd-stat-label">Refunds Received</div>
+                        </div>
+                        <div class="cd-stat-icon mint"><i class="fas fa-undo-alt"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <?php if ($myCancelCount > 0): ?>
+            <!-- Charts row -->
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px;margin-bottom:24px">
+                <div class="cd-card">
+                    <div class="cd-card-header">
+                        <div class="cd-card-title"><i class="fas fa-chart-pie"></i> Reasons</div>
+                    </div>
+                    <div style="position:relative;height:200px;display:flex;align-items:center;justify-content:center">
+                        <canvas id="myCancelReasonChart"></canvas>
+                    </div>
+                </div>
+                <div class="cd-card">
+                    <div class="cd-card-header">
+                        <div class="cd-card-title"><i class="fas fa-info-circle"></i> What This Means</div>
+                    </div>
+                    <div style="padding:8px 0">
+                        <?php
+                        $streak = (int)($banData['consecutive_cancellations'] ?? 0);
+                        $streakPct = min(100, $streak / 3 * 100);
+                        ?>
+                        <div style="margin-bottom:16px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <span style="font-size:13px;color:var(--text)">Cancellation Streak</span>
+                                <span style="font-size:13px;font-weight:700;color:<?= $streak >= 2 ? 'var(--coral)' : 'var(--mint)' ?>">
+                                    <?= $streak ?>/3
+                                </span>
+                            </div>
+                            <div class="cd-progress-bar">
+                                <div class="cd-progress-fill" style="width:<?= $streakPct ?>%;background:<?= $streak >= 2 ? 'linear-gradient(90deg,#f1a83c,#fb566b)' : 'linear-gradient(90deg,var(--mint),var(--blue))' ?>"></div>
+                            </div>
+                            <div style="font-size:11px;color:var(--muted);margin-top:6px">
+                                <?php if ($isBanned): ?>
+                                <span style="color:var(--coral)"><i class="fas fa-ban" style="margin-right:4px"></i>You are currently banned from reservations until <?= $banExpiry ?>.</span>
+                                <?php elseif ($streak >= 2): ?>
+                                <span style="color:#f1a83c"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Warning — 1 more cancellation will trigger a 7-day ban.</span>
+                                <?php else: ?>
+                                <span style="color:var(--muted)">Good standing — no restrictions.</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div style="background:rgba(251,86,107,.06);border:1px solid rgba(251,86,107,.15);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(255,255,255,.6);line-height:1.7">
+                            <i class="fas fa-lightbulb" style="color:#f1a83c;margin-right:6px"></i>
+                            Consistent cancellations can lead to a reservation ban. Walk-in access is never affected.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cancellations table -->
+            <div class="cd-card">
+                <div class="cd-card-header">
+                    <div class="cd-card-title"><i class="fas fa-history"></i> Cancellation History</div>
+                </div>
+                <div style="overflow-x:auto">
+                <table class="cd-table">
+                    <thead><tr>
+                        <th>Date Cancelled</th>
+                        <th>Console</th>
+                        <th>Mode</th>
+                        <th>Reserved For</th>
+                        <th>Reason</th>
+                        <th>Cancelled By</th>
+                        <th>Downpayment</th>
+                        <th>Refund</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($myCancels as $mc):
+                        $rtLabel = $cancelReasonLabelMap[$mc['cancel_reason_type']] ?? ucfirst(str_replace('_',' ',$mc['cancel_reason_type']));
+                        $modeLabel = match($mc['rental_mode']) {
+                            'open_time' => 'Open Time',
+                            'unlimited' => 'Unlimited',
+                            default     => 'Hourly'
+                        };
+                    ?>
+                    <tr>
+                        <td>
+                            <strong><?= date('M d, Y', strtotime($mc['cancelled_at'])) ?></strong><br>
+                            <span style="color:var(--muted);font-size:11px"><?= date('h:i A', strtotime($mc['cancelled_at'])) ?></span>
+                        </td>
+                        <td><?= htmlspecialchars($mc['console_type']) ?></td>
+                        <td><?= $modeLabel ?></td>
+                        <td><?= date('M d, Y', strtotime($mc['reserved_date'])) ?></td>
+                        <td>
+                            <span class="cd-badge coral" style="font-size:10px"><?= htmlspecialchars($rtLabel) ?></span>
+                            <?php if (!empty($mc['cancel_reason_detail'])): ?>
+                            <div style="font-size:11px;color:var(--muted);margin-top:3px;max-width:180px;white-space:normal">
+                                <?= htmlspecialchars(mb_strimwidth($mc['cancel_reason_detail'], 0, 60, '…')) ?>
+                            </div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($mc['cancelled_by'] === 'user'): ?>
+                            <span class="cd-badge gold"><i class="fas fa-user" style="margin-right:4px"></i>You</span>
+                            <?php else: ?>
+                            <span class="cd-badge purple"><i class="fas fa-shield-alt" style="margin-right:4px"></i>Staff</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ((float)$mc['downpayment_amount'] > 0): ?>
+                            <span style="color:var(--coral)">₱<?= number_format($mc['downpayment_amount'], 2) ?></span>
+                            <?php else: ?>
+                            <span style="color:var(--muted)">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($mc['refund_issued']): ?>
+                            <span class="cd-badge mint"><i class="fas fa-check" style="margin-right:4px"></i>Refunded</span>
+                            <?php elseif ((float)$mc['downpayment_amount'] > 0): ?>
+                            <span class="cd-badge gray">Pending</span>
+                            <?php else: ?>
+                            <span style="color:var(--muted)">—</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <?php else: ?>
+            <div class="cd-empty">
+                <i class="fas fa-check-circle" style="color:var(--mint)"></i>
+                <p>No cancellations on record — great track record! 🎉</p>
+            </div>
+            <?php endif; ?>
+        </div><!-- /page-cancellations -->
+
+        <!-- Mini reason chart for cancellations page -->
+        <script>
+        (function(){
+            <?php if ($myCancelCount > 0 && !empty($myReasonChartLabels)): ?>
+            const mcrCtx = document.getElementById('myCancelReasonChart');
+            if (mcrCtx) {
+                new Chart(mcrCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: <?= json_encode($myReasonChartLabels) ?>,
+                        datasets: [{
+                            data: <?= json_encode($myReasonChartCounts) ?>,
+                            backgroundColor: ['#fb566b','#f1a83c','#5f85da','#20c8a1','#b37bec','#38bdf8','#fb923c'],
+                            borderWidth: 2,
+                            borderColor: '#0d1117',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '65%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', font: { size: 10 }, padding: 8 } }
+                        }
+                    }
+                });
+            }
+            <?php endif; ?>
+        })();
+        </script>
+
     </main>
 </div>
 
@@ -1328,9 +1584,9 @@ function cdShowPage(page, el) {
 // Restore page from hash
 (function () {
     const hash = location.hash.replace('#', '');
-    const valid = ['overview','sessions','reservations','stats'];
+    const valid = ['overview','sessions','reservations','stats','cancellations'];
     if (hash && valid.includes(hash)) {
-        const navId = { overview:'navOverview', sessions:'navSessions', reservations:'navReservations', stats:'navStats' };
+        const navId = { overview:'navOverview', sessions:'navSessions', reservations:'navReservations', stats:'navStats', cancellations:'navCancellations' };
         cdShowPage(hash, document.getElementById(navId[hash]));
     }
 })();
