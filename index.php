@@ -1,4 +1,12 @@
-<?php require_once __DIR__ . '/includes/session_helper.php'; ?>
+<?php
+require_once __DIR__ . '/includes/session_helper.php';
+
+// Admins have no business on the public landing page — send them straight to the dashboard.
+if (isLoggedIn() && in_array($_SESSION['role'] ?? '', ['owner', 'shopkeeper'])) {
+    header('Location: ' . getBaseUrl() . '/admin.php');
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>

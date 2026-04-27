@@ -700,6 +700,11 @@ $typeUsage = $conn->query(
 )->fetch_all(MYSQLI_ASSOC);
 $typeLabels = array_column($typeUsage, 'console_type');
 $typeCounts = array_column($typeUsage, 'cnt');
+
+// Baseline reservation_id for the notification poller
+// JS will use this so it never alerts on reservations that existed at page load.
+$initResRow = $conn->query("SELECT COALESCE(MAX(reservation_id), 0) AS max_id FROM reservations");
+$initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -832,6 +837,44 @@ $typeCounts = array_column($typeUsage, 'cnt');
             width: auto;
         }
         .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
+
+        /* ── Admin topbar user dropdown ── */
+        .admin-user-dropdown { position:relative; }
+        .admin-user-toggle {
+            display:flex; align-items:center; gap:10px;
+            background:none; border:none; cursor:pointer;
+            color:inherit; padding:6px 10px;
+            border-radius:10px; transition:background .2s;
+        }
+        .admin-user-toggle:hover { background:rgba(255,255,255,.07); }
+        .admin-user-dropdown.open .admin-user-toggle .fa-chevron-down { transform:rotate(180deg); }
+        .admin-user-menu {
+            display:none; position:absolute; right:0; top:calc(100% + 8px);
+            min-width:220px; background:#0d1b3e;
+            border:1px solid rgba(95,133,218,.25); border-radius:14px;
+            box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:9999;
+            overflow:hidden; animation:fadeInDown .18s ease;
+        }
+        .admin-user-dropdown.open .admin-user-menu { display:block; }
+        @keyframes fadeInDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        .admin-dropdown-header {
+            display:flex; align-items:center; gap:12px;
+            padding:16px 16px 12px;
+        }
+        .admin-dropdown-name  { font-weight:700; font-size:14px; color:#f0f0f0; }
+        .admin-dropdown-email { font-size:12px; color:#718096; margin-top:2px; }
+        .admin-dropdown-divider { height:1px; background:rgba(95,133,218,.15); margin:0 12px; }
+        .admin-dropdown-item {
+            display:flex; align-items:center; gap:10px;
+            padding:11px 16px; font-size:14px; color:#ccc;
+            text-decoration:none; transition:background .15s, color .15s;
+        }
+        .admin-dropdown-item:hover { background:rgba(255,255,255,.06); color:#fff; }
+        .admin-dropdown-danger { color:#fb566b !important; }
+        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; color:#fb566b !important; }
+        .user-avatar-lg {
+            width:42px; height:42px; font-size:16px; flex-shrink:0;
+        }
     </style>
 </head>
 <body>
@@ -849,7 +892,7 @@ $typeCounts = array_column($typeUsage, 'cnt');
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        <a class="navbar-brand sidebar-logo" href="index.php">
+        <a class="navbar-brand sidebar-logo" >
             <div class="logo-container">
                 <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
                 <span class="logo-text">GAMING HUB</span>
@@ -907,10 +950,6 @@ $typeCounts = array_column($typeUsage, 'cnt');
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
-    <div style="flex:1"></div>
-    <a href="index.php" class="nav-item" style="text-decoration:none;color:inherit;border-top:1px solid rgba(255,255,255,.1);padding-top:15px">
-        <i class="fas fa-arrow-left"></i><span>Back to Site</span>
-    </a>
 </div>
 
 <!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
@@ -923,11 +962,28 @@ $typeCounts = array_column($typeUsage, 'cnt');
         <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
             <i class="fas fa-plus"></i> New Session
         </button>
-        <div class="user-profile" style="margin-left:12px">
-            <div class="user-avatar"><?= getUserInitials() ?></div>
-            <div>
-                <div style="font-weight:600;font-size:14px"><?= htmlspecialchars($user['full_name']) ?></div>
-                <div style="font-size:12px;color:#718096"><?= getRoleBadge() ?></div>
+        <!-- Admin user dropdown -->
+        <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px">
+            <button class="admin-user-toggle" id="adminUserBtn">
+                <div class="user-avatar"><?= getUserInitials() ?></div>
+                <div>
+                    <div style="font-weight:600;font-size:14px;line-height:1.2"><?= htmlspecialchars($user['full_name']) ?></div>
+                    <div style="font-size:11px;color:#718096"><?= getRoleBadge() ?></div>
+                </div>
+                <i class="fas fa-chevron-down" style="font-size:11px;color:#718096;margin-left:6px;transition:transform .2s"></i>
+            </button>
+            <div class="admin-user-menu" id="adminUserMenu">
+                <div class="admin-dropdown-header">
+                    <div class="user-avatar user-avatar-lg"><?= getUserInitials() ?></div>
+                    <div>
+                        <div class="admin-dropdown-name"><?= htmlspecialchars($user['full_name']) ?></div>
+                        <div class="admin-dropdown-email"><?= htmlspecialchars($user['email']) ?></div>
+                    </div>
+                </div>
+                <div class="admin-dropdown-divider"></div>
+                <a href="<?= getBaseUrl() ?>/auth/logout.php" class="admin-dropdown-item admin-dropdown-danger">
+                    <i class="fas fa-sign-out-alt"></i> Sign Out
+                </a>
             </div>
         </div>
     </div>
@@ -1083,6 +1139,29 @@ function onRentalModeChange() {
     }
 }
 
+/* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
+Hides/shows the controller rental checkbox depending on the selected
+console type. Only Xbox units support controller rentals.
+*/
+function onConsoleChange() {
+    const sel    = document.getElementById('consoleSelect');
+    const opt    = sel ? sel.options[sel.selectedIndex] : null;
+    const type   = opt ? (opt.dataset.type || '') : '';
+    const isXbox = type.toLowerCase().includes('xbox');
+    const group  = document.getElementById('controllerRentalGroup');
+    const toggle = document.getElementById('controllerRentalToggle');
+    if (!group) return;
+    if (isXbox) {
+        group.style.display = 'block';
+    } else {
+        group.style.display = 'none';
+        if (toggle && toggle.checked) {
+            toggle.checked = false;
+            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+        }
+    }
+}
+
 /* Show/hide payment method when the optional checkbox is toggled */
 function toggleStartPaymentFields(checkbox) {
     const fields = document.getElementById('startPaymentFields');
@@ -1171,6 +1250,7 @@ function syncTenderedAndSubmit(e) {
     }
 
     document.getElementById('endTenderedHidden').value = tenderedVal;
+    playSessionEndSound();  // Audio cue just before form submits
     // Form submits normally after this (no e.preventDefault())
 }
 
@@ -1214,6 +1294,8 @@ const recalcSessionPreview = updateSessionPreview;
 document.addEventListener('DOMContentLoaded', function () {
     // Show duration picker by default (hourly is default selected)
     onRentalModeChange();
+    // Hide controller rental until an Xbox console is selected
+    onConsoleChange();
 
     document.getElementById('startSessionForm').addEventListener('submit', function (e) {
         const mode = document.getElementById('rentalModeSelect').value;
@@ -1285,6 +1367,28 @@ let _endModalTimer = null;   // holds the live-update interval
 
 // Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
 let _pendingRefundArgs = null;
+
+/* ── Session-end audio alert (Web Audio API — no file needed) ──────────────
+Plays a short 3-beep chime when the admin confirms ending a session.
+Uses the browser’s built-in synthesis — works offline, no CDN required.
+*/
+function playSessionEndSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.20, 0.40].forEach(function(delay) {
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime + delay);
+            gain.gain.setValueAtTime(0.38, ctx.currentTime + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+            osc.start(ctx.currentTime + delay);
+            osc.stop(ctx.currentTime + delay + 0.18);
+        });
+    } catch(e) { /* AudioContext unavailable — silently ignore */ }
+}
 
 function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
     upfrontPaid = upfrontPaid || 0;
@@ -1427,12 +1531,37 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 document.getElementById('refundActionField').value  = 'early_end';
                 document.getElementById('refundEarlyEndFlag').value = '1';
 
-                // Pre-fill refund amount (lock at 0 when nothing to refund)
+                // Pre-fill refund amount — always locked for early-end flow
                 const amtEl = document.getElementById('refundAmount');
                 if (amtEl) {
-                    amtEl.value    = _pendingRefundArgs.refundAmt.toFixed(0);
-                    amtEl.readOnly = (_pendingRefundArgs.refundAmt <= 0);
-                    amtEl.style.opacity = _pendingRefundArgs.refundAmt <= 0 ? '0.5' : '1';
+                    amtEl.value           = _pendingRefundArgs.refundAmt.toFixed(2);
+                    amtEl.readOnly        = true;   // always read-only; amount is pre-calculated
+                    amtEl.style.opacity   = '1';
+                    amtEl.style.background  = 'rgba(32,200,161,.06)';
+                    amtEl.style.borderColor = 'rgba(32,200,161,.35)';
+                    amtEl.style.cursor      = 'not-allowed';
+                }
+
+                // Show auto-calc breakdown hint
+                const hintEl = document.getElementById('refundAutoCalcHint');
+                if (hintEl) {
+                    const paid     = _pendingRefundArgs.upfrontPaid;
+                    const consumed = _pendingRefundArgs.consumedCost;
+                    const refund   = _pendingRefundArgs.refundAmt;
+                    hintEl.style.display = 'block';
+                    if (refund > 0) {
+                        hintEl.innerHTML =
+                            '<i class="fas fa-calculator" style="margin-right:5px;color:#f1a83c;"></i>' +
+                            '<strong>\u20b1' + paid.toFixed(2) + ' paid</strong> \u2212 ' +
+                            '<strong>\u20b1' + consumed.toFixed(2) + ' consumed</strong> = ' +
+                            '<strong style="color:#fb566b;">\u20b1' + refund.toFixed(2) + ' refund</strong>';
+                        hintEl.style.color = '#f1e1aa';
+                    } else {
+                        hintEl.innerHTML =
+                            '<i class="fas fa-info-circle" style="margin-right:5px;color:#888;"></i>' +
+                            'Consumed cost (\u20b1' + consumed.toFixed(2) + ') covers the full upfront amount \u2014 no refund.';
+                        hintEl.style.color = '#888';
+                    }
                 }
 
                 // Clear stale errors
@@ -1761,12 +1890,17 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     // Amount input — locked + pre-filled for reservation
     const amtInput = document.getElementById('refundAmount');
     const maxNote  = document.getElementById('refundMaxNote');
-    amtInput.readOnly     = isRes;
-    amtInput.style.opacity = isRes ? '0.7' : '1';
+    const hintEl   = document.getElementById('refundAutoCalcHint');
+    amtInput.readOnly       = isRes;
+    amtInput.style.opacity  = isRes ? '0.7' : '1';
+    amtInput.style.background   = isRes ? 'rgba(32,200,161,.06)' : '';
+    amtInput.style.borderColor  = isRes ? 'rgba(32,200,161,.35)' : '';
+    amtInput.style.cursor       = isRes ? 'not-allowed' : '';
     amtInput.value = isRes ? parseFloat(upfrontPaid || 0) : '';
+    if (hintEl) hintEl.style.display = 'none';  // hide early-end hint for normal opens
     maxNote.textContent = isRes
-        ? 'Full payment amount — will be returned to customer.'
-        : 'Max refundable: ₱' + paid;
+        ? 'Full payment amount \u2014 will be returned to customer.'
+        : 'Max refundable: \u20b1' + paid;
 
     // Reason input — pre-filled for reservation
     const reasonInput = document.getElementById('refundReason');
@@ -1894,6 +2028,30 @@ const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
+// Tracks which timer elements already fired the overtime beep (once per element per load)
+const overtimeBeeped = new WeakSet();
+
+/* Descending 3-tone alarm — fires when a session crosses into overtime.
+   Square wave = more urgent/harsh than the sine-wave session-end chime. */
+function playOvertimeBeep() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [880, 660, 440].forEach(function(freq, i) {
+            const delay = i * 0.22;
+            const osc   = ctx.createOscillator();
+            const gain  = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.20);
+            osc.start(ctx.currentTime + delay);
+            osc.stop(ctx.currentTime + delay + 0.20);
+        });
+    } catch(e) {}
+}
+
 function updateTimers() {
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
         const start   = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
@@ -1918,6 +2076,11 @@ function updateTimers() {
                 el.style.color = '#20c8a1';
                 el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
             } else {
+                // — OVERTIME — beep once when the element first crosses the threshold
+                if (!overtimeBeeped.has(el)) {
+                    overtimeBeeped.add(el);
+                    playOvertimeBeep();
+                }
                 const over = -remaining;
                 const m = Math.floor(over / 60);
                 const s = over % 60;
@@ -1972,6 +2135,115 @@ function renderCharts() {
 }
 
 AOS.init({ duration: 600, once: true });
+
+// ── Admin user dropdown ──────────────────────────────────────────────
+(function () {
+    const btn      = document.getElementById('adminUserBtn');
+    const dropdown = document.getElementById('adminUserDropdown');
+    if (!btn || !dropdown) return;
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+})();
+
+// ── Reservation notification poller ───────────────────────────────────
+// Polls every 30 s. Baseline is set from PHP on page load so we never
+// fire a toast for reservations that already existed when the admin opened the page.
+(function () {
+    const POLL_MS   = 30000;
+    // PHP injects the current max id at page-load time — safe baseline
+    let lastId = <?= $initMaxResId ?>;
+    // If localStorage has a higher value (from a previous session still in memory), use that
+    const stored = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
+    if (stored > lastId) lastId = stored;
+    localStorage.setItem('gspot_last_res_id', lastId);
+
+    function poll() {
+        fetch('ajax/poll_notifications.php?last_id=' + lastId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.new_count > 0) showResNotification(data.new_count, data.items);
+                if (data.max_id > lastId) {
+                    lastId = data.max_id;
+                    localStorage.setItem('gspot_last_res_id', lastId);
+                }
+            })
+            .catch(function() {}); // silent on network failure
+    }
+
+    function showResNotification(count, items) {
+        const existing = document.getElementById('gspotResNotif');
+        if (existing) existing.remove();
+
+        const first  = items[0] || {};
+        const name   = first.customer_name || 'A customer';
+        const msg    = count === 1
+            ? name + ' just made a new reservation!'
+            : count + ' new reservations are waiting for review.';
+
+        const toast = document.createElement('div');
+        toast.id = 'gspotResNotif';
+        toast.style.cssText = [
+            'position:fixed;bottom:24px;right:24px;z-index:99999;',
+            'background:linear-gradient(135deg,#0d1b3e,#08101c);',
+            'border:1px solid rgba(32,200,161,.45);border-radius:16px;',
+            'padding:18px 20px;display:flex;align-items:flex-start;gap:14px;',
+            'box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(32,200,161,.1);',
+            'animation:slideInRight .35s cubic-bezier(.34,1.56,.64,1);',
+            'max-width:340px;font-family:inherit;'
+        ].join('');
+
+        toast.innerHTML =
+            '<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;' +
+            'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.3);' +
+            'display:flex;align-items:center;justify-content:center;font-size:18px;color:#20c8a1;">' +
+            '<i class="fas fa-calendar-check"></i></div>' +
+            '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:700;font-size:14px;color:#f0f0f0;margin-bottom:4px;">New Reservation' + (count > 1 ? 's' : '') + '!</div>' +
+            '<div style="font-size:13px;color:#aaa;line-height:1.4;">' + msg + '</div>' +
+            '<button id="gspotResNotifView" style="margin-top:10px;padding:6px 14px;border-radius:8px;' +
+            'background:rgba(32,200,161,.2);border:1px solid rgba(32,200,161,.4);' +
+            'color:#20c8a1;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">'
+            + '<i class="fas fa-eye" style="margin-right:5px;"></i>View Reservations</button>' +
+            '</div>' +
+            '<button onclick="document.getElementById(\'gspotResNotif\').remove()" ' +
+            'style="background:none;border:none;color:#666;cursor:pointer;font-size:18px;padding:0;flex-shrink:0;line-height:1;">&times;</button>';
+
+        document.body.appendChild(toast);
+
+        // Wire "View Reservations" button
+        document.getElementById('gspotResNotifView').addEventListener('click', function() {
+            const navEl = document.querySelector('.nav-item[onclick*="\'reservations\'"]');
+            showPage('reservations', navEl);
+            toast.remove();
+        });
+
+        // Play a subtle ping sound
+        try {
+            const ctx2 = new (window.AudioContext || window.webkitAudioContext)();
+            const osc2  = ctx2.createOscillator();
+            const gain2 = ctx2.createGain();
+            osc2.connect(gain2); gain2.connect(ctx2.destination);
+            osc2.type = 'sine'; osc2.frequency.value = 660;
+            gain2.gain.setValueAtTime(0.3, ctx2.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.5);
+            osc2.start(); osc2.stop(ctx2.currentTime + 0.5);
+        } catch(e) {}
+
+        // Auto-dismiss after 15 s
+        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 15000);
+    }
+
+    // Start polling after 15 s (avoids false-positive on fresh page load)
+    setTimeout(function() {
+        poll();
+        setInterval(poll, POLL_MS);
+    }, 15000);
+})();
 </script>
 </body>
 </html>
