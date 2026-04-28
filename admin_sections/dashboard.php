@@ -81,7 +81,17 @@
                         <span style="color:#f1e1aa;font-weight:600"><?= $bookedEndDt->format('h:i A') ?></span>
                     <?php else: ?>—<?php endif; ?>
                 </td>
-                <td><span class="session-timer" data-start="<?= $sess['start_time'] ?>" data-planned="<?= $sess['planned_minutes'] ?? '' ?>">—</span></td>
+                <td><span class="session-timer"
+                    data-start="<?= $sess['start_time'] ?>"
+                    data-planned="<?= $sess['planned_minutes'] ?? '' ?>"
+                    data-session-id="<?= $sess['session_id'] ?>"
+                    data-mode="<?= $sess['rental_mode'] ?>"
+                    data-start-ts="<?= strtotime($sess['start_time']) ?>"
+                    data-upfront-paid="<?= (float)($sess['upfront_paid'] ?? 0) ?>"
+                    data-unlimited-rate="<?= (float)($settings['unlimited_rate'] ?? 300) ?>"
+                    data-booked-minutes="<?= (int)($sess['planned_minutes'] ?? 0) ?>"
+                    data-customer="<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>"
+                    data-unit="<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>">—</span></td>
                 <td>
                     <button class="btn btn-danger btn-sm" onclick="openEndSessionModal(
                         <?= $sess['session_id'] ?>,

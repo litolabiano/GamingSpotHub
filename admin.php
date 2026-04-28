@@ -2115,16 +2115,40 @@ function pad(n) { return String(n).padStart(2, '0'); }
 
 // Tracks which timer elements already fired the overtime beep (once per element per load)
 const overtimeBeeped = new WeakSet();
+// Tracks which timer elements already fired the 15-second warning beep
+const warningBeeped  = new WeakSet();
+
+/* ── Shared AudioContext ────────────────────────────────────────────────────
+   Browsers suspend AudioContext when it isn't created inside a user gesture.
+   Keep one shared instance and call resume() before every sound so that
+   setInterval-driven beeps (overtime, 15-sec warning) can always play.
+*/
+let _sharedAudioCtx = null;
+function _getAudioCtx() {
+    if (!_sharedAudioCtx) {
+        try { _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch(e) { return null; }
+    }
+    return _sharedAudioCtx;
+}
+// Pre-unlock on any user interaction
+['click', 'keydown', 'touchstart'].forEach(function(evt) {
+    document.addEventListener(evt, function() {
+        var c = _getAudioCtx();
+        if (c && c.state === 'suspended') c.resume();
+    }, { passive: true });
+});
 
 /* Descending 3-tone alarm — fires when a session crosses into overtime.
    Square wave = more urgent/harsh than the sine-wave session-end chime. */
 function playOvertimeBeep() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = _getAudioCtx();
+    if (!ctx) return;
+    ctx.resume().then(function() {
         [880, 660, 440].forEach(function(freq, i) {
-            const delay = i * 0.22;
-            const osc   = ctx.createOscillator();
-            const gain  = ctx.createGain();
+            var delay = i * 0.22;
+            var osc   = ctx.createOscillator();
+            var gain  = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.type = 'square';
@@ -2134,8 +2158,238 @@ function playOvertimeBeep() {
             osc.start(ctx.currentTime + delay);
             osc.stop(ctx.currentTime + delay + 0.20);
         });
-    } catch(e) {}
+    });
 }
+
+/* ── SIREN ALARM — plays for 15 seconds ─────────────────────────────────────
+   Simulates an emergency-siren sweep: oscillator frequency glides up and
+   down between 800 Hz (low) and 1400 Hz (high) repeatedly, like a real
+   ambulance / police siren. Uses sawtooth wave for maximum urgency.
+   All notes are scheduled up-front so the sound plays even if the tab loses focus. */
+function playWarningBeep() {
+    var ctx = _getAudioCtx();
+    if (!ctx) return;
+    ctx.resume().then(function() {
+        var now       = ctx.currentTime;
+        var DURATION  = 15;      // total seconds of siren
+        var CYCLE     = 0.80;    // one up-down sweep = 0.80 s
+        var LOW_FREQ  = 800;
+        var HIGH_FREQ = 1400;
+        var VOLUME    = 0.50;
+
+        for (var i = 0; i < DURATION; i += CYCLE) {
+            var t   = now + i;
+            var osc = ctx.createOscillator();
+            var g   = ctx.createGain();
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.type = 'sawtooth';
+
+            // Sweep up for first half, sweep down for second half
+            osc.frequency.setValueAtTime(LOW_FREQ,  t);
+            osc.frequency.linearRampToValueAtTime(HIGH_FREQ, t + CYCLE * 0.5);
+            osc.frequency.linearRampToValueAtTime(LOW_FREQ,  t + CYCLE);
+
+            g.gain.setValueAtTime(VOLUME, t);
+            g.gain.setValueAtTime(VOLUME, t + CYCLE - 0.04);
+            g.gain.linearRampToValueAtTime(0, t + CYCLE); // click-free crossfade
+
+            osc.start(t);
+            osc.stop(t + CYCLE);
+        }
+    });
+}
+
+/* ── SESSION ENDING ALARM MODAL ─────────────────────────────────────────────
+   Fires at 15 s remaining for any hourly session.
+   • Covers the full screen (backdrop blocks all interaction)
+   • Cannot be dismissed by clicking outside or pressing Escape
+   • Auto-navigates the admin to the Sessions tab
+   • Offers two actions: Extend Session or End Session Now
+   • Countdown inside the modal ticks down every second
+   • Auto-dismissed when the session crosses into overtime              */
+var sessionEndingAlerts = {}; // key: el.dataset.start → modal element
+
+function showSessionEndingAlert(el, remaining) {
+    var key       = el.dataset.start;
+    var MODAL_ID  = 'gspotSirenModal';
+
+    // If modal already open for this key, just update countdown
+    if (sessionEndingAlerts[key] === 'dismissed') return; // user already acted — never recreate
+    if (sessionEndingAlerts[key] === true) {
+        // Modal is open — just tick the countdown
+        var cdEl = document.getElementById(MODAL_ID + '_cd');
+        if (cdEl) cdEl.textContent = remaining + 's';
+        return;
+    }
+    sessionEndingAlerts[key] = true;
+
+    // ── Read session data from the timer element ─────────────────────────
+    var customer     = el.dataset.customer     || 'Session';
+    var unit         = el.dataset.unit         || '';
+    var sessionId    = el.dataset.sessionId    || 0;
+    var mode         = el.dataset.mode         || 'hourly';
+    var startTs      = parseInt(el.dataset.startTs   || 0);
+    var upfrontPaid  = parseFloat(el.dataset.upfrontPaid  || 0);
+    var unlimRate    = parseFloat(el.dataset.unlimitedRate || 300);
+    var bookedMin    = parseInt(el.dataset.bookedMinutes   || 0);
+
+    // ── Navigate to Sessions tab ──────────────────────────────────────────
+    var sessNavEl = document.querySelector('.nav-item[onclick*="\'sessions\'"]');
+    if (sessNavEl) showPage('sessions', sessNavEl);
+
+    // ── Build the locked full-screen modal ───────────────────────────────
+    var overlay = document.createElement('div');
+    overlay.id  = MODAL_ID;
+    overlay.style.cssText =
+        'position:fixed;inset:0;z-index:999999;' +
+        'background:rgba(8,5,0,.88);backdrop-filter:blur(8px);' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'animation:gspotSirenFadeIn .25s ease;';
+
+    // Prevent outside-click dismiss — stop all pointer events on backdrop
+    overlay.addEventListener('click', function(e) { e.stopPropagation(); });
+    document.addEventListener('keydown', _sirenEscBlock, true);
+
+    overlay.innerHTML =
+        '<div style="' +
+            'background:linear-gradient(160deg,#1c0808,#2a0a0a,#0d0505);' +
+            'border:2px solid rgba(251,86,107,.7);border-radius:22px;' +
+            'padding:36px 34px 30px;max-width:440px;width:92%;' +
+            'box-shadow:0 0 80px rgba(251,86,107,.45),0 24px 64px rgba(0,0,0,.7);' +
+            'animation:gspotSirenIn .35s cubic-bezier(.34,1.56,.64,1);' +
+            'position:relative;text-align:center;">' +
+
+            /* Pulsing icon */
+            '<div style="width:64px;height:64px;border-radius:16px;margin:0 auto 18px;' +
+            'background:rgba(251,86,107,.2);border:2px solid rgba(251,86,107,.6);' +
+            'display:flex;align-items:center;justify-content:center;font-size:28px;' +
+            'animation:gspotSirenPulse .7s ease-in-out infinite;">' +
+            '<i class="fas fa-siren-on" style="color:#fb566b;"></i>' +
+            '<i class="fas fa-bell" style="color:#fb566b;display:none;" id="gspotSirenIcon"></i></div>' +
+
+            /* Headline */
+            '<div style="font-size:10px;font-weight:800;letter-spacing:2.5px;' +
+            'color:rgba(251,86,107,.7);text-transform:uppercase;margin-bottom:8px;">' +
+            '🚨 ALERT</div>' +
+            '<div style="font-size:22px;font-weight:900;color:#ff6060;margin-bottom:6px;' +
+            'letter-spacing:-.3px;">Session Ending!</div>' +
+            '<div style="font-size:14px;color:#f0c0c0;margin-bottom:20px;line-height:1.5;">' +
+            '<strong style="color:#fff;">' + customer + '</strong>' +
+            (unit ? ' &mdash; <span style="color:#f1a83c;">' + unit + '</span>' : '') +
+            '</div>' +
+
+            /* Countdown */
+            '<div style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);' +
+            'border-radius:14px;padding:14px 24px;margin:0 auto 24px;display:inline-block;">' +
+            '<div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:1px;' +
+            'margin-bottom:6px;">Time Remaining</div>' +
+            '<div id="' + MODAL_ID + '_cd" style="font-size:52px;font-weight:900;' +
+            'color:#fb566b;font-family:monospace;line-height:1;letter-spacing:-2px;">' +
+            remaining + 's</div></div>' +
+
+            /* Buttons */
+            '<div style="display:flex;gap:12px;margin-top:4px;">' +
+
+            /* Extend button */
+            '<button id="gspotSirenExtendBtn" ' +
+            'style="flex:1;padding:14px 10px;border-radius:12px;' +
+            'background:linear-gradient(135deg,rgba(95,133,218,.25),rgba(95,133,218,.15));' +
+            'border:1px solid rgba(95,133,218,.55);color:#8aa4e8;' +
+            'font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;' +
+            'display:flex;align-items:center;justify-content:center;gap:8px;transition:.18s;">' +
+            '<i class="fas fa-clock"></i> Extend Session</button>' +
+
+            /* End Now button */
+            '<button id="gspotSirenEndBtn" ' +
+            'style="flex:1;padding:14px 10px;border-radius:12px;' +
+            'background:linear-gradient(135deg,#fb566b,#c0392b);' +
+            'border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;' +
+            'font-family:inherit;' +
+            'display:flex;align-items:center;justify-content:center;gap:8px;' +
+            'box-shadow:0 4px 20px rgba(251,86,107,.4);transition:.18s;">' +
+            '<i class="fas fa-stop-circle"></i> End Session Now</button>' +
+
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+
+    // Fix the siren icon — fa-siren-on might not exist in FA free, use bell as fallback
+    var sirenIcon = overlay.querySelector('.fa-siren-on');
+    if (!sirenIcon || getComputedStyle(sirenIcon, ':before').content === 'none' ||
+        getComputedStyle(sirenIcon, ':before').content === '') {
+        if (sirenIcon) sirenIcon.style.display = 'none';
+        var bellIcon = overlay.querySelector('.fa-bell');
+        if (bellIcon) bellIcon.style.display = '';
+    }
+
+    // Extend button → open extend modal, close siren
+    document.getElementById('gspotSirenExtendBtn').addEventListener('click', function() {
+        _closeSirenModal(key);
+        openExtendModal(sessionId, customer, unit, bookedMin, mode);
+    });
+
+    // End Now button → open end session modal, close siren
+    document.getElementById('gspotSirenEndBtn').addEventListener('click', function() {
+        _closeSirenModal(key);
+        // Open the modal in locked mode (prevent outside-click close)
+        _sirenTriggeredEnd = true;
+        openEndSessionModal(sessionId, customer, unit, mode, startTs, bookedMin, upfrontPaid, unlimRate);
+    });
+}
+
+// Block Escape key while siren modal is open
+function _sirenEscBlock(e) {
+    if (e.key === 'Escape' && document.getElementById('gspotSirenModal')) {
+        e.preventDefault(); e.stopPropagation();
+    }
+}
+
+// Flag: when true, the End Session modal was opened by the siren → prevent outside-click close
+var _sirenTriggeredEnd = false;
+
+function _closeSirenModal(key) {
+    var modal = document.getElementById('gspotSirenModal');
+    if (modal) modal.remove();
+    // Mark as 'dismissed' so updateTimers never recreates the modal for this countdown window
+    sessionEndingAlerts[key] = 'dismissed';
+    _sirenTriggeredEnd = false;
+    document.removeEventListener('keydown', _sirenEscBlock, true);
+    // Immediately silence all pre-scheduled siren oscillators.
+    // ctx.resume() is called again by playOvertimeBeep() / user gestures if needed.
+    var ctx = _getAudioCtx();
+    if (ctx && ctx.state === 'running') ctx.suspend();
+}
+
+// Patch the existing outside-click listener for #endSessionModal to respect _sirenTriggeredEnd
+document.addEventListener('DOMContentLoaded', function() {
+    var endModal = document.getElementById('endSessionModal');
+    if (!endModal) return;
+    // Remove the original generic outside-click listener (already applied in admin.php)
+    // and replace with one that checks _sirenTriggeredEnd
+    endModal.addEventListener('click', function(e) {
+        if (e.target === endModal && !_sirenTriggeredEnd) {
+            endModal.classList.remove('active');
+        }
+    });
+});
+
+// CSS animations (injected once)
+(function() {
+    if (document.getElementById('gspotSirenStyle')) return;
+    var s = document.createElement('style');
+    s.id = 'gspotSirenStyle';
+    s.textContent =
+        '@keyframes gspotSirenFadeIn{from{opacity:0}to{opacity:1}}' +
+        '@keyframes gspotSirenIn{from{opacity:0;transform:scale(.88) translateY(16px)}' +
+            'to{opacity:1;transform:scale(1) translateY(0)}}' +
+        '@keyframes gspotSirenPulse{' +
+            '0%,100%{box-shadow:0 0 0 0 rgba(251,86,107,.7);background:rgba(251,86,107,.2)}' +
+            '50%{box-shadow:0 0 0 14px rgba(251,86,107,0);background:rgba(251,86,107,.35)}}';
+    document.head.appendChild(s);
+})();
+
 
 function updateTimers() {
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
@@ -2158,13 +2412,30 @@ function updateTimers() {
                 const h = Math.floor(remaining / 3600);
                 const m = Math.floor((remaining % 3600) / 60);
                 const s = remaining % 60;
-                el.style.color = '#20c8a1';
+
+                // ── 15-second warning beep + popup (fires once per element) ───────
+                if (remaining <= 15 && !warningBeeped.has(el)) {
+                    warningBeeped.add(el);
+                    playWarningBeep();
+                }
+
+                // Update (or create) the ending-soon popup while countdown is active
+                if (remaining <= 15) {
+                    showSessionEndingAlert(el, remaining);
+                }
+
+                // Colour shift: amber when ≤ 60 s, red when ≤ 15 s, green otherwise
+                el.style.color = remaining <= 15 ? '#fb566b'
+                               : remaining <= 60  ? '#f1a83c'
+                               : '#20c8a1';
                 el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
             } else {
-                // — OVERTIME — beep once when the element first crosses the threshold
+                // ─ OVERTIME ─ beep once when the element first crosses the threshold
                 if (!overtimeBeeped.has(el)) {
                     overtimeBeeped.add(el);
                     playOvertimeBeep();
+                    // Dismiss the siren alarm modal on overtime
+                    _closeSirenModal(el.dataset.start);
                 }
                 const over = -remaining;
                 const m = Math.floor(over / 60);
