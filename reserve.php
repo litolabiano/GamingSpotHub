@@ -47,8 +47,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notes              = trim($_POST['notes']     ?? '');
     $preferred_unit_id  = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
     $dp_amount          = (float)($_POST['downpayment_amount']  ?? 0);
-    $dp_method          = !empty($_POST['downpayment_method']) && $dp_amount > 0
-                          ? $_POST['downpayment_method'] : null;
+    $dp_method          = 'gcash'; // GCash is the only accepted method
+
+    // ── Handle GCash proof of payment upload ─────────────────────────────────────────────────────────────────────────────────────────────
+    $payment_proof_file = null;
+    $upload_error       = '';
+    if (!empty($_FILES['payment_proof']['name'])) {
+        $file     = $_FILES['payment_proof'];
+        $allowed  = ['image/jpeg','image/png','image/gif','image/webp'];
+        $maxSize  = 5 * 1024 * 1024; // 5 MB
+        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed_ext = ['jpg','jpeg','png','gif','webp'];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $upload_error = 'Upload failed. Please try again.';
+        } elseif (!in_array($file['type'], $allowed) || !in_array($ext, $allowed_ext)) {
+            $upload_error = 'Invalid file type. Please upload a JPG, PNG, GIF, or WebP image.';
+        } elseif ($file['size'] > $maxSize) {
+            $upload_error = 'File too large. Maximum allowed size is 5 MB.';
+        } else {
+            $destDir  = __DIR__ . '/uploads/payment_proofs/';
+            $filename = 'proof_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            if (move_uploaded_file($file['tmp_name'], $destDir . $filename)) {
+                $payment_proof_file = $filename;
+            } else {
+                $upload_error = 'Could not save file. Please contact support.';
+            }
+        }
+    }
 
     // ── Reservation ban check (3-strike rule) ──────────────────────────────
     $banStmt = $conn->prepare(
@@ -80,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (!$error && !in_array($console_type, ['PS5', 'PS4', 'Xbox Series X'])) {
         $error = 'Please select a valid console type.';
-    } elseif (!$error && !in_array($rental_mode, ['hourly', 'open_time', 'unlimited'])) {
+    } elseif (!$error && !in_array($rental_mode, ['hourly', 'unlimited'])) {
         $error = 'Please select a valid rental mode.';
     } elseif (!$error && $rental_mode === 'hourly' && $planned_minutes < 30) {
         $error = 'Please select a duration for hourly mode.';
@@ -95,12 +120,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Reservation must be at least 1 hour from now.';
     } elseif (!$error && (int)date('H', strtotime($reserved_time)) < 12) {
         $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
-    } elseif (!$error && ((int)date('H', strtotime($reserved_time)) >= 24 || $reserved_time > '23:59')) {
-        $error = 'Reservations must be before 12:00 AM (midnight) — operating hours end at midnight.';
-    } elseif (!$error && $dp_amount > 0 && !$dp_method) {
-        $error = 'Please select a payment method for your downpayment.';
-    } elseif (!$error && $dp_amount > 0 && ($_POST['no_refund_agreed'] ?? '') !== '1') {
-        $error = 'You must read and agree to the No-Refund Policy before submitting a payment.';
+    } elseif (!$error && $reserved_time > '23:00') {
+        $error = 'Reservations must be no later than 11:00 PM — our last bookable time slot.';
+    } elseif (!$error && !$dp_method) {
+        $error = 'Please select a payment method for the reservation fee.';
+    } elseif (!$error && empty($payment_proof_file) && empty($_FILES['payment_proof']['name'])) {
+        $error = 'Please upload your GCash proof of payment screenshot.';
+    } elseif (!$error && $upload_error) {
+        $error = $upload_error;
+    } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
+        $error = 'You must read and agree to the No-Refund Policy before submitting.';
     } elseif (!$error && ($_POST['unit_transfer_agreed'] ?? '') !== '1') {
         $error = 'You must acknowledge the Unit Transfer Policy before submitting your reservation.';
     }
@@ -111,7 +140,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $reserved_date, $reserved_time,
             $notes ?: null,
             $dp_amount, $dp_method,
-            $preferred_unit_id
+            $preferred_unit_id,
+            $payment_proof_file
         );
 
         if ($result['success']) {
@@ -149,6 +179,9 @@ if (!empty($_GET['console'])) {
         $presetConsole = $candidate;
     }
 }
+
+// GCash payment details
+$gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -688,6 +721,35 @@ if (!empty($_GET['console'])) {
         0%, 100% { opacity: 1; transform: scale(1); }
         50%       { opacity: .5; transform: scale(1.4); }
     }
+
+    /* ── Time select ──────────────────────────────── */
+    /* Style the select to match dt-native-input */
+    #timeSelect {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #e0e0e0;
+        font-size: 1rem;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        padding: 0;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+    #timeSelect option {
+        background: #0d1f3c;
+        color: #e0e0e0;
+        font-weight: 600;
+    }
+    #timeSelect option:disabled {
+        color: rgba(255,255,255,.22);
+        background: #0a1628;
+    }
+    #timeSelect option[value=""] {
+        color: #555;
+    }
     </style>
 
 </head>
@@ -798,11 +860,10 @@ if (!empty($_GET['console'])) {
 
             <!-- ── LEFT: Reservation Form ─────────────────────────── -->
             <div class="col-lg-7" data-aos="fade-up">
-                <form method="POST" id="reserveForm">
+                <form method="POST" id="reserveForm" enctype="multipart/form-data">
                     <input type="hidden" name="console_type"         id="hiddenConsoleType">
                     <input type="hidden" name="rental_mode"          id="hiddenRentalMode">
                     <input type="hidden" name="planned_minutes"      id="hiddenPlannedMinutes">
-                    <input type="hidden" name="downpayment_method"   id="hiddenDpMethod">
                     <input type="hidden" name="preferred_console_id" id="hiddenPreferredUnit" value="">
 
                     <div class="reserve-card" style="margin-bottom:24px;">
@@ -895,12 +956,13 @@ if (!empty($_GET['console'])) {
                                     </div>
                                     <div class="dt-field-body">
                                         <div class="dt-field-label">Time</div>
-                                        <input type="time" id="reservedTime" name="reserved_time"
-                                               class="dt-native-input"
-                                               min="12:00" max="23:59"
-                                               value="<?= htmlspecialchars($_POST['reserved_time'] ?? '') ?>"
-                                               onchange="onDateTimeChange(); updateDtBanner();" required>
-                                        <div class="dt-field-sublabel" id="timeSublabel">12:00 PM – 12:00 AM</div>
+                                        <!-- Hidden input keeps id=reservedTime so all existing JS works -->
+                                        <input type="hidden" id="reservedTime" name="reserved_time"
+                                               value="<?= htmlspecialchars($_POST['reserved_time'] ?? '') ?>">
+                                        <select id="timeSelect" onchange="onTimeSelect(this)" required>
+                                            <option value="" disabled selected>Select time&hellip;</option>
+                                        </select>
+                                        <div class="dt-field-sublabel" id="timeSublabel">12:00 PM &ndash; 11:00 PM</div>
                                     </div>
                                     <div class="dt-field-arrow" style="color:#b37bec;"><i class="fas fa-chevron-right"></i></div>
                                 </div>
@@ -914,12 +976,23 @@ if (!empty($_GET['console'])) {
                             <span style="width:8px;height:8px;border-radius:50%;background:#20c8a1;flex-shrink:0;
                                          box-shadow:0 0 0 3px rgba(32,200,161,.2);"></span>
                             <span style="font-size:12px;color:#888;">
-                                Operating hours &nbsp;<strong style="color:#20c8a1;">12:00 PM</strong> to
-                                <strong style="color:#20c8a1;">12:00 AM</strong>
-                                &nbsp;&middot;&nbsp; Reservation requires <strong style="color:#ccc;">1 hr lead time</strong>
+                                Reservation hours &nbsp;<strong style="color:#20c8a1;">12:00 PM</strong> to
+                                <strong style="color:#20c8a1;">11:00 PM</strong>
+                                &nbsp;&middot;&nbsp; Requires <strong style="color:#ccc;">1 hr lead time</strong>
                             </span>
                         </div>
                         <div id="availabilityResult" style="display:none;margin-top:14px;"></div>
+                        <!-- Slot-locked warning: shown when a confirmed reservation blocks the selected slot -->
+                        <div id="slotLockedAlert" style="display:none;margin-top:12px;
+                            background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.4);
+                            border-radius:12px;padding:14px 16px;
+                            display:none;align-items:flex-start;gap:12px;">
+                            <i class="fas fa-lock" style="color:#fb566b;font-size:1.2rem;margin-top:1px;flex-shrink:0;"></i>
+                            <div>
+                                <div style="font-weight:700;color:#fb566b;font-size:13px;margin-bottom:3px;">Time Slot Unavailable</div>
+                                <div id="slotLockedMsg" style="font-size:12px;color:#bbb;line-height:1.5;"></div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- ── Step 2b: Unit Picker ── -->
@@ -950,17 +1023,12 @@ if (!empty($_GET['console'])) {
                             <div class="mode-card" id="mode-hourly" onclick="selectMode('hourly')">
                                 <div class="mc-icon">⏱️</div>
                                 <div class="mc-name">Hourly</div>
-                                <div class="mc-desc">Pre-book a fixed duration. Pay at session start.</div>
-                            </div>
-                            <div class="mode-card" id="mode-open_time" onclick="selectMode('open_time')">
-                                <div class="mc-icon">🔓</div>
-                                <div class="mc-name">Open Time</div>
-                                <div class="mc-desc">Play freely. Pay bracket pricing at end.</div>
+                                <div class="mc-desc">Pre-book a fixed duration. Pay reservation fee now.</div>
                             </div>
                             <div class="mode-card" id="mode-unlimited" onclick="selectMode('unlimited')">
                                 <div class="mc-icon">♾️</div>
                                 <div class="mc-name">Unlimited</div>
-                                <div class="mc-desc">Flat ₱<?= $unlimitedRate ?> for unlimited play.</div>
+                                <div class="mc-desc">Flat ₱<?= $unlimitedRate ?> for unlimited play. Pay reservation fee now.</div>
                             </div>
                         </div>
 
@@ -998,57 +1066,108 @@ if (!empty($_GET['console'])) {
                         </div>
                     </div>
 
-                    <!-- ── Step 4: Payment ── -->
+                    <!-- ── Step 4: GCash Reservation Fee ── -->
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
-                        <h2><i class="fas fa-peso-sign"></i> Step 4 — Payment <span id="dpCardMode" style="font-size:13px;font-weight:500;color:#888;"></span></h2>
-                        <p id="dpDesc" style="color:#888;font-size:13px;margin-bottom:18px;">
-                            Full payment is required to confirm your hourly reservation.
+                        <h2><i class="fas fa-peso-sign"></i> Step 4 &mdash; Reservation Fee <span style="font-size:12px;font-weight:600;background:rgba(0,174,90,.18);color:#00c96b;border-radius:20px;padding:2px 10px;margin-left:6px;">GCash Only</span></h2>
+                        <p style="color:#888;font-size:13px;margin-bottom:16px;">
+                            Pay via GCash and upload your receipt screenshot. Reservation is confirmed only after admin verifies your payment.
                         </p>
 
-                        <!-- Open Time: no upfront payment notice (shown/hidden by JS) -->
-                        <div id="dpOpenTimeNotice" style="display:none;
-                            background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.25);
-                            border-radius:14px;padding:18px;text-align:center;">
-                            <i class="fas fa-clock" style="font-size:2rem;color:#5f85da;margin-bottom:10px;display:block;"></i>
-                            <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:6px;">No Upfront Payment Needed</div>
-                            <div style="font-size:12px;color:#888;line-height:1.6;">
-                                Pay bracket pricing at the end of your session.<br>
-                                <strong style="color:#5f85da;">Free 30 mins</strong> every 2 paid hours!
-                            </div>
+                        <!-- Waiting state (no mode selected yet) -->
+                        <div id="gcashWaiting" style="text-align:center;padding:28px;color:#555;">
+                            <i class="fas fa-mobile-alt" style="font-size:2.2rem;display:block;margin-bottom:10px;color:#333;"></i>
+                            <div style="font-size:13px;">Select a rental mode and duration above to see your GCash payment details.</div>
                         </div>
 
-                        <div id="dpPaymentBox" class="dp-box">
-                            <div class="dp-title" style="justify-content:space-between;">
-                                <span><i class="fas fa-coins"></i> Payment Amount</span>
-                                <span id="dpHint" style="font-size:12px;font-weight:600;color:#20c8a1;"></span>
-                            </div>
-                            <input type="number" name="downpayment_amount" id="dpAmount" class="res-input"
-                                   min="0" step="1" placeholder="Select a duration above first"
-                                   readonly
-                                   style="cursor:not-allowed;background:rgba(32,200,161,.06);border-color:rgba(32,200,161,.3);color:#20c8a1;font-size:16px;font-weight:700;"
-                                   value="<?= htmlspecialchars($_POST['downpayment_amount'] ?? '') ?>">
-                            <p id="dpNote" style="font-size:11px;color:#888;margin:-8px 0 14px;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.</p>
+                        <!-- GCash payment panel (shown once fee is calculated) -->
+                        <div id="gcashPanel" style="display:none;">
+                            <div style="
+                                background:linear-gradient(135deg,rgba(0,174,90,.12),rgba(32,200,161,.08));
+                                border:1.5px solid rgba(0,174,90,.4);
+                                border-radius:16px;padding:20px;margin-bottom:18px;">
 
-                            <div id="dpMethodSection" style="display:none;">
-                                <div class="sec-label">Payment Method *</div>
-                                <div class="dp-method-grid">
-                                    <div class="pm-card" id="pm-cash" onclick="selectDpMethod('cash')">
-                                        <span class="pm-icon">&#x1F4B5;</span>Cash
+                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                                    <div style="background:#00ae5a;border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        <i class="fas fa-mobile-alt" style="color:#fff;font-size:.95rem;"></i>
                                     </div>
-                                    <div class="pm-card" id="pm-gcash" onclick="selectDpMethod('gcash')">
-                                        <span class="pm-icon">&#x1F4F1;</span>GCash
+                                    <div style="font-weight:800;color:#00c96b;font-size:14px;">GCash Payment Details</div>
+                                </div>
+
+                                <!-- GCash number + amount -->
+                                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                                    <div style="flex:1;min-width:140px;background:rgba(0,0,0,.3);border-radius:10px;padding:14px;text-align:center;">
+                                        <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">GCash Number</div>
+                                        <div style="font-size:1.2rem;font-weight:900;color:#fff;letter-spacing:1.5px;"><?= htmlspecialchars($gcashNumber) ?></div>
+                                        <div style="font-size:10px;color:#888;margin-top:4px;">Good Spot Gaming Hub</div>
                                     </div>
-                                    <div class="pm-card" id="pm-credit_card" onclick="selectDpMethod('credit_card')">
-                                        <span class="pm-icon">&#x1F4B3;</span>Credit Card
+                                    <div style="flex:1;min-width:140px;background:rgba(0,0,0,.3);border-radius:10px;padding:14px;text-align:center;">
+                                        <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Amount to Send</div>
+                                        <div id="gcashAmountDisplay" style="font-size:1.7rem;font-weight:900;color:#20c8a1;">&#8369;0</div>
+                                        <div style="font-size:10px;color:#888;margin-top:4px;">Exact amount only</div>
                                     </div>
                                 </div>
-                                <p style="font-size:11px;color:#888;margin-bottom:0;">
-                                    <i class="fas fa-info-circle"></i>
-                                    Payment will be recorded as your session upfront payment.
-                                </p>
+
+                                <!-- Fee breakdown -->
+                                <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:12px;margin-bottom:16px;">
+                                    <div style="font-size:11px;color:#888;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Fee Breakdown</div>
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#ccc;margin-bottom:3px;">
+                                        <span>Base fee</span><span>&#8369;20.00</span>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#ccc;margin-bottom:6px;">
+                                        <span>5% of <span id="feeCostLabel">&#8369;0</span></span>
+                                        <span id="feePctAmount">&#8369;0.00</span>
+                                    </div>
+                                    <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:7px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;color:#20c8a1;">
+                                        <span>Total Reservation Fee</span>
+                                        <span id="feeTotalLabel">&#8369;0</span>
+                                    </div>
+                                </div>
+
+                                <!-- Step-by-step instructions -->
+                                <ol style="font-size:12px;color:#aaa;line-height:2.1;margin:0;padding-left:18px;">
+                                    <li>Open <strong style="color:#fff;">GCash</strong> &rarr; tap <strong style="color:#fff;">Send Money</strong>.</li>
+                                    <li>Enter number <strong style="color:#20c8a1;"><?= htmlspecialchars($gcashNumber) ?></strong> and send the <strong style="color:#20c8a1;">exact amount</strong> shown above.</li>
+                                    <li>Take a <strong style="color:#fff;">screenshot</strong> of the GCash transaction receipt.</li>
+                                    <li>Upload the screenshot below, then submit your reservation.</li>
+                                </ol>
                             </div>
+
+                            <!-- Proof of payment upload -->
+                            <div class="dp-box">
+                                <div class="dp-title">
+                                    <span><i class="fas fa-image"></i> Upload GCash Receipt *</span>
+                                </div>
+                                <label for="payment_proof" id="proofUploadLabel" style="
+                                    display:block;border:2px dashed rgba(32,200,161,.35);
+                                    border-radius:12px;padding:22px;text-align:center;
+                                    cursor:pointer;background:rgba(32,200,161,.03);
+                                    transition:border-color .2s,background .2s;"
+                                    onmouseover="this.style.borderColor='rgba(32,200,161,.7)';this.style.background='rgba(32,200,161,.07)'"
+                                    onmouseout="this.style.borderColor='rgba(32,200,161,.35)';this.style.background='rgba(32,200,161,.03)'">
+                                    <i class="fas fa-cloud-upload-alt" id="proofUploadIcon" style="font-size:2rem;color:#20c8a1;display:block;margin-bottom:8px;"></i>
+                                    <div id="proofFileName" style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Click to select screenshot</div>
+                                    <div style="font-size:11px;color:#666;">JPG, PNG, GIF or WebP &mdash; max 5 MB</div>
+                                </label>
+                                <input type="file" id="payment_proof" name="payment_proof"
+                                       accept="image/jpeg,image/png,image/gif,image/webp"
+                                       style="display:none;"
+                                       onchange="onProofSelected(this)">
+                                <!-- Preview -->
+                                <div id="proofPreview" style="display:none;margin-top:14px;text-align:center;">
+                                    <img id="proofImg" src="" alt="Receipt Preview"
+                                         style="max-width:100%;max-height:220px;border-radius:10px;border:2px solid rgba(32,200,161,.4);">
+                                    <div style="font-size:12px;color:#20c8a1;margin-top:8px;font-weight:700;">
+                                        <i class="fas fa-check-circle"></i> Screenshot ready to submit
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Hidden amount input read by PHP -->
+                            <input type="hidden" name="downpayment_amount" id="dpAmount" value="0">
+                            <input type="hidden" name="downpayment_method" value="gcash">
                         </div>
                     </div>
+
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-sticky-note"></i> Step 5 — Notes (Optional)</h2>
                         <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
@@ -1071,11 +1190,11 @@ if (!empty($_GET['console'])) {
                             <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
                         </div>
                         <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
-                            <li>All payments made for reservations are <strong style="color:#fff;">non-refundable</strong> under any circumstances.</li>
-                            <li>No refunds will be issued regardless of the cancellation reason.</li>
-                            <li>No store credit or GC will be given in place of a refund.</li>
-                            <li>No partial refunds will be processed.</li>
-                            <li>This policy applies to all cancellations — whether initiated by you or by staff on your behalf.</li>
+                            <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">₱20 + 5% of your session cost</strong> is required to confirm every booking.</li>
+                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, no-shows, and admin cancellations.</li>
+                            <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
+                            <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
+                            <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
                         </ul>
                         <label id="noRefundLabel" style="
                             display:flex;align-items:flex-start;gap:12px;
@@ -1141,7 +1260,7 @@ if (!empty($_GET['console'])) {
                         <div class="rs-row"><span class="rs-label">Date &amp; Time</span><span class="rs-value" id="s-datetime">—</span></div>
                         <div class="rs-row"><span class="rs-label">Mode</span><span class="rs-value" id="s-mode">—</span></div>
                         <div class="rs-row"><span class="rs-label">Duration</span><span class="rs-value" id="s-duration">—</span></div>
-                        <div class="rs-row"><span class="rs-label">Payment</span><span class="rs-value" id="s-dp">None</span></div>
+                        <div class="rs-row"><span class="rs-label">Reservation Fee</span><span class="rs-value" id="s-dp">—</span></div>
                     </div>
 
                     <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
@@ -1213,7 +1332,7 @@ if (!empty($_GET['console'])) {
                         <table class="my-res-table">
                             <thead>
                                 <tr>
-                                    <th>Date & Time</th>
+                                    <th>Date &amp; Time</th>
                                     <th>Console</th>
                                     <th>Mode</th>
                                     <th>Status</th>
@@ -1258,10 +1377,8 @@ AOS.init({ duration: 600, once: true });
 (function () {
     const preset = <?= json_encode($presetConsole) ?>;
     if (preset) {
-        // setTimeout so all functions below are fully defined before this runs
         setTimeout(function () {
             selectConsoleType(preset);
-            // Scroll the chosen console card into view
             const cardId = CONSOLE_TYPE_IDS[preset];
             if (cardId) {
                 const card = document.getElementById(cardId);
@@ -1279,9 +1396,70 @@ let selectedDpMethod    = '';
 let selectedUnitId      = null;
 let selectedUnitLabel   = '';
 
-const unlimitedRate   = <?= (int)$unlimitedRate ?>;
-const PRICING         = <?= json_encode(getPricingRules()) ?>;
+const unlimitedRate    = <?= (int)$unlimitedRate ?>;
+const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
+
+/* ── Time select helpers ────────────────────────── */
+// Valid slots 12:00–23:00 in 30-min steps
+const TIME_SLOTS = (function () {
+    const s = [];
+    for (let h = 12; h <= 23; h++) {
+        s.push(String(h).padStart(2,'0') + ':00');
+        if (h < 23) s.push(String(h).padStart(2,'00') + ':30');
+    }
+    return s;
+})();
+
+function fmtSlot(t) {
+    const [h, m] = t.split(':');
+    const hh = parseInt(h);
+    return `${hh % 12 || 12}:${m} ${hh >= 12 ? 'PM' : 'AM'}`;
+}
+
+// Rebuild <select> options; grey (disabled) anything before minT
+function buildTimeSelect() {
+    const sel    = document.getElementById('timeSelect');
+    const hidden = document.getElementById('reservedTime');
+    const dateEl = document.getElementById('reservedDate');
+    const minT   = getMinTimeForDate(dateEl.value || new Date().toISOString().slice(0,10));
+    const curVal = hidden.value;
+
+    // Rebuild all options
+    sel.innerHTML = '<option value="" disabled>Select time…</option>';
+    TIME_SLOTS.forEach(slot => {
+        const opt = document.createElement('option');
+        opt.value = slot;
+        opt.textContent = fmtSlot(slot);
+        if (slot < minT) {
+            opt.disabled = true;       // greyed out in browser
+            opt.title = slot < OPEN_TIME ? 'Outside operating hours' : 'Within 1-hr lead time';
+        }
+        opt.selected = (slot === curVal);
+        sel.appendChild(opt);
+    });
+
+    // If previously selected slot is now disabled, clear it
+    if (curVal && curVal < minT) {
+        hidden.value = '';
+        sel.value = '';
+        const wrap = document.getElementById('timeWrap');
+        if (wrap) wrap.classList.remove('dt-filled');
+    }
+}
+
+function onTimeSelect(sel) {
+    const hidden = document.getElementById('reservedTime');
+    hidden.value = sel.value;
+    const wrap = document.getElementById('timeWrap');
+    if (wrap) {
+        if (sel.value) wrap.classList.add('dt-filled');
+        else wrap.classList.remove('dt-filled');
+    }
+    onDateTimeChange();
+    updateDtBanner();
+}
+
 
 /* ── Console type ───────────────────────────────────── */
 const CONSOLE_TYPE_IDS = { 'PS5': 'ct-ps5', 'PS4': 'ct-ps4', 'Xbox Series X': 'ct-xbox' };
@@ -1500,54 +1678,53 @@ function selectMode(mode) {
         document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     }
 
-    // ── Update the Step 4 payment card to reflect the selected mode ──
-    const dpDesc        = document.getElementById('dpDesc');
-    const dpNote        = document.getElementById('dpNote');
-    const dpHint        = document.getElementById('dpHint');
-    const dpAmount      = document.getElementById('dpAmount');
-    const dpPaymentBox  = document.getElementById('dpPaymentBox');
-    const dpOpenNotice  = document.getElementById('dpOpenTimeNotice');
-    const dpMethodSec   = document.getElementById('dpMethodSection');
-
-    if (mode === 'open_time') {
-        dpDesc.textContent = 'No upfront payment needed — pay bracket pricing at the end of your session.';
-        dpOpenNotice.style.display  = 'block';
-        dpPaymentBox.style.display  = 'none';
-        // Zero out hidden amount so backend ignores it
-        dpAmount.value = '0';
-        selectedDpMethod = '';
-        document.getElementById('hiddenDpMethod').value = '';
-        document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
-
-    } else if (mode === 'unlimited') {
-        dpDesc.textContent = `A flat rate of \u20b1${unlimitedRate} is required upfront for unlimited play.`;
-        dpOpenNotice.style.display  = 'none';
-        dpPaymentBox.style.display  = 'block';
-        dpAmount.value              = unlimitedRate;
-        dpHint.textContent          = `Flat rate: \u20b1${unlimitedRate}`;
-        dpNote.innerHTML            = '<i class="fas fa-lock" style="margin-right:4px;"></i>Fixed flat rate — no duration to select.';
-        dpMethodSec.style.display   = 'block';
-
+    if (mode === 'unlimited') {
+        // Fee is deterministic for unlimited — show panel immediately
+        const pct = Math.round(unlimitedRate * 0.05);
+        const fee = 20 + pct;
+        setGcashFee(unlimitedRate, pct, fee);
+        showGcashPanel();
     } else {
-        // hourly — reset to waiting-for-duration state
-        dpDesc.textContent          = 'Full payment is required to confirm your hourly reservation.';
-        dpOpenNotice.style.display  = 'none';
-        dpPaymentBox.style.display  = 'block';
-        dpAmount.value              = '';
-        dpHint.textContent          = '';
-        dpNote.innerHTML            = '<i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 100% of your session cost.';
-        dpMethodSec.style.display   = 'none';
-        selectedDpMethod = '';
-        document.getElementById('hiddenDpMethod').value = '';
-        document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('selected'));
+        // Hourly — wait for duration pick
+        document.getElementById('dpAmount').value = '0';
+        hideGcashPanel();
     }
 
     updateSummary();
 }
 
+/* ── GCash panel helpers ─────────────────────────────── */
+function setGcashFee(sessionCost, pct, fee) {
+    document.getElementById('dpAmount').value = fee;
+    document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
+    document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
+    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee;
+    document.getElementById('gcashAmountDisplay').textContent = '\u20b1' + fee;
+}
+function showGcashPanel() {
+    document.getElementById('gcashWaiting').style.display = 'none';
+    document.getElementById('gcashPanel').style.display   = 'block';
+}
+function hideGcashPanel() {
+    document.getElementById('gcashPanel').style.display   = 'none';
+    document.getElementById('gcashWaiting').style.display = 'block';
+}
+
+/* ── Proof of payment file preview ──────────────────── */
+function onProofSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    document.getElementById('proofFileName').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('proofImg').src = e.target.result;
+        document.getElementById('proofPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
 /* ── Duration ───────────────────────────────────────── */
 function selectDuration(mins) {
-    // Guard: never accept more than 4 hours (240 min)
     if (mins > 240) { alert('Hourly reservations are limited to 4 hours maximum.'); return; }
 
     selectedDuration = mins;
@@ -1555,24 +1732,15 @@ function selectDuration(mins) {
     document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
-    // Read cost and bonus from data attributes on the button (set by PHP / getHourlyDurationOptions)
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
-    const fullCost = btn ? parseFloat(btn.dataset.cost  || 0) : (mins <= 30 ? PRICING.session_min_charge : mins / 60 * PRICING.hourly_rate);
-    const bonusMins= btn ? parseInt(btn.dataset.bonus   || 0) : 0;
-    const totalMins= btn ? parseInt(btn.dataset.total   || mins) : mins;
+    const fullCost = btn ? parseFloat(btn.dataset.cost || 0) : (mins <= 30 ? PRICING.session_min_charge : mins / 60 * PRICING.hourly_rate);
 
-    document.getElementById('dpAmount').value = fullCost;
+    // Reservation fee = \u20b120 + 5% of session cost
+    const pct = Math.round(fullCost * 0.05);
+    const fee = 20 + pct;
 
-    const totalH     = Math.floor(totalMins / 60);
-    const totalM     = totalMins % 60;
-    const totalLabel = (totalH ? totalH + 'h ' : '') + (totalM ? totalM + 'm' : '');
-
-    let hint = `Full cost: \u20b1${fullCost.toFixed(0)}`;
-    if (bonusMins > 0) {
-        hint += ` · Total session: ${totalLabel} (+${bonusMins} min free 🎁)`;
-    }
-    document.getElementById('dpHint').textContent = hint;
-    document.getElementById('dpMethodSection').style.display = 'block';
+    setGcashFee(fullCost, pct, fee);
+    showGcashPanel();
 
     updateSummary();
 }
@@ -1623,7 +1791,7 @@ function handleNoRefundCheck() { handlePolicyChecks(); }
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour
 const OPEN_TIME        = '12:00'; // noon
-const CLOSE_TIME       = '23:59'; // last slot (midnight closing)
+const CLOSE_TIME       = '23:00'; // last bookable slot (11 PM)
 
 function getMinTimeForDate(dateStr) {
     const today    = new Date();
@@ -1641,34 +1809,9 @@ function getMinTimeForDate(dateStr) {
 }
 
 function enforceMinTime() {
-    const dateEl = document.getElementById('reservedDate');
-    const timeEl = document.getElementById('reservedTime');
-    const minT   = getMinTimeForDate(dateEl.value);
-
-    // Always enforce operating window
-    timeEl.min = minT;
-    timeEl.max = CLOSE_TIME;
-
-    let invalid = false;
-    if (timeEl.value && timeEl.value < minT) {
-        invalid = true;
-        timeEl.title = timeEl.value < OPEN_TIME
-            ? 'We\'re open from 12:00 PM (noon)'
-            : 'Must be at least 1 hour from now';
-    } else if (timeEl.value && timeEl.value > CLOSE_TIME) {
-        invalid = true;
-        timeEl.title = 'We close at 12:00 AM (midnight)';
-    }
-
-    if (invalid) {
-        timeEl.value       = '';
-        timeEl.style.borderColor = '#fb566b';
-        timeEl.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.2)';
-    } else {
-        timeEl.style.borderColor = '';
-        timeEl.style.boxShadow   = '';
-        timeEl.title = '';
-    }
+    // Rebuild the <select> options to reflect the current date's lead time.
+    // Invalid slots are automatically greyed out (disabled) in the dropdown.
+    buildTimeSelect();
 }
 
 /* ── Availability check ─────────────────────────────── */
@@ -1685,9 +1828,13 @@ function onDateTimeChange() {
 // Run on page load — pre-fill and clamp to operating hours
 document.addEventListener('DOMContentLoaded', function () {
     const dateEl = document.getElementById('reservedDate');
-    const timeEl = document.getElementById('reservedTime');
+    const hidden = document.getElementById('reservedTime');
 
-    if (!dateEl.value && !timeEl.value) {
+    // Build the time select first
+    buildTimeSelect();
+
+    if (!dateEl.value) {
+        // Auto-fill today (or tomorrow if past close)
         const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
         const yyyy = earliest.getFullYear();
         const mm   = String(earliest.getMonth() + 1).padStart(2, '0');
@@ -1696,20 +1843,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const min  = String(earliest.getMinutes()).padStart(2, '0');
         const leadt = `${hh}:${min}`;
 
-        dateEl.value = `${yyyy}-${mm}-${dd}`;
-
-        // Snap to noon if lead-time falls before opening
-        if (leadt < OPEN_TIME) {
-            timeEl.value = OPEN_TIME;
-        } else if (leadt > CLOSE_TIME) {
-            // Past closing — move to next day at noon
+        if (leadt > CLOSE_TIME) {
             const tomorrow = new Date(earliest);
             tomorrow.setDate(tomorrow.getDate() + 1);
             dateEl.value = tomorrow.toISOString().slice(0, 10);
-            timeEl.value = OPEN_TIME;
         } else {
-            timeEl.value = leadt;
+            dateEl.value = `${yyyy}-${mm}-${dd}`;
         }
+        buildTimeSelect(); // rebuild with correct date
+    }
+
+    // Restore POST value display on validation error reload
+    if (hidden.value) {
+        const sel = document.getElementById('timeSelect');
+        if (sel) sel.value = hidden.value;
+        const wrap = document.getElementById('timeWrap');
+        if (wrap) wrap.classList.add('dt-filled');
     }
 
     enforceMinTime();
@@ -1820,7 +1969,7 @@ function updateDtBanner() {
         document.getElementById('timeSublabel').textContent = `${h12}:${m} ${ampm} selected`;
     } else {
         timeWrap.classList.remove('dt-filled');
-        document.getElementById('timeSublabel').textContent = '12:00 PM – 12:00 AM';
+        document.getElementById('timeSublabel').textContent = '12:00 PM – 11:00 PM';
     }
 
     // Show / update banner if both are set
@@ -1864,30 +2013,26 @@ function updateSummary() {
     document.getElementById('s-datetime').textContent =
         new Date(date + 'T' + time).toLocaleDateString('en-PH', {weekday:'short',month:'short',day:'numeric',year:'numeric'}) +
         ' at ' + new Date(date + 'T' + time).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit'});
-    document.getElementById('s-mode').textContent     =
-        selectedMode === 'open_time' ? 'Open Time' : selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1);
+    document.getElementById('s-mode').textContent =
+        selectedMode === 'unlimited' ? 'Unlimited' : 'Hourly';
 
     let durText = '—';
     if (selectedMode === 'hourly' && selectedDuration) {
         const h = Math.floor(selectedDuration/60), m = selectedDuration%60;
-        const cost = selectedDuration <= 30 ? 50 : selectedDuration/60*80;
-        durText = (h ? h+'h ' : '') + (m ? m+'m ' : '') + '— ₱' + cost.toFixed(0);
+        const cost = selectedDuration <= 30 ? PRICING.session_min_charge : selectedDuration/60*PRICING.hourly_rate;
+        durText = (h ? h+'h ' : '') + (m ? m+'m ' : '') + '— ₱' + cost.toFixed(0) + ' (session cost)';
     } else if (selectedMode === 'unlimited') {
         durText = 'Unlimited — ₱' + unlimitedRate;
-    } else if (selectedMode === 'open_time') {
-        durText = 'Pay at end (bracket pricing)';
     }
     document.getElementById('s-duration').textContent = durText;
 
     let dpText = 'None';
-    if (selectedMode === 'open_time') {
-        dpText = 'Pay at session end (bracket pricing)';
-    } else if (dp > 0) {
-        dpText = '\u20b1' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' — method required');
+    if (dp > 0) {
+        dpText = '₱' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' — payment method required');
     } else if (selectedMode === 'hourly') {
-        dpText = 'None — select a duration above';
+        dpText = 'Select a duration above';
     } else if (selectedMode === 'unlimited') {
-        dpText = '\u20b1' + unlimitedRate + ' — select payment method';
+        dpText = 'Select payment method';
     }
     document.getElementById('s-dp').textContent = dpText;
 }
@@ -1905,13 +2050,22 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         // Operating hours check
         if (timeVal < OPEN_TIME) {
             e.preventDefault();
-            alert('\u26a0\ufe0f We\u2019re only open from 12:00 PM (noon). Please pick a time between noon and midnight.');
+            alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
             document.getElementById('reservedTime').focus();
             return;
         }
         if (timeVal > CLOSE_TIME) {
             e.preventDefault();
-            alert('\u26a0\ufe0f We close at 12:00 AM (midnight). Please pick a time before midnight.');
+            alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
+            document.getElementById('reservedTime').focus();
+            return;
+        }
+
+        // Check if slot is confirmed-locked (alert from availability check)
+        const lockAlert = document.getElementById('slotLockedAlert');
+        if (lockAlert && lockAlert.style.display === 'flex' && selectedConsoleType) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f This time slot is already fully reserved (confirmed) for ' + selectedConsoleType + '. Please choose a different time.');
             document.getElementById('reservedTime').focus();
             return;
         }
@@ -1928,7 +2082,17 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     }
 
     const dp = parseFloat(document.getElementById('dpAmount').value) || 0;
-    if (dp > 0 && !selectedDpMethod) { e.preventDefault(); alert('Please select a payment method for your downpayment.'); return; }
+    if (!dp) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Please select a rental mode and duration to calculate your reservation fee.');
+        return;
+    }
+    const proofFile = document.getElementById('payment_proof');
+    if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
+        return;
+    }
 });
 </script>
 </body>

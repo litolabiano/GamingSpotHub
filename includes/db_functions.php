@@ -965,7 +965,8 @@ function createReservation(
     $user_id, $console_type, $rental_mode, $planned_minutes,
     $reserved_date, $reserved_time, $notes = null,
     $downpayment_amount = 0.0, $downpayment_method = null,
-    $preferred_unit_id = null   // optional: specific console the customer wants
+    $preferred_unit_id = null,
+    $payment_proof = null   // uploaded GCash screenshot filename
 ) {
     global $conn;
 
@@ -975,20 +976,24 @@ function createReservation(
         return ['success' => false, 'message' => 'Cannot reserve a past date.'];
     }
 
-    $downpayment_paid = ($downpayment_amount > 0 && $downpayment_method !== null) ? 1 : 0;
+    // Payment proof is required — payment_proof_status starts as 'pending' (awaiting admin verify)
+    $downpayment_paid  = 0;  // NOT marked paid until admin verifies the GCash proof
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
+    $proof_status      = $payment_proof ? 'pending' : null;
 
     $stmt = $conn->prepare(
         "INSERT INTO reservations
             (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
-             notes, downpayment_amount, downpayment_method, downpayment_paid, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+             notes, downpayment_amount, downpayment_method, downpayment_paid,
+             payment_proof, payment_proof_status, status, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
     );
     $stmt->bind_param(
-        'iississsdsii',
+        'iississsdsissi',
         $user_id, $preferred_unit_id, $console_type, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
+        $payment_proof, $proof_status,
         $user_id   // created_by = the customer themselves
     );
 

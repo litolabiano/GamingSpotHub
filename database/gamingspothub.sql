@@ -3,9 +3,30 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 27, 2026 at 06:03 PM
+-- Generation Time: Apr 28, 2026 at 06:15 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
+--
+-- ============================================================
+-- RESERVATION TIME RULES (enforced in app layer + DB settings)
+-- ============================================================
+-- Rule 1: Valid reservation hours = 12:00 PM (noon) to 11:00 PM (23:00).
+--         No reservations can be made outside this window.
+--         Controlled by: system_settings (business_hours_open / business_hours_close)
+--                        + PHP validation in reserve.php
+--                        + JS enforceMinTime() / CLOSE_TIME = '23:00'
+--
+-- Rule 2: Minimum 1-hour lead time.
+--         Customers can only book slots at least 1 hour ahead of current time.
+--         Controlled by: PHP strtotime check in reserve.php
+--                        + JS MIN_LEAD_SECONDS = 3600
+--
+-- Rule 3: Confirmed time slots are locked (non-selectable for other users).
+--         Once admin confirms a reservation for a specific unit + date + time,
+--         that slot is visually greyed out / locked in the booking UI.
+--         Controlled by: check_availability.php returns confirmed_count per
+--                        console type so the JS can show a lock alert.
+-- ============================================================
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -177,6 +198,8 @@ CREATE TABLE `reservations` (
   `downpayment_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `downpayment_method` enum('cash','gcash','credit_card') DEFAULT NULL,
   `downpayment_paid` tinyint(1) NOT NULL DEFAULT 0,
+  `payment_proof` varchar(255) DEFAULT NULL COMMENT 'Filename of uploaded GCash receipt screenshot',
+  `payment_proof_status` enum('pending','verified','rejected') DEFAULT NULL COMMENT 'Admin verifies GCash proof before confirming',
   `status` enum('pending','confirmed','converted','cancelled','no_show') NOT NULL DEFAULT 'pending',
   `created_by` int(11) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
@@ -305,7 +328,7 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (3, 'unlimited_rate', '400.00', 'Rate for unlimited play (whole day) in ₱', '2026-04-14 09:56:44'),
 (4, 'controller_rental_fee', '20.00', 'Additional controller rental fee in ₱', '2026-02-21 19:55:41'),
 (5, 'business_hours_open', '12:00', 'Shop opening time', '2026-04-14 09:56:44'),
-(6, 'business_hours_close', '00:00', 'Shop closing time', '2026-04-14 09:56:44'),
+(6, 'business_hours_close', '23:00', 'Last bookable reservation time slot (11:00 PM)', '2026-04-28 18:15:00'),
 (7, 'shop_name', 'Good Spot Gaming Hub', 'Shop name', '2026-02-21 19:55:41'),
 (8, 'shop_address', 'Don Placido Avenue, Dasmariñas, Cavite', 'Shop address', '2026-02-21 19:55:41'),
 (9, 'shop_phone', '09171234567', 'Shop contact number', '2026-02-21 19:55:41'),
@@ -313,7 +336,8 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (21, 'bonus_paid_minutes', '120', NULL, '2026-04-26 16:47:16'),
 (22, 'bonus_free_minutes', '30', NULL, '2026-04-26 16:47:16'),
 (23, 'max_hourly_minutes', '240', NULL, '2026-04-26 16:47:16'),
-(24, 'session_min_charge', '20', NULL, '2026-04-26 23:21:14');
+(24, 'session_min_charge', '20', NULL, '2026-04-26 23:21:14'),
+(25, 'gcash_number', '09XX-XXX-XXXX', 'Shop GCash number displayed on reservation payment screen', '2026-04-28 19:00:00');
 
 -- --------------------------------------------------------
 

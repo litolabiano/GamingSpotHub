@@ -23,6 +23,12 @@ if ($date < $today) {
     exit;
 }
 
+// Enforce allowed reservation window: 12:00 PM – 11:00 PM
+if ($time < '12:00' || $time > '23:00') {
+    echo json_encode(['success' => false, 'message' => 'Reservations are only accepted between 12:00 PM and 11:00 PM.']);
+    exit;
+}
+
 // For each console type, count how many consoles are NOT reserved or active at that date/time
 // A 2-hour window is assumed for conflict detection.
 $requestedDT = $date . ' ' . $time . ':00';
@@ -33,20 +39,27 @@ $sql = "
         c.console_id,
         c.unit_number,
         c.status,
-        -- Check for conflicting confirmed reservations within ±2h window
+        -- Count ALL pending+confirmed reservations within ±2h window
         (SELECT COUNT(*) FROM reservations r
             WHERE r.console_id = c.console_id
               AND r.status IN ('pending','confirmed')
               AND r.reserved_date = ?
               AND ABS(TIMESTAMPDIFF(MINUTE, CONCAT(r.reserved_date,' ',r.reserved_time), ?)) < 120
-        ) AS has_reservation
+        ) AS has_reservation,
+        -- Count ONLY confirmed reservations (slot is definitively locked)
+        (SELECT COUNT(*) FROM reservations r
+            WHERE r.console_id = c.console_id
+              AND r.status = 'confirmed'
+              AND r.reserved_date = ?
+              AND ABS(TIMESTAMPDIFF(MINUTE, CONCAT(r.reserved_date,' ',r.reserved_time), ?)) < 120
+        ) AS confirmed_reservation
     FROM consoles c
     WHERE c.status != 'maintenance'
     ORDER BY c.console_type, c.unit_number
 ";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param('ss', $date, $requestedDT);
+$stmt->bind_param('ssss', $date, $requestedDT, $date, $requestedDT);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -54,13 +67,17 @@ $summary = [];
 foreach ($rows as $r) {
     $type = $r['console_type'];
     if (!isset($summary[$type])) {
-        $summary[$type] = ['total' => 0, 'available' => 0, 'units' => []];
+        $summary[$type] = ['total' => 0, 'available' => 0, 'confirmed_count' => 0, 'units' => []];
     }
     $summary[$type]['total']++;
     $isFree = ($r['status'] !== 'in_use') && ((int)$r['has_reservation'] === 0);
     if ($isFree) {
         $summary[$type]['available']++;
         $summary[$type]['units'][] = $r['unit_number'];
+    }
+    // Accumulate confirmed-locked units
+    if ((int)$r['confirmed_reservation'] > 0) {
+        $summary[$type]['confirmed_count']++;
     }
 }
 
