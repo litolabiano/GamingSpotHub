@@ -135,7 +135,15 @@ function navIsActive(string $href, string $currentPage, string $currentUri): str
     const toggler  = nav.querySelector('.navbar-toggler');
     const collapse = nav.querySelector('.navbar-collapse');
     if (toggler && collapse) {
+        // Stop the toggler's own click from bubbling up to the document listener,
+        // which would call toggler.click() a second time and cancel the close action.
+        toggler.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+
         document.addEventListener('click', function (e) {
+            // Skip if the toggler itself was clicked (extra safety guard).
+            if (toggler.contains(e.target)) return;
             if (!nav.contains(e.target) && collapse.classList.contains('show')) {
                 toggler.click();
             }

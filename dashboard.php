@@ -2038,8 +2038,5 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </script>
 <?php endif; ?>
 
-<!-- Bootstrap JS (navbar mobile toggler) -->
-<script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
-<script src="assets/libs/aos/aos.js"></script>
 
 </html>
