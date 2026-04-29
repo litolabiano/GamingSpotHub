@@ -635,10 +635,32 @@
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:6px">
-                    <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱) <span style="font-weight:400;color:#666;">(optional)</span></label>
-                    <input type="number" id="extendTendered" name="tendered" min="0" step="1" placeholder="e.g. 100"
-                           style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                           oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                    <!-- Label row with checkbox toggle -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                        <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin:0;">Amount Tendered (₱)</label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                            <input type="checkbox" id="extendTenderedToggle"
+                                   style="width:14px;height:14px;accent-color:#8aa4e8;cursor:pointer;"
+                                   onchange="toggleExtendTendered(this)">
+                            <span style="color:#8aa4e8;">Optional — customer gave different amount</span>
+                        </label>
+                    </div>
+                    <!-- The input: pre-filled with cost, locked by default -->
+                    <div style="position:relative;">
+                        <input type="number" id="extendTendered" name="tendered" min="0" step="1"
+                               readonly
+                               style="width:100%;padding:10px 12px 10px 36px;border-radius:8px;
+                                      border:1px solid rgba(95,133,218,.35);background:rgba(95,133,218,.07);
+                                      color:#8aa4e8;font-size:16px;font-weight:700;cursor:not-allowed;
+                                      box-sizing:border-box;"
+                               oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                        <!-- Lock icon overlay -->
+                        <i id="extendTenderedLockIcon" class="fas fa-lock"
+                           style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
+                                  color:#5f85da;font-size:13px;pointer-events:none;"></i>
+                    </div>
+                    <p id="extendTenderedHint" style="font-size:11px;color:#666;margin:5px 0 0;"
+                    ><i class="fas fa-info-circle" style="margin-right:3px;"></i>Pre-filled with exact cost. Check the box above to enter a different amount.</p>
                 </div>
                 <div id="extendChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
             </div>
@@ -683,7 +705,7 @@
                 });
                 if (tendered) body.append('tendered', tendered);
 
-                fetch('ajax/extend_session.php', { method: 'POST', body })
+                fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body })
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         if (data.success) {
@@ -732,6 +754,9 @@ function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, ren
     document.getElementById('extendPaymentFields').style.display = 'none';
     document.getElementById('extendTendered').value = '';
     document.getElementById('extendChangeDisplay').style.display = 'none';
+    // Reset the tendered toggle to locked state
+    const toggle = document.getElementById('extendTenderedToggle');
+    if (toggle) { toggle.checked = false; _lockExtendTendered(); }
 
     // Load pending requests for this session
     loadPendingExtensions(sessionId);
@@ -745,7 +770,7 @@ function loadPendingExtensions(sessionId) {
     section.style.display = 'none';
     list.innerHTML = '';
 
-    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`)
+    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`, { credentials: 'same-origin' })
         .then(r => r.json())
         .then(function(data) {
             if (!data.pending || data.pending.length === 0) return;
@@ -787,13 +812,18 @@ function updateExtendCost() {
         payFlds.style.display  = 'none';
         holder.value = '0';
     } else {
-        // Hourly: bracket billing (mirror computeTimedCost)
+        // Hourly: straight ₱80/hr
         const cost = computeExtCost(mins);
         costEl.textContent = '₱' + cost;
         freeNote.style.display = 'none';
         payFlds.style.display  = 'block';
         holder.value = cost;
-        document.getElementById('extendTendered').value = '';
+        // Pre-fill tendered with the exact cost; keep it locked
+        const tendInput = document.getElementById('extendTendered');
+        tendInput.value = cost;
+        // Reset the toggle checkbox so the field stays locked
+        const toggle = document.getElementById('extendTenderedToggle');
+        if (toggle) { toggle.checked = false; _lockExtendTendered(); }
         document.getElementById('extendChangeDisplay').style.display = 'none';
     }
 }
@@ -802,6 +832,51 @@ function updateExtendCost() {
 function computeExtCost(mins) {
     // ₱80/hr straight — 30 min = ₱40, 60 min = ₱80, etc.
     return Math.round((mins / 60) * 80);
+}
+
+/* ── Tendered field lock/unlock helpers ──────────────────────────────── */
+function _lockExtendTendered() {
+    const inp  = document.getElementById('extendTendered');
+    const icon = document.getElementById('extendTenderedLockIcon');
+    const hint = document.getElementById('extendTenderedHint');
+    if (!inp) return;
+    inp.readOnly = true;
+    inp.style.borderColor  = 'rgba(95,133,218,.35)';
+    inp.style.background   = 'rgba(95,133,218,.07)';
+    inp.style.color        = '#8aa4e8';
+    inp.style.cursor       = 'not-allowed';
+    inp.style.paddingLeft  = '36px';
+    if (icon) { icon.className = 'fas fa-lock'; icon.style.color = '#5f85da'; }
+    if (hint) hint.style.display = 'block';
+    // Hide change display when locked
+    document.getElementById('extendChangeDisplay').style.display = 'none';
+}
+
+function toggleExtendTendered(cb) {
+    const inp  = document.getElementById('extendTendered');
+    const icon = document.getElementById('extendTenderedLockIcon');
+    const hint = document.getElementById('extendTenderedHint');
+    if (!inp) return;
+
+    if (cb.checked) {
+        // Unlock — editable, white style
+        inp.readOnly = false;
+        inp.style.borderColor  = 'rgba(255,255,255,.2)';
+        inp.style.background   = 'rgba(255,255,255,.06)';
+        inp.style.color        = '#fff';
+        inp.style.cursor       = 'text';
+        inp.style.paddingLeft  = '12px';
+        if (icon) { icon.className = 'fas fa-unlock'; icon.style.color = '#20c8a1'; }
+        if (hint) hint.style.display = 'none';
+        inp.focus();
+        inp.select();
+    } else {
+        // Re-lock and reset back to exact cost
+        const cost = document.getElementById('extendCostHolder').value;
+        inp.value = cost;
+        _lockExtendTendered();
+        document.getElementById('extendChangeDisplay').style.display = 'none';
+    }
 }
 
 function submitExtendSession() {
@@ -823,7 +898,7 @@ function submitExtendSession() {
     fd.append('payment_method', method);
     if (tendered) fd.append('tendered', tendered);
 
-    fetch('ajax/extend_session.php', { method: 'POST', body: fd })
+    fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(data) {
             btn.disabled = false;
@@ -853,7 +928,7 @@ function approveExt(extId) {
     fd.append('action', 'approve');
     fd.append('extension_id', extId);
     fd.append('payment_method', method);
-    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+    fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(d) {
             if (d.success) {
@@ -871,7 +946,7 @@ function denyExt(extId) {
     fd.append('action', 'deny');
     fd.append('extension_id', extId);
     fd.append('note', 'Denied by staff');
-    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+    fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(d) {
             if (d.success) {

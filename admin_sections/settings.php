@@ -1,9 +1,18 @@
 <!-- ════ SETTINGS ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="settings">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-cog" style="color:#f1a83c;margin-right:10px;"></i>Settings</h2>
+            <p class="page-subtitle">Pricing rules, bonus time, and shop configuration</p>
+        </div>
+    </div>
+
     <form method="POST">
         <input type="hidden" name="action" value="save_settings">
         <?= csrfField() ?>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
 
             <!-- ── Pricing ── -->
             <div class="card">

@@ -1,21 +1,54 @@
 <!-- ════ TRANSACTIONS ══════════════════════════════════════════════════════════ -->
 <div class="page" id="transactions">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-exchange-alt" style="color:#20c8a1;margin-right:10px;"></i>Transactions</h2>
+            <p class="page-subtitle">Financial overview and payment history</p>
+        </div>
+    </div>
+
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">Today's Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">Today's Revenue</div>
+                </div>
+                <div class="stat-icon revenue"><i class="fas fa-peso-sign"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-calendar-day"></i> <?= date('F d, Y') ?></div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">This Month's Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">This Month's Revenue</div>
+                </div>
+                <div class="stat-icon sessions"><i class="fas fa-calendar-alt"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-chart-line"></i> <?= date('F Y') ?></div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">All-Time Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">All-Time Revenue</div>
+                </div>
+                <div class="stat-icon bookings"><i class="fas fa-chart-bar"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-infinity"></i> All time</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value"><?= $finStats['total_transactions'] ?? 0 ?></div>
-            <div class="stat-label">Total Transactions</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value"><?= $finStats['total_transactions'] ?? 0 ?></div>
+                    <div class="stat-label">Total Transactions</div>
+                </div>
+                <div class="stat-icon consoles"><i class="fas fa-receipt"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-check-circle"></i> Completed</div>
         </div>
     </div>
 

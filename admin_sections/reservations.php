@@ -1,6 +1,17 @@
 <!-- ════ RESERVATIONS ════════════════════════════════════════════════════ -->
 <div class="page" id="reservations">
 
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:10px;"></i>Reservations</h2>
+            <p class="page-subtitle">Manage upcoming and cancelled reservations</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('addReservation')">
+            <i class="fas fa-plus"></i> Add Reservation
+        </button>
+    </div>
+
     <!-- Stats summary -->
     <div class="stats-grid" style="margin-bottom:24px;">
         <?php
@@ -61,9 +72,6 @@
                     </span>
                 <?php endif; ?>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openModal('addReservation')">
-                <i class="fas fa-plus"></i> Add Reservation
-            </button>
         </div>
 
         <?php if (empty($upcomingReservations)): ?>

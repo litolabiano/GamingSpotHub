@@ -29,7 +29,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['shopkeeper', 'owner']);
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['shopkeeper', 'owner'])) {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
+    exit;
+}
 
 $session_id     = (int)  ($_POST['session_id']     ?? 0);
 $reservation_id = (int)  ($_POST['reservation_id'] ?? 0);

@@ -805,20 +805,39 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
-        /* Force page visibility — overrides cached animation issue in admin.css */
+        /* ══════════════════════════════════════════════════════════
+           ADMIN DESIGN SYSTEM — CSS Custom Properties
+        ══════════════════════════════════════════════════════════ */
+        :root {
+            --clr-mint:    #20c8a1;
+            --clr-blue:    #5f85da;
+            --clr-coral:   #fb566b;
+            --clr-gold:    #f1a83c;
+            --clr-cream:   #f1e1aa;
+            --clr-purple:  #b37bec;
+            --clr-bg:      #0a0f1c;
+            --clr-surface: rgba(10,33,81,.55);
+            --clr-border:  rgba(95,133,218,.18);
+            --clr-text:    #f0f0f0;
+            --clr-muted:   #888;
+            --radius-sm:   8px;
+            --radius-md:   12px;
+            --radius-lg:   16px;
+            --shadow-card: 0 4px 24px rgba(0,0,0,.35);
+        }
+
+        /* Force page visibility */
         .page.active {
             display: block !important;
             opacity: 1 !important;
             transform: translateY(0) !important;
         }
-        /* Disabled submit buttons inside the end-session form (early-end guard) */
         #endSessionForm button[type="submit"]:disabled {
             opacity: 0.35 !important;
             filter: grayscale(40%);
             cursor: not-allowed !important;
             pointer-events: none !important;
         }
-        /* Keep the Refund & End button always clickable inside the warning banner */
         #endEarlyWarning button {
             pointer-events: auto !important;
             opacity: 1 !important;
@@ -826,128 +845,158 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             cursor: pointer !important;
         }
 
-        /* ── Extra admin overrides ── */
+        /* ── Flash messages ── */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
-            padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+            padding: 14px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
             display: flex; align-items: center; gap: 10px;
-            animation: slideInRight .3s ease; max-width: 380px;
-            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+            animation: slideInRight .3s ease; max-width: 400px;
+            box-shadow: 0 8px 40px rgba(0,0,0,.5);
+            backdrop-filter: blur(8px);
         }
-        .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: #20c8a1; }
-        .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: #fb566b; }
-        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: #f1a83c; }
+        .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: var(--clr-mint); }
+        .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: var(--clr-coral); }
+        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: var(--clr-gold); }
         @keyframes slideInRight { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 
+        /* ── Status dots ── */
         .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-        .status-dot.available  { background:#20c8a1; }
-        .status-dot.in_use     { background:#5f85da; }
-        .status-dot.maintenance{ background:#fb566b; }
+        .status-dot.available   { background:var(--clr-mint); box-shadow:0 0 6px rgba(32,200,161,.5); }
+        .status-dot.in_use      { background:var(--clr-blue); }
+        .status-dot.maintenance { background:var(--clr-coral); }
 
-        .console-type-badge { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
-        .console-type-badge.ps5  { background:rgba(95,133,218,.2); color:#5f85da; border:1px solid rgba(95,133,218,.3); }
-        .console-type-badge.ps4  { background:rgba(241,168,60,.15); color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
-        .console-type-badge.xbox { background:rgba(32,200,161,.2); color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
+        /* ── Console type badges ── */
+        .console-type-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; letter-spacing:.3px; }
+        .console-type-badge.ps5  { background:rgba(95,133,218,.18); color:#8aa4e8; border:1px solid rgba(95,133,218,.3); }
+        .console-type-badge.ps4  { background:rgba(241,168,60,.15);  color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
+        .console-type-badge.xbox { background:rgba(32,200,161,.18);  color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
         /* ── Session timer ── */
-        .session-timer { font-family: monospace; font-size: 13px; color: #f1e1aa; font-weight: 600; }
-        .session-timer.stale { color: #fb566b; font-size:11px; font-weight:500; }
+        .session-timer { font-family: monospace; font-size: 13px; color: var(--clr-cream); font-weight: 700; }
+        .session-timer.stale { color: var(--clr-coral); font-size:11px; font-weight:500; }
+
+        /* ── Page header pattern ── */
+        .page-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+        }
+        .page-header .page-title-group .page-title {
+            font-size: 22px; font-weight: 800; color: var(--clr-text);
+            margin: 0 0 4px; line-height: 1.2;
+        }
+        .page-header .page-title-group .page-subtitle {
+            font-size: 13px; color: var(--clr-muted); margin: 0;
+        }
 
         /* ── Form layout ── */
-        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
         .form-group { margin-bottom:16px; }
-        .form-group label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; font-weight:600; }
+        .form-group label {
+            display:block; font-size:12px; color:#aaa; margin-bottom:6px;
+            font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+        }
         .form-group select, .form-group input[type=text], .form-group input[type=number],
-        .form-group input[type=time], .form-group textarea {
-            width:100%; background:rgba(10,33,81,.6); border:1px solid rgba(95,133,218,.25);
-            color:#f0f0f0; padding:10px 14px; border-radius:8px; font-size:14px;
-            font-family:inherit; outline:none; box-sizing:border-box; transition:.2s; }
+        .form-group input[type=time], .form-group textarea, .form-group input[type=datetime-local] {
+            width:100%; background:rgba(10,33,81,.7); border:1px solid rgba(95,133,218,.25);
+            color:var(--clr-text); padding:10px 14px; border-radius:var(--radius-sm); font-size:14px;
+            font-family:inherit; outline:none; box-sizing:border-box; transition:.2s;
+        }
         .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
-            border-color:#20c8a1; box-shadow:0 0 0 3px rgba(32,200,161,.1); }
+            border-color:var(--clr-mint); box-shadow:0 0 0 3px rgba(32,200,161,.12);
+        }
         .form-group textarea { resize:vertical; min-height:80px; }
         .form-check { display:flex; align-items:center; gap:8px; margin-top:6px; }
-        .form-check input { width:auto; accent-color:#20c8a1; }
+        .form-check input { width:auto; accent-color:var(--clr-mint); }
+        .form-hint { font-size:11px; color:#666; margin-top:5px; }
 
         /* ── Stat cards ── */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
-        .stat-change.up { color:#20c8a1; }
-        .stat-icon.revenue  { background:rgba(32,200,161,.15); color:#20c8a1; }
-        .stat-icon.sessions { background:rgba(95,133,218,.15); color:#5f85da; }
-        .stat-icon.bookings { background:rgba(179,123,236,.15); color:#b37bec; }
-        .stat-icon.consoles { background:rgba(241,225,170,.15); color:#f1e1aa; }
+        .stat-change.up { color:var(--clr-mint); font-size:12px; }
+        .stat-icon {
+            width:44px; height:44px; border-radius:var(--radius-sm);
+            display:flex; align-items:center; justify-content:center;
+            font-size:20px; flex-shrink:0;
+        }
+        .stat-icon.revenue  { background:rgba(32,200,161,.15); color:var(--clr-mint); }
+        .stat-icon.sessions { background:rgba(95,133,218,.15); color:var(--clr-blue); }
+        .stat-icon.bookings { background:rgba(179,123,236,.15); color:var(--clr-purple); }
+        .stat-icon.consoles { background:rgba(241,225,170,.15); color:var(--clr-cream); }
 
         /* ── Console cards ── */
-        .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
-        .console-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.15);
-            border-radius:12px; padding:18px; position:relative; transition:.2s; }
-        .console-card:hover { transform:translateY(-3px); }
-        .console-card.available  { border-left:3px solid #20c8a1; }
-        .console-card.in_use     { border-left:3px solid #5f85da; }
-        .console-card.maintenance{ border-left:3px solid #fb566b; }
-        .console-unit  { font-size:22px; font-weight:800; margin-bottom:4px; color:#fff; }
-        .console-name  { font-size:13px; color:#888; margin-bottom:10px; }
-        .console-rate  { font-size:12px; color:#f1e1aa; margin-bottom:12px; }
+        .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+        .console-card {
+            background:var(--clr-surface); border:1px solid var(--clr-border);
+            border-radius:var(--radius-md); padding:18px; position:relative;
+            transition:transform .2s, box-shadow .2s;
+            box-shadow: var(--shadow-card);
+        }
+        .console-card:hover { transform:translateY(-4px); box-shadow:0 12px 40px rgba(0,0,0,.4); }
+        .console-card.available  { border-left:3px solid var(--clr-mint); }
+        .console-card.in_use     { border-left:3px solid var(--clr-blue); }
+        .console-card.maintenance{ border-left:3px solid var(--clr-coral); }
+        .console-unit  { font-size:24px; font-weight:800; margin-bottom:2px; color:#fff; font-family:'Outfit',sans-serif; }
+        .console-name  { font-size:12px; color:#666; margin-bottom:10px; }
+        .console-rate  { font-size:13px; color:var(--clr-cream); margin-bottom:14px; font-weight:600; }
         .console-actions { display:flex; gap:6px; flex-wrap:wrap; }
 
-
+        /* ── Data table ── */
+        .data-table thead tr { background:rgba(10,33,81,.6); }
+        .data-table tbody tr { transition:background .15s; }
+        .data-table tbody tr:hover { background:rgba(95,133,218,.06); }
 
         /* ── Badge ── */
-        .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
-        .badge.active     { background:rgba(95,133,218,.2);  color:#5f85da; }
-        .badge.completed  { background:rgba(32,200,161,.2);  color:#20c8a1; }
-        .badge.cancelled  { background:rgba(251,86,107,.2);  color:#fb566b; }
-        .badge.pending    { background:rgba(241,225,170,.2); color:#f1e1aa; }
-        .badge.available  { background:rgba(32,200,161,.2);  color:#20c8a1; }
-        .badge.in_use     { background:rgba(95,133,218,.2);  color:#5f85da; }
-        .badge.maintenance{ background:rgba(251,86,107,.2);  color:#fb566b; }
-        .badge.installed  { background:rgba(179,123,236,.2); color:#b37bec; }
+        .badge {
+            display:inline-block; padding:3px 10px; border-radius:20px;
+            font-size:11px; font-weight:700; letter-spacing:.4px; white-space:nowrap;
+        }
+        .badge.active     { background:rgba(95,133,218,.2);  color:#8aa4e8; }
+        .badge.completed  { background:rgba(32,200,161,.2);  color:var(--clr-mint); }
+        .badge.cancelled  { background:rgba(251,86,107,.2);  color:var(--clr-coral); }
+        .badge.pending    { background:rgba(241,225,170,.18); color:var(--clr-cream); }
+        .badge.available  { background:rgba(32,200,161,.2);  color:var(--clr-mint); }
+        .badge.in_use     { background:rgba(95,133,218,.2);  color:#8aa4e8; }
+        .badge.maintenance{ background:rgba(251,86,107,.2);  color:var(--clr-coral); }
+        .badge.installed  { background:rgba(179,123,236,.2); color:var(--clr-purple); }
 
         /* ── Empty state ── */
-        .empty-state { text-align:center; padding:40px; color:#555; }
-        .empty-state i { font-size:36px; margin-bottom:12px; display:block; }
+        .empty-state { text-align:center; padding:48px 20px; color:#444; }
+        .empty-state i { font-size:40px; margin-bottom:14px; display:block; opacity:.5; }
+        .empty-state p { margin:4px 0; font-size:14px; }
 
-        /* ── Responsive form ── */
+        /* ── Responsive ── */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
-
-        /* ── Topbar hamburger: hidden on desktop (sidebar has its own) ── */
         @media (min-width:769px) {
             .menu-toggle { display:none !important; }
             .sidebar-close-btn { display:none !important; visibility:hidden !important; }
         }
 
-        /* ── Sidebar hamburger FA icon ── */
+        /* ── Sidebar hamburger ── */
         .sidebar-hamburger .sidebar-ham-icon {
-            font-size: 14px;
-            color: rgba(255,255,255,0.55);
-            transition: color 0.2s ease;
-            width: auto;
+            font-size: 14px; color: rgba(255,255,255,0.55); transition: color 0.2s ease; width: auto;
         }
-        .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
+        .sidebar-hamburger:hover .sidebar-ham-icon { color: var(--clr-mint); }
 
-        /* ── Admin topbar user dropdown ── */
+        /* ── Admin user dropdown ── */
         .admin-user-dropdown { position:relative; }
         .admin-user-toggle {
             display:flex; align-items:center; gap:10px;
             background:none; border:none; cursor:pointer;
             color:inherit; padding:6px 10px;
-            border-radius:10px; transition:background .2s;
+            border-radius:var(--radius-sm); transition:background .2s;
         }
         .admin-user-toggle:hover { background:rgba(255,255,255,.07); }
         .admin-user-dropdown.open .admin-user-toggle .fa-chevron-down { transform:rotate(180deg); }
         .admin-user-menu {
             display:none; position:absolute; right:0; top:calc(100% + 8px);
             min-width:220px; background:#0d1b3e;
-            border:1px solid rgba(95,133,218,.25); border-radius:14px;
+            border:1px solid rgba(95,133,218,.25); border-radius:var(--radius-md);
             box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:9999;
             overflow:hidden; animation:fadeInDown .18s ease;
         }
         .admin-user-dropdown.open .admin-user-menu { display:block; }
         @keyframes fadeInDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-        .admin-dropdown-header {
-            display:flex; align-items:center; gap:12px;
-            padding:16px 16px 12px;
-        }
-        .admin-dropdown-name  { font-weight:700; font-size:14px; color:#f0f0f0; }
+        .admin-dropdown-header { display:flex; align-items:center; gap:12px; padding:16px 16px 12px; }
+        .admin-dropdown-name  { font-weight:700; font-size:14px; color:var(--clr-text); }
         .admin-dropdown-email { font-size:12px; color:#718096; margin-top:2px; }
         .admin-dropdown-divider { height:1px; background:rgba(95,133,218,.15); margin:0 12px; }
         .admin-dropdown-item {
@@ -956,11 +1005,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             text-decoration:none; transition:background .15s, color .15s;
         }
         .admin-dropdown-item:hover { background:rgba(255,255,255,.06); color:#fff; }
-        .admin-dropdown-danger { color:#fb566b !important; }
-        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; color:#fb566b !important; }
-        .user-avatar-lg {
-            width:42px; height:42px; font-size:16px; flex-shrink:0;
-        }
+        .admin-dropdown-danger { color:var(--clr-coral) !important; }
+        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; }
+        .user-avatar-lg { width:42px; height:42px; font-size:16px; flex-shrink:0; }
     </style>
 </head>
 <body>
@@ -1045,9 +1092,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         <h3 id="pageTitle">Dashboard</h3>
     </div>
     <div class="topbar-right">
-        <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
-            <i class="fas fa-plus"></i> New Session
-        </button>
 
         <!-- ── Bell Notification Icon ──────────────────────────────────── -->
         <div class="notif-bell-wrap" id="notifBellWrap" style="position:relative;">
@@ -1241,7 +1285,7 @@ var _currentSection = 'dashboard';
         // Dim dot while fetching
         dot.style.background = '#888';
 
-        fetch('ajax/live_section.php?section=' + encodeURIComponent(section))
+        fetch('ajax/live_section.php?section=' + encodeURIComponent(section), { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 dot.style.background = '#20c8a1';
@@ -1635,7 +1679,7 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
     document.getElementById('endSessionId').value = sessionId;
 
     // Fetch approved extras (controller rental etc.) FIRST, then render modal
-    fetch('ajax/session_extras.php?session_id=' + sessionId)
+    fetch('ajax/session_extras.php?session_id=' + sessionId, { credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(ex){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
@@ -1995,7 +2039,7 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
     if (_payModalTimer) { clearInterval(_payModalTimer); _payModalTimer = null; }
 
     // Fetch approved extras FIRST (controller rental etc.), then render
-    fetch('ajax/session_extras.php?session_id=' + sessionId)
+    fetch('ajax/session_extras.php?session_id=' + sessionId, { credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(ex){
             _renderPayModal(sessionId, customerName, unitNumber, mode, startTs,
@@ -2227,7 +2271,7 @@ function _submitRefundAjax() {
             action_type:    action_type,
         });
 
-        fetch('ajax/refund.php', { method: 'POST', body })
+        fetch('ajax/refund.php', { method: 'POST', credentials: 'same-origin', body })
             .then(function(r){ return r.json(); })
             .then(function(data) {
                 if (data.success) {
@@ -2840,7 +2884,7 @@ function _addNotifItems(newItems) {
     localStorage.setItem('gspot_last_res_id', lastId);
 
     function poll() {
-        fetch('ajax/poll_notifications.php?last_id=' + lastId)
+        fetch('ajax/poll_notifications.php?last_id=' + lastId, { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.new_count > 0) {

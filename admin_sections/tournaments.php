@@ -6,8 +6,8 @@
 <!-- ── SECTION: TOURNAMENTS ─────────────────────────────────────────────────── -->
 <div class="page" id="tournaments">
 <div class="page-header">
-    <div>
-        <h2 class="page-title"><i class="fas fa-trophy" style="color:#f1a83c;"></i> Tournaments</h2>
+    <div class="page-title-group">
+        <h2 class="page-title"><i class="fas fa-trophy" style="color:#f1a83c;margin-right:10px;"></i>Tournaments</h2>
         <p class="page-subtitle">Create tournaments and manage participant registrations</p>
     </div>
     <button class="btn btn-primary" onclick="openModal('createTournament')">
@@ -93,7 +93,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
     </div>
     <?php else: ?>
     <div style="overflow-x:auto;">
-    <table class="table">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>Tournament</th>
