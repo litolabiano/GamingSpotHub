@@ -52,7 +52,7 @@ $reasonDetail = $reasonDetail !== '' ? htmlspecialchars(strip_tags($reasonDetail
 // ── Fetch the reservation — must belong to this user ─────────────────────────
 $stmt = $conn->prepare(
     "SELECT reservation_id, status, downpayment_amount, refund_issued,
-            reserved_date, reserved_time
+            reserved_date, reserved_time, created_at
        FROM reservations
       WHERE reservation_id = ? AND user_id = ?"
 );
@@ -114,7 +114,26 @@ if ($logRow) {
     $logStmt->execute();
 }
 
-// ── Update cancellation streak on the user ───────────────────────────────────
+// ── Grace-period check: did the user cancel within 30 minutes of booking? ─────────
+// If yes → skip streak / ban logic entirely (no penalty).
+$createdAt      = strtotime($r['created_at']);
+$minutesSince   = (time() - $createdAt) / 60;
+$isGracePeriod  = ($minutesSince <= 30);
+
+if ($isGracePeriod) {
+    // ── Grace-period cancel: no streak penalty ─────────────────────────────
+    echo json_encode([
+        'success'      => true,
+        'message'      => 'Reservation #' . $res_id . ' has been cancelled. '
+                        . 'Since you cancelled within 30 minutes of booking, this will not count against your cancellation limit.',
+        'streak'       => null,
+        'banned_until' => null,
+        'grace_period' => true,
+    ]);
+    exit;
+}
+
+// ── Normal cancel (> 30 min after booking): update cancellation streak ─────────
 $su = $conn->prepare("SELECT consecutive_cancellations FROM users WHERE user_id = ?");
 $su->bind_param('i', $uid);
 $su->execute();
@@ -143,7 +162,7 @@ if ($streak >= 3) {
     $ub->execute();
 }
 
-// ── Build response ───────────────────────────────────────────────────────────
+// ── Build response ─────────────────────────────────────────────────
 $msg = 'Reservation #' . $res_id . ' has been cancelled.';
 
 // Streak warning (only if not banned yet)
@@ -158,4 +177,6 @@ echo json_encode([
     'message'      => $msg,
     'streak'       => $streak,
     'banned_until' => $banUntil,
+    'grace_period' => false,
 ]);
+?>
