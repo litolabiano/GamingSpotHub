@@ -2705,7 +2705,10 @@ function _addNotifItems(newItems) {
     if (newItems.length > 0) {
         var count = _notifItems.length;
         badge.textContent = count > 9 ? '9+' : String(count);
-        badge.style.cssText += ';display:flex;align-items:center;justify-content:center;';
+        // ── BUG FIX #2: Set display directly — cssText+= left display:none active in some browsers
+        badge.style.display         = 'flex';
+        badge.style.alignItems      = 'center';
+        badge.style.justifyContent  = 'center';
         hBadge.textContent   = count + ' new';
         hBadge.style.display = 'inline-block';
         btn.classList.add('has-notif');
@@ -2717,13 +2720,19 @@ function _addNotifItems(newItems) {
 }
 
 // ── Reservation notification poller ───────────────────────────────────
-// Polls every 30 s. Baseline is set from PHP on page load so we never
-// alert on reservations that already existed when the admin opened the page.
+// Polls every 8 s. Baseline from PHP is ALWAYS authoritative at page load —
+// localStorage is only used to avoid re-alerting the same IDs within one session,
+// but NEVER to INCREASE the baseline above what the server reported.
 (function () {
-    const POLL_MS = 30000;
-    let lastId    = <?= $initMaxResId ?>;
-    const stored  = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
-    if (stored > lastId) lastId = stored;
+    const POLL_MS = 8000;
+
+    // ── BUG FIX #1: Never let localStorage INCREASE the baseline.
+    // Old localStorage values from past sessions would block all future alerts.
+    let lastId = <?= $initMaxResId ?>;
+    const stored = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
+    // Only use localStorage to SKIP re-alerting IDs already seen THIS session,
+    // but only if stored is between our PHP baseline and max — not to raise it above PHP.
+    // Simplest correct fix: always trust PHP baseline, ignore localStorage override.
     localStorage.setItem('gspot_last_res_id', lastId);
 
     function poll() {
@@ -2752,11 +2761,11 @@ function _addNotifItems(newItems) {
             .catch(function() {});
     }
 
-    // Start polling after 15 s (avoids false-positive on fresh page load)
+    // ── BUG FIX #3: First poll at 3 s, then every 8 s (was 15 s / 30 s)
     setTimeout(function() {
         poll();
         setInterval(poll, POLL_MS);
-    }, 15000);
+    }, 3000);
 })();
 </script>
 </body>
