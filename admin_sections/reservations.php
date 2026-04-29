@@ -17,9 +17,11 @@
         <?php
         $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
         $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
-        $resToday     = count(array_filter($upcomingReservations, fn($r) => $r['reserved_date'] === date('Y-m-d')));
-        $resNeedRefund = count(array_filter($cancelledReservations ?? [], fn($r) =>
-        $r['cancelled_by'] === 'user' && (float)$r['downpayment_amount'] > 0 && !$r['refund_issued']));
+        $resRescheduled = 0;
+        try {
+            $rrStat = $conn->query("SELECT COUNT(*) AS cnt FROM reservation_reschedules");
+            if ($rrStat) $resRescheduled = (int)$rrStat->fetch_assoc()['cnt'];
+        } catch (Exception $e) {}
         ?>
         <div class="stat-card">
             <div class="stat-card-header">
@@ -51,10 +53,10 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value"><?= $resNeedRefund ?></div>
-                    <div class="stat-label">Refunds Pending</div>
+                    <div class="stat-value"><?= $resRescheduled ?></div>
+                    <div class="stat-label">Rescheduled</div>
                 </div>
-                <div class="stat-icon" style="background:rgba(251,86,107,.15);color:#fb566b;"><i class="fas fa-coins"></i></div>
+                <div class="stat-icon" style="background:rgba(32,200,161,.15);color:#20c8a1;"><i class="fas fa-calendar-alt"></i></div>
             </div>
         </div>
     </div>
@@ -164,6 +166,11 @@
                                                 onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
                                                 title="Convert to Session">
                                                 <i class="fas fa-play"></i> Start
+                                            </button>
+                                            <button class="btn btn-primary btn-sm" title="Reschedule"
+                                                onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>')"
+                                                style="background:linear-gradient(135deg,#20c8a1,#17a887);border-color:transparent;">
+                                                <i class="fas fa-calendar-alt"></i>
                                             </button>
                                             <form method="POST" style="display:inline;" onsubmit="return false" id="formNoshowRes<?= $r['reservation_id'] ?>">
                                                 <input type="hidden" name="action" value="noshow_reservation">
@@ -402,5 +409,172 @@ function adminCancelSubmit(e) {
 }
 document.getElementById('adminCancelResModal')?.addEventListener('click', function(e) {
     if (e.target === this) closeAdminCancelModal();
+</script>
+
+<!-- ── Reschedule Reservation Modal ── -->
+<div id="rescheduleResModal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
+     align-items:center;justify-content:center;">
+    <div style="background:#0e1d36;border:1px solid rgba(32,200,161,.4);border-radius:18px;
+                padding:28px 28px 24px;max-width:480px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:rgba(32,200,161,.15);
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-calendar-alt" style="color:#20c8a1;"></i>
+            </div>
+            <div>
+                <div style="font-weight:800;color:#fff;font-size:15px;">Reschedule Reservation</div>
+                <div style="font-size:12px;color:#888;" id="rescheduleResSubtitle">Reservation #... &mdash; Customer</div>
+            </div>
+        </div>
+
+        <input type="hidden" id="rescheduleResId">
+
+        <!-- Reason -->
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Reason *</label>
+            <select id="rescheduleReason" required style="
+                width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;">
+                <option value="" disabled selected>-- Select a reason --</option>
+                <option value="typhoon">🌀 Typhoon / Bad Weather</option>
+                <option value="power_outage">⚡ Power Outage</option>
+                <option value="emergency">🚨 Emergency</option>
+                <option value="maintenance">🔧 Equipment Maintenance</option>
+                <option value="other">📋 Other&hellip;</option>
+            </select>
+        </div>
+
+        <!-- Detail -->
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;"
+                   id="rescheduleDetailLabel">Additional Notes (Optional)</label>
+            <textarea id="rescheduleDetail" rows="2"
+                placeholder="Explain the situation to the customer..." style="
+                width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:13px;font-family:inherit;outline:none;
+                resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+
+        <!-- New Date -->
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Date *</label>
+            <input type="date" id="rescheduleDate" required
+                min="<?= date('Y-m-d') ?>"
+                style="width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;">
+        </div>
+
+        <!-- New Time -->
+        <div style="margin-bottom:20px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Time *</label>
+            <select id="rescheduleTime" required style="
+                width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;">
+                <option value="" disabled selected>-- Select a time --</option>
+                <?php
+                for ($h = 12; $h <= 23; $h++) {
+                    foreach (['00', '30'] as $m) {
+                        $val  = sprintf('%02d:%s', $h, $m);
+                        $disp = date('g:i A', strtotime("2000-01-01 $val"));
+                        echo "<option value=\"$val\">$disp</option>\n";
+                    }
+                }
+                ?>
+            </select>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;gap:10px;">
+            <button type="button" id="rescheduleSubmitBtn" onclick="submitReschedule()"
+                style="flex:1;padding:11px;border-radius:10px;border:none;
+                       background:linear-gradient(135deg,#20c8a1,#17a887);color:#0a0f1c;
+                       font-weight:700;font-size:13px;cursor:pointer;">
+                <i class="fas fa-calendar-check"></i> Confirm Reschedule
+            </button>
+            <button type="button" onclick="closeRescheduleModal()"
+                style="flex:1;padding:11px;border-radius:10px;
+                       border:1px solid rgba(255,255,255,.15);background:transparent;
+                       color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openRescheduleModal(resId, customerName, oldDate, oldTime) {
+    document.getElementById('rescheduleResId').value = resId;
+    document.getElementById('rescheduleResSubtitle').textContent =
+        'Reservation #' + resId + ' — ' + customerName;
+    document.getElementById('rescheduleReason').value  = '';
+    document.getElementById('rescheduleDetail').value  = '';
+    document.getElementById('rescheduleDate').value    = oldDate;  // pre-fill with current date
+    document.getElementById('rescheduleTime').value    = oldTime.substring(0,5);
+    document.getElementById('rescheduleResModal').style.display = 'flex';
+}
+function closeRescheduleModal() {
+    document.getElementById('rescheduleResModal').style.display = 'none';
+}
+document.getElementById('rescheduleResModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeRescheduleModal();
 });
+document.getElementById('rescheduleReason')?.addEventListener('change', function() {
+    const isOther = this.value === 'other';
+    document.getElementById('rescheduleDetailLabel').textContent =
+        isOther ? 'Please describe the reason *' : 'Additional Notes (Optional)';
+});
+function submitReschedule() {
+    const resId  = document.getElementById('rescheduleResId').value;
+    const reason = document.getElementById('rescheduleReason').value;
+    const detail = document.getElementById('rescheduleDetail').value.trim();
+    const date   = document.getElementById('rescheduleDate').value;
+    const time   = document.getElementById('rescheduleTime').value;
+
+    if (!reason) { alert('Please select a reason.'); return; }
+    if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
+    if (!date)   { alert('Please select a new date.'); return; }
+    if (!time)   { alert('Please select a new time.'); return; }
+
+    const btn = document.getElementById('rescheduleSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Rescheduling...';
+
+    fetch('ajax/reschedule_reservation.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            closeRescheduleModal();
+            // Show success toast if available, else alert
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(data.message, 'success');
+            } else {
+                alert('✓ ' + data.message);
+            }
+            setTimeout(() => location.reload(), 1800);
+        } else {
+            alert('✕ ' + (data.message || 'Failed to reschedule.'));
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
+        }
+    })
+    .catch(() => {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
+    });
+}
 </script>

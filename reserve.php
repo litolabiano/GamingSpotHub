@@ -145,8 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please upload your GCash proof of payment screenshot.';
     } elseif (!$error && $upload_error) {
         $error = $upload_error;
-    } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
-        $error = 'You must read and agree to the No-Refund Policy before submitting.';
     } elseif (!$error && ($_POST['unit_transfer_agreed'] ?? '') !== '1') {
         $error = 'You must acknowledge the Unit Transfer Policy before submitting your reservation.';
     }
@@ -1274,46 +1272,6 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                         <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
                     </div>
 
-                    <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
-                    <div id="noRefundPolicyBox" style="
-                        background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
-                        border:1px solid rgba(251,86,107,.35);
-                        border-radius:16px;
-                        padding:20px 22px;
-                        margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                            <div style="width:38px;height:38px;border-radius:10px;
-                                background:rgba(251,86,107,.15);
-                                display:flex;align-items:center;justify-content:center;
-                                flex-shrink:0;color:#fb566b;font-size:1rem;">
-                                <i class="fas fa-ban"></i>
-                            </div>
-                            <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
-                        </div>
-                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
-                            <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">₱20 + 5% of your session cost</strong> is required to confirm every booking.</li>
-                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, no-shows, and admin cancellations.</li>
-                            <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
-                            <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
-                            <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
-                        </ul>
-                        <label id="noRefundLabel" style="
-                            display:flex;align-items:flex-start;gap:12px;
-                            cursor:pointer;
-                            background:rgba(255,255,255,.04);
-                            border:1px solid rgba(255,255,255,.1);
-                            border-radius:10px;
-                            padding:12px 14px;
-                            transition:border-color .2s,background .2s;">
-                            <input type="checkbox" id="noRefundCheck" name="no_refund_agreed" value="1"
-                                   onchange="handleNoRefundCheck(this)"
-                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#fb566b;cursor:pointer;">
-                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
-                                I have read, understood, and agreed to the <strong style="color:#fb566b;">No-Refund Policy</strong> above.
-                                I acknowledge that any payment I make for this reservation will not be refunded for any reason.
-                            </span>
-                        </label>
-                    </div>
 
                     <!-- ── Unit Transfer Policy Acknowledgment ─────────────── -->
                     <div id="unitTransferPolicyBox" style="
@@ -1860,35 +1818,21 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
-/* ── Policy checkboxes — both must be ticked to enable Submit ──────── */
+/* ── Policy checkbox — unit transfer must be ticked to enable Submit ── */
 function handlePolicyChecks() {
     const btn           = document.getElementById('submitBtn');
-    const noRefund      = document.getElementById('noRefundCheck');
     const unitTransfer  = document.getElementById('unitTransferCheck');
-    const noRefundLabel = document.getElementById('noRefundLabel');
     const transferLabel = document.getElementById('unitTransferLabel');
 
-    // Highlight each label based on its own state
-    if (noRefundLabel) {
-        noRefundLabel.style.borderColor = noRefund?.checked ? 'rgba(251,86,107,.6)' : 'rgba(255,255,255,.1)';
-        noRefundLabel.style.background  = noRefund?.checked ? 'rgba(251,86,107,.08)' : 'rgba(255,255,255,.04)';
-    }
     if (transferLabel) {
         transferLabel.style.borderColor = unitTransfer?.checked ? 'rgba(95,133,218,.6)' : 'rgba(255,255,255,.1)';
         transferLabel.style.background  = unitTransfer?.checked ? 'rgba(95,133,218,.08)' : 'rgba(255,255,255,.04)';
     }
 
-    // Both must be checked — unit transfer is always required; no-refund only if paying
-    const noRefundOk  = noRefund   ? noRefund.checked   : true;
-    const transferOk  = unitTransfer ? unitTransfer.checked : false;
-    const allAgreed   = noRefundOk && transferOk;
-
+    const allAgreed   = unitTransfer ? unitTransfer.checked : false;
     btn.disabled      = !allAgreed;
     btn.style.opacity = allAgreed ? '1' : '0.5';
 }
-
-/* Alias — the no-refund checkbox calls this by name */
-function handleNoRefundCheck() { handlePolicyChecks(); }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour

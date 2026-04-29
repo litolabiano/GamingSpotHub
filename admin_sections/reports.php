@@ -43,11 +43,14 @@
         $totalCancels   = (int)($cancelStatsRow['total_cancels']   ?? 0);
         $userCancels    = (int)($cancelStatsRow['user_cancels']    ?? 0);
         $adminCancels   = (int)($cancelStatsRow['admin_cancels']   ?? 0);
-        $refundsIssued  = (int)($cancelStatsRow['refunds_issued']  ?? 0);
-        $totalRefunded  = (float)($cancelStatsRow['total_refunded'] ?? 0);
         $userPct        = $totalCancels > 0 ? round($userCancels  / $totalCancels * 100) : 0;
         $adminPct       = $totalCancels > 0 ? round($adminCancels / $totalCancels * 100) : 0;
-        $refundRate     = $totalCancels > 0 ? round($refundsIssued / $totalCancels * 100) : 0;
+        // Rescheduled count
+        $totalRescheduled = 0;
+        try {
+            $rrr = $conn->query("SELECT COUNT(*) AS cnt FROM reservation_reschedules");
+            if ($rrr) $totalRescheduled = (int)$rrr->fetch_assoc()['cnt'];
+        } catch (Exception $e) {}
 
         // Reason label map
         $reasonLabels = [
@@ -74,11 +77,10 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">
         <?php
         $cancelStatCards = [
-            ['label'=>'Total Cancellations', 'value'=>$totalCancels,         'icon'=>'ban',           'color'=>'#fb566b', 'bg'=>'rgba(251,86,107,.12)'],
-            ['label'=>'User-Initiated',       'value'=>$userCancels.' ('.$userPct.'%)',  'icon'=>'user-times',   'color'=>'#f1a83c', 'bg'=>'rgba(241,168,60,.12)'],
-            ['label'=>'Admin-Initiated',      'value'=>$adminCancels.' ('.$adminPct.'%)','icon'=>'shield-alt',   'color'=>'#b37bec', 'bg'=>'rgba(179,123,236,.12)'],
-            ['label'=>'Refunds Issued',       'value'=>$refundsIssued.' ('.$refundRate.'%)','icon'=>'undo-alt', 'color'=>'#20c8a1', 'bg'=>'rgba(32,200,161,.12)'],
-            ['label'=>'Total Refunded',       'value'=>'₱'.number_format($totalRefunded,2),'icon'=>'peso-sign','color'=>'#5f85da', 'bg'=>'rgba(95,133,218,.12)'],
+            ['label'=>'Total Cancellations', 'value'=>$totalCancels,                          'icon'=>'ban',          'color'=>'#fb566b', 'bg'=>'rgba(251,86,107,.12)'],
+            ['label'=>'User-Initiated',       'value'=>$userCancels.' ('.$userPct.'%)',        'icon'=>'user-times',   'color'=>'#f1a83c', 'bg'=>'rgba(241,168,60,.12)'],
+            ['label'=>'Admin-Initiated',      'value'=>$adminCancels.' ('.$adminPct.'%)',      'icon'=>'shield-alt',   'color'=>'#b37bec', 'bg'=>'rgba(179,123,236,.12)'],
+            ['label'=>'Rescheduled',          'value'=>$totalRescheduled,                     'icon'=>'calendar-alt', 'color'=>'#20c8a1', 'bg'=>'rgba(32,200,161,.12)'],
         ];
         foreach ($cancelStatCards as $sc): ?>
         <div class="card" style="padding:18px;border-color:<?= $sc['color'] ?>22">
@@ -150,7 +152,6 @@
                 <th>% of Total</th>
                 <th>User-Initiated</th>
                 <th>Admin-Initiated</th>
-                <th>Refunds Given</th>
             </tr></thead>
             <tbody>
             <?php
@@ -159,8 +160,7 @@
                     cancel_reason_type AS reason,
                     COUNT(*)                                        AS total,
                     SUM(cancelled_by = 'user')                      AS by_user,
-                    SUM(cancelled_by = 'admin')                     AS by_admin,
-                    SUM(refund_issued = 1)                          AS refunded
+                    SUM(cancelled_by = 'admin')                     AS by_admin
                  FROM reservation_cancellations
                  GROUP BY cancel_reason_type
                  ORDER BY total DESC"
@@ -187,11 +187,10 @@
                 </td>
                 <td style="color:#f1a83c"><?= (int)$rd['by_user'] ?></td>
                 <td style="color:#b37bec"><?= (int)$rd['by_admin'] ?></td>
-                <td style="color:#20c8a1"><?= (int)$rd['refunded'] ?></td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($reasonDetail)): ?>
-            <tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,.35);padding:30px">No cancellations recorded yet.</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,.35);padding:30px">No cancellations recorded yet.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
