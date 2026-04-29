@@ -101,7 +101,7 @@ if ($logRow) {
          VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?, 0, NOW())"
     );
     $logStmt->bind_param(
-        'iissssssd',
+        'iissssss',
         $res_id,
         $uid,
         $reasonType,

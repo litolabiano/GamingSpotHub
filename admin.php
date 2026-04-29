@@ -298,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, ?, NOW())"
                 );
                 $logStmt->bind_param(
-                    'iissssssdi',
+                    'iisssssdi',
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
