@@ -970,7 +970,30 @@ function createReservation(
 ) {
     global $conn;
 
-    // Basic validation
+    // ── One active reservation per user ──────────────────────────────────────
+    // A user may not hold more than one pending/confirmed reservation at a time.
+    // They must cancel the existing one before making a new booking.
+    $activeCheck = $conn->prepare(
+        "SELECT reservation_id, reserved_date, reserved_time
+           FROM reservations
+          WHERE user_id = ? AND status IN ('pending','confirmed')
+          LIMIT 1"
+    );
+    $activeCheck->bind_param('i', $user_id);
+    $activeCheck->execute();
+    $existing = $activeCheck->get_result()->fetch_assoc();
+    if ($existing) {
+        return [
+            'success'            => false,
+            'message'            => 'You already have an active reservation (Reservation #'
+                                  . $existing['reservation_id'] . ' on '
+                                  . date('M d, Y', strtotime($existing['reserved_date'])) . ' at '
+                                  . date('g:i A', strtotime($existing['reserved_time']))
+                                  . '). Please cancel it first before making a new booking.',
+            'existing_id'        => $existing['reservation_id'],
+        ];
+    }
+
     $today = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
     if ($reserved_date < $today) {
         return ['success' => false, 'message' => 'Cannot reserve a past date.'];
