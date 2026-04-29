@@ -177,11 +177,12 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         $psElapsed = time() - $psStart;
                         $psH = floor($psElapsed / 3600);
                         $psM = floor(($psElapsed % 3600) / 60);
-                        $psPaid = (float)$ps['paid_so_far'];
+                        $psPaid   = (float)$ps['paid_so_far'];
+                        $psExtras = (float)($ps['approved_extras'] ?? 0); // approved additional_requests sum
                         $isCompleted = ($ps['status'] === 'completed');
 
                         if ($isCompleted) {
-                            // Completed: use actual total_cost
+                            // Completed: use actual total_cost (already includes extras via endSession())
                             $psExpected  = (float)$ps['total_cost'];
                             $psModeLabel = match ($ps['rental_mode']) {
                                 'open_time' => 'Open Time',
@@ -189,7 +190,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 default => 'Hourly'
                             };
                         } else {
-                            // Active: estimate expected cost from DB-driven pricing rules
+                            // Active: estimate expected cost from DB-driven pricing rules + approved extras
                             if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
                                 $pr = getPricingRules();
                                 $psExpected = $ps['planned_minutes'] <= 30
@@ -200,6 +201,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 $psExpected  = $unlimitedRateVal;
                                 $psModeLabel = 'Unlimited';
                             }
+                            // Add any approved additional_requests (e.g. controller rental)
+                            // to the expected total so the balance owed is correct.
+                            $psExpected += $psExtras;
                         }
                         $psOwed = max(0, $psExpected - $psPaid);
                         $bookedMinutes = ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) ? (int)$ps['planned_minutes'] : 0;

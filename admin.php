@@ -616,7 +616,8 @@ $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $stmt = $conn->prepare(
     "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
-            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
+            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount,
+            COALESCE((SELECT SUM(ar.extra_cost) FROM additional_requests ar WHERE ar.session_id = gs.session_id AND ar.status = 'approved'), 0) AS approved_extras
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
@@ -1839,6 +1840,23 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
 
     if (_payModalTimer) { clearInterval(_payModalTimer); _payModalTimer = null; }
 
+    // Fetch approved extras FIRST (controller rental etc.), then render
+    fetch('ajax/session_extras.php?session_id=' + sessionId)
+        .then(function(r){ return r.json(); })
+        .then(function(ex){
+            _renderPayModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate,
+                ex.extras || 0, ex.items || []);
+        })
+        .catch(function(){
+            _renderPayModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate, 0, []);
+        });
+}
+
+function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate, extras, extraItems) {
+    extras = extras || 0;
+
     const costPanel   = document.getElementById('payCostPanel');
     const elapsedEl   = document.getElementById('payElapsed');
     const costEl      = document.getElementById('payEstCost');
@@ -1875,10 +1893,11 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
             const minutes  = Math.floor(elapsed / 60);
             const h = Math.floor(minutes / 60), m = minutes % 60, s = elapsed % 60;
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-            const totalCost = _timedCost(minutes);
+            const timeCost  = _timedCost(minutes);
+            const totalCost = timeCost + extras;
             costEl.textContent  = '₱' + totalCost.toFixed(2);
             const due = Math.max(0, totalCost - upfrontPaid);
-            const sublabel = upfrontPaid > 0
+            let sublabel = upfrontPaid > 0
                 ? 'Running cost ₱' + totalCost.toFixed(2) + ' — Already paid ₱' + upfrontPaid.toFixed(2)
                 : 'Cost accumulating — pay at any time';
             setPayDue(due, sublabel);
@@ -1891,7 +1910,8 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
         costPanel.style.display = 'block';
         const elapsed   = Math.floor((Date.now() / 1000) - startTs);
         const minutes   = Math.floor(elapsed / 60);
-        const totalCost = _hourlyCost(minutes, plannedMinutes);
+        const timeCost  = _hourlyCost(minutes, plannedMinutes);
+        const totalCost = timeCost + extras;               // ← extras included
         const due       = Math.max(0, totalCost - upfrontPaid);
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
@@ -1903,22 +1923,34 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
         let sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ')';
         if (upfrontPaid > 0) sublabel += ' — Prepaid ₱' + upfrontPaid.toFixed(2);
         if (overtime > 0)    sublabel += ' — +' + overtime + 'min overtime';
+        if (extras > 0) {
+            const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
+            sublabel += ' — +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
+        }
         setPayDue(due, sublabel);
 
-    /* ── Unlimited: already fully paid ── */
+    /* ── Unlimited: flat rate already paid; show extras if any ── */
     } else if (mode === 'unlimited') {
         costPanel.style.display = 'none';
-        dueBigEl.textContent = '₱0.00';
-        dueBigEl.style.color = '#888';
-        dueLblEl.textContent = 'Unlimited session — flat rate already collected at start';
-        amtHidden.value      = '0';
-        confirmLbl.textContent = 'No Balance Due';
-        confirmBtn.disabled    = true;
-        confirmBtn.style.opacity = '0.5';
+        dueBigEl.textContent = extras > 0 ? '₱' + extras.toFixed(2) : '₱0.00';
+        dueBigEl.style.color = extras > 0 ? '#20c8a1' : '#888';
+        dueLblEl.textContent = extras > 0
+            ? 'Flat rate collected — extras outstanding'
+            : 'Unlimited session — flat rate already collected at start';
+        amtHidden.value = extras > 0 ? extras.toFixed(2) : '0';
+        if (extras > 0) {
+            confirmLbl.textContent = 'Collect ₱' + extras.toFixed(2) + ' Balance';
+            confirmBtn.disabled    = false;
+            confirmBtn.style.opacity = '1';
+        } else {
+            confirmLbl.textContent = 'No Balance Due';
+            confirmBtn.disabled    = true;
+            confirmBtn.style.opacity = '0.5';
+        }
 
     } else {
         costPanel.style.display = 'none';
-        setPayDue(0, 'Enter amount if needed');
+        setPayDue(extras > 0 ? extras : 0, extras > 0 ? 'Extras outstanding' : 'Enter amount if needed');
     }
 
     openModal('paySession');
