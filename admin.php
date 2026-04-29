@@ -689,16 +689,17 @@ foreach ($recentSessions as $sess) {
         $pendingSessions[] = $sess;
     } elseif ($sess['status'] === 'completed'
         && $sess['total_cost'] > 0
-        && $refundedAmount == 0               // no refund was issued
-        && $paidSoFar > 0                     // customer DID pay something upfront
-        && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
+        && $paidSoFar < (float)$sess['total_cost']  // paid less than consumed cost
+        && $refundedAmount < $paidSoFar              // hasn't been fully refunded back
     ) {
-        // Completed session where total paid < total cost — genuine short payment
+        // Completed session where total paid < total cost — outstanding balance
+        // This covers: short payments at session start AND early-ends where
+        // consumed cost exceeded the upfront amount (no refund, balance owed).
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
-    // Early-end with nothing paid (walk-in, no upfront): fully settled, skip.
-    // Sessions with refunds issued are also fully settled — skip them entirely
+    // Walk-in sessions where nothing was paid at all (open_time/walk-in): skip.
+    // They are fully handled at end-of-session payment.
 }
 
 
@@ -1497,6 +1498,66 @@ function calcChange(tenderedId, displayId, costHolderId) {
 }
 
 /**
+ * toggleTendered — generic lock/unlock for pre-filled tendered fields.
+ * Used by End Session, Collect Balance modals.
+ * @param {string} inputId       - id of the number input
+ * @param {string} cbId          - id of the checkbox
+ * @param {string} costHolderId  - id of the hidden cost holder
+ * @param {string} changeDispId  - id of the change display div
+ */
+function toggleTendered(inputId, cbId, costHolderId, changeDispId) {
+    const inp  = document.getElementById(inputId);
+    const cb   = document.getElementById(cbId);
+    const icon = inp ? inp.parentElement.querySelector('i') : null;
+    const hint = inp ? inp.closest('.form-group, div')?.querySelector('.field-hint') : null;
+    if (!inp) return;
+
+    if (cb && cb.checked) {
+        inp.readOnly = false;
+        inp.classList.remove('field-locked');
+        inp.classList.add('field-unlocked');
+        inp.style.paddingLeft = '14px';
+        if (icon) { icon.className = 'fas fa-unlock'; icon.style.color = '#20c8a1'; }
+        if (hint) hint.style.display = 'none';
+        inp.focus(); inp.select();
+    } else {
+        // Re-lock: reset to exact cost
+        const el = document.getElementById(costHolderId);
+        const cost = el ? (parseFloat(el.value || el.textContent) || 0) : 0;
+        inp.value = cost > 0 ? cost : '';
+        inp.readOnly = true;
+        inp.classList.remove('field-unlocked');
+        inp.classList.add('field-locked');
+        inp.style.paddingLeft = '36px';
+        if (icon) { icon.className = 'fas fa-lock'; icon.style.color = '#5f85da'; }
+        if (hint) hint.style.display = 'block';
+        const disp = document.getElementById(changeDispId);
+        if (disp) disp.style.display = 'none';
+    }
+}
+
+/**
+ * preFillTendered — call when a modal opens to set the initial pre-filled value.
+ */
+function preFillTendered(inputId, cbId, costHolderId, changeDispId) {
+    const cb = document.getElementById(cbId);
+    if (cb) cb.checked = false;
+    // force locked state first
+    const inp = document.getElementById(inputId);
+    if (inp) {
+        inp.readOnly = true;
+        inp.classList.remove('field-unlocked');
+        inp.classList.add('field-locked');
+        inp.style.paddingLeft = '36px';
+    }
+    // now fill
+    toggleTendered(inputId, cbId, costHolderId, changeDispId);
+    // reset toggle visual
+    if (cb) { cb.checked = false; toggleTendered(inputId, cbId, costHolderId, changeDispId); }
+}
+
+
+/**
  * Called by the End Session confirm button.
  * Copies the visible tendered input into the hidden POST field, then lets the form submit.
  * No blocking — a short payment is always allowed through.
@@ -1771,7 +1832,6 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 }
             }
 
-            // ── No-refund note: context-aware message ────────────────────
             const noRefundNote   = document.getElementById('endEarlyNoRefundNote');
             const noRefundReason = document.getElementById('endEarlyNoRefundReason');
             if (noRefundNote) {
@@ -1779,8 +1839,14 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 if (noRefundReason) {
                     if (upfrontPaid === 0) {
                         noRefundReason.textContent = 'Nothing was paid upfront — balance will be collected at check-out.';
-                    } else if (timeCost >= upfrontPaid) {
-                        noRefundReason.textContent = 'Time used already covers the upfront payment — no refund needed.';
+                    } else if (consumedCost > upfrontPaid) {
+                        // Customer owes MORE than they paid — clearly flag this
+                        const stillOwed = (consumedCost - upfrontPaid).toFixed(2);
+                        noRefundReason.innerHTML =
+                            '<span style="color:#f1a83c;font-weight:700;">' +
+                            '\u20b1' + stillOwed + ' still owed</span> — consumed cost (\u20b1' +
+                            consumedCost.toFixed(2) + ') exceeds upfront paid. ' +
+                            'Collect via <strong>Pending Payments</strong> after session ends.';
                     } else {
                         noRefundReason.textContent = 'Additional fees consume the remaining balance — no refund needed.';
                     }
@@ -1839,6 +1905,14 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                             '<strong>\u20b1' + paid.toFixed(2) + ' paid</strong> \u2212 ' +
                             '<strong>\u20b1' + consumed.toFixed(2) + ' consumed</strong> = ' +
                             '<strong style="color:#fb566b;">\u20b1' + refund.toFixed(2) + ' refund</strong>';
+                        hintEl.style.color = '#f1e1aa';
+                    } else if (consumed > paid) {
+                        // Customer owes more — warn clearly
+                        const owed = (consumed - paid).toFixed(2);
+                        hintEl.innerHTML =
+                            '<i class="fas fa-triangle-exclamation" style="margin-right:5px;color:#f1a83c;"></i>' +
+                            'Consumed cost (\u20b1' + consumed.toFixed(2) + ') exceeds upfront paid (\u20b1' + paid.toFixed(2) + '). ' +
+                            '<strong style="color:#f1a83c;">\u20b1' + owed + ' still owed</strong> — will appear in Pending Payments.';
                         hintEl.style.color = '#f1e1aa';
                     } else {
                         hintEl.innerHTML =
