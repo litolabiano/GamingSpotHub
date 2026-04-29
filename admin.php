@@ -1048,6 +1048,68 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
             <i class="fas fa-plus"></i> New Session
         </button>
+
+        <!-- ── Bell Notification Icon ──────────────────────────────────── -->
+        <div class="notif-bell-wrap" id="notifBellWrap" style="position:relative;">
+            <button id="notifBellBtn" onclick="toggleNotifDropdown()"
+                title="Reservations"
+                style="position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+                       border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+                       cursor:pointer;transition:background .2s,border-color .2s;color:rgba(255,255,255,.75);font-size:16px;">
+                <i class="fas fa-bell"></i>
+                <!-- red badge — hidden until there are new reservations -->
+                <span id="notifBellBadge"
+                      style="display:none;position:absolute;top:-5px;right:-5px;
+                             background:#fb566b;color:#fff;border-radius:50%;
+                             min-width:18px;height:18px;font-size:10px;font-weight:700;
+                             line-height:18px;text-align:center;padding:0 3px;
+                             box-shadow:0 0 0 2px #0a0f1c;animation:bellPop .3s ease;"></span>
+            </button>
+
+            <!-- Dropdown panel -->
+            <div id="notifDropdown"
+                 style="display:none;position:absolute;top:calc(100% + 10px);right:0;width:320px;
+                        background:linear-gradient(135deg,#0d1b3e,#08101c);
+                        border:1px solid rgba(32,200,161,.3);border-radius:14px;
+                        box-shadow:0 16px 48px rgba(0,0,0,.65),0 0 0 1px rgba(32,200,161,.08);
+                        z-index:10000;overflow:hidden;animation:dropIn .2s ease;">
+
+                <!-- Header -->
+                <div style="padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,.07);
+                            display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:700;font-size:14px;color:#f0f0f0;">
+                        <i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:7px;"></i>
+                        New Reservations
+                    </span>
+                    <span id="notifHeaderBadge"
+                          style="background:rgba(251,86,107,.2);color:#fb566b;border:1px solid rgba(251,86,107,.35);
+                                 border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;display:none;"></span>
+                </div>
+
+                <!-- List of notifications -->
+                <div id="notifList" style="max-height:280px;overflow-y:auto;padding:8px 0;"></div>
+
+                <!-- Empty state -->
+                <div id="notifEmpty"
+                     style="padding:28px 18px;text-align:center;color:#555;font-size:13px;">
+                    <i class="fas fa-bell-slash" style="font-size:1.6rem;display:block;margin-bottom:8px;color:#333;"></i>
+                    No new reservations
+                </div>
+
+                <!-- Footer -->
+                <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);text-align:center;">
+                    <button onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();"
+                            style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.35);color:#20c8a1;
+                                   border-radius:8px;padding:6px 18px;font-size:12px;font-weight:700;cursor:pointer;
+                                   font-family:inherit;width:100%;transition:background .2s;"
+                            onmouseover="this.style.background='rgba(32,200,161,.25)'"
+                            onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                        <i class="fas fa-list" style="margin-right:5px;"></i> View All Reservations
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Admin user dropdown -->
         <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px">
             <button class="admin-user-toggle" id="adminUserBtn">
@@ -2538,15 +2600,129 @@ AOS.init({ duration: 600, once: true });
     });
 })();
 
+// ── Bell notification icon — styles ──────────────────────────────────
+(function injectNotifStyles() {
+    const s = document.createElement('style');
+    s.textContent = `
+    @keyframes bellPop {
+        0%   { transform: scale(0); }
+        70%  { transform: scale(1.25); }
+        100% { transform: scale(1); }
+    }
+    @keyframes bellShake {
+        0%,100% { transform: rotate(0deg); }
+        20%     { transform: rotate(-14deg); }
+        40%     { transform: rotate(12deg); }
+        60%     { transform: rotate(-8deg); }
+        80%     { transform: rotate(6deg); }
+    }
+    @keyframes dropIn {
+        from { opacity:0; transform:translateY(-8px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    #notifBellBtn:hover { background:rgba(32,200,161,.15) !important; border-color:rgba(32,200,161,.4) !important; color:#20c8a1 !important; }
+    #notifBellBtn.has-notif i { animation:bellShake .5s ease; }
+    #notifList::-webkit-scrollbar { width:4px; }
+    #notifList::-webkit-scrollbar-track { background:transparent; }
+    #notifList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:4px; }
+    `;
+    document.head.appendChild(s);
+})();
+
+// Bell state
+var _notifItems = [];
+var _notifDropdownOpen = false;
+
+function toggleNotifDropdown() {
+    var drop = document.getElementById('notifDropdown');
+    if (!drop) return;
+    _notifDropdownOpen = !_notifDropdownOpen;
+    drop.style.display = _notifDropdownOpen ? 'block' : 'none';
+    // Clear badge when opened
+    if (_notifDropdownOpen) {
+        document.getElementById('notifBellBadge').style.display = 'none';
+        document.getElementById('notifBellBtn').classList.remove('has-notif');
+    }
+}
+
+function closeNotifDropdown() {
+    _notifDropdownOpen = false;
+    var drop = document.getElementById('notifDropdown');
+    if (drop) drop.style.display = 'none';
+}
+
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('notifBellWrap');
+    if (wrap && !wrap.contains(e.target) && _notifDropdownOpen) closeNotifDropdown();
+});
+
+function _addNotifItems(newItems) {
+    _notifItems = newItems.concat(_notifItems).slice(0, 20);
+    var list   = document.getElementById('notifList');
+    var empty  = document.getElementById('notifEmpty');
+    var badge  = document.getElementById('notifBellBadge');
+    var hBadge = document.getElementById('notifHeaderBadge');
+    var btn    = document.getElementById('notifBellBtn');
+    if (!list) return;
+
+    // Rebuild list
+    list.innerHTML = '';
+    _notifItems.forEach(function(r) {
+        var dateStr = '';
+        if (r.reserved_date) {
+            try { dateStr = new Date(r.reserved_date).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}); } catch(e) { dateStr = r.reserved_date; }
+        }
+        var timeStr = r.reserved_time ? r.reserved_time.substring(0, 5) : '';
+        var mode    = r.rental_mode === 'open_time' ? 'Open Time' : r.rental_mode === 'unlimited' ? 'Unlimited' : 'Hourly';
+        var row     = document.createElement('div');
+        row.style.cssText = 'padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .15s;';
+        row.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;background:rgba(32,200,161,.12);' +
+            'border:1px solid rgba(32,200,161,.25);display:flex;align-items:center;justify-content:center;color:#20c8a1;font-size:13px;">' +
+            '<i class="fas fa-calendar-check"></i></div>' +
+            '<div style="min-width:0;flex:1;">' +
+            '<div style="font-weight:600;font-size:13px;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+            (r.customer_name || 'A customer') + '</div>' +
+            '<div style="font-size:11px;color:#888;margin-top:1px;">' +
+            (r.console_type || '') + ' · ' + mode + (dateStr ? ' · ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
+            '</div></div>' +
+            '<span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);' +
+            'border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;">Pending</span>' +
+            '</div>';
+        row.addEventListener('mouseover',  function() { this.style.background = 'rgba(32,200,161,.06)'; });
+        row.addEventListener('mouseout',   function() { this.style.background = ''; });
+        row.addEventListener('click', function() {
+            showPage('reservations', document.querySelector('.nav-item[onclick*="reservations"]'));
+            closeNotifDropdown();
+        });
+        list.appendChild(row);
+    });
+
+    empty.style.display = _notifItems.length > 0 ? 'none' : 'block';
+
+    if (newItems.length > 0) {
+        var count = _notifItems.length;
+        badge.textContent = count > 9 ? '9+' : String(count);
+        badge.style.cssText += ';display:flex;align-items:center;justify-content:center;';
+        hBadge.textContent   = count + ' new';
+        hBadge.style.display = 'inline-block';
+        btn.classList.add('has-notif');
+        var bellI = btn.querySelector('i');
+        bellI.style.animation = 'none';
+        void bellI.offsetWidth;
+        bellI.style.animation = 'bellShake .5s ease';
+    }
+}
+
 // ── Reservation notification poller ───────────────────────────────────
 // Polls every 30 s. Baseline is set from PHP on page load so we never
-// fire a toast for reservations that already existed when the admin opened the page.
+// alert on reservations that already existed when the admin opened the page.
 (function () {
-    const POLL_MS   = 30000;
-    // PHP injects the current max id at page-load time — safe baseline
-    let lastId = <?= $initMaxResId ?>;
-    // If localStorage has a higher value (from a previous session still in memory), use that
-    const stored = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
+    const POLL_MS = 30000;
+    let lastId    = <?= $initMaxResId ?>;
+    const stored  = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
     if (stored > lastId) lastId = stored;
     localStorage.setItem('gspot_last_res_id', lastId);
 
@@ -2554,76 +2730,26 @@ AOS.init({ duration: 600, once: true });
         fetch('ajax/poll_notifications.php?last_id=' + lastId)
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                if (data.new_count > 0) showResNotification(data.new_count, data.items);
+                if (data.new_count > 0) {
+                    _addNotifItems(data.items);
+                    // Ping sound
+                    try {
+                        var ctx  = new (window.AudioContext || window.webkitAudioContext)();
+                        var osc  = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.connect(gain); gain.connect(ctx.destination);
+                        osc.type = 'sine'; osc.frequency.value = 660;
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                        osc.start(); osc.stop(ctx.currentTime + 0.5);
+                    } catch(e) {}
+                }
                 if (data.max_id > lastId) {
                     lastId = data.max_id;
                     localStorage.setItem('gspot_last_res_id', lastId);
                 }
             })
-            .catch(function() {}); // silent on network failure
-    }
-
-    function showResNotification(count, items) {
-        const existing = document.getElementById('gspotResNotif');
-        if (existing) existing.remove();
-
-        const first  = items[0] || {};
-        const name   = first.customer_name || 'A customer';
-        const msg    = count === 1
-            ? name + ' just made a new reservation!'
-            : count + ' new reservations are waiting for review.';
-
-        const toast = document.createElement('div');
-        toast.id = 'gspotResNotif';
-        toast.style.cssText = [
-            'position:fixed;bottom:24px;right:24px;z-index:99999;',
-            'background:linear-gradient(135deg,#0d1b3e,#08101c);',
-            'border:1px solid rgba(32,200,161,.45);border-radius:16px;',
-            'padding:18px 20px;display:flex;align-items:flex-start;gap:14px;',
-            'box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(32,200,161,.1);',
-            'animation:slideInRight .35s cubic-bezier(.34,1.56,.64,1);',
-            'max-width:340px;font-family:inherit;'
-        ].join('');
-
-        toast.innerHTML =
-            '<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;' +
-            'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.3);' +
-            'display:flex;align-items:center;justify-content:center;font-size:18px;color:#20c8a1;">' +
-            '<i class="fas fa-calendar-check"></i></div>' +
-            '<div style="flex:1;min-width:0;">' +
-            '<div style="font-weight:700;font-size:14px;color:#f0f0f0;margin-bottom:4px;">New Reservation' + (count > 1 ? 's' : '') + '!</div>' +
-            '<div style="font-size:13px;color:#aaa;line-height:1.4;">' + msg + '</div>' +
-            '<button id="gspotResNotifView" style="margin-top:10px;padding:6px 14px;border-radius:8px;' +
-            'background:rgba(32,200,161,.2);border:1px solid rgba(32,200,161,.4);' +
-            'color:#20c8a1;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">'
-            + '<i class="fas fa-eye" style="margin-right:5px;"></i>View Reservations</button>' +
-            '</div>' +
-            '<button onclick="document.getElementById(\'gspotResNotif\').remove()" ' +
-            'style="background:none;border:none;color:#666;cursor:pointer;font-size:18px;padding:0;flex-shrink:0;line-height:1;">&times;</button>';
-
-        document.body.appendChild(toast);
-
-        // Wire "View Reservations" button
-        document.getElementById('gspotResNotifView').addEventListener('click', function() {
-            const navEl = document.querySelector('.nav-item[onclick*="\'reservations\'"]');
-            showPage('reservations', navEl);
-            toast.remove();
-        });
-
-        // Play a subtle ping sound
-        try {
-            const ctx2 = new (window.AudioContext || window.webkitAudioContext)();
-            const osc2  = ctx2.createOscillator();
-            const gain2 = ctx2.createGain();
-            osc2.connect(gain2); gain2.connect(ctx2.destination);
-            osc2.type = 'sine'; osc2.frequency.value = 660;
-            gain2.gain.setValueAtTime(0.3, ctx2.currentTime);
-            gain2.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.5);
-            osc2.start(); osc2.stop(ctx2.currentTime + 0.5);
-        } catch(e) {}
-
-        // Auto-dismiss after 15 s
-        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 15000);
+            .catch(function() {});
     }
 
     // Start polling after 15 s (avoids false-positive on fresh page load)
