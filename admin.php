@@ -1063,7 +1063,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
                              background:#fb566b;color:#fff;border-radius:50%;
                              min-width:18px;height:18px;font-size:10px;font-weight:700;
                              line-height:18px;text-align:center;padding:0 3px;
-                             box-shadow:0 0 0 2px #0a0f1c;animation:bellPop .3s ease;"></span>
+                             box-shadow:0 0 0 2px #0a0f1c;"></span>
             </button>
 
             <!-- Dropdown panel -->
@@ -2664,7 +2664,12 @@ function _addNotifItems(newItems) {
     var badge  = document.getElementById('notifBellBadge');
     var hBadge = document.getElementById('notifHeaderBadge');
     var btn    = document.getElementById('notifBellBtn');
-    if (!list) return;
+
+    console.log('[GSpot Notif] _addNotifItems called. newItems:', newItems.length, '| badge el:', !!badge, '| list el:', !!list);
+    if (!list || !badge || !btn) {
+        console.warn('[GSpot Notif] Missing DOM elements — bell notification cannot display.');
+        return;
+    }
 
     // Rebuild list
     list.innerHTML = '';
@@ -2700,22 +2705,29 @@ function _addNotifItems(newItems) {
         list.appendChild(row);
     });
 
-    empty.style.display = _notifItems.length > 0 ? 'none' : 'block';
+    if (empty) empty.style.display = _notifItems.length > 0 ? 'none' : 'block';
 
     if (newItems.length > 0) {
         var count = _notifItems.length;
         badge.textContent = count > 9 ? '9+' : String(count);
-        // ── BUG FIX #2: Set display directly — cssText+= left display:none active in some browsers
-        badge.style.display         = 'flex';
-        badge.style.alignItems      = 'center';
-        badge.style.justifyContent  = 'center';
-        hBadge.textContent   = count + ' new';
-        hBadge.style.display = 'inline-block';
+        // Force-set display using setAttribute to bypass any inline style conflict
+        badge.setAttribute('style',
+            'display:flex !important;align-items:center;justify-content:center;' +
+            'position:absolute;top:-5px;right:-5px;' +
+            'background:#fb566b;color:#fff;border-radius:50%;' +
+            'min-width:18px;height:18px;font-size:10px;font-weight:700;' +
+            'line-height:18px;text-align:center;padding:0 3px;' +
+            'box-shadow:0 0 0 2px #0a0f1c;animation:bellPop .3s ease;'
+        );
+        if (hBadge) { hBadge.textContent = count + ' new'; hBadge.style.display = 'inline-block'; }
         btn.classList.add('has-notif');
         var bellI = btn.querySelector('i');
-        bellI.style.animation = 'none';
-        void bellI.offsetWidth;
-        bellI.style.animation = 'bellShake .5s ease';
+        if (bellI) {
+            bellI.style.animation = 'none';
+            void bellI.offsetWidth;
+            bellI.style.animation = 'bellShake .5s ease';
+        }
+        console.log('[GSpot Notif] Badge shown. count=', count);
     }
 }
 
