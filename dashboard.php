@@ -233,7 +233,7 @@ function fmtMins(int $m): string {
             --trans  : .22s ease;
         }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
+        html { scroll-behavior: smooth; overflow-x: hidden; }
         body {
             background: var(--dark);
             color: var(--text);
@@ -241,6 +241,7 @@ function fmtMins(int $m): string {
             font-size: 14px;
             min-height: 100vh;
             padding-top: 70px; /* for the site navbar */
+            overflow-x: hidden;
         }
 
         /* ── Page wrapper ─────────────────────────────────────────────── */
@@ -516,6 +517,9 @@ function fmtMins(int $m): string {
         /* ── Charts grid ──────────────────────────────────────────────── */
         .cd-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 
+        /* ── Two-column responsive grid (stats page personality row etc.) */
+        .cd-2col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
         /* ── Progress bar ─────────────────────────────────────────────── */
         .cd-progress-bar {
             height: 6px;
@@ -558,23 +562,151 @@ function fmtMins(int $m): string {
         }
         .cd-btn-ghost:hover { background: rgba(95,133,218,0.22); transform: translateY(-2px); color:var(--blue); }
 
+        /* ══════════════════════════════════════════════════════════════════
+           MOBILE BOTTOM NAV BAR
+        ══════════════════════════════════════════════════════════════════ */
+        .cd-bottom-nav {
+            display: none; /* hidden on desktop */
+        }
+
         /* ── Responsive ───────────────────────────────────────────────── */
         @media (max-width: 900px) {
-            .cd-wrapper { grid-template-columns: 1fr; }
-            .cd-sidebar  { display: none; }
-            .cd-charts-grid { grid-template-columns: 1fr; }
-            .cd-mobile-nav {
+            /* Hard-clip the viewport — nothing bleeds horizontally */
+            html, body {
+                overflow-x: hidden;
+                max-width: 100vw;
+            }
+            body {
+                padding-top: 70px; /* keep space for fixed site navbar */
+            }
+
+            .cd-wrapper {
+                grid-template-columns: 1fr;
+                min-height: 100vh;
+            }
+            .cd-sidebar { display: none; }
+
+            /* Main content area: full width, pad bottom for bottom nav */
+            .cd-main {
+                padding: 20px 16px 90px;
+                overflow-x: hidden;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Old horizontal scroll nav — completely hidden on mobile now */
+            .cd-mobile-nav { display: none !important; }
+
+            /* ── Bottom navigation bar ─────────────────────────────────── */
+            .cd-bottom-nav {
                 display: flex;
-                overflow-x: auto;
-                gap: 8px;
-                padding: 12px 16px;
-                background: var(--panel);
-                border-bottom: 1px solid var(--border);
-                margin: -30px -30px 24px;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: 64px;
+                background: rgba(10, 20, 45, 0.97);
+                border-top: 1px solid rgba(95,133,218,0.2);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                z-index: 1000;
+                align-items: stretch;
+                box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+            }
+            .cd-bnav-btn {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 3px;
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: rgba(255,255,255,0.45);
+                font-family: inherit;
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: .3px;
+                padding: 8px 4px;
+                transition: color .2s;
+                position: relative;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .cd-bnav-btn i {
+                font-size: 18px;
+                transition: color .2s, transform .2s;
+            }
+            .cd-bnav-btn.active {
+                color: var(--mint);
+            }
+            .cd-bnav-btn.active i {
+                transform: translateY(-2px);
+            }
+            .cd-bnav-btn.active::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 32px;
+                height: 3px;
+                background: var(--mint);
+                border-radius: 0 0 4px 4px;
+            }
+            /* Badge on bottom nav */
+            .cd-bnav-badge {
+                position: absolute;
+                top: 6px;
+                right: calc(50% - 14px);
+                background: var(--mint);
+                color: #000;
+                font-size: 9px;
+                font-weight: 800;
+                min-width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 4px;
+                pointer-events: none;
+            }
+            .cd-bnav-badge.coral {
+                background: var(--coral);
+                color: #fff;
+            }
+
+            /* Content grids on mobile */
+            .cd-stats {
+                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+                gap: 12px;
+            }
+            .cd-charts-grid,
+            .cd-2col-grid {
+                grid-template-columns: 1fr;
+            }
+            .cd-live-meta {
+                grid-template-columns: 1fr 1fr;
+            }
+            /* Welcome title smaller on mobile */
+            .cd-section-title {
+                font-size: 18px;
+                margin-bottom: 16px;
+            }
+            .cd-card {
+                padding: 16px;
             }
         }
+        @media (max-width: 480px) {
+            .cd-stats    { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .cd-live-meta { grid-template-columns: 1fr; }
+            .cd-stat-value { font-size: 22px; }
+        }
         @media (min-width: 901px) {
-            .cd-mobile-nav { display: none; }
+            .cd-mobile-nav  { display: none; }
+            .cd-bottom-nav  { display: none !important; }
         }
 
         /* Flash */
@@ -657,14 +789,8 @@ function fmtMins(int $m): string {
     <!-- ══ MAIN ═════════════════════════════════════════════════════════════ -->
     <main class="cd-main">
 
-        <!-- Mobile nav -->
-        <div class="cd-mobile-nav">
-            <button class="cd-nav-btn active" onclick="cdShowPage('overview',this)" style="white-space:nowrap"><i class="fas fa-chart-line"></i> Overview</button>
-            <button class="cd-nav-btn" onclick="cdShowPage('sessions',this)" style="white-space:nowrap"><i class="fas fa-play-circle"></i> Sessions</button>
-            <button class="cd-nav-btn" onclick="cdShowPage('reservations',this)" style="white-space:nowrap"><i class="fas fa-calendar-check"></i> Reservations</button>
-            <button class="cd-nav-btn" onclick="cdShowPage('stats',this)" style="white-space:nowrap"><i class="fas fa-trophy"></i> My Stats</button>
-            <button class="cd-nav-btn" onclick="cdShowPage('cancellations',this)" style="white-space:nowrap"><i class="fas fa-ban"></i> Cancellations</button>
-        </div>
+        <!-- Mobile nav (horizontal scroll) — hidden on mobile, kept for structure -->
+        <div class="cd-mobile-nav"></div>
 
 
         <!-- ══ PAGE: OVERVIEW ═════════════════════════════════════════════ -->
@@ -1257,7 +1383,7 @@ function fmtMins(int $m): string {
             </div>
 
             <!-- Personality row -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+            <div class="cd-2col-grid">
                 <div class="cd-card">
                     <div class="cd-card-title" style="margin-bottom:16px"><i class="fas fa-star"></i> Favourite Console</div>
                     <?php if ($favourite): ?>
@@ -1328,7 +1454,7 @@ function fmtMins(int $m): string {
                 <div class="cd-card-header">
                     <div class="cd-card-title"><i class="fas fa-peso-sign"></i> Spending Breakdown</div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px">
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Today</div>
                         <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--mint)">₱<?= number_format($spending['today'],2) ?></div>
@@ -1571,23 +1697,84 @@ function fmtMins(int $m): string {
     </main>
 </div>
 
+<!-- ══ MOBILE BOTTOM NAVIGATION BAR ══════════════════════════════════════ -->
+<nav class="cd-bottom-nav" id="cdBottomNav">
+    <button class="cd-bnav-btn active" id="bnavOverview" onclick="cdShowPage('overview', this)">
+        <i class="fas fa-home"></i>
+        <span>Overview</span>
+    </button>
+    <button class="cd-bnav-btn" id="bnavSessions" onclick="cdShowPage('sessions', this)">
+        <i class="fas fa-play-circle"></i>
+        <span>Sessions</span>
+    </button>
+    <button class="cd-bnav-btn" id="bnavReservations" onclick="cdShowPage('reservations', this)">
+        <i class="fas fa-calendar-check"></i>
+        <span>Reserve</span>
+        <?php if (count($upcomingRes) > 0): ?>
+        <span class="cd-bnav-badge"><?= count($upcomingRes) ?></span>
+        <?php endif; ?>
+    </button>
+    <button class="cd-bnav-btn" id="bnavStats" onclick="cdShowPage('stats', this)">
+        <i class="fas fa-trophy"></i>
+        <span>Rank</span>
+    </button>
+    <button class="cd-bnav-btn" id="bnavCancellations" onclick="cdShowPage('cancellations', this)">
+        <i class="fas fa-user-circle"></i>
+        <span>Profile</span>
+        <?php if ($myCancelCount > 0): ?>
+        <span class="cd-bnav-badge coral"><?= $myCancelCount ?></span>
+        <?php endif; ?>
+    </button>
+</nav>
+
 <script>
 /* ══ Navigation ══════════════════════════════════════════════════════════════ */
+const BNAV_MAP = {
+    overview:      'bnavOverview',
+    sessions:      'bnavSessions',
+    reservations:  'bnavReservations',
+    stats:         'bnavStats',
+    cancellations: 'bnavCancellations',
+};
+const SIDEBAR_MAP = {
+    overview: 'navOverview', sessions: 'navSessions',
+    reservations: 'navReservations', stats: 'navStats', cancellations: 'navCancellations'
+};
+
 function cdShowPage(page, el) {
+    // Deactivate all pages
     document.querySelectorAll('.cd-page').forEach(p => p.classList.remove('active'));
+    // Deactivate all nav buttons (sidebar + bottom nav)
     document.querySelectorAll('.cd-nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.cd-bnav-btn').forEach(b => b.classList.remove('active'));
+
+    // Show target page
     document.getElementById('page-' + page).classList.add('active');
+
+    // Activate the button that was clicked
     if (el) el.classList.add('active');
+
+    // Sync bottom nav button
+    const bnavBtn = document.getElementById(BNAV_MAP[page]);
+    if (bnavBtn && bnavBtn !== el) bnavBtn.classList.add('active');
+
+    // Sync sidebar button
+    const sideBtn = document.getElementById(SIDEBAR_MAP[page]);
+    if (sideBtn && sideBtn !== el) sideBtn.classList.add('active');
+
     history.replaceState(null, '', '#' + page);
+
+    // Scroll content back to top on page switch (mobile)
+    document.querySelector('.cd-main')?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Restore page from hash
+// Restore page from hash on load
 (function () {
     const hash = location.hash.replace('#', '');
     const valid = ['overview','sessions','reservations','stats','cancellations'];
     if (hash && valid.includes(hash)) {
-        const navId = { overview:'navOverview', sessions:'navSessions', reservations:'navReservations', stats:'navStats', cancellations:'navCancellations' };
-        cdShowPage(hash, document.getElementById(navId[hash]));
+        cdShowPage(hash, null);
     }
 })();
 
@@ -1782,11 +1969,14 @@ function submitCancelReservation() {
                     setTimeout(() => { row.remove(); }, 420);
                 }
                 showDashToast(data.message, 'success');
-                // Reload to #cancellations so the new entry appears immediately
+                // Store message in sessionStorage so it survives the reload
+                sessionStorage.setItem('dashToastMsg',  data.message);
+                sessionStorage.setItem('dashToastType', 'success');
+                // Reload to #cancellations — message will re-appear for 10s after load
                 setTimeout(() => {
                     location.href = location.pathname + '#cancellations';
                     location.reload();
-                }, 2200);
+                }, 800);
             } else {
                 showDashToast(data.message || 'Could not cancel reservation.', 'error');
                 btn.disabled = false;
@@ -1799,7 +1989,7 @@ function submitCancelReservation() {
         });
 }
 
-function showDashToast(msg, type) {
+function showDashToast(msg, type, duration) {
     const t = document.getElementById('dashToast');
     t.style.background = type === 'success'
         ? 'linear-gradient(135deg,#0d3d2e,#0a2218)'
@@ -1810,8 +2000,21 @@ function showDashToast(msg, type) {
     t.style.display = 'block';
     t.style.opacity = '1';
     clearTimeout(t._timer);
-    t._timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 320); }, 3500);
+    const ms = duration || 3500;
+    t._timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 320); }, ms);
 }
+
+// ── Re-display toast saved before page reload ─────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    const msg  = sessionStorage.getItem('dashToastMsg');
+    const type = sessionStorage.getItem('dashToastType');
+    if (msg && type) {
+        sessionStorage.removeItem('dashToastMsg');
+        sessionStorage.removeItem('dashToastType');
+        // Show for 10 seconds on the reloaded page
+        showDashToast(msg, type, 10000);
+    }
+});
 
 // Close cancel modal on backdrop click
 document.getElementById('cancelResModal')?.addEventListener('click', function(e) {
