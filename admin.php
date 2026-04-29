@@ -1192,7 +1192,99 @@ function showPage(page, el) {
     }
 }
 
-// ── Restore active page from URL hash on load ──
+// track which section is currently visible (for live-refresh)
+var _currentSection = 'dashboard';
+
+// ── Live Section Refresh ─────────────────────────────────────────────────────
+// Every 12 seconds, re-fetches the active section's rendered HTML from the server
+// and updates the DOM — keeps reservations, sessions, dashboard etc. live without reload.
+(function () {
+    var REFRESH_MS = 12000;
+    // Sections we can safely auto-refresh (exclude settings to avoid mid-edit disruption)
+    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments'];
+    // CSS flash keyframe for subtle update feedback
+    var styleEl = document.createElement('style');
+    styleEl.textContent = '@keyframes liveFlash{0%{opacity:.6}50%{opacity:.9}100%{opacity:1}} .live-refreshing{animation:liveFlash .4s ease;}';
+    document.head.appendChild(styleEl);
+
+    // Live indicator dot in topbar
+    var dot = document.createElement('span');
+    dot.id = 'liveIndicator';
+    dot.title = 'Live data — auto-refreshing';
+    dot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#20c8a1;display:inline-block;box-shadow:0 0 0 0 rgba(32,200,161,.5);animation:livePulse 2s ease infinite;flex-shrink:0;';
+    var pulseStyle = document.createElement('style');
+    pulseStyle.textContent = '@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(32,200,161,.5)}70%{box-shadow:0 0 0 6px rgba(32,200,161,0)}100%{box-shadow:0 0 0 0 rgba(32,200,161,0)}}';
+    document.head.appendChild(pulseStyle);
+    var topbarLeft = document.querySelector('.topbar-left');
+    if (topbarLeft) topbarLeft.appendChild(dot);
+
+    function isModalOpen() {
+        // Check any visible modal — don't refresh while admin is interacting
+        var modals = document.querySelectorAll('.modal, [id$="Modal"], [id*="modal"]');
+        for (var i = 0; i < modals.length; i++) {
+            var s = modals[i].style;
+            if (s.display === 'flex' || s.display === 'block') return true;
+        }
+        return false;
+    }
+
+    function isInputFocused() {
+        var tag = document.activeElement && document.activeElement.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
+
+    function refreshSection() {
+        var section = _currentSection;
+        if (!refreshable.includes(section)) return;
+        if (isModalOpen() || isInputFocused()) return; // don't interrupt user
+
+        // Dim dot while fetching
+        dot.style.background = '#888';
+
+        fetch('ajax/live_section.php?section=' + encodeURIComponent(section))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                dot.style.background = '#20c8a1';
+                if (!data.html) return;
+
+                var container = document.getElementById(section);
+                if (!container) return;
+
+                // Don't replace if user just opened a modal or focused an input
+                if (isModalOpen() || isInputFocused()) return;
+
+                // Replace inner content
+                container.innerHTML = data.html;
+
+                // Subtle flash to signal update
+                container.classList.add('live-refreshing');
+                setTimeout(function() { container.classList.remove('live-refreshing'); }, 450);
+            })
+            .catch(function() {
+                dot.style.background = '#fb566b'; // red on error
+                setTimeout(function() { dot.style.background = '#20c8a1'; }, 3000);
+            });
+    }
+
+    // Start after 5s, then every 12s
+    setTimeout(function() {
+        refreshSection();
+        setInterval(refreshSection, REFRESH_MS);
+    }, 5000);
+
+    // Also refresh immediately when switching to a refreshable section
+    var _origShowPage = window.showPage;
+    window.showPage = function(page, el) {
+        _currentSection = page;
+        _origShowPage(page, el);
+        // Refresh new section data immediately on tab switch (after 300ms for animation)
+        if (refreshable.includes(page)) {
+            setTimeout(refreshSection, 300);
+        }
+    };
+})();
+
+
 (function () {
     const hash = window.location.hash.replace('#', '');
     const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings','tournaments'];

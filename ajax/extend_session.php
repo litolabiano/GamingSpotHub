@@ -5,15 +5,26 @@
  *
  * POST params:
  *   session_id     int
- *   extra_minutes  int  (30 | 60 | 90 | 120)
+ *   extra_minutes  int  (15 | 30 | 60 | 90 | 120 | 180 | 240)
  *   payment_method string (cash | gcash | credit_card)
  *   tendered       float  (optional — amount customer gave)
  */
+// Set JSON header FIRST — must come before any output or redirects.
+// This ensures AJAX callers always receive parseable JSON, even on auth failure.
 header('Content-Type: application/json');
+
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['shopkeeper', 'owner']);
+// Auth guard: return JSON error instead of an HTML redirect for AJAX callers.
+if (!isLoggedIn()) {
+    echo json_encode(['success' => false, 'message' => 'Session expired — please log in again.']);
+    exit;
+}
+if (!in_array($_SESSION['role'] ?? '', ['shopkeeper', 'owner'])) {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
+    exit;
+}
 
 $session_id     = (int)   ($_POST['session_id']     ?? 0);
 $extra_minutes  = (int)   ($_POST['extra_minutes']  ?? 0);

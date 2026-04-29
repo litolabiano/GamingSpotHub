@@ -589,11 +589,23 @@
         </div>
 
         <form id="extendSessionForm">
+            <!-- Hidden state fields used by openExtendModal() JS helper -->
             <input type="hidden" name="action" value="extend_session">
             <input type="hidden" name="session_id" id="extendSessionId">
+            <input type="hidden" id="extendSessionMode" value="hourly">
+            <input type="hidden" id="extendCostHolder" value="0">
+
+            <!-- Pending extension requests (populated by loadPendingExtensions) -->
+            <div id="extendPendingSection" style="display:none;margin-bottom:14px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#f1a83c;margin-bottom:8px;">
+                    <i class="fas fa-clock"></i> Pending Customer Extension Requests
+                </div>
+                <div id="extendPendingList"></div>
+            </div>
+
             <div class="form-group">
                 <label>Add Time *</label>
-                <select name="extra_minutes" id="extendMinutes" required>
+                <select name="extra_minutes" id="extendMinutes" required onchange="updateExtendCost()">
                     <option value="" disabled selected>— Select additional time —</option>
                     <option value="15">+ 15 minutes</option>
                     <option value="30">+ 30 minutes — ₱50</option>
@@ -604,18 +616,33 @@
                     <option value="240">+ 4 hours — ₱320</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label>Payment Method</label>
-                <select name="payment_method" id="extendPaymentMethod">
-                    <option value="cash">💵 Cash</option>
-                    <option value="gcash">📱 GCash</option>
-                </select>
+
+            <!-- Cost preview (shown after time selection) -->
+            <div id="extendCostPreview" style="display:none;background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px;">
+                Extension cost: <strong id="extendCostAmt" style="color:#8aa4e8;">₱0</strong>
+                <span id="extendFreeNote" style="display:none;color:#20c8a1;font-size:12px;margin-left:8px;">
+                    <i class="fas fa-gift"></i> No charge for this session type
+                </span>
             </div>
-            <div class="form-group" style="margin-bottom:6px">
-                <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱) <span style="font-weight:400;color:#666;">(optional)</span></label>
-                <input type="number" id="extendTendered" name="tendered" min="0" step="1" placeholder="e.g. 100"
-                       style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;">
+
+            <!-- Payment fields (shown for hourly extensions) -->
+            <div id="extendPaymentFields">
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select name="payment_method" id="extendPaymentMethod">
+                        <option value="cash">💵 Cash</option>
+                        <option value="gcash">📱 GCash</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:6px">
+                    <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱) <span style="font-weight:400;color:#666;">(optional)</span></label>
+                    <input type="number" id="extendTendered" name="tendered" min="0" step="1" placeholder="e.g. 100"
+                           style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
+                           oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                </div>
+                <div id="extendChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
             </div>
+
             <div style="background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#8aa4e8;">
                 <i class="fas fa-info-circle"></i> Extension cost is collected immediately for hourly sessions. Open Time and Unlimited sessions have no extension charge.
             </div>
