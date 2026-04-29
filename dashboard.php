@@ -1753,6 +1753,8 @@ function cancelStep2Back() {
 function submitCancelReservation() {
     if (!_cancelResId) return;
 
+    // Capture the ID NOW — closeCancelModal() will null _cancelResId
+    const resId        = _cancelResId;
     const reasonType   = document.getElementById('cancelReasonType').value;
     const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
 
@@ -1761,8 +1763,8 @@ function submitCancelReservation() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling…';
 
     const fd = new FormData();
-    fd.append('reservation_id',     _cancelResId);
-    fd.append('cancel_reason_type', reasonType);
+    fd.append('reservation_id',      resId);
+    fd.append('cancel_reason_type',  reasonType);
     fd.append('cancel_reason_detail', reasonDetail);
 
     fetch('ajax/cancel_reservation.php', { method: 'POST', body: fd })
@@ -1770,8 +1772,9 @@ function submitCancelReservation() {
         .then(data => {
             closeCancelModal();
             if (data.success) {
-                const row = document.querySelector(`[data-cancel-row="${_cancelResId || data.reservation_id}"]`)
-                         || document.querySelector(`button[data-id="${_cancelResId}"]`)?.closest('tr');
+                // Fade-out the cancelled row in the Reservations table
+                const row = document.querySelector(`[data-cancel-row="${resId}"]`)
+                         || document.querySelector(`button[data-id="${resId}"]`)?.closest('tr');
                 if (row) {
                     row.style.transition = 'opacity .4s, transform .4s';
                     row.style.opacity = '0';
@@ -1779,7 +1782,11 @@ function submitCancelReservation() {
                     setTimeout(() => { row.remove(); }, 420);
                 }
                 showDashToast(data.message, 'success');
-                setTimeout(() => location.reload(), 2200);
+                // Reload to #cancellations so the new entry appears immediately
+                setTimeout(() => {
+                    location.href = location.pathname + '#cancellations';
+                    location.reload();
+                }, 2200);
             } else {
                 showDashToast(data.message || 'Could not cancel reservation.', 'error');
                 btn.disabled = false;
@@ -2038,8 +2045,5 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </script>
 <?php endif; ?>
 
-<!-- Bootstrap JS (navbar mobile toggler) -->
-<script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
-<script src="assets/libs/aos/aos.js"></script>
 
 </html>
