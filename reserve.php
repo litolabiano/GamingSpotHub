@@ -16,23 +16,35 @@ $user    = getCurrentUser();
 $success = '';
 $error   = '';
 
-// Fetch all non-maintenance consoles for display
-$allConsoles = getConsoles();
+// Fetch ALL consoles (including maintenance) so we can track per-type availability
+$allConsoles = getConsoles(); // null status = all, including maintenance
+
+// Counts of ALL units per type (for display)
 $ps5Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'));
 $ps4Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'));
 $xboxCount   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X'));
 
-// Group non-maintenance consoles by type for the unit picker (passed to JS)
+// Counts of maintenance units per type
+$ps5Maint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'           && $c['status'] === 'maintenance'));
+$ps4Maint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'           && $c['status'] === 'maintenance'));
+$xboxMaint  = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X' && $c['status'] === 'maintenance'));
+
+// True when every unit of that type is under maintenance
+$ps5AllMaint  = $ps5Count  > 0 && $ps5Maint  === $ps5Count;
+$ps4AllMaint  = $ps4Count  > 0 && $ps4Maint  === $ps4Count;
+$xboxAllMaint = $xboxCount > 0 && $xboxMaint === $xboxCount;
+
+// Group ALL consoles by type for the unit picker (JS uses this).
+// Maintenance units are included but flagged so JS can render them greyed out.
 $consolesByType = [];
 foreach ($allConsoles as $c) {
-    if ($c['status'] !== 'maintenance') {
-        $consolesByType[$c['console_type']][] = [
-            'id'     => (int)$c['console_id'],
-            'unit'   => $c['unit_number'],
-            'name'   => $c['console_name'],
-            'status' => $c['status'],
-        ];
-    }
+    $consolesByType[$c['console_type']][] = [
+        'id'          => (int)$c['console_id'],
+        'unit'        => $c['unit_number'],
+        'name'        => $c['console_name'],
+        'status'      => $c['status'],
+        'maintenance' => ($c['status'] === 'maintenance'),
+    ];
 }
 
 $unlimitedRate = getSetting('unlimited_rate') ?? 300;
@@ -393,6 +405,35 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
     .console-type-card .ct-name  { font-weight: 700; font-size: .9rem; color: #fff; }
     .console-type-card .ct-count { font-size: 11px; color: #888; margin-top: 3px; }
     .console-type-card .ct-avail { font-size: 10px; margin-top: 3px; }
+
+    /* ── Maintenance state ───────────────────────────── */
+    .console-type-card.ct-maintenance {
+        border-color: rgba(255,255,255,.06) !important;
+        background: rgba(255,255,255,.02) !important;
+        cursor: not-allowed !important;
+        opacity: .55;
+        pointer-events: none;   /* block all mouse events */
+    }
+    .ct-maint-badge {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        color: #f1a83c;
+        background: rgba(241,168,60,.12);
+        border: 1px solid rgba(241,168,60,.3);
+        border-radius: 20px;
+        padding: 2px 8px;
+        letter-spacing: .3px;
+    }
+    /* Unit card inside unit picker — individual maintenance unit */
+    .unit-card-maintenance {
+        opacity: .45 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+        border-color: rgba(255,255,255,.06) !important;
+        background: rgba(255,255,255,.02) !important;
+    }
 
     /* ── Mode grid ──────────────────────────────────────── */
     .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
@@ -869,27 +910,35 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-desktop"></i> Step 1 — Choose Console Type</h2>
                         <div class="console-type-grid">
-                            <div class="console-type-card" id="ct-ps5" onclick="selectConsoleType('PS5')">
-                                <div class="ct-icon"><i class="fab fa-playstation" style="color:#5f85da;"></i></div>
-                                <div class="ct-name">PlayStation 5</div>
-                                <div class="ct-count"><?= $ps5Count ?> units</div>
-                                <div class="ct-avail" id="avail-ps5"></div>
+                            <?php
+                            $ctCards = [
+                                ['type'=>'PS5',         'id'=>'ct-ps5',  'icon'=>'fab fa-playstation', 'color'=>'#5f85da', 'label'=>'PlayStation 5', 'count'=>$ps5Count,  'allMaint'=>$ps5AllMaint,  'maintCount'=>$ps5Maint],
+                                ['type'=>'PS4',         'id'=>'ct-ps4',  'icon'=>'fab fa-playstation', 'color'=>'#f1a83c', 'label'=>'PlayStation 4', 'count'=>$ps4Count,  'allMaint'=>$ps4AllMaint,  'maintCount'=>$ps4Maint],
+                                ['type'=>'Xbox Series X','id'=>'ct-xbox','icon'=>'fab fa-xbox',         'color'=>'#20c8a1', 'label'=>'Xbox Series X', 'count'=>$xboxCount, 'allMaint'=>$xboxAllMaint, 'maintCount'=>$xboxMaint],
+                            ];
+                            foreach ($ctCards as $ct):
+                                if ($ct['count'] === 0) continue; // hide types with no units at all
+                                $isMaint = $ct['allMaint'];
+                            ?>
+                            <div class="console-type-card<?= $isMaint ? ' ct-maintenance' : '' ?>"
+                                 id="<?= $ct['id'] ?>"
+                                 <?= !$isMaint ? "onclick=\"selectConsoleType('{$ct['type']}')\"" : '' ?>
+                                 <?= $isMaint ? 'title="All units of this type are currently under maintenance."' : '' ?>>
+                                <div class="ct-icon">
+                                    <i class="<?= $ct['icon'] ?>" style="color:<?= $isMaint ? '#444' : $ct['color'] ?>;"></i>
+                                </div>
+                                <div class="ct-name" style="<?= $isMaint ? 'color:#555;' : '' ?>"><?= $ct['label'] ?></div>
+                                <?php if ($isMaint): ?>
+                                    <div class="ct-count" style="color:#444;"><?= $ct['count'] ?> units</div>
+                                    <div class="ct-maint-badge"><i class="fas fa-tools"></i> Under Maintenance</div>
+                                <?php else: ?>
+                                    <div class="ct-count"><?= $ct['count'] ?> units</div>
+                                    <div class="ct-avail" id="avail-<?= strtolower(str_replace(' ','-',$ct['type'])) ?>"></div>
+                                <?php endif; ?>
                             </div>
-                            <?php if ($ps4Count > 0): ?>
-                            <div class="console-type-card" id="ct-ps4" onclick="selectConsoleType('PS4')">
-                                <div class="ct-icon"><i class="fab fa-playstation" style="color:#f1a83c;"></i></div>
-                                <div class="ct-name">PlayStation 4</div>
-                                <div class="ct-count"><?= $ps4Count ?> units</div>
-                                <div class="ct-avail" id="avail-ps4"></div>
-                            </div>
-                            <?php endif; ?>
-                            <div class="console-type-card" id="ct-xbox" onclick="selectConsoleType('Xbox Series X')">
-                                <div class="ct-icon"><i class="fab fa-xbox" style="color:#20c8a1;"></i></div>
-                                <div class="ct-name">Xbox Series X</div>
-                                <div class="ct-count"><?= $xboxCount ?> units</div>
-                                <div class="ct-avail" id="avail-xbox"></div>
-                            </div>
+                            <?php endforeach; ?>
                         </div>
+
                     </div>
 
 
