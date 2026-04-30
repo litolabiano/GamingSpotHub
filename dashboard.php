@@ -34,6 +34,28 @@ $isBanned  = !empty($banData['reservation_banned_until']) && strtotime($banData[
 $banExpiry = $isBanned ? date('F j, Y \a\t g:i A', strtotime($banData['reservation_banned_until'])) : '';
 $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 
+// ── Reschedule notifications (unseen reschedules for this user) ──────────────
+$rescheduleStmt = $conn->prepare(
+    "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
+            rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at,
+            r.console_type
+       FROM reservation_reschedules rs
+       JOIN reservations r ON rs.reservation_id = r.reservation_id
+      WHERE rs.user_id = ? AND rs.seen_by_user = 0
+      ORDER BY rs.created_at DESC"
+);
+$rescheduleStmt->bind_param('i', $user_id);
+$rescheduleStmt->execute();
+$unseenReschedules = $rescheduleStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+$rescheduleReasonLabels = [
+    'typhoon'       => '🌀 Typhoon / Bad Weather',
+    'power_outage'  => '⚡ Power Outage',
+    'emergency'     => '🚨 Emergency',
+    'maintenance'   => '🔧 Equipment Maintenance',
+    'other'         => '📋 Other Reason',
+];
+
 // Active session for THIS user (if any)
 $activeSession = null;
 $stmt = $conn->prepare(
@@ -154,7 +176,7 @@ $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
             rc.cancel_reason_type, rc.cancel_reason_detail,
             rc.console_type, rc.rental_mode, rc.reserved_date,
-            rc.downpayment_amount, rc.refund_issued, rc.cancelled_at
+            rc.downpayment_amount, rc.cancelled_at
        FROM reservation_cancellations rc
       WHERE rc.user_id = ?
       ORDER BY rc.cancelled_at DESC
@@ -796,6 +818,69 @@ function fmtMins(int $m): string {
         <!-- ══ PAGE: OVERVIEW ═════════════════════════════════════════════ -->
         <div class="cd-page active" id="page-overview">
             <h2 class="cd-section-title"><i class="fas fa-chart-line"></i> Welcome back, <?= htmlspecialchars(explode(' ', $user['full_name'])[0]) ?>!</h2>
+
+            <?php if (!empty($unseenReschedules)): ?>
+            <!-- ── Reschedule notification banners ──────────────────── -->
+            <div id="reschedule-notifications">
+                <?php foreach ($unseenReschedules as $rs): ?>
+                <div id="rn-<?= $rs['reschedule_id'] ?>" style="
+                    background: linear-gradient(135deg, rgba(32,200,161,.1), rgba(95,133,218,.08));
+                    border: 1px solid rgba(32,200,161,.4);
+                    border-radius: 16px;
+                    padding: 18px 22px;
+                    margin-bottom: 14px;
+                    display: flex;
+                    gap: 16px;
+                    align-items: flex-start;
+                    position: relative;">
+                    <div style="width:42px;height:42px;border-radius:12px;flex-shrink:0;
+                        background:rgba(32,200,161,.15);color:#20c8a1;
+                        display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;color:#20c8a1;font-size:14px;margin-bottom:4px;">
+                            📅 Your Reservation Has Been Rescheduled
+                        </div>
+                        <div style="font-size:13px;color:#ccc;line-height:1.7;">
+                            <strong style="color:#fff;">Reservation #<?= $rs['reservation_id'] ?></strong>
+                            (<?= htmlspecialchars($rs['console_type']) ?>) has been rescheduled by staff.<br>
+                            <span style="color:#888;">From:</span>
+                            <strong style="color:#fff;"><?= date('M d, Y', strtotime($rs['old_date'])) ?> at <?= date('g:i A', strtotime($rs['old_time'])) ?></strong><br>
+                            <span style="color:#888;">To:</span>
+                            <strong style="color:#20c8a1;"><?= date('M d, Y', strtotime($rs['new_date'])) ?> at <?= date('g:i A', strtotime($rs['new_time'])) ?></strong><br>
+                            <span style="color:#888;">Reason:</span>
+                            <span style="color:#f1a83c;"><?= $rescheduleReasonLabels[$rs['reason']] ?? ucfirst($rs['reason']) ?></span>
+                            <?php if ($rs['reason_detail']): ?>
+                            — <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <button onclick="dismissReschedule(<?= $rs['reschedule_id'] ?>)"
+                        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+                        color:#aaa;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;
+                        flex-shrink:0;transition:all .2s;"
+                        onmouseover="this.style.background='rgba(251,86,107,.15)';this.style.color='#fb566b'"
+                        onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='#aaa'"
+                        title="Dismiss this notification">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <script>
+            function dismissReschedule(id) {
+                fetch('ajax/dismiss_reschedule.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'reschedule_id=' + id
+                }).then(() => {
+                    const el = document.getElementById('rn-' + id);
+                    if (el) { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }
+                });
+            }
+            </script>
+            <?php endif; ?>
 
             <?php if ($activeSession): ?>
             <!-- Live session banner -->
@@ -1488,8 +1573,7 @@ function fmtMins(int $m): string {
             $myReasonChartLabels = array_map(fn($k) => $cancelReasonLabelMap[$k] ?? ucfirst($k), array_keys($myReasonCounts));
             $myReasonChartCounts = array_values($myReasonCounts);
 
-            // Count refunded
-            $myRefundCount    = count(array_filter($myCancels, fn($c) => $c['refund_issued']));
+            // Count user vs admin cancellations
             $myUserCancelCnt  = count(array_filter($myCancels, fn($c) => $c['cancelled_by'] === 'user'));
             $myAdminCancelCnt = count(array_filter($myCancels, fn($c) => $c['cancelled_by'] === 'admin'));
         ?>
@@ -1523,15 +1607,6 @@ function fmtMins(int $m): string {
                             <div class="cd-stat-label">Admin Cancelled</div>
                         </div>
                         <div class="cd-stat-icon purple"><i class="fas fa-shield-alt"></i></div>
-                    </div>
-                </div>
-                <div class="cd-stat-card">
-                    <div class="cd-stat-top">
-                        <div>
-                            <div class="cd-stat-value" style="color:#20c8a1"><?= $myRefundCount ?></div>
-                            <div class="cd-stat-label">Refunds Received</div>
-                        </div>
-                        <div class="cd-stat-icon mint"><i class="fas fa-undo-alt"></i></div>
                     </div>
                 </div>
             </div>
@@ -1599,7 +1674,6 @@ function fmtMins(int $m): string {
                         <th>Reason</th>
                         <th>Cancelled By</th>
                         <th>Downpayment</th>
-                        <th>Refund</th>
                     </tr></thead>
                     <tbody>
                     <?php foreach ($myCancels as $mc):
@@ -1636,15 +1710,6 @@ function fmtMins(int $m): string {
                         <td>
                             <?php if ((float)$mc['downpayment_amount'] > 0): ?>
                             <span style="color:var(--coral)">₱<?= number_format($mc['downpayment_amount'], 2) ?></span>
-                            <?php else: ?>
-                            <span style="color:var(--muted)">—</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($mc['refund_issued']): ?>
-                            <span class="cd-badge mint"><i class="fas fa-check" style="margin-right:4px"></i>Refunded</span>
-                            <?php elseif ((float)$mc['downpayment_amount'] > 0): ?>
-                            <span class="cd-badge gray">Pending</span>
                             <?php else: ?>
                             <span style="color:var(--muted)">—</span>
                             <?php endif; ?>

@@ -139,7 +139,7 @@
                     <a href="#sec-accounts"     class="toc-link">3. Accounts</a>
                     <a href="#sec-rates"        class="toc-link">4. Rates &amp; Payments</a>
                     <a href="#sec-reservations" class="toc-link">5. Reservations</a>
-                    <a href="#sec-cancel"       class="toc-link">6. Cancellations &amp; Refunds</a>
+                    <a href="#sec-cancel"       class="toc-link">6. Cancellations &amp; Rescheduling</a>
                     <a href="#sec-tournaments"  class="toc-link">7. Tournaments</a>
                     <a href="#sec-conduct"      class="toc-link">8. Code of Conduct</a>
                     <a href="#sec-equipment"    class="toc-link">9. Equipment</a>
@@ -229,27 +229,37 @@
                         <li>Reservations must be made at least <strong>1 hour in advance</strong> through the online reservation system.</li>
                         <li>Reservation slots are available from <strong>12:00 PM to 11:59 PM</strong> only.</li>
                         <li>A reservation fee (downpayment) may be collected to secure your slot. This fee is <strong>credited toward your total session cost</strong> — it is not an extra charge.</li>
-                        <li>Customers are allowed a maximum of <strong>3 simultaneous active reservations</strong>, with full payment guaranteed.</li>
+                        <li>Each customer may hold a maximum of <strong>1 active reservation</strong> at a time. You must cancel or complete your existing reservation before creating a new one.</li>
                         <li>The Hub reserves the right to reassign a unit if the customer has not arrived within <strong>15 minutes</strong> of their reserved time without prior notice.</li>
                         <li>Consoles under maintenance (e.g., PlayStation 4 if marked unavailable) cannot be selected for reservation until restored by management.</li>
                     </ul>
                     <div class="hl info"><i class="fas fa-clock me-2" style="color:#5f85da;"></i>Reservation slots cannot be transferred to another person. The account holder must be present.</div>
                 </div>
 
-                <!-- 6. Cancellations -->
+                <!-- 6. Cancellations & Rescheduling -->
                 <div class="terms-section" id="sec-cancel" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-coral"><i class="fas fa-rotate-left" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">6. Cancellations &amp; Refunds <span>Policy</span></h2>
+                        <div class="terms-icon ti-coral"><i class="fas fa-calendar-alt" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">6. Cancellations &amp; Rescheduling <span>Policy</span></h2>
                     </div>
+
+                    <div class="hl warn"><i class="fas fa-ban me-2" style="color:#fb566b;"></i>
+                        <strong>Non-Refundable Reservation Fee:</strong> All reservation fees (downpayments) are <strong>strictly non-refundable</strong> under all circumstances — including customer-initiated cancellations, no-shows, and admin-initiated cancellations. No store credit, GC, or partial refund will be issued in place of the fee.
+                    </div>
+
                     <ul>
-                        <li><strong>Before session starts:</strong> Cancelling before your reserved start time entitles you to a <strong>full 100% refund</strong> of the reservation fee.</li>
-                        <li><strong>After session starts:</strong> Cancelling after your booked time has begun will incur an <strong>inconvenience fee</strong> deducted from the reservation fee. The remaining balance will be refunded.</li>
+                        <li><strong>30-Minute Grace Period:</strong> If you cancel your reservation within <strong>30 minutes of making it</strong>, the cancellation will <strong>not count toward your cancellation streak</strong>. This is a one-time goodwill window per booking.</li>
+                        <li><strong>3-Strike Cancellation Streak:</strong> Three (3) consecutive customer-initiated cancellations (outside the grace period) will result in a <strong>7-day online reservation ban</strong>. Walk-in access is not affected. The streak resets after a successfully completed session.</li>
+                        <li>Ban appeals may be submitted to management on a case-by-case basis.</li>
                     </ul>
-                    <div class="hl warn"><i class="fas fa-ban me-2" style="color:#fb566b;"></i><strong>3-Strike Rule:</strong> Accounts with <strong>3 consecutive cancelled reservations</strong> will be placed on a <strong>1-week reservation ban</strong>. The counter resets after a successfully completed session.</div>
+
+                    <div class="hl" style="border-color:#20c8a1;background:rgba(32,200,161,.07);">
+                        <i class="fas fa-calendar-alt me-2" style="color:#20c8a1;"></i>
+                        <strong>Force Majeure Rescheduling:</strong> In the event of circumstances beyond anyone's control — such as <strong>typhoons, power outages, emergency declarations, or equipment failures</strong> — staff may reschedule your reservation to a new available date and time at no penalty to you. You will be notified immediately on your dashboard. Rescheduled reservations do <strong>not</strong> count as cancellations and will not affect your streak.
+                    </div>
+
                     <ul>
-                        <li>Refunds are processed within <strong>1–3 business days</strong>. Cash refunds may be settled on the same day at the front desk.</li>
-                        <li>Suspension appeals may be submitted to management on a case-by-case basis.</li>
+                        <li><strong>Early Session End Refund:</strong> If you have fully pre-paid for a session (e.g., 2 hours) but choose to end your session early (e.g., after 1 hour), staff will calculate and refund the unused session time proportionally. This applies to in-session payments only — not reservation downpayments.</li>
                     </ul>
                 </div>
 

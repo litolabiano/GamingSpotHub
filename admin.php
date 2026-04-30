@@ -284,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // ── Log to reservation_cancellations audit table ──────────────
             $logFetch = $conn->prepare(
-                "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount, refund_issued
+                "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount
                    FROM reservations WHERE reservation_id = ?"
             );
             $logFetch->bind_param('i', $res_id);
@@ -294,11 +294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $logStmt = $conn->prepare(
                     "INSERT INTO reservation_cancellations
                          (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
-                          console_type, rental_mode, reserved_date, downpayment_amount, refund_issued, cancelled_at)
-                     VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, ?, NOW())"
+                          console_type, rental_mode, reserved_date, downpayment_amount, cancelled_at)
+                     VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, NOW())"
                 );
-                $logStmt->bind_param(
-                    'iisssssdi',
+                $logStmt->execute([
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
@@ -307,9 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $logRow['rental_mode'],
                     $logRow['reserved_date'],
                     $logRow['downpayment_amount'],
-                    $logRow['refund_issued']
-                );
-                $logStmt->execute();
+                ]);
             }
 
             $message     = 'Reservation #' . $res_id . ' cancelled.';
@@ -317,52 +314,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // PROCESS REFUND for a customer-cancelled reservation
-    elseif ($action === 'process_refund') {
-        $res_id = (int)($_POST['reservation_id'] ?? 0);
-        if ($res_id) {
-            $stmt = $conn->prepare(
-                "SELECT user_id, downpayment_amount, downpayment_method
-                   FROM reservations
-                  WHERE reservation_id = ?
-                    AND status         = 'cancelled'
-                    AND (cancelled_by  = 'user' OR cancelled_by IS NULL)
-                    AND downpayment_amount > 0
-                    AND refund_issued = 0"
-            );
-            $stmt->bind_param('i', $res_id);
-            $stmt->execute();
-            $res = $stmt->get_result()->fetch_assoc();
-
-            if ($res) {
-                $refundAmt = (float)$res['downpayment_amount'];
-                $method    = $res['downpayment_method'] ?? 'cash';
-                $note      = 'Refund for cancelled reservation #' . $res_id;
-
-                // recordTransaction() handles NULL session_id correctly
-                recordTransaction(null, $res['user_id'], -$refundAmt, $method,
-                                  $user['user_id'], null, null, $note);
-
-                $stmt2 = $conn->prepare("UPDATE reservations SET refund_issued = 1 WHERE reservation_id = ?");
-                $stmt2->bind_param('i', $res_id);
-                $stmt2->execute();
-
-                // Keep cancellations log in sync
-                $syncStmt = $conn->prepare("UPDATE reservation_cancellations SET refund_issued = 1 WHERE reservation_id = ?");
-                $syncStmt->bind_param('i', $res_id);
-                $syncStmt->execute();
-
-                $message     = '₱' . number_format($refundAmt, 2) . ' refund issued for reservation #' . $res_id . '.';
-                $messageType = 'success';
-            } else {
-                $message     = 'Reservation not eligible for refund (already processed or no payment on record).';
-                $messageType = 'error';
-            }
-        } else {
-            $message     = 'Invalid reservation ID.';
-            $messageType = 'error';
-        }
-    }
 
     // NO-SHOW
     elseif ($action === 'noshow_reservation') {
@@ -713,9 +664,7 @@ $cancelStatsRow = $conn->query(
         COUNT(*)                                                      AS total_cancels,
         SUM(cancelled_by = 'user')                                    AS user_cancels,
         SUM(cancelled_by = 'admin')                                   AS admin_cancels,
-        SUM(refund_issued = 1)                                        AS refunds_issued,
-        COALESCE(SUM(downpayment_amount),0)                           AS total_downpayments,
-        COALESCE(SUM(CASE WHEN refund_issued=1 THEN downpayment_amount ELSE 0 END),0) AS total_refunded
+        COALESCE(SUM(downpayment_amount),0)                           AS total_downpayments
      FROM reservation_cancellations"
 )->fetch_assoc();
 

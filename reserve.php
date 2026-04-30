@@ -100,17 +100,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                . 'This restriction is automatically lifted on <strong>' . $banExpiry . '</strong>. '
                . 'You are still welcome to walk in and use any available unit.';
     }
-    // ── Max 3 active reservations check ────────────────────────────────────
+    // ── One active reservation limit ────────────────────────────────────────
     elseif (!$error) {
         $cntStmt = $conn->prepare(
-            "SELECT COUNT(*) AS cnt FROM reservations WHERE user_id = ? AND status IN ('pending','confirmed')"
+            "SELECT reservation_id, reserved_date, reserved_time
+               FROM reservations
+              WHERE user_id = ? AND status IN ('pending','confirmed')
+              LIMIT 1"
         );
         $cntStmt->bind_param('i', $user['user_id']);
         $cntStmt->execute();
-        $activeCount = (int)$cntStmt->get_result()->fetch_assoc()['cnt'];
-        if ($activeCount >= 3) {
-            $error = 'You already have ' . $activeCount . ' active reservation(s). The maximum allowed is 3 simultaneous reservations. '
-                   . 'Please cancel or wait for an existing reservation to be processed before booking another.';
+        $existingRes = $cntStmt->get_result()->fetch_assoc();
+        if ($existingRes) {
+            $error = 'You already have an active reservation (Reservation #' . $existingRes['reservation_id']
+                   . ' on ' . date('M d, Y', strtotime($existingRes['reserved_date']))
+                   . ' at ' . date('g:i A', strtotime($existingRes['reserved_time']))
+                   . '). Please cancel it first before making a new booking.';
         }
     }
 
@@ -140,8 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please upload your GCash proof of payment screenshot.';
     } elseif (!$error && $upload_error) {
         $error = $upload_error;
-    } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
-        $error = 'You must read and agree to the No-Refund Policy before submitting.';
     } elseif (!$error && ($_POST['unit_transfer_agreed'] ?? '') !== '1') {
         $error = 'You must acknowledge the Unit Transfer Policy before submitting your reservation.';
     }
@@ -178,6 +181,17 @@ if (!empty($_SESSION['reserve_success'])) {
 
 // My reservations
 $myReservations = getMyReservations($user['user_id']);
+
+// Check if user already has an active reservation (for the page-level warning banner)
+$activeResCheck = $conn->prepare(
+    "SELECT reservation_id, reserved_date, reserved_time, status
+       FROM reservations
+      WHERE user_id = ? AND status IN ('pending','confirmed')
+      LIMIT 1"
+);
+$activeResCheck->bind_param('i', $user['user_id']);
+$activeResCheck->execute();
+$activeReservation = $activeResCheck->get_result()->fetch_assoc();
 $todayStr = date('Y-m-d');
 // Earliest bookable datetime = now + 1 hour (rounded down to the minute)
 $minDateTime = date('Y-m-d\TH:i', strtotime('+1 hour'));
@@ -897,11 +911,47 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
         </div>
         <?php endif; ?>
 
+        <?php if ($activeReservation && !$success): ?>
+        <div style="background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.45);border-radius:16px;padding:22px 26px;margin-bottom:30px;display:flex;gap:16px;align-items:flex-start;" data-aos="fade-down">
+            <i class="fas fa-exclamation-triangle" style="color:#f1a83c;font-size:1.6rem;margin-top:2px;flex-shrink:0;"></i>
+            <div style="flex:1;">
+                <div style="font-weight:800;color:#f1a83c;font-size:15px;margin-bottom:6px;">You already have an active reservation</div>
+                <div style="color:#ccc;font-size:13px;line-height:1.6;">
+                    <strong style="color:#fff;">Reservation #<?= $activeReservation['reservation_id'] ?></strong>
+                    is currently <span style="color:#f1a83c;font-weight:700;text-transform:uppercase;font-size:11px;"><?= $activeReservation['status'] ?></span>
+                    for <strong style="color:#fff;"><?= date('F j, Y', strtotime($activeReservation['reserved_date'])) ?></strong>
+                    at <strong style="color:#fff;"><?= date('g:i A', strtotime($activeReservation['reserved_time'])) ?></strong>.<br>
+                    You can only hold <strong style="color:#f1a83c;">one active reservation</strong> at a time.
+                    You must cancel your existing reservation first before making a new one.
+                </div>
+                <a href="dashboard.php#reservations" style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+                    background:rgba(241,168,60,.15);border:1px solid rgba(241,168,60,.4);color:#f1a83c;
+                    padding:9px 18px;border-radius:10px;font-weight:700;font-size:13px;text-decoration:none;
+                    transition:all .2s;" onmouseover="this.style.background='rgba(241,168,60,.25)'"
+                    onmouseout="this.style.background='rgba(241,168,60,.15)'">
+                    <i class="fas fa-calendar-times"></i> Go to My Reservations to Cancel
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="row g-5">
 
             <!-- ── LEFT: Reservation Form ─────────────────────────── -->
             <div class="col-lg-7" data-aos="fade-up">
-                <form method="POST" id="reserveForm" enctype="multipart/form-data">
+                <?php if ($activeReservation && !$success): ?>
+                <div style="position:relative;">
+                    <div style="position:absolute;inset:0;background:rgba(6,13,26,.65);z-index:10;border-radius:22px;
+                        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+                        backdrop-filter:blur(2px);">
+                        <i class="fas fa-lock" style="font-size:2.5rem;color:rgba(241,168,60,.6);"></i>
+                        <div style="color:rgba(255,255,255,.5);font-size:13px;font-weight:600;text-align:center;padding:0 20px;">
+                            Cancel your existing reservation to unlock the booking form
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <form method="POST" id="reserveForm" enctype="multipart/form-data"
+                    <?= ($activeReservation && !$success) ? 'style="pointer-events:none;user-select:none;"' : '' ?>>
                     <input type="hidden" name="console_type"         id="hiddenConsoleType">
                     <input type="hidden" name="rental_mode"          id="hiddenRentalMode">
                     <input type="hidden" name="planned_minutes"      id="hiddenPlannedMinutes">
@@ -1222,46 +1272,6 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                         <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
                     </div>
 
-                    <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
-                    <div id="noRefundPolicyBox" style="
-                        background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
-                        border:1px solid rgba(251,86,107,.35);
-                        border-radius:16px;
-                        padding:20px 22px;
-                        margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                            <div style="width:38px;height:38px;border-radius:10px;
-                                background:rgba(251,86,107,.15);
-                                display:flex;align-items:center;justify-content:center;
-                                flex-shrink:0;color:#fb566b;font-size:1rem;">
-                                <i class="fas fa-ban"></i>
-                            </div>
-                            <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
-                        </div>
-                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
-                            <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">₱20 + 5% of your session cost</strong> is required to confirm every booking.</li>
-                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, no-shows, and admin cancellations.</li>
-                            <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
-                            <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
-                            <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
-                        </ul>
-                        <label id="noRefundLabel" style="
-                            display:flex;align-items:flex-start;gap:12px;
-                            cursor:pointer;
-                            background:rgba(255,255,255,.04);
-                            border:1px solid rgba(255,255,255,.1);
-                            border-radius:10px;
-                            padding:12px 14px;
-                            transition:border-color .2s,background .2s;">
-                            <input type="checkbox" id="noRefundCheck" name="no_refund_agreed" value="1"
-                                   onchange="handleNoRefundCheck(this)"
-                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#fb566b;cursor:pointer;">
-                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
-                                I have read, understood, and agreed to the <strong style="color:#fb566b;">No-Refund Policy</strong> above.
-                                I acknowledge that any payment I make for this reservation will not be refunded for any reason.
-                            </span>
-                        </label>
-                    </div>
 
                     <!-- ── Unit Transfer Policy Acknowledgment ─────────────── -->
                     <div id="unitTransferPolicyBox" style="
@@ -1316,6 +1326,7 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                         <i class="fas fa-calendar-check"></i> Submit Reservation
                     </button>
                 </form>
+                <?php if ($activeReservation && !$success): ?></div><?php endif; ?>
             </div>
 
             <!-- ── RIGHT: Info + My Reservations ─────────────────── -->
@@ -1807,35 +1818,21 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
-/* ── Policy checkboxes — both must be ticked to enable Submit ──────── */
+/* ── Policy checkbox — unit transfer must be ticked to enable Submit ── */
 function handlePolicyChecks() {
     const btn           = document.getElementById('submitBtn');
-    const noRefund      = document.getElementById('noRefundCheck');
     const unitTransfer  = document.getElementById('unitTransferCheck');
-    const noRefundLabel = document.getElementById('noRefundLabel');
     const transferLabel = document.getElementById('unitTransferLabel');
 
-    // Highlight each label based on its own state
-    if (noRefundLabel) {
-        noRefundLabel.style.borderColor = noRefund?.checked ? 'rgba(251,86,107,.6)' : 'rgba(255,255,255,.1)';
-        noRefundLabel.style.background  = noRefund?.checked ? 'rgba(251,86,107,.08)' : 'rgba(255,255,255,.04)';
-    }
     if (transferLabel) {
         transferLabel.style.borderColor = unitTransfer?.checked ? 'rgba(95,133,218,.6)' : 'rgba(255,255,255,.1)';
         transferLabel.style.background  = unitTransfer?.checked ? 'rgba(95,133,218,.08)' : 'rgba(255,255,255,.04)';
     }
 
-    // Both must be checked — unit transfer is always required; no-refund only if paying
-    const noRefundOk  = noRefund   ? noRefund.checked   : true;
-    const transferOk  = unitTransfer ? unitTransfer.checked : false;
-    const allAgreed   = noRefundOk && transferOk;
-
+    const allAgreed   = unitTransfer ? unitTransfer.checked : false;
     btn.disabled      = !allAgreed;
     btn.style.opacity = allAgreed ? '1' : '0.5';
 }
-
-/* Alias — the no-refund checkbox calls this by name */
-function handleNoRefundCheck() { handlePolicyChecks(); }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour

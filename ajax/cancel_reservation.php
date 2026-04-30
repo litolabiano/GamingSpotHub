@@ -51,8 +51,8 @@ $reasonDetail = $reasonDetail !== '' ? htmlspecialchars(strip_tags($reasonDetail
 
 // ── Fetch the reservation — must belong to this user ─────────────────────────
 $stmt = $conn->prepare(
-    "SELECT reservation_id, status, downpayment_amount, refund_issued,
-            reserved_date, reserved_time, created_at
+    "SELECT reservation_id, status, console_type, rental_mode,
+            reserved_date, reserved_time, downpayment_amount, created_at
        FROM reservations
       WHERE reservation_id = ? AND user_id = ?"
 );
@@ -97,11 +97,11 @@ if ($logRow) {
     $logStmt = $conn->prepare(
         "INSERT INTO reservation_cancellations
              (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
-              console_type, rental_mode, reserved_date, downpayment_amount, refund_issued, cancelled_at)
-         VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?, 0, NOW())"
+              console_type, rental_mode, reserved_date, downpayment_amount, cancelled_at)
+         VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?, NOW())"
     );
     $logStmt->bind_param(
-        'iissssss',
+        'iisssss' . 's',
         $res_id,
         $uid,
         $reasonType,
