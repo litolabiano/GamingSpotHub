@@ -179,6 +179,34 @@
 /* Constraint hint */
 .field-hint { font-size:11px;color:#556;margin-top:5px;line-height:1.4; }
 .field-hint.warn { color:#8a6630; }
+/* Hide number spinner arrows */
+.modal-body input[type=number]::-webkit-inner-spin-button,
+.modal-body input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+.modal-body input[type=number] { -moz-appearance:textfield; }
+/* Tendered wrapper states */
+.tendered-wrapper-locked  { border-color:rgba(95,133,218,.4)!important; background:rgba(95,133,218,.07)!important; }
+.tendered-wrapper-locked  .tendered-prefix { color:#5f85da!important; }
+.tendered-wrapper-locked  input { color:#8aa4e8!important; }
+.tendered-wrapper-locked  .tendered-lock  { color:#5f85da!important; }
+.tendered-wrapper-unlocked{ border-color:rgba(32,200,161,.5)!important; background:rgba(32,200,161,.05)!important; }
+.tendered-wrapper-unlocked .tendered-prefix { color:#20c8a1!important; }
+.tendered-wrapper-unlocked input { color:#fff!important; }
+.tendered-wrapper-unlocked .tendered-lock  { color:#20c8a1!important; }
+/* Shake animation for insufficient payment */
+@keyframes shakeX {
+    0%,100% { transform:translateX(0); }
+    20%     { transform:translateX(-8px); }
+    40%     { transform:translateX(8px); }
+    60%     { transform:translateX(-5px); }
+    80%     { transform:translateX(5px); }
+}
+/* Start Session button disabled state */
+#startSessionForm .btn-primary:disabled {
+    background:rgba(100,100,120,.3)!important;
+    box-shadow:none!important;
+    cursor:not-allowed!important;
+    opacity:.55!important;
+}
 </style>
 
 <script>
@@ -353,7 +381,7 @@
                             <label>Amount Tendered (₱)</label>
                             <input type="number" id="startTendered" name="start_tendered" min="0" step="1" placeholder="e.g. 200"
                                    style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                                   oninput="calcChange('startTendered','startChangeDisplay','startCostAmt')">
+                                   oninput="calcChange('startTendered','startChangeDisplay','startCostAmt'); _syncStartBtn()">
                         </div>
                         <span id="startCostAmt" style="display:none">0</span>
                         <div id="startChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
@@ -382,7 +410,7 @@
                         <label>Amount Tendered (₱)</label>
                         <input type="number" id="unlimTendered" min="0" step="1" placeholder="e.g. 400"
                                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                               oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt')">
+                               oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
                     </div>
                     <div id="unlimChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
                     <!-- Hidden cost holder for JS -->
@@ -538,21 +566,23 @@
                 </select>
 
                 <!-- Tendered amount with pre-fill + optional unlock -->
-                <div style="margin-top:12px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
-                        <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered (₱)</label>
+                <div style="margin-top:14px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
                         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
                             <input type="checkbox" id="endTenderedToggle" style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;" onchange="toggleTendered('endTendered','endTenderedToggle','endCostAmtHolder','endChangeDisplay')">
-                            <span style="color:#8aa4e8;">Optional — different amount</span>
+                            <span style="color:#8aa4e8;">Different amount</span>
                         </label>
                     </div>
-                    <div style="position:relative;">
-                        <input type="number" id="endTendered" min="0" step="1" readonly class="field-locked"
-                               style="width:100%;padding:11px 14px 11px 36px;border-radius:10px;font-size:18px;font-weight:700;box-sizing:border-box;"
+                    <!-- Flex row: ₱ prefix | input | lock icon -->
+                    <div id="endTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                        <span style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                        <input type="number" id="endTendered" min="0" step="0.01" readonly
+                               style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                                oninput="calcChange('endTendered','endChangeDisplay','endCostAmtHolder')">
-                        <i id="endTenderedIcon" class="fas fa-lock" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#5f85da;font-size:13px;pointer-events:none;"></i>
+                        <i id="endTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
                     </div>
-                    <p class="field-hint">Pre-filled with amount due. Check the box to enter a different amount.</p>
+                    <p class="field-hint" id="endTenderedHintText">Pre-filled with amount due. Tick to enter a different amount.</p>
                     <input type="hidden" id="endCostAmtHolder" value="0">
                 </div>
                 <!-- Change / Insufficient display (warning only — does NOT block submission) -->
@@ -626,20 +656,22 @@
             </div>
 
             <div class="form-group" style="margin-bottom:6px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
-                    <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered (₱)</label>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
                     <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;">
                         <input type="checkbox" id="payTenderedToggle" style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;" onchange="toggleTendered('payTendered','payTenderedToggle','payAmount','payChangeDisplay')">
-                        <span style="color:#8aa4e8;">Optional — different amount</span>
+                        <span style="color:#8aa4e8;">Different amount</span>
                     </label>
                 </div>
-                <div style="position:relative;">
-                    <input type="number" id="payTendered" name="tendered_amount" min="0" step="1" readonly class="field-locked"
-                           style="width:100%;padding:11px 14px 11px 36px;border-radius:10px;font-size:18px;font-weight:700;box-sizing:border-box;"
+                <!-- Flex row: ₱ prefix | input | lock icon -->
+                <div id="payTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                    <span style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                    <input type="number" id="payTendered" name="tendered_amount" min="0" step="0.01" readonly
+                           style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                            oninput="calcChange('payTendered','payChangeDisplay','payAmount'); syncPayBtn()">
-                    <i id="payTenderedIcon" class="fas fa-lock" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#5f85da;font-size:13px;pointer-events:none;"></i>
+                    <i id="payTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
                 </div>
-                <p class="field-hint">Pre-filled with balance due. Check the box to enter a different amount.</p>
+                <p class="field-hint" id="payTenderedHintText">Pre-filled with balance due. Tick to enter a different amount.</p>
                 <!-- Hidden field — stores the balance due for calcChange -->
                 <input type="hidden" name="amount" id="payAmount" value="0">
             </div>
