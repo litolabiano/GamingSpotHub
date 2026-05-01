@@ -76,21 +76,31 @@ class PayMongoService
         int    $amount_centavos,
         string $description,
         string $redirect_success,
-        string $redirect_failed
+        string $redirect_failed,
+        string $billing_email = '',
+        string $billing_name  = '',
+        string $billing_phone = ''
     ): array {
+        // billing.email is required by PayMongo
+        $billing = [
+            'email' => $billing_email ?: 'noreply@goodspothub.com',
+            'name'  => $billing_name  ?: 'Good Spot Gaming Hub Customer',
+        ];
+        if ($billing_phone) {
+            $billing['phone'] = $billing_phone;
+        }
+
         $result = self::request('POST', '/sources', [
             'data' => [
                 'attributes' => [
-                    'amount'   => $amount_centavos,
-                    'currency' => 'PHP',
-                    'type'     => 'gcash',
-                    'redirect' => [
+                    'amount'               => $amount_centavos,
+                    'currency'             => 'PHP',
+                    'type'                 => 'gcash',
+                    'redirect'             => [
                         'success' => $redirect_success,
                         'failed'  => $redirect_failed,
                     ],
-                    'billing' => [
-                        'name' => 'Good Spot Gaming Hub Customer',
-                    ],
+                    'billing'              => $billing,
                     'statement_descriptor' => 'GOOD SPOT HUB',
                 ],
             ],

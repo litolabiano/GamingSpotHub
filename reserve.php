@@ -54,8 +54,9 @@ $gcashNumber   = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
 // ══════════════════════════════════════════════════════════════════════════════
 if (!empty($_GET['paymongo'])) {
     $pm_result = $_GET['paymongo'];        // 'success' or 'failed'
-    $source_id = trim($_GET['source_id'] ?? '');
     $pending   = $_SESSION['pending_reservation'] ?? null;
+    // Read source_id from session — PayMongo does NOT inject {id} into redirect URLs
+    $source_id = $pending['source_id'] ?? trim($_GET['source_id'] ?? '');
 
     if ($pm_result === 'success' && $source_id && $pending) {
 
@@ -207,16 +208,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Build redirect URLs that PayMongo will use after GCash checkout
             $base           = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
             $script_dir     = rtrim(dirname($_SERVER['PHP_SELF']),'/');
-            $success_url    = $base . $script_dir . '/reserve.php?paymongo=success&source_id={id}';
+            $success_url    = $base . $script_dir . '/reserve.php?paymongo=success';
             $failed_url     = $base . $script_dir . '/reserve.php?paymongo=failed';
 
-            // Note: PayMongo replaces {id} with the actual source ID in the redirect URL
+            // Amount must be at least ₱1 (100 centavos)
             $centavos = PayMongoService::pesosToCentavos($dp_amount > 0 ? $dp_amount : 20.0);
             $pm = PayMongoService::createGCashSource(
                 $centavos,
                 'Reservation fee — Good Spot Gaming Hub',
                 $success_url,
-                $failed_url
+                $failed_url,
+                $user['email']     ?? '',
+                $user['full_name'] ?? 'Customer'
             );
 
             if ($pm['success'] && !empty($pm['checkout_url'])) {
@@ -239,15 +242,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
 
             } else {
-                // PayMongo API unreachable or error — fall through to screenshot fallback
+                // PayMongo API error — show the error, do not fall into screenshot check
                 $error = 'Could not connect to GCash payment gateway: ' .
                          htmlspecialchars($pm['message'] ?? 'Unknown error') .
-                         '. Please use the manual screenshot option below.';
+                         '. Please try again, or use the "pay manually" link to upload a screenshot instead.';
             }
         }
 
-        // ── PATH A2: Screenshot fallback ──────────────────────────────────────
-        if ($pay_via === 'screenshot' || ($pay_via === 'paymongo' && $error)) {
+        // ── PATH A2: Screenshot fallback (only when customer explicitly chose it) ──
+        if (!$error && $pay_via === 'screenshot') {
             $payment_proof_file = null;
             $upload_error       = '';
             if (!empty($_FILES['payment_proof']['name'])) {
