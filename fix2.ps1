@@ -1,19 +1,6 @@
-$file = 'c:\xampp\htdocs\GamingSpotHub\admin.php'
-$lines = Get-Content $file
-$result = @()
-$skip = $false
-for ($i = 0; $i -lt $lines.Count; $i++) {
-    $line = $lines[$i]
-    if ($line -match 'Standalone IIFE guard closure') {
-        $skip = $true
-    }
-    if ($skip -and $line -match "document\.addEventListener\('DOMContentLoaded'") {
-        $skip = $false
-        continue  # skip this line too
-    }
-    if (!$skip) {
-        $result += $line
-    }
-}
-Set-Content $file $result -Encoding UTF8
-Write-Host "Done. Lines: $($result.Count)"
+$file = 'c:\xampp\htdocs\GamingSpotHub\admin_sections\tournaments.php'
+$enc  = [System.Text.Encoding]::UTF8
+$lines = [System.IO.File]::ReadAllLines($file, $enc)
+$keep  = $lines[0..260]
+[System.IO.File]::WriteAllLines($file, $keep, $enc)
+Write-Host "Trimmed to $($keep.Count) lines"

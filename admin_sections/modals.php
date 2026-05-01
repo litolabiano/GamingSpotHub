@@ -378,10 +378,24 @@
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom:6px">
-                            <label>Amount Tendered (₱)</label>
-                            <input type="number" id="startTendered" name="start_tendered" min="0" step="1" placeholder="e.g. 200"
-                                   style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                                   oninput="calcChange('startTendered','startChangeDisplay','startCostAmt'); _syncStartBtn()">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                                    <input type="checkbox" id="startTenderedToggle"
+                                           style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
+                                           onchange="toggleTendered('startTendered','startTenderedToggle','startCostAmt','startChangeDisplay')">
+                                    <span style="color:#8aa4e8;">Different amount</span>
+                                </label>
+                            </div>
+                            <!-- Flex row: ₱ prefix | input | lock icon -->
+                            <div id="startTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                                <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                                <input type="number" id="startTendered" name="start_tendered" min="0" step="1" readonly
+                                       style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                                       oninput="calcChange('startTendered','startChangeDisplay','startCostAmt'); _syncStartBtn()">
+                                <i id="startTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
+                            </div>
+                            <p class="field-hint" id="startTenderedHintText">Pre-filled with session cost. Tick to enter a different amount.</p>
                         </div>
                         <span id="startCostAmt" style="display:none">0</span>
                         <div id="startChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
@@ -407,16 +421,31 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom:6px">
-                        <label>Amount Tendered (₱)</label>
-                        <input type="number" id="unlimTendered" min="0" step="1" placeholder="e.g. 400"
-                               style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                               oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                                <input type="checkbox" id="unlimTenderedToggle"
+                                       style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
+                                       onchange="toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay')">
+                                <span style="color:#8aa4e8;">Different amount</span>
+                            </label>
+                        </div>
+                        <!-- Flex row: ₱ prefix | input | lock icon -->
+                        <div id="unlimTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(241,225,170,.4);background:rgba(241,225,170,.07);overflow:hidden;transition:.2s;">
+                            <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#f1e1aa;flex-shrink:0;line-height:1;">₱</span>
+                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="0" step="1" readonly
+                                   style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                                   oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
+                            <i id="unlimTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#f1e1aa;flex-shrink:0;cursor:default;"></i>
+                        </div>
+                        <p class="field-hint" id="unlimTenderedHintText">Pre-filled with flat rate. Tick to enter a different amount.</p>
                     </div>
                     <div id="unlimChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
                     <!-- Hidden cost holder for JS -->
                     <span id="unlimCostAmt" style="display:none"><?= $settings['unlimited_rate'] ?? 300 ?></span>
                 </div>
             </div>
+
 
             <!-- ── Open Time reminder ── -->
             <div id="openTimeNote" style="display:none;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#8aa4e8;">

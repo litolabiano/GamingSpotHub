@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
             $pr = getPricingRules();
-            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat â‚±' . getSetting('unlimited_rate') . ') for longer sessions.';
+            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
@@ -70,10 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
             $tendered,
             $shortfall,
-            $shortfall ? 'Short payment at session start â€” short by â‚±' . number_format($shortfall, 2) : null
+            $shortfall ? 'Short payment at session start â€” short by ₱' . number_format($shortfall, 2) : null
         );
         $cost = number_format($upfront_cost, 2);
-        $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
 
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
         $pr           = getPricingRules();
@@ -95,18 +95,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
             $tendered,
             $shortfall,
-            $shortfall ? 'Short payment at session start â€” short by â‚±' . number_format($shortfall, 2) : null
+            $shortfall ? 'Short payment at session start â€” short by ₱' . number_format($shortfall, 2) : null
         );
         $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
         $cost      = number_format($upfront_cost, 2);
         if ($shortfall !== null && $shortfall > 0) {
             $tendFmt  = number_format($tendered, 2);
             $shortFmt = number_format($shortfall, 2);
-            $message  = "Session #" . $result['session_id'] . " started. â‚±{$tendFmt} collected upfront via "
-                      . ucfirst($start_payment_method) . " (short by â‚±{$shortFmt}).";
+            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
+                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
             $messageType = 'warning';
         } else {
-            $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
         }
 
     } else {
@@ -161,8 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Short payment â€” record only what was tendered
                         $actualCollected = $tendered_amount;
                         $shortfall       = round($remaining - $tendered_amount, 2);
-                        $paymentNote     = 'Short payment â€” collected â‚±' . number_format($tendered_amount, 2)
-                                         . ', short by â‚±' . number_format($shortfall, 2);
+                        $paymentNote     = 'Short payment â€” collected ₱' . number_format($tendered_amount, 2)
+                                         . ', short by ₱' . number_format($shortfall, 2);
                     } else {
                         $paymentNote = 'Balance payment collected at session end';
                     }
@@ -182,14 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($shortfall !== null && $shortfall > 0) {
                     $shortFmt    = number_format($shortfall, 2);
                     $tenderedFmt = number_format($tendered_amount, 2);
-                    $message     = "Session ended. Total: â‚±{$total}. Collected â‚±{$tenderedFmt} â€” still â‚±{$shortFmt} outstanding.";
+                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} â€” still ₱{$shortFmt} outstanding.";
                     $messageType = 'warning';
                 } elseif ($remaining > 0) {
                     $due     = number_format($remaining, 2);
-                    $message = "Session ended. Duration: {$mins} min. Total: â‚±{$total} (prepaid â‚±{$paid} + collected â‚±{$due}).";
+                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
                     $messageType = 'success';
                 } else {
-                    $message     = "Session ended. Duration: {$mins} min. Total: â‚±{$total}. Fully paid upfront â€” no extra charge.";
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront â€” no extra charge.";
                     $messageType = 'success';
                 }
             } else {
@@ -381,7 +381,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ? round($balanceDue - $tendered, 2) : null;
 
         if (!$session_id || $balanceDue <= 0) {
-            $message = 'Invalid payment â€” balance must be greater than â‚±0.';
+            $message = 'Invalid payment â€” balance must be greater than ₱0.';
             $messageType = 'error';
         } else {
             $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
@@ -393,17 +393,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
                     $user['user_id'], $tendered, $shortfall,
                     $shortfall
-                        ? 'Partial payment â€” collected â‚±' . number_format($actualCollected, 2)
-                          . ', short by â‚±' . number_format($shortfall, 2)
-                          . ' of â‚±' . number_format($balanceDue, 2) . ' balance'
+                        ? 'Partial payment â€” collected ₱' . number_format($actualCollected, 2)
+                          . ', short by ₱' . number_format($shortfall, 2)
+                          . ' of ₱' . number_format($balanceDue, 2) . ' balance'
                         : 'Balance payment collected'
                 );
                 if ($shortfall !== null && $shortfall > 0) {
-                    $message = 'Collected â‚±' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
-                             . '. Still short by â‚±' . number_format($shortfall, 2) . '.';
+                    $message = 'Collected ₱' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
+                             . '. Still short by ₱' . number_format($shortfall, 2) . '.';
                     $messageType = 'warning';
                 } else {
-                    $message = 'Payment of â‚±' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
+                    $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
                     $messageType = 'success';
                 }
             } else {
@@ -1370,7 +1370,30 @@ function onRentalModeChange() {
     if (mode === 'hourly') {
         toggle.checked = false;
         document.getElementById('startPaymentFields').style.display = 'none';
+        document.getElementById('startTendered').value = '';
     }
+
+    // Pre-fill unlimTendered with flat rate and lock it when switching to unlimited
+    if (mode === 'unlimited') {
+        const cost = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+        const inp  = document.getElementById('unlimTendered');
+        if (inp) {
+            inp.value    = cost > 0 ? cost.toFixed(2) : '';
+            inp.readOnly = true;
+        }
+        const tog     = document.getElementById('unlimTenderedToggle');
+        const wrapper = document.getElementById('unlimTenderedWrapper');
+        const icon    = document.getElementById('unlimTenderedIcon');
+        const hint    = document.getElementById('unlimTenderedHintText');
+        if (tog)     tog.checked = false;
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon)    { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint)    { hint.style.display = 'block'; }
+        document.getElementById('unlimChangeDisplay').style.display = 'none';
+    }
+
+    // Re-evaluate Start button for the new mode
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
 
 /* â”€â”€ Controller Rental: Xbox-only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1400,7 +1423,25 @@ function onConsoleChange() {
 function toggleStartPaymentFields(checkbox) {
     const fields = document.getElementById('startPaymentFields');
     fields.style.display = checkbox.checked ? 'block' : 'none';
-    if (!checkbox.checked) {
+    if (checkbox.checked) {
+        // Pre-fill startTendered with current session cost and lock it
+        const cost = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
+        const inp  = document.getElementById('startTendered');
+        if (inp) {
+            inp.value    = cost > 0 ? cost.toFixed(2) : '';
+            inp.readOnly = true;
+        }
+        // Ensure toggle checkbox is unchecked (locked state)
+        const tog = document.getElementById('startTenderedToggle');
+        if (tog) tog.checked = false;
+        const wrapper = document.getElementById('startTenderedWrapper');
+        const icon    = document.getElementById('startTenderedIcon');
+        const hint    = document.getElementById('startTenderedHintText');
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon)    { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint)    { hint.style.display = 'block'; }
+        document.getElementById('startChangeDisplay').style.display = 'none';
+    } else {
         document.getElementById('startTendered').value = '';
         document.getElementById('startChangeDisplay').style.display = 'none';
     }
@@ -1435,14 +1476,14 @@ function calcChange(tenderedId, displayId, costHolderId) {
         disp.style.background = 'rgba(32,200,161,.15)';
         disp.style.border     = '1px solid rgba(32,200,161,.3)';
         disp.style.color      = '#20c8a1';
-        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>â‚±${change.toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'none';
         if (payShortNotice) payShortNotice.style.display = 'none';
     } else {
         disp.style.background = 'rgba(251,86,107,.15)';
         disp.style.border     = '1px solid rgba(251,86,107,.3)';
         disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient â€” short by <strong>â‚±${Math.abs(change).toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient â€” short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'block';
         if (payShortNotice) payShortNotice.style.display = 'block';
     }
@@ -1557,10 +1598,13 @@ function updateSessionPreview() {
     if (costHolder) costHolder.textContent = cost.toFixed(2);
 
     document.getElementById('previewEndTime').textContent = endStr;
-    document.getElementById('previewCost').textContent    = 'â‚±' + cost.toFixed(2);
+    document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
+    // Re-evaluate Start button whenever cost changes
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
+
 // Alias â€” called by controller rental checkbox onchange
 const recalcSessionPreview = updateSessionPreview;
 
@@ -1645,9 +1689,8 @@ function _clearStartShortError() {
 }
 
 /**
- * _syncStartBtn — called live on every input in startTendered / unlimTendered.
- * Disables the Start Session button immediately if the tendered amount is short,
- * shows an inline banner, and re-enables it as soon as the shortfall is resolved.
+ * _syncStartBtn — called live on every input, cost change, or mode change.
+ * Disables the Start button if the tendered amount is empty or below the session cost.
  */
 function _syncStartBtn() {
     const mode = document.getElementById('rentalModeSelect') ?
@@ -1655,25 +1698,31 @@ function _syncStartBtn() {
     const btn  = document.querySelector('#startSessionForm .btn-primary');
     if (!btn) return;
 
-    let isShort   = false;
-    let shortMsg  = '';
+    let isShort  = false;
+    let shortMsg = '';
 
     if (mode === 'hourly') {
         const collectNow = document.getElementById('collectNowToggle');
         if (collectNow && collectNow.checked) {
-            const tendered = parseFloat(document.getElementById('startTendered').value) || 0;
-            const due      = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
-            if (due > 0 && tendered < due) {
+            const tenderedVal = document.getElementById('startTendered').value;
+            const tendered    = parseFloat(tenderedVal) || 0;
+            const due         = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
+            if (due > 0 && (tenderedVal === '' || tendered < due)) {
                 isShort  = true;
-                shortMsg = 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 collect the full amount or uncheck payment.';
+                shortMsg = tenderedVal === ''
+                    ? 'Enter the amount tendered to start the session.'
+                    : 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 collect the full amount or uncheck payment.';
             }
         }
     } else if (mode === 'unlimited') {
-        const tendered = parseFloat(document.getElementById('unlimTendered').value) || 0;
-        const due      = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
-        if (due > 0 && tendered < due) {
+        const tenderedVal = document.getElementById('unlimTendered').value;
+        const tendered    = parseFloat(tenderedVal) || 0;
+        const due         = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+        if (due > 0 && (tenderedVal === '' || tendered < due)) {
             isShort  = true;
-            shortMsg = 'Flat rate of \u20b1' + due.toFixed(2) + ' must be paid in full before starting.';
+            shortMsg = tenderedVal === ''
+                ? 'Flat rate of \u20b1' + due.toFixed(2) + ' must be collected before starting.'
+                : 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 flat rate must be paid in full.';
         }
     }
 
@@ -1845,10 +1894,10 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             // â”€â”€ Populate breakdown display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
             // Time Used row: show time-only cost (not extras)
-            document.getElementById('endEarlyConsumedCost').textContent = 'â‚±' + timeCost.toFixed(2);
-            document.getElementById('endEarlyUpfrontStr').textContent  = 'â‚±' + upfrontPaid.toFixed(2);
-            document.getElementById('endEarlyRefundAmt').textContent   = 'â‚±' + refundAmt.toFixed(2);
-            document.getElementById('endEarlyRefundBtnAmt').textContent = 'â‚±' + refundAmt.toFixed(2);
+            document.getElementById('endEarlyConsumedCost').textContent = '₱' + timeCost.toFixed(2);
+            document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
+            document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
+            document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
 
             // â”€â”€ Show / hide Additional Fees row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const extrasRow   = document.getElementById('endEarlyExtrasRow');
@@ -1857,7 +1906,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             if (extrasRow) {
                 if (extras > 0) {
                     extrasRow.style.display  = 'flex';
-                    extrasAmt.textContent    = '+â‚±' + extras.toFixed(2);
+                    extrasAmt.textContent    = '+₱' + extras.toFixed(2);
                     // Build a compact label from extra items if available
                     const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
                     extrasLabel.textContent  = itemNames ? '(' + itemNames + ')' : '';
@@ -2069,7 +2118,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             const remaining = Math.max(0, dueCost - upfrontPaid);
             // Sync cost holder + big display
             if (remaining > 0) {
-                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: â‚±' + upfrontPaid.toFixed(2) + ')' : ''}`);
+                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
             } else {
                 hideAmountDue();
                 costHolder.value = '0';
@@ -2097,24 +2146,24 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const remaining = Math.max(0, cost - upfrontPaid);
 
         if (remaining > 0) {
-            setAmountDue(remaining, `Total base + overtime: â‚±${cost.toFixed(2)} â€” Prepaid: â‚±${upfrontPaid.toFixed(2)}`);
+            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} â€” Prepaid: ₱${upfrontPaid.toFixed(2)}`);
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session â€” Collect Payment';
             if (overtime > 0) {
-                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (â‚±${base.toFixed(2)}).<br>`
-                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: â‚±${remaining.toFixed(2)}.</span>`;
+                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
             } else {
-                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>â‚±${remaining.toFixed(2)}</strong> now.`;
+                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>₱${remaining.toFixed(2)}</strong> now.`;
             }
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
             payLabel.textContent      = 'Payment Method';
-            confirmLbl.textContent    = `Confirm End & Collect â‚±${remaining.toFixed(2)}`;
+            confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
         } else {
             // Session fully paid
             hideAmountDue();
             costHolder.value = '0';
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session â€” Paid in Full';
-            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost â‚±${cost.toFixed(2)} already paid. No additional charge.`;
+            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
             payGroup.style.display    = 'none';
             prepaidNote.style.display = 'block';
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
@@ -2232,10 +2281,10 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             const timeCost  = _timedCost(minutes);
             const totalCost = timeCost + extras;
-            costEl.textContent  = 'â‚±' + totalCost.toFixed(2);
+            costEl.textContent  = '₱' + totalCost.toFixed(2);
             const due = Math.max(0, totalCost - upfrontPaid);
             let sublabel = upfrontPaid > 0
-                ? 'Running cost â‚±' + totalCost.toFixed(2) + ' â€” Already paid â‚±' + upfrontPaid.toFixed(2)
+                ? 'Running cost ₱' + totalCost.toFixed(2) + ' â€” Already paid ₱' + upfrontPaid.toFixed(2)
                 : 'Cost accumulating â€” pay at any time';
             setPayDue(due, sublabel);
         };
@@ -2252,31 +2301,31 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
         const due       = Math.max(0, totalCost - upfrontPaid);
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
-        costEl.textContent    = 'â‚±' + totalCost.toFixed(2);
+        costEl.textContent    = '₱' + totalCost.toFixed(2);
         const baseCost  = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
         const overtime  = Math.max(0, minutes - plannedMinutes);
-        let sublabel = 'Booked ' + bookedStr + ' (â‚±' + baseCost.toFixed(0) + ')';
-        if (upfrontPaid > 0) sublabel += ' â€” Prepaid â‚±' + upfrontPaid.toFixed(2);
+        let sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ')';
+        if (upfrontPaid > 0) sublabel += ' â€” Prepaid ₱' + upfrontPaid.toFixed(2);
         if (overtime > 0)    sublabel += ' â€” +' + overtime + 'min overtime';
         if (extras > 0) {
             const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
-            sublabel += ' â€” +â‚±' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
+            sublabel += ' â€” +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
         }
         setPayDue(due, sublabel);
 
     /* â”€â”€ Unlimited: flat rate already paid; show extras if any â”€â”€ */
     } else if (mode === 'unlimited') {
         costPanel.style.display = 'none';
-        dueBigEl.textContent = extras > 0 ? 'â‚±' + extras.toFixed(2) : 'â‚±0.00';
+        dueBigEl.textContent = extras > 0 ? '₱' + extras.toFixed(2) : '₱0.00';
         dueBigEl.style.color = extras > 0 ? '#20c8a1' : '#888';
         dueLblEl.textContent = extras > 0
             ? 'Flat rate collected â€” extras outstanding'
             : 'Unlimited session â€” flat rate already collected at start';
         amtHidden.value = extras > 0 ? extras.toFixed(2) : '0';
         if (extras > 0) {
-            confirmLbl.textContent = 'Collect â‚±' + extras.toFixed(2) + ' Balance';
+            confirmLbl.textContent = 'Collect ₱' + extras.toFixed(2) + ' Balance';
             confirmBtn.disabled    = false;
             confirmBtn.style.opacity = '1';
         } else {
@@ -2339,7 +2388,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     document.getElementById('refundSessionSummary').textContent = isRes
         ? 'Reservation #' + reservationId + ' â€” ' + customerName
         : 'Session #'     + sessionId     + ' â€” ' + customerName + ' on ' + unitNumber;
-    document.getElementById('refundPaidSoFar').textContent = 'â‚±' + paid;
+    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
 
     // Amount input â€” locked + pre-filled for reservation
     const amtInput = document.getElementById('refundAmount');
@@ -2385,9 +2434,9 @@ function _submitRefundAjax() {
     if (isEarlyEnd) action_type = 'early_end';
 
     // Standard/manual refunds require a positive amount.
-    // early_end with â‚±0 is allowed â€” the session ends with no refund transaction.
+    // early_end with ₱0 is allowed â€” the session ends with no refund transaction.
     if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
-        _showRefundError('Please enter a refund amount greater than â‚±0.');
+        _showRefundError('Please enter a refund amount greater than ₱0.');
         return;
     }
 

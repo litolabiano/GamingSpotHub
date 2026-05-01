@@ -226,7 +226,7 @@
                             <th>Customer</th>
                             <th>Console</th>
                             <th>Mode</th>
-                            <th>Payment</th>
+                            <th>Downpayment</th>
                             <th>Cancelled By</th>
                             <th>Reason</th>
                         </tr>
@@ -262,7 +262,10 @@
                                     <?php if ((float)$r['downpayment_amount'] > 0): ?>
                                         <span style="color:#20c8a1;font-weight:700;">&#8369;<?= number_format((float)$r['downpayment_amount'], 2) ?></span>
                                         <span style="color:#888;font-size:11px;display:block;"><?= ucfirst($r['downpayment_method'] ?? '') ?></span>
-                                        <span style="color:#fb566b;font-size:10px;font-weight:700;display:block;margin-top:2px;">Non-refundable</span>
+                                        <span style="color:#fb566b;font-size:10px;font-weight:700;display:block;margin-top:2px;"
+                                              title="Reservation downpayments are non-refundable per store policy.">
+                                            <i class="fas fa-lock" style="margin-right:3px;"></i>Non-refundable
+                                        </span>
                                     <?php else: ?>
                                         <span style="color:#555;">&#8212;</span>
                                     <?php endif; ?>
@@ -296,6 +299,7 @@
                                     <?php endif; ?>
                                 </td>
                             </tr>
+
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -409,6 +413,7 @@ function adminCancelSubmit(e) {
 }
 document.getElementById('adminCancelResModal')?.addEventListener('click', function(e) {
     if (e.target === this) closeAdminCancelModal();
+});
 </script>
 
 <!-- ── Reschedule Reservation Modal ── -->

@@ -259,7 +259,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 
 </div><!-- /#tournaments -->
 
-<!-- ── CREATE TOURNAMENT MODAL (uses existing .modal system) ──────────────────── -->
+<!-- ── CREATE TOURNAMENT MODAL ──────────────────────────────────────────────── -->
 <div class="modal" id="createTournamentModal">
     <div class="modal-content" style="max-width:580px;">
         <div class="modal-header">
@@ -271,68 +271,120 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
         <form method="POST">
             <input type="hidden" name="action" value="create_tournament">
             <?= csrfField() ?>
-            <div style="max-height:65vh;overflow-y:auto;padding-right:4px;">
+            <div class="form-group">
+                <label>Tournament Name *</label>
+                <input type="text" name="tournament_name" placeholder="e.g. Tekken 8 Grand Prix" required>
+            </div>
+            <div class="form-row">
                 <div class="form-group">
-                    <label>Tournament Name *</label>
-                    <input type="text" name="tournament_name" class="form-control" placeholder="e.g. Tekken 8 Grand Prix" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Game Name *</label>
-                        <input type="text" name="game_name" placeholder="e.g. Tekken 8" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Console *</label>
-                        <select name="console_type" required>
-                            <option value="" disabled selected>Select Console</option>
-                            <option value="PS5">PlayStation 5</option>
-                            <option value="Xbox Series X">Xbox Series X</option>
-                        </select>
-                    </div>
-                </div>
-                <?php
-                    $minTournDate = (new DateTime('+7 days'))->format('Y-m-d\TH:i');
-                    $minTournLabel = (new DateTime('+7 days'))->format('M d, Y');
-                ?>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Start Date & Time *
-                            <span style="font-size:11px;color:#f1a83c;font-weight:600;margin-left:6px;">(earliest: <?= $minTournLabel ?>)</span>
-                        </label>
-                        <input type="datetime-local" name="start_date" id="tournStartDate"
-                               min="<?= $minTournDate ?>" required>
-                    </div>
-                    <div class="form-group">
-                        <label>End Date & Time *</label>
-                        <input type="datetime-local" name="end_date" id="tournEndDate"
-                               min="<?= $minTournDate ?>" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Entry Fee (₱)</label>
-                        <input type="number" name="entry_fee" value="250" min="0" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Prize Pool (₱)</label>
-                        <input type="number" name="prize_pool" value="0" min="0" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Max Participants</label>
-                        <input type="number" name="max_participants" value="16" min="2" max="256">
-                    </div>
+                    <label>Game Name *</label>
+                    <input type="text" name="game_name" placeholder="e.g. Tekken 8" required>
                 </div>
                 <div class="form-group">
-                    <label>Announcement / Description</label>
-                    <textarea name="announcement" rows="3" placeholder="Optional details…"></textarea>
-                </div>
-                <div style="background:rgba(241,168,60,.07);border:1px solid rgba(241,168,60,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,.6);">
-                    <i class="fas fa-info-circle" style="color:#f1a83c;margin-right:6px;"></i>
-                    New tournaments start as <strong style="color:#f1a83c;">Upcoming</strong>.
-                    Switch to <strong style="color:#20c8a1;">Scheduled</strong> to open public registration.
+                    <label>Console *</label>
+                    <select name="console_type" required>
+                        <option value="" disabled selected>Select Console</option>
+                        <option value="PS5">PlayStation 5</option>
+                        <option value="Xbox Series X">Xbox Series X</option>
+                    </select>
                 </div>
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
+            <?php
+                $minTournDate  = (new DateTime('+7 days'))->format('Y-m-d');
+                $minTournLabel = (new DateTime('+7 days'))->format('M d, Y');
+            ?>
+            <!-- Start Date & Time — split selects, no browser datetime-local picker -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Start Date *
+                        <span style="font-size:11px;color:#f1a83c;font-weight:600;margin-left:6px;">(earliest: <?= $minTournLabel ?>)</span>
+                    </label>
+                    <input type="date" id="tournStartDatePart" min="<?= $minTournDate ?>" required
+                           onchange="syncTournDateTime('start')"
+                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f0f0f0;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Start Time *</label>
+                    <select id="tournStartTimePart" onchange="syncTournDateTime('start')" required>
+                        <option value="" disabled selected>— Select time —</option>
+                        <?php for ($h = 8; $h <= 22; $h++): foreach (['00','30'] as $m): ?>
+                            <?php $val = sprintf('%02d:%s',$h,$m); $disp = date('g:i A', strtotime("2000-01-01 $val")); ?>
+                            <option value="<?= $val ?>"><?= $disp ?></option>
+                        <?php endforeach; endfor; ?>
+                    </select>
+                </div>
+            </div>
+            <input type="hidden" name="start_date" id="tournStartDateHidden">
+
+            <!-- End Date & Time -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>End Date *</label>
+                    <input type="date" id="tournEndDatePart" min="<?= $minTournDate ?>" required
+                           onchange="syncTournDateTime('end')"
+                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f0f0f0;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>End Time *</label>
+                    <select id="tournEndTimePart" onchange="syncTournDateTime('end')" required>
+                        <option value="" disabled selected>— Select time —</option>
+                        <?php for ($h = 8; $h <= 23; $h++): foreach (['00','30'] as $m): ?>
+                            <?php $val = sprintf('%02d:%s',$h,$m); $disp = date('g:i A', strtotime("2000-01-01 $val")); ?>
+                            <option value="<?= $val ?>"><?= $disp ?></option>
+                        <?php endforeach; endfor; ?>
+                    </select>
+                </div>
+            </div>
+            <input type="hidden" name="end_date" id="tournEndDateHidden">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Entry Fee (₱)</label>
+                    <select name="entry_fee">
+                        <option value="0">Free</option>
+                        <option value="50">₱50</option>
+                        <option value="100">₱100</option>
+                        <option value="150">₱150</option>
+                        <option value="200">₱200</option>
+                        <option value="250" selected>₱250</option>
+                        <option value="300">₱300</option>
+                        <option value="500">₱500</option>
+                        <option value="1000">₱1,000</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Prize Pool (₱)</label>
+                    <select name="prize_pool">
+                        <option value="0" selected>None</option>
+                        <option value="500">₱500</option>
+                        <option value="1000">₱1,000</option>
+                        <option value="2000">₱2,000</option>
+                        <option value="3000">₱3,000</option>
+                        <option value="5000">₱5,000</option>
+                        <option value="10000">₱10,000</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Max Participants</label>
+                    <select name="max_participants">
+                        <option value="4">4 players</option>
+                        <option value="8">8 players</option>
+                        <option value="16" selected>16 players</option>
+                        <option value="32">32 players</option>
+                        <option value="64">64 players</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Announcement / Description</label>
+                <textarea name="announcement" rows="3" placeholder="Optional details…"></textarea>
+            </div>
+            <div style="background:rgba(241,168,60,.07);border:1px solid rgba(241,168,60,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,.6);margin-bottom:16px;">
+                <i class="fas fa-info-circle" style="color:#f1a83c;margin-right:6px;"></i>
+                New tournaments start as <strong style="color:#f1a83c;">Upcoming</strong>.
+                Switch to <strong style="color:#20c8a1;">Scheduled</strong> to open public registration.
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('createTournament')">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create Tournament</button>
             </div>
@@ -381,10 +433,26 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 </div>
 
 <script>
-// ── CSRF token (PHP-rendered) available to JS-generated forms ─────────────────
 const _CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>';
 
-// ── Participants Drawer ────────────────────────────────────────────────────────
+function syncTournDateTime(which) {
+    const prefix   = which === 'start' ? 'Start' : 'End';
+    const datePart = document.getElementById('tourn' + prefix + 'DatePart');
+    const timePart = document.getElementById('tourn' + prefix + 'TimePart');
+    const hidden   = document.getElementById('tourn' + prefix + 'DateHidden');
+    if (!datePart || !timePart || !hidden) return;
+    if (datePart.value && timePart.value) {
+        hidden.value = datePart.value + 'T' + timePart.value;
+    }
+    if (which === 'start' && datePart.value) {
+        const endDate = document.getElementById('tournEndDatePart');
+        if (endDate) {
+            endDate.min = datePart.value;
+            if (endDate.value && endDate.value < datePart.value) endDate.value = '';
+        }
+    }
+}
+
 function viewParticipants(tournamentId, tournamentName) {
     document.getElementById('drawerTournamentName').textContent = tournamentName;
     document.getElementById('drawerContent').innerHTML =
@@ -467,23 +535,5 @@ function escHtml(str) {
     d.appendChild(document.createTextNode(str || ''));
     return d.innerHTML;
 }
-
-
-
-// ── End date must be >= start date (min is already set via PHP on page load) ──
-document.addEventListener('DOMContentLoaded', function () {
-    const startInput = document.getElementById('tournStartDate');
-    const endInput   = document.getElementById('tournEndDate');
-    if (!startInput || !endInput) return;
-
-    startInput.addEventListener('change', function () {
-        if (this.value) {
-            // End date cannot be before start date
-            endInput.min = this.value;
-            if (endInput.value && endInput.value < this.value) {
-                endInput.value = '';
-            }
-        }
-    });
-});
 </script>
+
