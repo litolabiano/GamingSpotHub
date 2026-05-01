@@ -393,7 +393,10 @@
                                 <input type="number" id="startTendered" name="start_tendered" min="0" step="1" readonly
                                        style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                                        oninput="calcChange('startTendered','startChangeDisplay','startCostAmt'); _syncStartBtn()">
-                                <i id="startTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
+                                <i id="startTenderedIcon" class="fas fa-lock"
+                                   style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                                   title="Click to enter a different amount"
+                                   onclick="var cb=document.getElementById('startTenderedToggle');cb.checked=!cb.checked;toggleTendered('startTendered','startTenderedToggle','startCostAmt','startChangeDisplay');"></i>
                             </div>
                             <p class="field-hint" id="startTenderedHintText">Pre-filled with session cost. Tick to enter a different amount.</p>
                         </div>
@@ -436,7 +439,10 @@
                             <input type="number" id="unlimTendered" name="unlimited_tendered" min="0" step="1" readonly
                                    style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                                    oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
-                            <i id="unlimTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#f1e1aa;flex-shrink:0;cursor:default;"></i>
+                            <i id="unlimTenderedIcon" class="fas fa-lock"
+                               style="padding:0 16px;font-size:14px;color:#f1e1aa;flex-shrink:0;cursor:pointer;"
+                               title="Click to enter a different amount"
+                               onclick="var cb=document.getElementById('unlimTenderedToggle');cb.checked=!cb.checked;toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay');"></i>
                         </div>
                         <p class="field-hint" id="unlimTenderedHintText">Pre-filled with flat rate. Tick to enter a different amount.</p>
                     </div>
@@ -609,7 +615,10 @@
                         <input type="number" id="endTendered" min="0" step="0.01" readonly
                                style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                                oninput="calcChange('endTendered','endChangeDisplay','endCostAmtHolder')">
-                        <i id="endTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
+                        <i id="endTenderedIcon" class="fas fa-lock"
+                           style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                           title="Click to enter a different amount"
+                           onclick="var cb=document.getElementById('endTenderedToggle');cb.checked=!cb.checked;toggleTendered('endTendered','endTenderedToggle','endCostAmtHolder','endChangeDisplay');"></i>
                     </div>
                     <p class="field-hint" id="endTenderedHintText">Pre-filled with amount due. Tick to enter a different amount.</p>
                     <input type="hidden" id="endCostAmtHolder" value="0">
@@ -698,7 +707,10 @@
                     <input type="number" id="payTendered" name="tendered_amount" min="0" step="0.01" readonly
                            style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
                            oninput="calcChange('payTendered','payChangeDisplay','payAmount'); syncPayBtn()">
-                    <i id="payTenderedIcon" class="fas fa-lock" style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:default;"></i>
+                    <i id="payTenderedIcon" class="fas fa-lock"
+                       style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                       title="Click to enter a different amount"
+                       onclick="var cb=document.getElementById('payTenderedToggle');cb.checked=!cb.checked;toggleTendered('payTendered','payTenderedToggle','payAmount','payChangeDisplay');"></i>
                 </div>
                 <p class="field-hint" id="payTenderedHintText">Pre-filled with balance due. Tick to enter a different amount.</p>
                 <!-- Hidden field — stores the balance due for calcChange -->
