@@ -1425,12 +1425,6 @@ if (!empty($_GET['console'])) {
 
 
 
-                    <div class="reserve-card" style="margin-bottom:24px;">
-                        <h2><i class="fas fa-sticky-note"></i> Step 5 — Notes (Optional)</h2>
-                        <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
-                    </div>
-
-
                     <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
                     <div id="noRefundPolicyBox" style="
                         background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
@@ -1449,7 +1443,7 @@ if (!empty($_GET['console'])) {
                         </div>
                         <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
                             <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">&#8369;20 + 5% of your session cost</strong> is required to confirm every booking.</li>
-                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, and no-shows</li>
+                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, and no-shows.</li>
                             <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
                             <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
                             <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
@@ -1471,6 +1465,12 @@ if (!empty($_GET['console'])) {
                             </span>
                         </label>
                     </div>
+
+                    <div class="reserve-card" style="margin-bottom:24px;">
+                        <h2><i class="fas fa-sticky-note"></i> Step 5 — Notes (Optional)</h2>
+                        <textarea name="notes" class="res-input" placeholder="Any special requests? (e.g. preferred controller, specific game ready, group size...)"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+                    </div>
+
 
                     <div class="reserve-summary" id="summaryBox" style="display:none;">
                         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#20c8a1;margin-bottom:14px;">
@@ -1954,7 +1954,7 @@ function submitViaPaymongo() {
     const rentalMode  = document.getElementById('hiddenRentalMode').value;
     const date        = document.getElementById('reservedDate').value;
     const time        = document.getElementById('reservedTime').value;
-    const agreed      = document.getElementById('unitTransferCheck')?.checked;
+    const agreed      = document.getElementById('noRefundCheck')?.checked;
     const amount      = parseFloat(document.getElementById('dpAmount').value || '0');
 
     if (!consoleType) { alert('Please select a console type.'); return; }
@@ -1962,7 +1962,7 @@ function submitViaPaymongo() {
     if (rentalMode === 'hourly' && !document.getElementById('hiddenPlannedMinutes').value)
         { alert('Please select a duration.'); return; }
     if (!date || !time) { alert('Please select a date and time.'); return; }
-    if (!agreed)        { alert('Please acknowledge the Unit Transfer Policy.'); return; }
+    if (!agreed)        { alert('Please read and agree to the No-Refund Policy before paying.'); return; }
     if (amount <= 0)    { alert('Reservation fee not calculated yet.'); return; }
 
     document.getElementById('payViaInput').value = 'paymongo';
