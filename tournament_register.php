@@ -85,7 +85,7 @@ if (!empty($_GET['paymongo']) && $loggedIn) {
 
                     if ($ins->execute()) {
                         unset($_SESSION['pending_tournament_reg']);
-                        $success = 'Payment confirmed! Your slot for <strong>' . htmlspecialchars($pending['tournament_name']) . '</strong> is secured. See you on the battlefield!';
+                        $success = 'Payment confirmed — your slot for <strong>' . htmlspecialchars($pending['tournament_name']) . '</strong> is secured, and we\'ll see you on the battlefield!';
                         $alreadyRegistered = true;
                     } else {
                         $error = 'Payment was received but we could not save your registration. Please contact the shop with your GCash reference.';
