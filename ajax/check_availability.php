@@ -29,8 +29,11 @@ if ($time < '12:00' || $time > '23:00') {
     exit;
 }
 
-// For each console type, count how many consoles are NOT reserved or active at that date/time
-// A 2-hour window is assumed for conflict detection.
+// A unit is conflicted only when an existing reservation's session window actually
+// overlaps the requested start time:
+//   reservation_start  <=  requested_time  <  reservation_start + planned_minutes
+// This avoids false positives from the old ±2h blanket window.
+// Fallback: treat rows with no planned_minutes as 60-minute sessions.
 $requestedDT = $date . ' ' . $time . ':00';
 
 $sql = "
@@ -39,19 +42,23 @@ $sql = "
         c.console_id,
         c.unit_number,
         c.status,
-        -- Count ALL pending+confirmed reservations within ±2h window
+        -- Count pending+confirmed reservations whose session window overlaps the requested slot
         (SELECT COUNT(*) FROM reservations r
             WHERE r.console_id = c.console_id
               AND r.status IN ('pending','confirmed')
               AND r.reserved_date = ?
-              AND ABS(TIMESTAMPDIFF(MINUTE, CONCAT(r.reserved_date,' ',r.reserved_time), ?)) < 120
+              AND CONCAT(r.reserved_date,' ',r.reserved_time) <= ?
+              AND DATE_ADD(CONCAT(r.reserved_date,' ',r.reserved_time),
+                          INTERVAL COALESCE(NULLIF(r.planned_minutes,0), 60) MINUTE) > ?
         ) AS has_reservation,
         -- Count ONLY confirmed reservations (slot is definitively locked)
         (SELECT COUNT(*) FROM reservations r
             WHERE r.console_id = c.console_id
               AND r.status = 'confirmed'
               AND r.reserved_date = ?
-              AND ABS(TIMESTAMPDIFF(MINUTE, CONCAT(r.reserved_date,' ',r.reserved_time), ?)) < 120
+              AND CONCAT(r.reserved_date,' ',r.reserved_time) <= ?
+              AND DATE_ADD(CONCAT(r.reserved_date,' ',r.reserved_time),
+                          INTERVAL COALESCE(NULLIF(r.planned_minutes,0), 60) MINUTE) > ?
         ) AS confirmed_reservation
     FROM consoles c
     WHERE c.status != 'maintenance'
@@ -59,7 +66,7 @@ $sql = "
 ";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param('ssss', $date, $requestedDT, $date, $requestedDT);
+$stmt->bind_param('ssssss', $date, $requestedDT, $requestedDT, $date, $requestedDT, $requestedDT);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -70,7 +77,12 @@ foreach ($rows as $r) {
         $summary[$type] = ['total' => 0, 'available' => 0, 'confirmed_count' => 0, 'units' => []];
     }
     $summary[$type]['total']++;
-    $isFree = ($r['status'] !== 'in_use') && ((int)$r['has_reservation'] === 0);
+    // For FUTURE dates: a unit is free if it has no overlapping reservation booked —
+    // the console's current real-time status (in_use right now) is irrelevant for advance bookings.
+    // For TODAY: also gate on the live status so we don't show an actively-used unit as free.
+    $isToday  = ($date === $today);
+    $isFree   = (!$isToday || $r['status'] !== 'in_use') && ((int)$r['has_reservation'] === 0);
+
     if ($isFree) {
         $summary[$type]['available']++;
         $summary[$type]['units'][] = $r['unit_number'];
