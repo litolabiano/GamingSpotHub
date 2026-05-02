@@ -143,6 +143,16 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
 <div class="page" id="sessions">
 
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-play-circle" style="color:#5f85da;margin-right:10px;"></i>Session Management</h2>
+            <p class="page-subtitle">View, manage, and control all gaming sessions</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('startSession')">
+            <i class="fas fa-plus"></i> New Session
+        </button>
+    </div>
 
 
     <?php if (!empty($pendingSessions)): ?>
@@ -177,11 +187,12 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         $psElapsed = time() - $psStart;
                         $psH = floor($psElapsed / 3600);
                         $psM = floor(($psElapsed % 3600) / 60);
-                        $psPaid = (float)$ps['paid_so_far'];
+                        $psPaid   = (float)$ps['paid_so_far'];
+                        $psExtras = (float)($ps['approved_extras'] ?? 0); // approved additional_requests sum
                         $isCompleted = ($ps['status'] === 'completed');
 
                         if ($isCompleted) {
-                            // Completed: use actual total_cost
+                            // Completed: use actual total_cost (already includes extras via endSession())
                             $psExpected  = (float)$ps['total_cost'];
                             $psModeLabel = match ($ps['rental_mode']) {
                                 'open_time' => 'Open Time',
@@ -189,7 +200,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 default => 'Hourly'
                             };
                         } else {
-                            // Active: estimate expected cost from DB-driven pricing rules
+                            // Active: estimate expected cost from DB-driven pricing rules + approved extras
                             if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
                                 $pr = getPricingRules();
                                 $psExpected = $ps['planned_minutes'] <= 30
@@ -200,6 +211,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 $psExpected  = $unlimitedRateVal;
                                 $psModeLabel = 'Unlimited';
                             }
+                            // Add any approved additional_requests (e.g. controller rental)
+                            // to the expected total so the balance owed is correct.
+                            $psExpected += $psExtras;
                         }
                         $psOwed = max(0, $psExpected - $psPaid);
                         $bookedMinutes = ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) ? (int)$ps['planned_minutes'] : 0;
@@ -258,10 +272,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             <h3 class="card-title">All Sessions</h3>
             <div style="display:flex;gap:8px;align-items:center;">
                 <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
-                    style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#ccc;font-size:12px;">
-                    <i class="fas fa-sort-amount-down"></i> Default Sort
+                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#888;font-size:12px;">
+                    <i class="fas fa-sort-amount-down"></i>
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
             </div>
         </div>
         <table class="data-table" id="sessionsTable">
@@ -454,6 +467,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
                 fetch('ajax/recalculate_session.php', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         body: fd
                     })
                     .then(r => r.json())

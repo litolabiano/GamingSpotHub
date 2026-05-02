@@ -14,7 +14,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['shopkeeper', 'owner']);
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['shopkeeper', 'owner'])) {
+    echo json_encode(['success' => false, 'extras' => 0, 'items' => [], 'message' => 'Unauthorized.']);
+    exit;
+}
 
 $session_id = (int)($_GET['session_id'] ?? 0);
 if (!$session_id) {

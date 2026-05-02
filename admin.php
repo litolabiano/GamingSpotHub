@@ -11,12 +11,12 @@ $user = getCurrentUser();
 $message = '';
 $messageType = '';
 
-// ——————————————————————————————————————————————————————————————————————————————
+// â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ── CSRF guard — all admin POST actions require a valid token ──────────
+    // â”€â”€ CSRF guard â€” all admin POST actions require a valid token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!verifyCsrf($message, $messageType)) {
         // verifyCsrf() has already populated $message/$messageType; skip all actions
         $action = '';
@@ -44,9 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
       if ($result['success']) {
 
-        // ── Persist controller rental fee to additional_requests (always, ──────
-        // ── regardless of whether upfront was collected). endSession()    ──────
-        // ── and the End Session modal both read from this table.          ──────
+        // â”€â”€ Persist controller rental fee to additional_requests (always, â”€â”€â”€â”€â”€â”€
+        // â”€â”€ regardless of whether upfront was collected). endSession()    â”€â”€â”€â”€â”€â”€
+        // â”€â”€ and the End Session modal both read from this table.          â”€â”€â”€â”€â”€â”€
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
             if ($ctrl_fee > 0) {
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
             $tendered,
             $shortfall,
-            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+            $shortfall ? 'Short payment at session start â€” short by ₱' . number_format($shortfall, 2) : null
         );
         $cost = number_format($upfront_cost, 2);
         $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
@@ -88,14 +88,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
         $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
 
-        // Amount actually collected — if customer paid less, record only what they gave
+        // Amount actually collected â€” if customer paid less, record only what they gave
         $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
 
         recordTransaction(
             $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
             $tendered,
             $shortfall,
-            $shortfall ? 'Short payment at session start — short by ₱' . number_format($shortfall, 2) : null
+            $shortfall ? 'Short payment at session start â€” short by ₱' . number_format($shortfall, 2) : null
         );
         $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
         $cost      = number_format($upfront_cost, 2);
@@ -158,10 +158,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($tendered_amount !== null && $remaining > 0) {
                     if ($tendered_amount < $remaining) {
-                        // Short payment — record only what was tendered
+                        // Short payment â€” record only what was tendered
                         $actualCollected = $tendered_amount;
                         $shortfall       = round($remaining - $tendered_amount, 2);
-                        $paymentNote     = 'Short payment — collected ₱' . number_format($tendered_amount, 2)
+                        $paymentNote     = 'Short payment â€” collected ₱' . number_format($tendered_amount, 2)
                                          . ', short by ₱' . number_format($shortfall, 2);
                     } else {
                         $paymentNote = 'Balance payment collected at session end';
@@ -182,14 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($shortfall !== null && $shortfall > 0) {
                     $shortFmt    = number_format($shortfall, 2);
                     $tenderedFmt = number_format($tendered_amount, 2);
-                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} — still ₱{$shortFmt} outstanding.";
+                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} â€” still ₱{$shortFmt} outstanding.";
                     $messageType = 'warning';
                 } elseif ($remaining > 0) {
                     $due     = number_format($remaining, 2);
                     $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
                     $messageType = 'success';
                 } else {
-                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront — no extra charge.";
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront â€” no extra charge.";
                     $messageType = 'success';
                 }
             } else {
@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // ── Sync consoles.hourly_rate from system_settings ──────────────────
+        // â”€â”€ Sync consoles.hourly_rate from system_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // This ensures the "Console" dropdown in Start Session always shows the
         // live rate from system settings, not a stale per-row value.
         $rateMap = [
@@ -253,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // CANCEL RESERVATION (admin-initiated → cancelled_by = 'admin')
+    // CANCEL RESERVATION (admin-initiated â†’ cancelled_by = 'admin')
     elseif ($action === 'cancel_reservation') {
         $res_id       = (int)($_POST['reservation_id'] ?? 0);
         $allowedCancelReasons = ['schedule_change','found_alternative','budget_issue',
@@ -282,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
             $stmt->execute();
 
-            // ── Log to reservation_cancellations audit table ──────────────
+            // â”€â”€ Log to reservation_cancellations audit table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $logFetch = $conn->prepare(
                 "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount
                    FROM reservations WHERE reservation_id = ?"
@@ -325,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // CONVERT RESERVATION → SESSION
+    // CONVERT RESERVATION â†’ SESSION
     elseif ($action === 'convert_reservation') {
         $res_id     = (int)($_POST['reservation_id'] ?? 0);
         $console_id = (int)($_POST['console_id'] ?? 0);
@@ -374,14 +374,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tendered_raw   = $_POST['tendered_amount'] ?? '';
         $tendered       = ($tendered_raw !== '') ? (float)$tendered_raw : null;
 
-        // What was ACTUALLY handed over — capped at the balance due
+        // What was ACTUALLY handed over â€” capped at the balance due
         // (if no tendered entered, assume exact payment of balance due)
         $actualCollected = ($tendered !== null) ? min($tendered, $balanceDue) : $balanceDue;
         $shortfall       = ($tendered !== null && $tendered < $balanceDue)
                             ? round($balanceDue - $tendered, 2) : null;
 
         if (!$session_id || $balanceDue <= 0) {
-            $message = 'Invalid payment — balance must be greater than ₱0.';
+            $message = 'Invalid payment â€” balance must be greater than ₱0.';
             $messageType = 'error';
         } else {
             $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
@@ -393,7 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
                     $user['user_id'], $tendered, $shortfall,
                     $shortfall
-                        ? 'Partial payment — collected ₱' . number_format($actualCollected, 2)
+                        ? 'Partial payment â€” collected ₱' . number_format($actualCollected, 2)
                           . ', short by ₱' . number_format($shortfall, 2)
                           . ' of ₱' . number_format($balanceDue, 2) . ' balance'
                         : 'Balance payment collected'
@@ -421,10 +421,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // PROCESS REFUND for cancelled reservations is handled at lines 266–306 above.
+    // PROCESS REFUND for cancelled reservations is handled at lines 266â€“306 above.
 
     // NOTE: Session extension is handled exclusively through ajax/extend_session.php
-    // which calls extendSession() — applying bonus minutes and recording a transaction.
+    // which calls extendSession() â€” applying bonus minutes and recording a transaction.
     // The old direct form-POST handler has been removed (Bug #4 fix) to prevent
     // bypassing the billing engine with a raw planned_minutes UPDATE.
     elseif ($action === 'extend_session') {
@@ -432,7 +432,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
+    // â”€â”€ TOURNAMENT ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // CREATE TOURNAMENT
     elseif ($action === 'create_tournament') {
@@ -490,30 +490,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ADMIN REGISTER PARTICIPANT
+    // ADMIN REGISTER PARTICIPANT (registered customer OR walk-in)
     elseif ($action === 'admin_register_participant') {
-        $tid            = (int)($_POST['tournament_id']  ?? 0);
-        $uid            = (int)($_POST['user_id']        ?? 0);
-        $pay_status     = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
-                          ? $_POST['payment_status'] : 'pending';
-        if ($tid && $uid) {
-            $stmt = $conn->prepare(
-                "INSERT INTO tournament_participants
-                    (tournament_id, user_id, payment_status, registered_by)
-                 VALUES (?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE payment_status = VALUES(payment_status)"
-            );
-            $stmt->bind_param('iisi', $tid, $uid, $pay_status, $user['user_id']);
-            if ($stmt->execute()) {
-                $message = 'Participant registered.';
-                $messageType = 'success';
+        $tid          = (int)($_POST['tournament_id']   ?? 0);
+        $mode         = $_POST['participant_mode']      ?? 'registered'; // 'registered' | 'walkin'
+        $pay_status   = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                        ? $_POST['payment_status'] : 'pending';
+        $ign          = trim($_POST['ign']              ?? '');
+        $contact      = trim($_POST['contact_number']   ?? '');
+        $notes        = trim($_POST['notes']            ?? '');
+        $staff_id     = (int)($user['user_id'] ?? 0);
+
+        if ($mode === 'walkin') {
+            // ── Walk-in: no user account required ────────────────────────────
+            $walkin_name = trim($_POST['walkin_name'] ?? '');
+            if ($tid && $walkin_name) {
+                $uid = 0; // walk-in system user
+                $stmt = $conn->prepare(
+                    "INSERT INTO tournament_participants
+                         (tournament_id, user_id, payment_status, ign, contact_number, walkin_name, notes, registered_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->bind_param('iisssssi', $tid, $uid, $pay_status, $ign, $contact, $walkin_name, $notes, $staff_id);
+                if ($stmt->execute()) {
+                    $message     = 'Walk-in participant registered.';
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Could not register walk-in: ' . $conn->error;
+                    $messageType = 'error';
+                }
             } else {
-                $message = 'Could not register participant: ' . $conn->error;
+                $message     = 'Please provide a tournament and the walk-in name.';
                 $messageType = 'error';
             }
         } else {
-            $message = 'Invalid tournament or user.';
-            $messageType = 'error';
+            // ── Registered customer ───────────────────────────────────────────
+            $uid = (int)($_POST['user_id'] ?? 0);
+            if ($tid && $uid) {
+                // Application-level duplicate check (uk_tp_entry was removed to support multiple walk-ins)
+                $dupChk = $conn->prepare("SELECT participant_id FROM tournament_participants WHERE tournament_id = ? AND user_id = ? AND user_id != 0");
+                $dupChk->bind_param('ii', $tid, $uid);
+                $dupChk->execute();
+                if ($dupChk->get_result()->num_rows > 0) {
+                    $message     = 'This customer is already registered for this tournament.';
+                    $messageType = 'error';
+                } else {
+                    $stmt = $conn->prepare(
+                        "INSERT INTO tournament_participants
+                             (tournament_id, user_id, payment_status, ign, contact_number, notes, registered_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    );
+                    $stmt->bind_param('iissssi', $tid, $uid, $pay_status, $ign, $contact, $notes, $staff_id);
+                    if ($stmt->execute()) {
+                        $message     = 'Participant registered.';
+                        $messageType = 'success';
+                    } else {
+                        $message     = 'Could not register participant: ' . $conn->error;
+                        $messageType = 'error';
+                    }
+                }
+            } else {
+                $message     = 'Invalid tournament or customer.';
+                $messageType = 'error';
+            }
         }
     }
 
@@ -547,7 +586,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
-// ─── DATA FETCHING ──────────────────────────────────────────────────────────
+// â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Dashboard stats
 $today = date('Y-m-d');
@@ -563,11 +602,12 @@ $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
 
-// Sessions: active/live first (sorted by urgency — closest booked end time), then completed newest-first
+// Sessions: active/live first (sorted by urgency â€” closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
     "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
-            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
+            COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount,
+            COALESCE((SELECT SUM(ar.extra_cost) FROM additional_requests ar WHERE ar.session_id = gs.session_id AND ar.status = 'approved'), 0) AS approved_extras
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
@@ -593,7 +633,7 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// Reservations — upcoming (pending/confirmed) + cancelled (for refund management)
+// Reservations â€” upcoming (pending/confirmed) + cancelled (for refund management)
 $upcomingReservations  = getUpcomingReservations();
 $cancelledReservations = getCancelledReservations();
 $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
@@ -614,7 +654,7 @@ $finStats = $finStmt ? $finStmt->fetch_assoc() : [];
 // NOTE: LEFT JOINs used because session_id can be NULL for reservation refunds.
 $transResult = $conn->query(
     "SELECT t.*, u.full_name AS customer_name,
-            COALESCE(c.unit_number, '—') AS unit_number,
+            COALESCE(c.unit_number, 'â€”') AS unit_number,
             COALESCE(gs.rental_mode, 'refund') AS rental_mode
      FROM transactions t
      JOIN users u ON t.user_id = u.user_id
@@ -634,28 +674,29 @@ foreach ($recentSessions as $sess) {
     $refundedAmount = (float)($sess['refunded_amount'] ?? 0); // total refunded
 
     if ($sess['status'] === 'active' && $paidSoFar > 0) {
-        // Active session with upfront payment — balance pending at end
+        // Active session with upfront payment â€” balance pending at end
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     } elseif ($sess['status'] === 'completed'
         && $sess['total_cost'] > 0
-        && $refundedAmount == 0               // no refund was issued
-        && $paidSoFar > 0                     // customer DID pay something upfront
-        && $paidSoFar < (float)$sess['total_cost'] // still genuinely short
+        && $paidSoFar < (float)$sess['total_cost']  // paid less than consumed cost
+        && $refundedAmount < $paidSoFar              // hasn't been fully refunded back
     ) {
-        // Completed session where total paid < total cost — genuine short payment
+        // Completed session where total paid < total cost â€” outstanding balance
+        // This covers: short payments at session start AND early-ends where
+        // consumed cost exceeded the upfront amount (no refund, balance owed).
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
-    // Early-end with nothing paid (walk-in, no upfront): fully settled, skip.
-    // Sessions with refunds issued are also fully settled — skip them entirely
+    // Walk-in sessions where nothing was paid at all (open_time/walk-in): skip.
+    // They are fully handled at end-of-session payment.
 }
 
 
 // Console usage (all time)
 $usageReport = getConsoleUsageReport('2020-01-01', $today);
 
-// ── Cancellation Analytics (for Reports tab) ──────────────────────────────────
+// â”€â”€ Cancellation Analytics (for Reports tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Overall counts
 $cancelStatsRow = $conn->query(
@@ -753,20 +794,39 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
-        /* Force page visibility — overrides cached animation issue in admin.css */
+        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           ADMIN DESIGN SYSTEM â€” CSS Custom Properties
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+        :root {
+            --clr-mint:    #20c8a1;
+            --clr-blue:    #5f85da;
+            --clr-coral:   #fb566b;
+            --clr-gold:    #f1a83c;
+            --clr-cream:   #f1e1aa;
+            --clr-purple:  #b37bec;
+            --clr-bg:      #0a0f1c;
+            --clr-surface: rgba(10,33,81,.55);
+            --clr-border:  rgba(95,133,218,.18);
+            --clr-text:    #f0f0f0;
+            --clr-muted:   #888;
+            --radius-sm:   8px;
+            --radius-md:   12px;
+            --radius-lg:   16px;
+            --shadow-card: 0 4px 24px rgba(0,0,0,.35);
+        }
+
+        /* Force page visibility */
         .page.active {
             display: block !important;
             opacity: 1 !important;
             transform: translateY(0) !important;
         }
-        /* Disabled submit buttons inside the end-session form (early-end guard) */
         #endSessionForm button[type="submit"]:disabled {
             opacity: 0.35 !important;
             filter: grayscale(40%);
             cursor: not-allowed !important;
             pointer-events: none !important;
         }
-        /* Keep the Refund & End button always clickable inside the warning banner */
         #endEarlyWarning button {
             pointer-events: auto !important;
             opacity: 1 !important;
@@ -774,128 +834,158 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             cursor: pointer !important;
         }
 
-        /* ── Extra admin overrides ── */
+        /* â”€â”€ Flash messages â”€â”€ */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
-            padding: 14px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+            padding: 14px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
             display: flex; align-items: center; gap: 10px;
-            animation: slideInRight .3s ease; max-width: 380px;
-            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+            animation: slideInRight .3s ease; max-width: 400px;
+            box-shadow: 0 8px 40px rgba(0,0,0,.5);
+            backdrop-filter: blur(8px);
         }
-        .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: #20c8a1; }
-        .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: #fb566b; }
-        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: #f1a83c; }
+        .flash-msg.success { background: rgba(32,200,161,.15); border: 1px solid rgba(32,200,161,.4); color: var(--clr-mint); }
+        .flash-msg.error   { background: rgba(251,86,107,.15); border: 1px solid rgba(251,86,107,.4); color: var(--clr-coral); }
+        .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: var(--clr-gold); }
         @keyframes slideInRight { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 
+        /* â”€â”€ Status dots â”€â”€ */
         .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-        .status-dot.available  { background:#20c8a1; }
-        .status-dot.in_use     { background:#5f85da; }
-        .status-dot.maintenance{ background:#fb566b; }
+        .status-dot.available   { background:var(--clr-mint); box-shadow:0 0 6px rgba(32,200,161,.5); }
+        .status-dot.in_use      { background:var(--clr-blue); }
+        .status-dot.maintenance { background:var(--clr-coral); }
 
-        .console-type-badge { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
-        .console-type-badge.ps5  { background:rgba(95,133,218,.2); color:#5f85da; border:1px solid rgba(95,133,218,.3); }
-        .console-type-badge.ps4  { background:rgba(241,168,60,.15); color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
-        .console-type-badge.xbox { background:rgba(32,200,161,.2); color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
+        /* â”€â”€ Console type badges â”€â”€ */
+        .console-type-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; letter-spacing:.3px; }
+        .console-type-badge.ps5  { background:rgba(95,133,218,.18); color:#8aa4e8; border:1px solid rgba(95,133,218,.3); }
+        .console-type-badge.ps4  { background:rgba(241,168,60,.15);  color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
+        .console-type-badge.xbox { background:rgba(32,200,161,.18);  color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
-        /* ── Session timer ── */
-        .session-timer { font-family: monospace; font-size: 13px; color: #f1e1aa; font-weight: 600; }
-        .session-timer.stale { color: #fb566b; font-size:11px; font-weight:500; }
+        /* â”€â”€ Session timer â”€â”€ */
+        .session-timer { font-family: monospace; font-size: 13px; color: var(--clr-cream); font-weight: 700; }
+        .session-timer.stale { color: var(--clr-coral); font-size:11px; font-weight:500; }
 
-        /* ── Form layout ── */
-        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+        /* â”€â”€ Page header pattern â”€â”€ */
+        .page-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+        }
+        .page-header .page-title-group .page-title {
+            font-size: 22px; font-weight: 800; color: var(--clr-text);
+            margin: 0 0 4px; line-height: 1.2;
+        }
+        .page-header .page-title-group .page-subtitle {
+            font-size: 13px; color: var(--clr-muted); margin: 0;
+        }
+
+        /* â”€â”€ Form layout â”€â”€ */
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
         .form-group { margin-bottom:16px; }
-        .form-group label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; font-weight:600; }
+        .form-group label {
+            display:block; font-size:12px; color:#aaa; margin-bottom:6px;
+            font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+        }
         .form-group select, .form-group input[type=text], .form-group input[type=number],
-        .form-group input[type=time], .form-group textarea {
-            width:100%; background:rgba(10,33,81,.6); border:1px solid rgba(95,133,218,.25);
-            color:#f0f0f0; padding:10px 14px; border-radius:8px; font-size:14px;
-            font-family:inherit; outline:none; box-sizing:border-box; transition:.2s; }
+        .form-group input[type=time], .form-group textarea, .form-group input[type=datetime-local] {
+            width:100%; background:rgba(10,33,81,.7); border:1px solid rgba(95,133,218,.25);
+            color:var(--clr-text); padding:10px 14px; border-radius:var(--radius-sm); font-size:14px;
+            font-family:inherit; outline:none; box-sizing:border-box; transition:.2s;
+        }
         .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
-            border-color:#20c8a1; box-shadow:0 0 0 3px rgba(32,200,161,.1); }
+            border-color:var(--clr-mint); box-shadow:0 0 0 3px rgba(32,200,161,.12);
+        }
         .form-group textarea { resize:vertical; min-height:80px; }
         .form-check { display:flex; align-items:center; gap:8px; margin-top:6px; }
-        .form-check input { width:auto; accent-color:#20c8a1; }
+        .form-check input { width:auto; accent-color:var(--clr-mint); }
+        .form-hint { font-size:11px; color:#666; margin-top:5px; }
 
-        /* ── Stat cards ── */
+        /* â”€â”€ Stat cards â”€â”€ */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
-        .stat-change.up { color:#20c8a1; }
-        .stat-icon.revenue  { background:rgba(32,200,161,.15); color:#20c8a1; }
-        .stat-icon.sessions { background:rgba(95,133,218,.15); color:#5f85da; }
-        .stat-icon.bookings { background:rgba(179,123,236,.15); color:#b37bec; }
-        .stat-icon.consoles { background:rgba(241,225,170,.15); color:#f1e1aa; }
+        .stat-change.up { color:var(--clr-mint); font-size:12px; }
+        .stat-icon {
+            width:44px; height:44px; border-radius:var(--radius-sm);
+            display:flex; align-items:center; justify-content:center;
+            font-size:20px; flex-shrink:0;
+        }
+        .stat-icon.revenue  { background:rgba(32,200,161,.15); color:var(--clr-mint); }
+        .stat-icon.sessions { background:rgba(95,133,218,.15); color:var(--clr-blue); }
+        .stat-icon.bookings { background:rgba(179,123,236,.15); color:var(--clr-purple); }
+        .stat-icon.consoles { background:rgba(241,225,170,.15); color:var(--clr-cream); }
 
-        /* ── Console cards ── */
-        .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
-        .console-card { background:rgba(10,33,81,.55); border:1px solid rgba(95,133,218,.15);
-            border-radius:12px; padding:18px; position:relative; transition:.2s; }
-        .console-card:hover { transform:translateY(-3px); }
-        .console-card.available  { border-left:3px solid #20c8a1; }
-        .console-card.in_use     { border-left:3px solid #5f85da; }
-        .console-card.maintenance{ border-left:3px solid #fb566b; }
-        .console-unit  { font-size:22px; font-weight:800; margin-bottom:4px; color:#fff; }
-        .console-name  { font-size:13px; color:#888; margin-bottom:10px; }
-        .console-rate  { font-size:12px; color:#f1e1aa; margin-bottom:12px; }
+        /* â”€â”€ Console cards â”€â”€ */
+        .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+        .console-card {
+            background:var(--clr-surface); border:1px solid var(--clr-border);
+            border-radius:var(--radius-md); padding:18px; position:relative;
+            transition:transform .2s, box-shadow .2s;
+            box-shadow: var(--shadow-card);
+        }
+        .console-card:hover { transform:translateY(-4px); box-shadow:0 12px 40px rgba(0,0,0,.4); }
+        .console-card.available  { border-left:3px solid var(--clr-mint); }
+        .console-card.in_use     { border-left:3px solid var(--clr-blue); }
+        .console-card.maintenance{ border-left:3px solid var(--clr-coral); }
+        .console-unit  { font-size:24px; font-weight:800; margin-bottom:2px; color:#fff; font-family:'Outfit',sans-serif; }
+        .console-name  { font-size:12px; color:#666; margin-bottom:10px; }
+        .console-rate  { font-size:13px; color:var(--clr-cream); margin-bottom:14px; font-weight:600; }
         .console-actions { display:flex; gap:6px; flex-wrap:wrap; }
 
+        /* â”€â”€ Data table â”€â”€ */
+        .data-table thead tr { background:rgba(10,33,81,.6); }
+        .data-table tbody tr { transition:background .15s; }
+        .data-table tbody tr:hover { background:rgba(95,133,218,.06); }
 
+        /* â”€â”€ Badge â”€â”€ */
+        .badge {
+            display:inline-block; padding:3px 10px; border-radius:20px;
+            font-size:11px; font-weight:700; letter-spacing:.4px; white-space:nowrap;
+        }
+        .badge.active     { background:rgba(95,133,218,.2);  color:#8aa4e8; }
+        .badge.completed  { background:rgba(32,200,161,.2);  color:var(--clr-mint); }
+        .badge.cancelled  { background:rgba(251,86,107,.2);  color:var(--clr-coral); }
+        .badge.pending    { background:rgba(241,225,170,.18); color:var(--clr-cream); }
+        .badge.available  { background:rgba(32,200,161,.2);  color:var(--clr-mint); }
+        .badge.in_use     { background:rgba(95,133,218,.2);  color:#8aa4e8; }
+        .badge.maintenance{ background:rgba(251,86,107,.2);  color:var(--clr-coral); }
+        .badge.installed  { background:rgba(179,123,236,.2); color:var(--clr-purple); }
 
-        /* ── Badge ── */
-        .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
-        .badge.active     { background:rgba(95,133,218,.2);  color:#5f85da; }
-        .badge.completed  { background:rgba(32,200,161,.2);  color:#20c8a1; }
-        .badge.cancelled  { background:rgba(251,86,107,.2);  color:#fb566b; }
-        .badge.pending    { background:rgba(241,225,170,.2); color:#f1e1aa; }
-        .badge.available  { background:rgba(32,200,161,.2);  color:#20c8a1; }
-        .badge.in_use     { background:rgba(95,133,218,.2);  color:#5f85da; }
-        .badge.maintenance{ background:rgba(251,86,107,.2);  color:#fb566b; }
-        .badge.installed  { background:rgba(179,123,236,.2); color:#b37bec; }
+        /* â”€â”€ Empty state â”€â”€ */
+        .empty-state { text-align:center; padding:48px 20px; color:#444; }
+        .empty-state i { font-size:40px; margin-bottom:14px; display:block; opacity:.5; }
+        .empty-state p { margin:4px 0; font-size:14px; }
 
-        /* ── Empty state ── */
-        .empty-state { text-align:center; padding:40px; color:#555; }
-        .empty-state i { font-size:36px; margin-bottom:12px; display:block; }
-
-        /* ── Responsive form ── */
+        /* â”€â”€ Responsive â”€â”€ */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
-
-        /* ── Topbar hamburger: hidden on desktop (sidebar has its own) ── */
         @media (min-width:769px) {
             .menu-toggle { display:none !important; }
             .sidebar-close-btn { display:none !important; visibility:hidden !important; }
         }
 
-        /* ── Sidebar hamburger FA icon ── */
+        /* â”€â”€ Sidebar hamburger â”€â”€ */
         .sidebar-hamburger .sidebar-ham-icon {
-            font-size: 14px;
-            color: rgba(255,255,255,0.55);
-            transition: color 0.2s ease;
-            width: auto;
+            font-size: 14px; color: rgba(255,255,255,0.55); transition: color 0.2s ease; width: auto;
         }
-        .sidebar-hamburger:hover .sidebar-ham-icon { color: #20c8a1; }
+        .sidebar-hamburger:hover .sidebar-ham-icon { color: var(--clr-mint); }
 
-        /* ── Admin topbar user dropdown ── */
+        /* â”€â”€ Admin user dropdown â”€â”€ */
         .admin-user-dropdown { position:relative; }
         .admin-user-toggle {
             display:flex; align-items:center; gap:10px;
             background:none; border:none; cursor:pointer;
             color:inherit; padding:6px 10px;
-            border-radius:10px; transition:background .2s;
+            border-radius:var(--radius-sm); transition:background .2s;
         }
         .admin-user-toggle:hover { background:rgba(255,255,255,.07); }
         .admin-user-dropdown.open .admin-user-toggle .fa-chevron-down { transform:rotate(180deg); }
         .admin-user-menu {
             display:none; position:absolute; right:0; top:calc(100% + 8px);
             min-width:220px; background:#0d1b3e;
-            border:1px solid rgba(95,133,218,.25); border-radius:14px;
+            border:1px solid rgba(95,133,218,.25); border-radius:var(--radius-md);
             box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:9999;
             overflow:hidden; animation:fadeInDown .18s ease;
         }
         .admin-user-dropdown.open .admin-user-menu { display:block; }
         @keyframes fadeInDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-        .admin-dropdown-header {
-            display:flex; align-items:center; gap:12px;
-            padding:16px 16px 12px;
-        }
-        .admin-dropdown-name  { font-weight:700; font-size:14px; color:#f0f0f0; }
+        .admin-dropdown-header { display:flex; align-items:center; gap:12px; padding:16px 16px 12px; }
+        .admin-dropdown-name  { font-weight:700; font-size:14px; color:var(--clr-text); }
         .admin-dropdown-email { font-size:12px; color:#718096; margin-top:2px; }
         .admin-dropdown-divider { height:1px; background:rgba(95,133,218,.15); margin:0 12px; }
         .admin-dropdown-item {
@@ -904,11 +994,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             text-decoration:none; transition:background .15s, color .15s;
         }
         .admin-dropdown-item:hover { background:rgba(255,255,255,.06); color:#fff; }
-        .admin-dropdown-danger { color:#fb566b !important; }
-        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; color:#fb566b !important; }
-        .user-avatar-lg {
-            width:42px; height:42px; font-size:16px; flex-shrink:0;
-        }
+        .admin-dropdown-danger { color:var(--clr-coral) !important; }
+        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; }
+        .user-avatar-lg { width:42px; height:42px; font-size:16px; flex-shrink:0; }
     </style>
 </head>
 <body>
@@ -922,7 +1010,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php endif; ?>
 
 
-<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -986,16 +1074,75 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     </div>
 </div>
 
-<!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="topbar">
     <div class="topbar-left">
         <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
         <h3 id="pageTitle">Dashboard</h3>
     </div>
     <div class="topbar-right">
-        <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
-            <i class="fas fa-plus"></i> New Session
-        </button>
+
+        <!-- â”€â”€ Bell Notification Icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+        <div class="notif-bell-wrap" id="notifBellWrap" style="position:relative;">
+            <button id="notifBellBtn" onclick="toggleNotifDropdown()"
+                title="Reservations"
+                style="position:relative;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+                       border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+                       cursor:pointer;transition:background .2s,border-color .2s;color:rgba(255,255,255,.75);font-size:16px;">
+                <i class="fas fa-bell"></i>
+                <!-- red badge â€” hidden until there are new reservations -->
+                <span id="notifBellBadge"
+                      style="display:none;position:absolute;top:-5px;right:-5px;
+                             background:#fb566b;color:#fff;border-radius:50%;
+                             min-width:18px;height:18px;font-size:10px;font-weight:700;
+                             line-height:18px;text-align:center;padding:0 3px;
+                             box-shadow:0 0 0 2px #0a0f1c;"></span>
+            </button>
+
+            <!-- Dropdown panel -->
+            <div id="notifDropdown"
+                 style="display:none;position:absolute;top:calc(100% + 10px);right:0;width:320px;
+                        background:linear-gradient(135deg,#0d1b3e,#08101c);
+                        border:1px solid rgba(32,200,161,.3);border-radius:14px;
+                        box-shadow:0 16px 48px rgba(0,0,0,.65),0 0 0 1px rgba(32,200,161,.08);
+                        z-index:10000;overflow:hidden;animation:dropIn .2s ease;">
+
+                <!-- Header -->
+                <div style="padding:14px 18px 10px;border-bottom:1px solid rgba(255,255,255,.07);
+                            display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:700;font-size:14px;color:#f0f0f0;">
+                        <i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:7px;"></i>
+                        New Reservations
+                    </span>
+                    <span id="notifHeaderBadge"
+                          style="background:rgba(251,86,107,.2);color:#fb566b;border:1px solid rgba(251,86,107,.35);
+                                 border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;display:none;"></span>
+                </div>
+
+                <!-- List of notifications -->
+                <div id="notifList" style="max-height:280px;overflow-y:auto;padding:8px 0;"></div>
+
+                <!-- Empty state -->
+                <div id="notifEmpty"
+                     style="padding:28px 18px;text-align:center;color:#555;font-size:13px;">
+                    <i class="fas fa-bell-slash" style="font-size:1.6rem;display:block;margin-bottom:8px;color:#333;"></i>
+                    No new reservations
+                </div>
+
+                <!-- Footer -->
+                <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);text-align:center;">
+                    <button onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();"
+                            style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.35);color:#20c8a1;
+                                   border-radius:8px;padding:6px 18px;font-size:12px;font-weight:700;cursor:pointer;
+                                   font-family:inherit;width:100%;transition:background .2s;"
+                            onmouseover="this.style.background='rgba(32,200,161,.25)'"
+                            onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                        <i class="fas fa-list" style="margin-right:5px;"></i> View All Reservations
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Admin user dropdown -->
         <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px">
             <button class="admin-user-toggle" id="adminUserBtn">
@@ -1023,7 +1170,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     </div>
 </div>
 
-<!-- ── Main Content ──────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="main-content">
 
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
@@ -1038,10 +1185,10 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
-<!-- â”€â”€ JavaScript â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- Ã¢â€â‚¬Ã¢â€â‚¬ JavaScript Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
-// â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Navigation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function showPage(page, el) {
     document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
@@ -1078,7 +1225,99 @@ function showPage(page, el) {
     }
 }
 
-// ── Restore active page from URL hash on load ──
+// track which section is currently visible (for live-refresh)
+var _currentSection = 'dashboard';
+
+// â”€â”€ Live Section Refresh â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Every 12 seconds, re-fetches the active section's rendered HTML from the server
+// and updates the DOM â€” keeps reservations, sessions, dashboard etc. live without reload.
+(function () {
+    var REFRESH_MS = 12000;
+    // Sections we can safely auto-refresh (exclude settings to avoid mid-edit disruption)
+    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments'];
+    // CSS flash keyframe for subtle update feedback
+    var styleEl = document.createElement('style');
+    styleEl.textContent = '@keyframes liveFlash{0%{opacity:.6}50%{opacity:.9}100%{opacity:1}} .live-refreshing{animation:liveFlash .4s ease;}';
+    document.head.appendChild(styleEl);
+
+    // Live indicator dot in topbar
+    var dot = document.createElement('span');
+    dot.id = 'liveIndicator';
+    dot.title = 'Live data â€” auto-refreshing';
+    dot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#20c8a1;display:inline-block;box-shadow:0 0 0 0 rgba(32,200,161,.5);animation:livePulse 2s ease infinite;flex-shrink:0;';
+    var pulseStyle = document.createElement('style');
+    pulseStyle.textContent = '@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(32,200,161,.5)}70%{box-shadow:0 0 0 6px rgba(32,200,161,0)}100%{box-shadow:0 0 0 0 rgba(32,200,161,0)}}';
+    document.head.appendChild(pulseStyle);
+    var topbarLeft = document.querySelector('.topbar-left');
+    if (topbarLeft) topbarLeft.appendChild(dot);
+
+    function isModalOpen() {
+        // Check any visible modal â€” don't refresh while admin is interacting
+        var modals = document.querySelectorAll('.modal, [id$="Modal"], [id*="modal"]');
+        for (var i = 0; i < modals.length; i++) {
+            var s = modals[i].style;
+            if (s.display === 'flex' || s.display === 'block') return true;
+        }
+        return false;
+    }
+
+    function isInputFocused() {
+        var tag = document.activeElement && document.activeElement.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
+
+    function refreshSection() {
+        var section = _currentSection;
+        if (!refreshable.includes(section)) return;
+        if (isModalOpen() || isInputFocused()) return; // don't interrupt user
+
+        // Dim dot while fetching
+        dot.style.background = '#888';
+
+        fetch('ajax/live_section.php?section=' + encodeURIComponent(section), { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                dot.style.background = '#20c8a1';
+                if (!data.html) return;
+
+                var container = document.getElementById(section);
+                if (!container) return;
+
+                // Don't replace if user just opened a modal or focused an input
+                if (isModalOpen() || isInputFocused()) return;
+
+                // Replace inner content
+                container.innerHTML = data.html;
+
+                // Subtle flash to signal update
+                container.classList.add('live-refreshing');
+                setTimeout(function() { container.classList.remove('live-refreshing'); }, 450);
+            })
+            .catch(function() {
+                dot.style.background = '#fb566b'; // red on error
+                setTimeout(function() { dot.style.background = '#20c8a1'; }, 3000);
+            });
+    }
+
+    // Start after 5s, then every 12s
+    setTimeout(function() {
+        refreshSection();
+        setInterval(refreshSection, REFRESH_MS);
+    }, 5000);
+
+    // Also refresh immediately when switching to a refreshable section
+    var _origShowPage = window.showPage;
+    window.showPage = function(page, el) {
+        _currentSection = page;
+        _origShowPage(page, el);
+        // Refresh new section data immediately on tab switch (after 300ms for animation)
+        if (refreshable.includes(page)) {
+            setTimeout(refreshSection, 300);
+        }
+    };
+})();
+
+
 (function () {
     const hash = window.location.hash.replace('#', '');
     const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings','tournaments'];
@@ -1143,7 +1382,7 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeSidebar();
 });
 
-// â”€â”€ Start Session Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Start Session Modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function onRentalModeChange() {
     const mode            = document.getElementById('rentalModeSelect').value;
     const group           = document.getElementById('durationPickerGroup');
@@ -1170,10 +1409,33 @@ function onRentalModeChange() {
     if (mode === 'hourly') {
         toggle.checked = false;
         document.getElementById('startPaymentFields').style.display = 'none';
+        document.getElementById('startTendered').value = '';
     }
+
+    // Pre-fill unlimTendered with flat rate and lock it when switching to unlimited
+    if (mode === 'unlimited') {
+        const cost = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+        const inp  = document.getElementById('unlimTendered');
+        if (inp) {
+            inp.value    = cost > 0 ? cost.toFixed(2) : '';
+            inp.readOnly = true;
+        }
+        const tog     = document.getElementById('unlimTenderedToggle');
+        const wrapper = document.getElementById('unlimTenderedWrapper');
+        const icon    = document.getElementById('unlimTenderedIcon');
+        const hint    = document.getElementById('unlimTenderedHintText');
+        if (tog)     tog.checked = false;
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon)    { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint)    { hint.style.display = 'block'; }
+        document.getElementById('unlimChangeDisplay').style.display = 'none';
+    }
+
+    // Re-evaluate Start button for the new mode
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
 
-/* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
+/* â”€â”€ Controller Rental: Xbox-only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Hides/shows the controller rental checkbox depending on the selected
 console type. Only Xbox units support controller rentals.
 */
@@ -1200,13 +1462,33 @@ function onConsoleChange() {
 function toggleStartPaymentFields(checkbox) {
     const fields = document.getElementById('startPaymentFields');
     fields.style.display = checkbox.checked ? 'block' : 'none';
-    if (!checkbox.checked) {
+    if (checkbox.checked) {
+        // Pre-fill startTendered with current session cost and lock it
+        const cost = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
+        const inp  = document.getElementById('startTendered');
+        if (inp) {
+            inp.value    = cost > 0 ? cost.toFixed(2) : '';
+            inp.readOnly = true;
+        }
+        // Ensure toggle checkbox is unchecked (locked state)
+        const tog = document.getElementById('startTenderedToggle');
+        if (tog) tog.checked = false;
+        const wrapper = document.getElementById('startTenderedWrapper');
+        const icon    = document.getElementById('startTenderedIcon');
+        const hint    = document.getElementById('startTenderedHintText');
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon)    { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint)    { hint.style.display = 'block'; }
+        document.getElementById('startChangeDisplay').style.display = 'none';
+    } else {
         document.getElementById('startTendered').value = '';
         document.getElementById('startChangeDisplay').style.display = 'none';
     }
+    // Re-evaluate button state whenever checkbox changes
+    _syncStartBtn();
 }
 
-/* ── Change calculator ──
+/* â”€â”€ Change calculator â”€â”€
    tenderedId  : id of the amount-tendered input
    displayId   : id of the change display div
    costHolderId: id of element whose textContent/value holds the amount due
@@ -1216,7 +1498,7 @@ function calcChange(tenderedId, displayId, costHolderId) {
     const due  = parseFloat(el.value !== undefined ? el.value : el.textContent) || 0;
     const paid = parseFloat(document.getElementById(tenderedId).value) || 0;
     const disp = document.getElementById(displayId);
-    // Short-payment notices — end modal and pay modal
+    // Short-payment notices â€” end modal and pay modal
     const endShortNotice = document.getElementById('endShortNotice');
     const payShortNotice = document.getElementById('payShortNotice');
 
@@ -1240,16 +1522,54 @@ function calcChange(tenderedId, displayId, costHolderId) {
         disp.style.background = 'rgba(251,86,107,.15)';
         disp.style.border     = '1px solid rgba(251,86,107,.3)';
         disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient — short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient â€” short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'block';
         if (payShortNotice) payShortNotice.style.display = 'block';
     }
 }
 
 /**
+ * toggleTendered â€” generic lock/unlock for pre-filled tendered fields.
+ * Used by End Session, Collect Balance modals.
+ * @param {string} inputId       - id of the number input
+ * @param {string} cbId          - id of the checkbox
+ * @param {string} costHolderId  - id of the hidden cost holder
+ * @param {string} changeDispId  - id of the change display div
+ */
+function toggleTendered(inputId, cbId, costHolderId, changeDispId) {
+    const inp     = document.getElementById(inputId);
+    const cb      = document.getElementById(cbId);
+    const icon    = document.getElementById(inputId + 'Icon');
+    const wrapper = document.getElementById(inputId + 'Wrapper');
+    const hint    = document.getElementById(inputId + 'HintText');
+    if (!inp) return;
+
+    if (cb && cb.checked) {
+        inp.readOnly = false;
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-locked'); wrapper.classList.add('tendered-wrapper-unlocked'); }
+        if (icon) { icon.className = 'fas fa-unlock tendered-lock'; }
+        if (hint) hint.style.display = 'none';
+        inp.focus(); inp.select();
+    } else {
+        const el   = document.getElementById(costHolderId);
+        const cost = el ? (parseFloat(el.value || el.textContent) || 0) : 0;
+        inp.value    = cost > 0 ? cost.toFixed(2) : '';
+        inp.readOnly = true;
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon) { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint) hint.style.display = 'block';
+        const disp = document.getElementById(changeDispId);
+        if (disp) disp.style.display = 'none';
+    }
+}
+
+/* preFillTendered removed â€” setAmountDue/setPayDue handle initial pre-fill */
+
+
+/**
  * Called by the End Session confirm button.
  * Copies the visible tendered input into the hidden POST field, then lets the form submit.
- * No blocking — a short payment is always allowed through.
+ * No blocking â€” a short payment is always allowed through.
  */
 function syncTenderedAndSubmit(e) {
     // Block if the early-end warning is active (confirm button disabled)
@@ -1278,7 +1598,7 @@ function syncTenderedAndSubmit(e) {
             input.style.borderColor = '#fb566b';
             input.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.25)';
             input.focus();
-            input.setAttribute('placeholder', '⚠ Enter amount tendered');
+            input.setAttribute('placeholder', 'âš  Enter amount tendered');
             return false;
         }
     }
@@ -1297,7 +1617,7 @@ function updateSessionPreview() {
 
     input.value = paid;
 
-    // Read cost and total play time from data-* set by PHP (getHourlyDurationOptions — DB-driven)
+    // Read cost and total play time from data-* set by PHP (getHourlyDurationOptions â€” DB-driven)
     const opt        = sel.options[sel.selectedIndex];
     let   cost       = parseFloat(opt.dataset.cost  || 0);
     const totalMin   = parseInt(opt.dataset.total   || paid);   // paid + bonus
@@ -1320,8 +1640,11 @@ function updateSessionPreview() {
     document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
+    // Re-evaluate Start button whenever cost changes
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
-// Alias — called by controller rental checkbox onchange
+
+// Alias â€” called by controller rental checkbox onchange
 const recalcSessionPreview = updateSessionPreview;
 
 // Form validation: require duration for hourly
@@ -1333,14 +1656,124 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('startSessionForm').addEventListener('submit', function (e) {
         const mode = document.getElementById('rentalModeSelect').value;
+
+        // â”€â”€ Validation 1: hourly requires a duration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (mode === 'hourly' && !document.getElementById('durationSelect').value) {
             e.preventDefault();
-            alert('Please select a duration for the hourly session.');
+            showInlineToast('Please select a duration for the hourly session.', 'error');
+            return;
         }
+
+        // â”€â”€ Validation 2: short payment guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Hourly optional collect-now
+        if (mode === 'hourly') {
+            const collectNow = document.getElementById('collectNowToggle');
+            if (collectNow && collectNow.checked) {
+                const tendered = parseFloat(document.getElementById('startTendered').value) || 0;
+                const due      = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
+                if (due > 0 && tendered < due) {
+                    e.preventDefault();
+                    _showStartShortError('short by \u20b1' + (due - tendered).toFixed(2) + ' â€” please collect the full amount or uncheck payment.');
+                    return;
+                }
+            }
+        }
+
+        // Unlimited â€” always mandatory
+        if (mode === 'unlimited') {
+            const tendered = parseFloat(document.getElementById('unlimTendered').value) || 0;
+            const due      = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+            if (due > 0 && tendered < due) {
+                e.preventDefault();
+                _showStartShortError('Flat rate of \u20b1' + due.toFixed(2) + ' must be collected in full before starting.');
+                return;
+            }
+        }
+    });
+
+    // Wire up live re-validation to dismiss the error when user fixes the amount
+    ['startTendered','unlimTendered'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', function() { _clearStartShortError(); });
     });
 });
 
-// â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function _showStartShortError(msg) {
+    let banner = document.getElementById('startShortErrorBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'startShortErrorBanner';
+        banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(251,86,107,.13);border:1.5px solid rgba(251,86,107,.45);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:13px;font-weight:600;color:#fb566b;animation:shakeX .35s;';
+        // inject before the submit button
+        const btn = document.querySelector('#startSessionForm .btn-primary');
+        if (btn) btn.parentNode.insertBefore(banner, btn);
+    }
+    banner.innerHTML = '<i class="fas fa-circle-exclamation"></i><span>' + msg + '</span>';
+    banner.style.display = 'flex';
+    // Disable submit button briefly
+    const btn = document.querySelector('#startSessionForm .btn-primary');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.animation = 'shakeX .35s';
+        setTimeout(function() { btn.style.animation = ''; }, 400);
+    }
+}
+
+function _clearStartShortError() {
+    const banner = document.getElementById('startShortErrorBanner');
+    if (banner) banner.style.display = 'none';
+    const btn = document.querySelector('#startSessionForm .btn-primary');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+}
+
+/**
+ * _syncStartBtn — called live on every input, cost change, or mode change.
+ * Disables the Start button if the tendered amount is empty or below the session cost.
+ */
+function _syncStartBtn() {
+    const mode = document.getElementById('rentalModeSelect') ?
+                 document.getElementById('rentalModeSelect').value : '';
+    const btn  = document.querySelector('#startSessionForm .btn-primary');
+    if (!btn) return;
+
+    let isShort  = false;
+    let shortMsg = '';
+
+    if (mode === 'hourly') {
+        const collectNow = document.getElementById('collectNowToggle');
+        if (collectNow && collectNow.checked) {
+            const tenderedVal = document.getElementById('startTendered').value;
+            const tendered    = parseFloat(tenderedVal) || 0;
+            const due         = parseFloat(document.getElementById('startCostAmt').textContent) || 0;
+            if (due > 0 && (tenderedVal === '' || tendered < due)) {
+                isShort  = true;
+                shortMsg = tenderedVal === ''
+                    ? 'Enter the amount tendered to start the session.'
+                    : 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 collect the full amount or uncheck payment.';
+            }
+        }
+    } else if (mode === 'unlimited') {
+        const tenderedVal = document.getElementById('unlimTendered').value;
+        const tendered    = parseFloat(tenderedVal) || 0;
+        const due         = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+        if (due > 0 && (tenderedVal === '' || tendered < due)) {
+            isShort  = true;
+            shortMsg = tenderedVal === ''
+                ? 'Flat rate of \u20b1' + due.toFixed(2) + ' must be collected before starting.'
+                : 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 flat rate must be paid in full.';
+        }
+    }
+
+    if (isShort) {
+        _showStartShortError(shortMsg);
+    } else {
+        _clearStartShortError();
+    }
+}
+
+
+// Ã¢â€â‚¬Ã¢â€â‚¬ Modals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
@@ -1357,14 +1790,14 @@ document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
 });
 
-/* ── Billing helpers — all values driven from DB via getPricingRules() ──────── *
+/* â”€â”€ Billing helpers â€” all values driven from DB via getPricingRules() â”€â”€â”€â”€â”€â”€â”€â”€ *
  * PRICING is injected by PHP so the JS always matches the backend.
- * _bracketCost / _timedCost are unchanged in shape — only their constants move.
+ * _bracketCost / _timedCost are unchanged in shape â€” only their constants move.
  */
 const PRICING = <?= json_encode(getPricingRules()) ?>;
 
 function _bracketCost(partialMin) {
-    // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
+    // Partial-hour bracket for minutes 0â€“59 (fixed brackets, not rate-dependent)
     if (partialMin <=  4) return 0;   // grace
     if (partialMin <= 19) return 20;
     if (partialMin <= 34) return 40;
@@ -1382,7 +1815,7 @@ function _timedCost(totalMin) {
     const rem      = totalMin % cycleLen;
     let cost       = full * cyclePay;
     if (rem > bp) {
-        cost += cyclePay;  // inside the free window — charge the full paid block
+        cost += cyclePay;  // inside the free window â€” charge the full paid block
     } else {
         cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
     }
@@ -1402,9 +1835,9 @@ let _endModalTimer = null;   // holds the live-update interval
 // Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
 let _pendingRefundArgs = null;
 
-/* ── Session-end audio alert (Web Audio API — no file needed) ──────────────
+/* â”€â”€ Session-end audio alert (Web Audio API â€” no file needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Plays a short 3-beep chime when the admin confirms ending a session.
-Uses the browser’s built-in synthesis — works offline, no CDN required.
+Uses the browserâ€™s built-in synthesis â€” works offline, no CDN required.
 */
 function playSessionEndSound() {
     try {
@@ -1421,7 +1854,7 @@ function playSessionEndSound() {
             osc.start(ctx.currentTime + delay);
             osc.stop(ctx.currentTime + delay + 0.18);
         });
-    } catch(e) { /* AudioContext unavailable — silently ignore */ }
+    } catch(e) { /* AudioContext unavailable â€” silently ignore */ }
 }
 
 function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
@@ -1429,7 +1862,7 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
     document.getElementById('endSessionId').value = sessionId;
 
     // Fetch approved extras (controller rental etc.) FIRST, then render modal
-    fetch('ajax/session_extras.php?session_id=' + sessionId)
+    fetch('ajax/session_extras.php?session_id=' + sessionId, { credentials: 'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(ex){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
@@ -1445,7 +1878,7 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
 function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate, extras, extraItems) {
     extras = extras || 0;
 
-    // ── Early-end guard (hourly only) ────────────────────────────────────
+    // â”€â”€ Early-end guard (hourly only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const earlyWarning    = document.getElementById('endEarlyWarning');
     const earlyRemStr     = document.getElementById('endEarlyRemainingStr');
     const earlyRefundBtn  = document.getElementById('endEarlyRefundBtn');
@@ -1457,7 +1890,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
     confirmBtn.style.opacity   = '1';
     confirmBtn.style.cursor    = 'pointer';
 
-    // ── Helper: drive the extras pill badge below the big cost number ─────
+    // â”€â”€ Helper: drive the extras pill badge below the big cost number â”€â”€â”€â”€â”€
     function updateExtrasTag(extrasVal, items) {
         const tag     = document.getElementById('endExtrasTag');
         const tagText = document.getElementById('endExtrasTagText');
@@ -1477,27 +1910,27 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const remaining = (plannedMinutes * 60) - elapsed; // seconds
 
         if (remaining > 0) {
-            // ── Remaining time label ─────────────────────────────────────
+            // â”€â”€ Remaining time label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const remH = Math.floor(remaining / 3600);
             const remM = Math.floor((remaining % 3600) / 60);
             const remS = remaining % 60;
             earlyRemStr.textContent = (remH ? remH + 'h ' : '') +
                 String(remM).padStart(2,'0') + ':' + String(remS).padStart(2,'0');
 
-            // ── Consumed time & cost calculation ─────────────────────────
+            // â”€â”€ Consumed time & cost calculation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const elapsedMin    = Math.floor(elapsed / 60);
             const elH           = Math.floor(elapsedMin / 60);
             const elM           = elapsedMin % 60;
             const elapsedLabel  = (elH ? elH + 'h ' : '') + String(elM).padStart(2,'0') + 'm';
 
-            // Time cost alone (no extras — extras are a fixed charge, not time-based)
+            // Time cost alone (no extras â€” extras are a fixed charge, not time-based)
             const timeCost      = _timedCost(elapsedMin);
             const consumedCost  = timeCost + extras;   // total owed = time + fixed fees
             // Refund = upfront paid minus total owed
             const refundAmt     = Math.max(0, upfrontPaid - consumedCost);
             const hasRefund     = refundAmt > 0;
 
-            // ── Populate breakdown display ───────────────────────────────
+            // â”€â”€ Populate breakdown display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
             // Time Used row: show time-only cost (not extras)
             document.getElementById('endEarlyConsumedCost').textContent = '₱' + timeCost.toFixed(2);
@@ -1505,7 +1938,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
             document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
 
-            // ── Show / hide Additional Fees row ──────────────────────────
+            // â”€â”€ Show / hide Additional Fees row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const extrasRow   = document.getElementById('endEarlyExtrasRow');
             const extrasAmt   = document.getElementById('endEarlyExtrasAmt');
             const extrasLabel = document.getElementById('endEarlyExtrasLabel');
@@ -1521,18 +1954,23 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 }
             }
 
-            // ── No-refund note: context-aware message ────────────────────
             const noRefundNote   = document.getElementById('endEarlyNoRefundNote');
             const noRefundReason = document.getElementById('endEarlyNoRefundReason');
             if (noRefundNote) {
                 noRefundNote.style.display = hasRefund ? 'none' : 'block';
                 if (noRefundReason) {
                     if (upfrontPaid === 0) {
-                        noRefundReason.textContent = 'Nothing was paid upfront — balance will be collected at check-out.';
-                    } else if (timeCost >= upfrontPaid) {
-                        noRefundReason.textContent = 'Time used already covers the upfront payment — no refund needed.';
+                        noRefundReason.textContent = 'Nothing was paid upfront â€” balance will be collected at check-out.';
+                    } else if (consumedCost > upfrontPaid) {
+                        // Customer owes MORE than they paid â€” clearly flag this
+                        const stillOwed = (consumedCost - upfrontPaid).toFixed(2);
+                        noRefundReason.innerHTML =
+                            '<span style="color:#f1a83c;font-weight:700;">' +
+                            '\u20b1' + stillOwed + ' still owed</span> â€” consumed cost (\u20b1' +
+                            consumedCost.toFixed(2) + ') exceeds upfront paid. ' +
+                            'Collect via <strong>Pending Payments</strong> after session ends.';
                     } else {
-                        noRefundReason.textContent = 'Additional fees consume the remaining balance — no refund needed.';
+                        noRefundReason.textContent = 'Additional fees consume the remaining balance â€” no refund needed.';
                     }
                 }
             }
@@ -1541,13 +1979,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             const refundEl = document.getElementById('endEarlyRefundAmt');
             refundEl.style.color = hasRefund ? '#fb566b' : '#888';
 
-            // ── Show warning, disable confirm button ─────────────────────
+            // â”€â”€ Show warning, disable confirm button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             earlyWarning.style.display = 'block';
             confirmBtn.disabled        = true;
             confirmBtn.style.opacity   = '0.35';
             confirmBtn.style.cursor    = 'not-allowed';
 
-            // ── Wire up "Refund & End" button ────────────────────────────
+            // â”€â”€ Wire up "Refund & End" button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _pendingRefundArgs = { sessionId, customerName, unitNumber, upfrontPaid, refundAmt, consumedCost, elapsedLabel };
 
             earlyRefundBtn.onclick = function () {
@@ -1565,7 +2003,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 document.getElementById('refundActionField').value  = 'early_end';
                 document.getElementById('refundEarlyEndFlag').value = '1';
 
-                // Pre-fill refund amount — always locked for early-end flow
+                // Pre-fill refund amount â€” always locked for early-end flow
                 const amtEl = document.getElementById('refundAmount');
                 if (amtEl) {
                     amtEl.value           = _pendingRefundArgs.refundAmt.toFixed(2);
@@ -1589,6 +2027,14 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                             '<strong>\u20b1' + paid.toFixed(2) + ' paid</strong> \u2212 ' +
                             '<strong>\u20b1' + consumed.toFixed(2) + ' consumed</strong> = ' +
                             '<strong style="color:#fb566b;">\u20b1' + refund.toFixed(2) + ' refund</strong>';
+                        hintEl.style.color = '#f1e1aa';
+                    } else if (consumed > paid) {
+                        // Customer owes more â€” warn clearly
+                        const owed = (consumed - paid).toFixed(2);
+                        hintEl.innerHTML =
+                            '<i class="fas fa-triangle-exclamation" style="margin-right:5px;color:#f1a83c;"></i>' +
+                            'Consumed cost (\u20b1' + consumed.toFixed(2) + ') exceeds upfront paid (\u20b1' + paid.toFixed(2) + '). ' +
+                            '<strong style="color:#f1a83c;">\u20b1' + owed + ' still owed</strong> â€” will appear in Pending Payments.';
                         hintEl.style.color = '#f1e1aa';
                     } else {
                         hintEl.innerHTML =
@@ -1626,7 +2072,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         }
     }
 
-    // ── End early-end guard ───────────────────────────────────────────────
+    // â”€â”€ End early-end guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const panel       = document.getElementById('endCostPanel');
     const elapsedEl   = document.getElementById('endElapsed');
@@ -1641,29 +2087,45 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
     // Clear any previous live timer
     if (_endModalTimer) { clearInterval(_endModalTimer); _endModalTimer = null; }
 
-    // Reset tendered input & change display each time modal opens
+    // Reset tendered field to locked state on every open
+    // (setAmountDue will pre-fill value once cost is known)
     const tenderedEl  = document.getElementById('endTendered');
     const changeDisp  = document.getElementById('endChangeDisplay');
     const costHolder  = document.getElementById('endCostAmtHolder');
     const amountDueEl = document.getElementById('endAmountDueDisplay');
     const amountDueLbl= document.getElementById('endAmountDueLabel');
     const amountDueBox= document.getElementById('endAmountDueBox');
-    tenderedEl.value         = '';
+    const cb = document.getElementById('endTenderedToggle');
+    const endWrapper = document.getElementById('endTenderedWrapper');
+    if (cb) cb.checked = false;
+    tenderedEl.value    = '';
+    tenderedEl.readOnly = true;
+    if (endWrapper) { endWrapper.classList.remove('tendered-wrapper-unlocked'); endWrapper.classList.add('tendered-wrapper-locked'); }
+    const tendIconEl = document.getElementById('endTenderedIcon');
+    if (tendIconEl) { tendIconEl.className = 'fas fa-lock tendered-lock'; }
+    const endHint = document.getElementById('endTenderedHintText');
+    if (endHint) endHint.style.display = 'block';
     changeDisp.style.display = 'none';
     costHolder.value         = '0';
     document.getElementById('endTenderedHidden').value = '';
     const shortNotice = document.getElementById('endShortNotice');
     if (shortNotice) shortNotice.style.display = 'none';
 
-    // Helper: update the big amount-due display + sync cost holder
+    // Helper: update the big amount-due display + sync cost holder + pre-fill tendered
     function setAmountDue(amount, sublabel) {
-        costHolder.value      = amount.toFixed(2);
-        amountDueEl.textContent = '₱' + amount.toFixed(2);
+        costHolder.value        = amount.toFixed(2);
+        amountDueEl.textContent = '\u20b1' + amount.toFixed(2);
         if (sublabel !== undefined) amountDueLbl.textContent = sublabel;
         amountDueBox.style.display = 'block';
+        // Auto pre-fill tendered if still in locked state
+        const cbEl = document.getElementById('endTenderedToggle');
+        if (!cbEl || !cbEl.checked) {
+            tenderedEl.value = amount > 0 ? amount.toFixed(2) : '';
+        }
     }
     function hideAmountDue() {
         amountDueBox.style.display = 'none';
+        tenderedEl.value = '';
     }
 
     const modeLabel = mode === 'open_time' ? 'Open Time'
@@ -1671,9 +2133,9 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                     : 'Hourly';
 
     document.getElementById('endSessionSummary').textContent =
-        `Ending session #${sessionId} — ${customerName} on ${unitNumber} (${modeLabel})`;
+        `Ending session #${sessionId} â€” ${customerName} on ${unitNumber} (${modeLabel})`;
 
-    /* ── OPEN TIME: pay at end, show live ticking cost ── */
+    /* â”€â”€ OPEN TIME: pay at end, show live ticking cost â”€â”€ */
     if (mode === 'open_time' && startTs) {
         titleEl.innerHTML     = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session & Collect Payment';
         panel.style.display   = 'block';
@@ -1681,7 +2143,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         prepaidNote.style.display = 'none';
         payLabel.textContent  = 'Payment Method';
         confirmLbl.textContent = 'Confirm End & Record Payment';
-        noteEl.innerHTML = '<i class="fas fa-info-circle"></i> Cost is calculated at end — collect from customer after confirming.';
+        noteEl.innerHTML = '<i class="fas fa-info-circle"></i> Cost is calculated at end â€” collect from customer after confirming.';
 
         function tick() {
             const elapsed = Math.floor((Date.now() / 1000) - startTs);
@@ -1705,7 +2167,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         tick();
         _endModalTimer = setInterval(tick, 1000);
 
-    /* ── HOURLY: prepaid base, overtime may apply ── */
+    /* â”€â”€ HOURLY: prepaid base, overtime may apply â”€â”€ */
     } else if (mode === 'hourly' && plannedMinutes) {
         const base    = plannedMinutes <= 30 ? PRICING.session_min_charge : (plannedMinutes / 60 * PRICING.hourly_rate);
         const elapsed = Math.floor((Date.now() / 1000) - startTs);
@@ -1723,8 +2185,8 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const remaining = Math.max(0, cost - upfrontPaid);
 
         if (remaining > 0) {
-            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} — Prepaid: ₱${upfrontPaid.toFixed(2)}`);
-            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Collect Payment';
+            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} â€” Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session â€” Collect Payment';
             if (overtime > 0) {
                 noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
                                   + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
@@ -1739,20 +2201,20 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             // Session fully paid
             hideAmountDue();
             costHolder.value = '0';
-            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session â€” Paid in Full';
             noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
             payGroup.style.display    = 'none';
             prepaidNote.style.display = 'block';
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
         }
 
-    /* ── UNLIMITED: flat rate was fully prepaid ── */
+    /* â”€â”€ UNLIMITED: flat rate was fully prepaid â”€â”€ */
     } else if (mode === 'unlimited') {
-        titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session — Paid in Full';
+        titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session â€” Paid in Full';
         panel.style.display       = 'block';
-        elapsedEl.textContent     = '—';
+        elapsedEl.textContent     = 'â€”';
         costEl.textContent        = 'Flat rate';
-        noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session — flat rate already collected at start.';
+        noteEl.innerHTML          = '<i class="fas fa-infinity"></i> Unlimited session â€” flat rate already collected at start.';
         hideAmountDue();
         payGroup.style.display    = 'none';
         prepaidNote.style.display = 'block';
@@ -1768,7 +2230,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
     openModal('endSession');
 }
 
-/* ── Pay Modal (collect outstanding balance, session continues) ──────── */
+/* â”€â”€ Pay Modal (collect outstanding balance, session continues) â”€â”€â”€â”€â”€â”€â”€â”€ */
 let _payModalTimer = null;
 
 function openPayModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
@@ -1777,16 +2239,42 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
 
     document.getElementById('paySessionId').value = sessionId;
     document.getElementById('paySessionSummary').textContent =
-        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber +
+        'Session #' + sessionId + ' â€” ' + customerName + ' on ' + unitNumber +
         ' (' + (mode === 'open_time' ? 'Open Time' : mode === 'unlimited' ? 'Unlimited' : 'Hourly') + ')';
 
-    // Reset
-    document.getElementById('payTendered').value              = '';
+    // Reset pay modal tendered field to locked state
+    const payTendInp = document.getElementById('payTendered');
+    const payTendCb  = document.getElementById('payTenderedToggle');
+    const payWrapper = document.getElementById('payTenderedWrapper');
+    if (payTendCb) payTendCb.checked = false;
+    if (payTendInp) { payTendInp.value = ''; payTendInp.readOnly = true; }
+    if (payWrapper) { payWrapper.classList.remove('tendered-wrapper-unlocked'); payWrapper.classList.add('tendered-wrapper-locked'); }
+    const payTendIcon = document.getElementById('payTenderedIcon');
+    if (payTendIcon) { payTendIcon.className = 'fas fa-lock tendered-lock'; }
+    const payHint = document.getElementById('payTenderedHintText');
+    if (payHint) payHint.style.display = 'block';
     document.getElementById('payChangeDisplay').style.display = 'none';
     document.getElementById('payShortNotice').style.display   = 'none';
     document.getElementById('payAmountDueDisplay').style.color = '#20c8a1';
 
     if (_payModalTimer) { clearInterval(_payModalTimer); _payModalTimer = null; }
+
+    // Fetch approved extras FIRST (controller rental etc.), then render
+    fetch('ajax/session_extras.php?session_id=' + sessionId, { credentials: 'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(ex){
+            _renderPayModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate,
+                ex.extras || 0, ex.items || []);
+        })
+        .catch(function(){
+            _renderPayModal(sessionId, customerName, unitNumber, mode, startTs,
+                plannedMinutes, upfrontPaid, unlimitedRate, 0, []);
+        });
+}
+
+function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate, extras, extraItems) {
+    extras = extras || 0;
 
     const costPanel   = document.getElementById('payCostPanel');
     const elapsedEl   = document.getElementById('payElapsed');
@@ -1799,11 +2287,11 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
     const confirmLbl  = document.getElementById('payConfirmLabel');
 
     function setPayDue(due, sublabel) {
-        dueBigEl.textContent   = '₱' + due.toFixed(2);
+        dueBigEl.textContent   = '\u20b1' + due.toFixed(2);
         dueLblEl.textContent   = sublabel || '';
         amtHidden.value        = due.toFixed(2);
         if (due > 0) {
-            confirmLbl.textContent = 'Collect ₱' + due.toFixed(2) + ' Balance';
+            confirmLbl.textContent = 'Collect \u20b1' + due.toFixed(2) + ' Balance';
             confirmBtn.disabled    = false;
             confirmBtn.style.opacity = '1';
         } else {
@@ -1811,12 +2299,18 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
             confirmBtn.disabled    = true;
             confirmBtn.style.opacity = '0.5';
         }
-        // Refresh change display if tendered already entered
-        if (document.getElementById('payTendered').value)
+        // Auto pre-fill payTendered if still in locked state
+        const payCb = document.getElementById('payTenderedToggle');
+        const payInp = document.getElementById('payTendered');
+        if (payInp && (!payCb || !payCb.checked)) {
+            payInp.value = due > 0 ? due.toFixed(2) : '';
+        }
+        // Refresh change display if tendered already manually entered
+        if (document.getElementById('payTendered').value && payCb && payCb.checked)
             calcChange('payTendered','payChangeDisplay','payAmount');
     }
 
-    /* ── Open Time: live-ticking balance ── */
+    /* â”€â”€ Open Time: live-ticking balance â”€â”€ */
     if (mode === 'open_time' && startTs) {
         costPanel.style.display = 'block';
         var payTick = function() {
@@ -1824,23 +2318,25 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
             const minutes  = Math.floor(elapsed / 60);
             const h = Math.floor(minutes / 60), m = minutes % 60, s = elapsed % 60;
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-            const totalCost = _timedCost(minutes);
+            const timeCost  = _timedCost(minutes);
+            const totalCost = timeCost + extras;
             costEl.textContent  = '₱' + totalCost.toFixed(2);
             const due = Math.max(0, totalCost - upfrontPaid);
-            const sublabel = upfrontPaid > 0
-                ? 'Running cost ₱' + totalCost.toFixed(2) + ' — Already paid ₱' + upfrontPaid.toFixed(2)
-                : 'Cost accumulating — pay at any time';
+            let sublabel = upfrontPaid > 0
+                ? 'Running cost ₱' + totalCost.toFixed(2) + ' â€” Already paid ₱' + upfrontPaid.toFixed(2)
+                : 'Cost accumulating â€” pay at any time';
             setPayDue(due, sublabel);
         };
         payTick();
         _payModalTimer = setInterval(payTick, 1000);
 
-    /* ── Hourly: snapshot at open time ── */
+    /* â”€â”€ Hourly: snapshot at open time â”€â”€ */
     } else if (mode === 'hourly' && plannedMinutes && startTs) {
         costPanel.style.display = 'block';
         const elapsed   = Math.floor((Date.now() / 1000) - startTs);
         const minutes   = Math.floor(elapsed / 60);
-        const totalCost = _hourlyCost(minutes, plannedMinutes);
+        const timeCost  = _hourlyCost(minutes, plannedMinutes);
+        const totalCost = timeCost + extras;               // â† extras included
         const due       = Math.max(0, totalCost - upfrontPaid);
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
@@ -1850,24 +2346,36 @@ function openPayModal(sessionId, customerName, unitNumber, mode, startTs, planne
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
         const overtime  = Math.max(0, minutes - plannedMinutes);
         let sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ')';
-        if (upfrontPaid > 0) sublabel += ' — Prepaid ₱' + upfrontPaid.toFixed(2);
-        if (overtime > 0)    sublabel += ' — +' + overtime + 'min overtime';
+        if (upfrontPaid > 0) sublabel += ' â€” Prepaid ₱' + upfrontPaid.toFixed(2);
+        if (overtime > 0)    sublabel += ' â€” +' + overtime + 'min overtime';
+        if (extras > 0) {
+            const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
+            sublabel += ' â€” +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
+        }
         setPayDue(due, sublabel);
 
-    /* ── Unlimited: already fully paid ── */
+    /* â”€â”€ Unlimited: flat rate already paid; show extras if any â”€â”€ */
     } else if (mode === 'unlimited') {
         costPanel.style.display = 'none';
-        dueBigEl.textContent = '₱0.00';
-        dueBigEl.style.color = '#888';
-        dueLblEl.textContent = 'Unlimited session — flat rate already collected at start';
-        amtHidden.value      = '0';
-        confirmLbl.textContent = 'No Balance Due';
-        confirmBtn.disabled    = true;
-        confirmBtn.style.opacity = '0.5';
+        dueBigEl.textContent = extras > 0 ? '₱' + extras.toFixed(2) : '₱0.00';
+        dueBigEl.style.color = extras > 0 ? '#20c8a1' : '#888';
+        dueLblEl.textContent = extras > 0
+            ? 'Flat rate collected â€” extras outstanding'
+            : 'Unlimited session â€” flat rate already collected at start';
+        amtHidden.value = extras > 0 ? extras.toFixed(2) : '0';
+        if (extras > 0) {
+            confirmLbl.textContent = 'Collect ₱' + extras.toFixed(2) + ' Balance';
+            confirmBtn.disabled    = false;
+            confirmBtn.style.opacity = '1';
+        } else {
+            confirmLbl.textContent = 'No Balance Due';
+            confirmBtn.disabled    = true;
+            confirmBtn.style.opacity = '0.5';
+        }
 
     } else {
         costPanel.style.display = 'none';
-        setPayDue(0, 'Enter amount if needed');
+        setPayDue(extras > 0 ? extras : 0, extras > 0 ? 'Extras outstanding' : 'Enter amount if needed');
     }
 
     openModal('paySession');
@@ -1887,7 +2395,7 @@ function syncPayBtn() {
     const confirmLbl = document.getElementById('payConfirmLabel');
     const confirmBtn = document.getElementById('payConfirmBtn');
     if (!tenderedEl.value || isNaN(tendered)) {
-        // No tendered value — revert to full balance label
+        // No tendered value â€” revert to full balance label
         if (balanceDue > 0) {
             confirmLbl.textContent   = 'Collect \u20b1' + balanceDue.toFixed(2) + ' Balance';
             confirmBtn.disabled      = false;
@@ -1903,7 +2411,7 @@ function syncPayBtn() {
     }
 }
 
-/* ── Refund Modal ─────────────────────────────────────────────────────── */
+/* â”€â”€ Refund Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reservationId) {
     const isRes = !!reservationId;
     const paid  = parseFloat(upfrontPaid || 0).toFixed(2);
@@ -1917,11 +2425,11 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
 
     // Summary banner text
     document.getElementById('refundSessionSummary').textContent = isRes
-        ? 'Reservation #' + reservationId + ' — ' + customerName
-        : 'Session #'     + sessionId     + ' — ' + customerName + ' on ' + unitNumber;
+        ? 'Reservation #' + reservationId + ' â€” ' + customerName
+        : 'Session #'     + sessionId     + ' â€” ' + customerName + ' on ' + unitNumber;
     document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
 
-    // Amount input — locked + pre-filled for reservation
+    // Amount input â€” locked + pre-filled for reservation
     const amtInput = document.getElementById('refundAmount');
     const maxNote  = document.getElementById('refundMaxNote');
     const hintEl   = document.getElementById('refundAutoCalcHint');
@@ -1936,7 +2444,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
         ? 'Full payment amount \u2014 will be returned to customer.'
         : 'Max refundable: \u20b1' + paid;
 
-    // Reason input — pre-filled for reservation
+    // Reason input â€” pre-filled for reservation
     const reasonInput = document.getElementById('refundReason');
     reasonInput.readOnly      = isRes;
     reasonInput.style.opacity = isRes ? '0.7' : '1';
@@ -1951,7 +2459,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     openModal('refundSession');
 }
 
-/* ── Centralized Refund AJAX Submission ──────────────────────────────── */
+/* â”€â”€ Centralized Refund AJAX Submission â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function _submitRefundAjax() {
     const sessionId     = document.getElementById('refundSessionId').value;
     const reservationId = document.getElementById('refundReservationId').value;
@@ -1965,7 +2473,7 @@ function _submitRefundAjax() {
     if (isEarlyEnd) action_type = 'early_end';
 
     // Standard/manual refunds require a positive amount.
-    // early_end with ₱0 is allowed — the session ends with no refund transaction.
+    // early_end with ₱0 is allowed â€” the session ends with no refund transaction.
     if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
         _showRefundError('Please enter a refund amount greater than ₱0.');
         return;
@@ -1980,7 +2488,7 @@ function _submitRefundAjax() {
     gspotConfirm(confirmMsg, function () {
         const btn = document.getElementById('refundConfirmBtn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processingâ€¦';
 
         const body = new URLSearchParams({
             session_id:     sessionId     || '0',
@@ -1990,7 +2498,7 @@ function _submitRefundAjax() {
             action_type:    action_type,
         });
 
-        fetch('ajax/refund.php', { method: 'POST', body })
+        fetch('ajax/refund.php', { method: 'POST', credentials: 'same-origin', body })
             .then(function(r){ return r.json(); })
             .then(function(data) {
                 if (data.success) {
@@ -2007,7 +2515,7 @@ function _submitRefundAjax() {
                 }
             })
             .catch(function() {
-                _showRefundError('Network error — please try again.');
+                _showRefundError('Network error â€” please try again.');
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>';
             });
@@ -2027,11 +2535,11 @@ function _showRefundError(msg) {
 }
 
 
-/* ── Extend Modal ─────────────────────────────────────────────────────── */
+/* â”€â”€ Extend Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes) {
     document.getElementById('extendSessionId').value = sessionId;
     document.getElementById('extendSessionSummary').textContent =
-        'Session #' + sessionId + ' — ' + customerName + ' on ' + unitNumber;
+        'Session #' + sessionId + ' â€” ' + customerName + ' on ' + unitNumber;
     const h = Math.floor(bookedMinutes / 60), m = bookedMinutes % 60;
     document.getElementById('extendCurrentDuration').textContent =
         bookedMinutes > 0
@@ -2057,23 +2565,47 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// â”€â”€ Live Session Timers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Live Session Timers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
 // Tracks which timer elements already fired the overtime beep (once per element per load)
 const overtimeBeeped = new WeakSet();
+// Tracks which timer elements already fired the 15-second warning beep
+const warningBeeped  = new WeakSet();
 
-/* Descending 3-tone alarm — fires when a session crosses into overtime.
+/* â”€â”€ Shared AudioContext â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Browsers suspend AudioContext when it isn't created inside a user gesture.
+   Keep one shared instance and call resume() before every sound so that
+   setInterval-driven beeps (overtime, 15-sec warning) can always play.
+*/
+let _sharedAudioCtx = null;
+function _getAudioCtx() {
+    if (!_sharedAudioCtx) {
+        try { _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch(e) { return null; }
+    }
+    return _sharedAudioCtx;
+}
+// Pre-unlock on any user interaction
+['click', 'keydown', 'touchstart'].forEach(function(evt) {
+    document.addEventListener(evt, function() {
+        var c = _getAudioCtx();
+        if (c && c.state === 'suspended') c.resume();
+    }, { passive: true });
+});
+
+/* Descending 3-tone alarm â€” fires when a session crosses into overtime.
    Square wave = more urgent/harsh than the sine-wave session-end chime. */
 function playOvertimeBeep() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = _getAudioCtx();
+    if (!ctx) return;
+    ctx.resume().then(function() {
         [880, 660, 440].forEach(function(freq, i) {
-            const delay = i * 0.22;
-            const osc   = ctx.createOscillator();
-            const gain  = ctx.createGain();
+            var delay = i * 0.22;
+            var osc   = ctx.createOscillator();
+            var gain  = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.type = 'square';
@@ -2083,8 +2615,238 @@ function playOvertimeBeep() {
             osc.start(ctx.currentTime + delay);
             osc.stop(ctx.currentTime + delay + 0.20);
         });
-    } catch(e) {}
+    });
 }
+
+/* â”€â”€ SIREN ALARM â€” plays for 15 seconds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Simulates an emergency-siren sweep: oscillator frequency glides up and
+   down between 800 Hz (low) and 1400 Hz (high) repeatedly, like a real
+   ambulance / police siren. Uses sawtooth wave for maximum urgency.
+   All notes are scheduled up-front so the sound plays even if the tab loses focus. */
+function playWarningBeep() {
+    var ctx = _getAudioCtx();
+    if (!ctx) return;
+    ctx.resume().then(function() {
+        var now       = ctx.currentTime;
+        var DURATION  = 15;      // total seconds of siren
+        var CYCLE     = 0.80;    // one up-down sweep = 0.80 s
+        var LOW_FREQ  = 800;
+        var HIGH_FREQ = 1400;
+        var VOLUME    = 0.50;
+
+        for (var i = 0; i < DURATION; i += CYCLE) {
+            var t   = now + i;
+            var osc = ctx.createOscillator();
+            var g   = ctx.createGain();
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.type = 'sawtooth';
+
+            // Sweep up for first half, sweep down for second half
+            osc.frequency.setValueAtTime(LOW_FREQ,  t);
+            osc.frequency.linearRampToValueAtTime(HIGH_FREQ, t + CYCLE * 0.5);
+            osc.frequency.linearRampToValueAtTime(LOW_FREQ,  t + CYCLE);
+
+            g.gain.setValueAtTime(VOLUME, t);
+            g.gain.setValueAtTime(VOLUME, t + CYCLE - 0.04);
+            g.gain.linearRampToValueAtTime(0, t + CYCLE); // click-free crossfade
+
+            osc.start(t);
+            osc.stop(t + CYCLE);
+        }
+    });
+}
+
+/* â”€â”€ SESSION ENDING ALARM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Fires at 15 s remaining for any hourly session.
+   â€¢ Covers the full screen (backdrop blocks all interaction)
+   â€¢ Cannot be dismissed by clicking outside or pressing Escape
+   â€¢ Auto-navigates the admin to the Sessions tab
+   â€¢ Offers two actions: Extend Session or End Session Now
+   â€¢ Countdown inside the modal ticks down every second
+   â€¢ Auto-dismissed when the session crosses into overtime              */
+var sessionEndingAlerts = {}; // key: el.dataset.start â†’ modal element
+
+function showSessionEndingAlert(el, remaining) {
+    var key       = el.dataset.start;
+    var MODAL_ID  = 'gspotSirenModal';
+
+    // If modal already open for this key, just update countdown
+    if (sessionEndingAlerts[key] === 'dismissed') return; // user already acted â€” never recreate
+    if (sessionEndingAlerts[key] === true) {
+        // Modal is open â€” just tick the countdown
+        var cdEl = document.getElementById(MODAL_ID + '_cd');
+        if (cdEl) cdEl.textContent = remaining + 's';
+        return;
+    }
+    sessionEndingAlerts[key] = true;
+
+    // â”€â”€ Read session data from the timer element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    var customer     = el.dataset.customer     || 'Session';
+    var unit         = el.dataset.unit         || '';
+    var sessionId    = el.dataset.sessionId    || 0;
+    var mode         = el.dataset.mode         || 'hourly';
+    var startTs      = parseInt(el.dataset.startTs   || 0);
+    var upfrontPaid  = parseFloat(el.dataset.upfrontPaid  || 0);
+    var unlimRate    = parseFloat(el.dataset.unlimitedRate || 300);
+    var bookedMin    = parseInt(el.dataset.bookedMinutes   || 0);
+
+    // â”€â”€ Navigate to Sessions tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    var sessNavEl = document.querySelector('.nav-item[onclick*="\'sessions\'"]');
+    if (sessNavEl) showPage('sessions', sessNavEl);
+
+    // â”€â”€ Build the locked full-screen modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    var overlay = document.createElement('div');
+    overlay.id  = MODAL_ID;
+    overlay.style.cssText =
+        'position:fixed;inset:0;z-index:999999;' +
+        'background:rgba(8,5,0,.88);backdrop-filter:blur(8px);' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'animation:gspotSirenFadeIn .25s ease;';
+
+    // Prevent outside-click dismiss â€” stop all pointer events on backdrop
+    overlay.addEventListener('click', function(e) { e.stopPropagation(); });
+    document.addEventListener('keydown', _sirenEscBlock, true);
+
+    overlay.innerHTML =
+        '<div style="' +
+            'background:linear-gradient(160deg,#1c0808,#2a0a0a,#0d0505);' +
+            'border:2px solid rgba(251,86,107,.7);border-radius:22px;' +
+            'padding:36px 34px 30px;max-width:440px;width:92%;' +
+            'box-shadow:0 0 80px rgba(251,86,107,.45),0 24px 64px rgba(0,0,0,.7);' +
+            'animation:gspotSirenIn .35s cubic-bezier(.34,1.56,.64,1);' +
+            'position:relative;text-align:center;">' +
+
+            /* Pulsing icon */
+            '<div style="width:64px;height:64px;border-radius:16px;margin:0 auto 18px;' +
+            'background:rgba(251,86,107,.2);border:2px solid rgba(251,86,107,.6);' +
+            'display:flex;align-items:center;justify-content:center;font-size:28px;' +
+            'animation:gspotSirenPulse .7s ease-in-out infinite;">' +
+            '<i class="fas fa-siren-on" style="color:#fb566b;"></i>' +
+            '<i class="fas fa-bell" style="color:#fb566b;display:none;" id="gspotSirenIcon"></i></div>' +
+
+            /* Headline */
+            '<div style="font-size:10px;font-weight:800;letter-spacing:2.5px;' +
+            'color:rgba(251,86,107,.7);text-transform:uppercase;margin-bottom:8px;">' +
+            'ðŸš¨ ALERT</div>' +
+            '<div style="font-size:22px;font-weight:900;color:#ff6060;margin-bottom:6px;' +
+            'letter-spacing:-.3px;">Session Ending!</div>' +
+            '<div style="font-size:14px;color:#f0c0c0;margin-bottom:20px;line-height:1.5;">' +
+            '<strong style="color:#fff;">' + customer + '</strong>' +
+            (unit ? ' &mdash; <span style="color:#f1a83c;">' + unit + '</span>' : '') +
+            '</div>' +
+
+            /* Countdown */
+            '<div style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);' +
+            'border-radius:14px;padding:14px 24px;margin:0 auto 24px;display:inline-block;">' +
+            '<div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:1px;' +
+            'margin-bottom:6px;">Time Remaining</div>' +
+            '<div id="' + MODAL_ID + '_cd" style="font-size:52px;font-weight:900;' +
+            'color:#fb566b;font-family:monospace;line-height:1;letter-spacing:-2px;">' +
+            remaining + 's</div></div>' +
+
+            /* Buttons */
+            '<div style="display:flex;gap:12px;margin-top:4px;">' +
+
+            /* Extend button */
+            '<button id="gspotSirenExtendBtn" ' +
+            'style="flex:1;padding:14px 10px;border-radius:12px;' +
+            'background:linear-gradient(135deg,rgba(95,133,218,.25),rgba(95,133,218,.15));' +
+            'border:1px solid rgba(95,133,218,.55);color:#8aa4e8;' +
+            'font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;' +
+            'display:flex;align-items:center;justify-content:center;gap:8px;transition:.18s;">' +
+            '<i class="fas fa-clock"></i> Extend Session</button>' +
+
+            /* End Now button */
+            '<button id="gspotSirenEndBtn" ' +
+            'style="flex:1;padding:14px 10px;border-radius:12px;' +
+            'background:linear-gradient(135deg,#fb566b,#c0392b);' +
+            'border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;' +
+            'font-family:inherit;' +
+            'display:flex;align-items:center;justify-content:center;gap:8px;' +
+            'box-shadow:0 4px 20px rgba(251,86,107,.4);transition:.18s;">' +
+            '<i class="fas fa-stop-circle"></i> End Session Now</button>' +
+
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+
+    // Fix the siren icon â€” fa-siren-on might not exist in FA free, use bell as fallback
+    var sirenIcon = overlay.querySelector('.fa-siren-on');
+    if (!sirenIcon || getComputedStyle(sirenIcon, ':before').content === 'none' ||
+        getComputedStyle(sirenIcon, ':before').content === '') {
+        if (sirenIcon) sirenIcon.style.display = 'none';
+        var bellIcon = overlay.querySelector('.fa-bell');
+        if (bellIcon) bellIcon.style.display = '';
+    }
+
+    // Extend button â†’ open extend modal, close siren
+    document.getElementById('gspotSirenExtendBtn').addEventListener('click', function() {
+        _closeSirenModal(key);
+        openExtendModal(sessionId, customer, unit, bookedMin, mode);
+    });
+
+    // End Now button â†’ open end session modal, close siren
+    document.getElementById('gspotSirenEndBtn').addEventListener('click', function() {
+        _closeSirenModal(key);
+        // Open the modal in locked mode (prevent outside-click close)
+        _sirenTriggeredEnd = true;
+        openEndSessionModal(sessionId, customer, unit, mode, startTs, bookedMin, upfrontPaid, unlimRate);
+    });
+}
+
+// Block Escape key while siren modal is open
+function _sirenEscBlock(e) {
+    if (e.key === 'Escape' && document.getElementById('gspotSirenModal')) {
+        e.preventDefault(); e.stopPropagation();
+    }
+}
+
+// Flag: when true, the End Session modal was opened by the siren â†’ prevent outside-click close
+var _sirenTriggeredEnd = false;
+
+function _closeSirenModal(key) {
+    var modal = document.getElementById('gspotSirenModal');
+    if (modal) modal.remove();
+    // Mark as 'dismissed' so updateTimers never recreates the modal for this countdown window
+    sessionEndingAlerts[key] = 'dismissed';
+    _sirenTriggeredEnd = false;
+    document.removeEventListener('keydown', _sirenEscBlock, true);
+    // Immediately silence all pre-scheduled siren oscillators.
+    // ctx.resume() is called again by playOvertimeBeep() / user gestures if needed.
+    var ctx = _getAudioCtx();
+    if (ctx && ctx.state === 'running') ctx.suspend();
+}
+
+// Patch the existing outside-click listener for #endSessionModal to respect _sirenTriggeredEnd
+document.addEventListener('DOMContentLoaded', function() {
+    var endModal = document.getElementById('endSessionModal');
+    if (!endModal) return;
+    // Remove the original generic outside-click listener (already applied in admin.php)
+    // and replace with one that checks _sirenTriggeredEnd
+    endModal.addEventListener('click', function(e) {
+        if (e.target === endModal && !_sirenTriggeredEnd) {
+            endModal.classList.remove('active');
+        }
+    });
+});
+
+// CSS animations (injected once)
+(function() {
+    if (document.getElementById('gspotSirenStyle')) return;
+    var s = document.createElement('style');
+    s.id = 'gspotSirenStyle';
+    s.textContent =
+        '@keyframes gspotSirenFadeIn{from{opacity:0}to{opacity:1}}' +
+        '@keyframes gspotSirenIn{from{opacity:0;transform:scale(.88) translateY(16px)}' +
+            'to{opacity:1;transform:scale(1) translateY(0)}}' +
+        '@keyframes gspotSirenPulse{' +
+            '0%,100%{box-shadow:0 0 0 0 rgba(251,86,107,.7);background:rgba(251,86,107,.2)}' +
+            '50%{box-shadow:0 0 0 14px rgba(251,86,107,0);background:rgba(251,86,107,.35)}}';
+    document.head.appendChild(s);
+})();
+
 
 function updateTimers() {
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
@@ -2093,10 +2855,10 @@ function updateTimers() {
         const now     = new Date();
         const elapsed = Math.floor((now - start) / 1000); // seconds
 
-        // Stale session guard (>24h open â€” likely test/orphan data)
+        // Stale session guard (>24h open Ã¢â‚¬â€ likely test/orphan data)
         if (elapsed > STALE_THRESHOLD) {
             el.classList.add('stale');
-            el.textContent = `âš ï¸ ${Math.floor(elapsed / 86400)}d old â€” end session`;
+            el.textContent = `Ã¢Å¡Â Ã¯Â¸Â ${Math.floor(elapsed / 86400)}d old Ã¢â‚¬â€ end session`;
             return;
         }
 
@@ -2107,13 +2869,30 @@ function updateTimers() {
                 const h = Math.floor(remaining / 3600);
                 const m = Math.floor((remaining % 3600) / 60);
                 const s = remaining % 60;
-                el.style.color = '#20c8a1';
+
+                // â”€â”€ 15-second warning beep + popup (fires once per element) â”€â”€â”€â”€â”€â”€â”€
+                if (remaining <= 15 && !warningBeeped.has(el)) {
+                    warningBeeped.add(el);
+                    playWarningBeep();
+                }
+
+                // Update (or create) the ending-soon popup while countdown is active
+                if (remaining <= 15) {
+                    showSessionEndingAlert(el, remaining);
+                }
+
+                // Colour shift: amber when â‰¤ 60 s, red when â‰¤ 15 s, green otherwise
+                el.style.color = remaining <= 15 ? '#fb566b'
+                               : remaining <= 60  ? '#f1a83c'
+                               : '#20c8a1';
                 el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
             } else {
-                // — OVERTIME — beep once when the element first crosses the threshold
+                // â”€ OVERTIME â”€ beep once when the element first crosses the threshold
                 if (!overtimeBeeped.has(el)) {
                     overtimeBeeped.add(el);
                     playOvertimeBeep();
+                    // Dismiss the siren alarm modal on overtime
+                    _closeSirenModal(el.dataset.start);
                 }
                 const over = -remaining;
                 const m = Math.floor(over / 60);
@@ -2134,7 +2913,7 @@ function updateTimers() {
 updateTimers();
 setInterval(updateTimers, 1000);
 
-// â”€â”€ Charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬ Charts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function renderCharts() {
     const revLabels = <?= json_encode($revLabels) ?>;
     const revData   = <?= json_encode($revChartData) ?>;
@@ -2149,7 +2928,7 @@ function renderCharts() {
         type: 'bar',
         data: {
             labels: revLabels,
-            datasets: [{ label: 'Revenue (â‚±)', data: revData,
+            datasets: [{ label: 'Revenue (Ã¢â€šÂ±)', data: revData,
                 backgroundColor: 'rgba(32,200,161,.5)', borderColor: '#20c8a1',
                 borderWidth: 2, borderRadius: 6 }]
         },
@@ -2170,7 +2949,7 @@ function renderCharts() {
 
 AOS.init({ duration: 600, once: true });
 
-// ── Admin user dropdown ──────────────────────────────────────────────
+// â”€â”€ Admin user dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 (function () {
     const btn      = document.getElementById('adminUserBtn');
     const dropdown = document.getElementById('adminUserDropdown');
@@ -2184,99 +2963,184 @@ AOS.init({ duration: 600, once: true });
     });
 })();
 
-// ── Reservation notification poller ───────────────────────────────────
-// Polls every 30 s. Baseline is set from PHP on page load so we never
-// fire a toast for reservations that already existed when the admin opened the page.
+// â”€â”€ Bell notification icon â€” styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+(function injectNotifStyles() {
+    const s = document.createElement('style');
+    s.textContent = `
+    @keyframes bellPop {
+        0%   { transform: scale(0); }
+        70%  { transform: scale(1.25); }
+        100% { transform: scale(1); }
+    }
+    @keyframes bellShake {
+        0%,100% { transform: rotate(0deg); }
+        20%     { transform: rotate(-14deg); }
+        40%     { transform: rotate(12deg); }
+        60%     { transform: rotate(-8deg); }
+        80%     { transform: rotate(6deg); }
+    }
+    @keyframes dropIn {
+        from { opacity:0; transform:translateY(-8px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    #notifBellBtn:hover { background:rgba(32,200,161,.15) !important; border-color:rgba(32,200,161,.4) !important; color:#20c8a1 !important; }
+    #notifBellBtn.has-notif i { animation:bellShake .5s ease; }
+    #notifList::-webkit-scrollbar { width:4px; }
+    #notifList::-webkit-scrollbar-track { background:transparent; }
+    #notifList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:4px; }
+    `;
+    document.head.appendChild(s);
+})();
+
+// Bell state
+var _notifItems = [];
+var _notifDropdownOpen = false;
+
+function toggleNotifDropdown() {
+    var drop = document.getElementById('notifDropdown');
+    if (!drop) return;
+    _notifDropdownOpen = !_notifDropdownOpen;
+    drop.style.display = _notifDropdownOpen ? 'block' : 'none';
+    // Clear badge when opened
+    if (_notifDropdownOpen) {
+        document.getElementById('notifBellBadge').style.display = 'none';
+        document.getElementById('notifBellBtn').classList.remove('has-notif');
+    }
+}
+
+function closeNotifDropdown() {
+    _notifDropdownOpen = false;
+    var drop = document.getElementById('notifDropdown');
+    if (drop) drop.style.display = 'none';
+}
+
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('notifBellWrap');
+    if (wrap && !wrap.contains(e.target) && _notifDropdownOpen) closeNotifDropdown();
+});
+
+function _addNotifItems(newItems) {
+    _notifItems = newItems.concat(_notifItems).slice(0, 20);
+    var list   = document.getElementById('notifList');
+    var empty  = document.getElementById('notifEmpty');
+    var badge  = document.getElementById('notifBellBadge');
+    var hBadge = document.getElementById('notifHeaderBadge');
+    var btn    = document.getElementById('notifBellBtn');
+
+    console.log('[GSpot Notif] _addNotifItems called. newItems:', newItems.length, '| badge el:', !!badge, '| list el:', !!list);
+    if (!list || !badge || !btn) {
+        console.warn('[GSpot Notif] Missing DOM elements â€” bell notification cannot display.');
+        return;
+    }
+
+    // Rebuild list
+    list.innerHTML = '';
+    _notifItems.forEach(function(r) {
+        var dateStr = '';
+        if (r.reserved_date) {
+            try { dateStr = new Date(r.reserved_date).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}); } catch(e) { dateStr = r.reserved_date; }
+        }
+        var timeStr = r.reserved_time ? r.reserved_time.substring(0, 5) : '';
+        var mode    = r.rental_mode === 'open_time' ? 'Open Time' : r.rental_mode === 'unlimited' ? 'Unlimited' : 'Hourly';
+        var row     = document.createElement('div');
+        row.style.cssText = 'padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .15s;';
+        row.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;background:rgba(32,200,161,.12);' +
+            'border:1px solid rgba(32,200,161,.25);display:flex;align-items:center;justify-content:center;color:#20c8a1;font-size:13px;">' +
+            '<i class="fas fa-calendar-check"></i></div>' +
+            '<div style="min-width:0;flex:1;">' +
+            '<div style="font-weight:600;font-size:13px;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+            (r.customer_name || 'A customer') + '</div>' +
+            '<div style="font-size:11px;color:#888;margin-top:1px;">' +
+            (r.console_type || '') + ' Â· ' + mode + (dateStr ? ' Â· ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
+            '</div></div>' +
+            '<span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);' +
+            'border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;">Pending</span>' +
+            '</div>';
+        row.addEventListener('mouseover',  function() { this.style.background = 'rgba(32,200,161,.06)'; });
+        row.addEventListener('mouseout',   function() { this.style.background = ''; });
+        row.addEventListener('click', function() {
+            showPage('reservations', document.querySelector('.nav-item[onclick*="reservations"]'));
+            closeNotifDropdown();
+        });
+        list.appendChild(row);
+    });
+
+    if (empty) empty.style.display = _notifItems.length > 0 ? 'none' : 'block';
+
+    if (newItems.length > 0) {
+        var count = _notifItems.length;
+        badge.textContent = count > 9 ? '9+' : String(count);
+        // Force-set display using setAttribute to bypass any inline style conflict
+        badge.setAttribute('style',
+            'display:flex !important;align-items:center;justify-content:center;' +
+            'position:absolute;top:-5px;right:-5px;' +
+            'background:#fb566b;color:#fff;border-radius:50%;' +
+            'min-width:18px;height:18px;font-size:10px;font-weight:700;' +
+            'line-height:18px;text-align:center;padding:0 3px;' +
+            'box-shadow:0 0 0 2px #0a0f1c;animation:bellPop .3s ease;'
+        );
+        if (hBadge) { hBadge.textContent = count + ' new'; hBadge.style.display = 'inline-block'; }
+        btn.classList.add('has-notif');
+        var bellI = btn.querySelector('i');
+        if (bellI) {
+            bellI.style.animation = 'none';
+            void bellI.offsetWidth;
+            bellI.style.animation = 'bellShake .5s ease';
+        }
+        console.log('[GSpot Notif] Badge shown. count=', count);
+    }
+}
+
+// â”€â”€ Reservation notification poller â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Polls every 8 s. Baseline from PHP is ALWAYS authoritative at page load â€”
+// localStorage is only used to avoid re-alerting the same IDs within one session,
+// but NEVER to INCREASE the baseline above what the server reported.
 (function () {
-    const POLL_MS   = 30000;
-    // PHP injects the current max id at page-load time — safe baseline
+    const POLL_MS = 8000;
+
+    // â”€â”€ BUG FIX #1: Never let localStorage INCREASE the baseline.
+    // Old localStorage values from past sessions would block all future alerts.
     let lastId = <?= $initMaxResId ?>;
-    // If localStorage has a higher value (from a previous session still in memory), use that
     const stored = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
-    if (stored > lastId) lastId = stored;
+    // Only use localStorage to SKIP re-alerting IDs already seen THIS session,
+    // but only if stored is between our PHP baseline and max â€” not to raise it above PHP.
+    // Simplest correct fix: always trust PHP baseline, ignore localStorage override.
     localStorage.setItem('gspot_last_res_id', lastId);
 
     function poll() {
-        fetch('ajax/poll_notifications.php?last_id=' + lastId)
+        fetch('ajax/poll_notifications.php?last_id=' + lastId, { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                if (data.new_count > 0) showResNotification(data.new_count, data.items);
+                if (data.new_count > 0) {
+                    _addNotifItems(data.items);
+                    // Ping sound
+                    try {
+                        var ctx  = new (window.AudioContext || window.webkitAudioContext)();
+                        var osc  = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.connect(gain); gain.connect(ctx.destination);
+                        osc.type = 'sine'; osc.frequency.value = 660;
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                        osc.start(); osc.stop(ctx.currentTime + 0.5);
+                    } catch(e) {}
+                }
                 if (data.max_id > lastId) {
                     lastId = data.max_id;
                     localStorage.setItem('gspot_last_res_id', lastId);
                 }
             })
-            .catch(function() {}); // silent on network failure
+            .catch(function() {});
     }
 
-    function showResNotification(count, items) {
-        const existing = document.getElementById('gspotResNotif');
-        if (existing) existing.remove();
-
-        const first  = items[0] || {};
-        const name   = first.customer_name || 'A customer';
-        const msg    = count === 1
-            ? name + ' just made a new reservation!'
-            : count + ' new reservations are waiting for review.';
-
-        const toast = document.createElement('div');
-        toast.id = 'gspotResNotif';
-        toast.style.cssText = [
-            'position:fixed;bottom:24px;right:24px;z-index:99999;',
-            'background:linear-gradient(135deg,#0d1b3e,#08101c);',
-            'border:1px solid rgba(32,200,161,.45);border-radius:16px;',
-            'padding:18px 20px;display:flex;align-items:flex-start;gap:14px;',
-            'box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(32,200,161,.1);',
-            'animation:slideInRight .35s cubic-bezier(.34,1.56,.64,1);',
-            'max-width:340px;font-family:inherit;'
-        ].join('');
-
-        toast.innerHTML =
-            '<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;' +
-            'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.3);' +
-            'display:flex;align-items:center;justify-content:center;font-size:18px;color:#20c8a1;">' +
-            '<i class="fas fa-calendar-check"></i></div>' +
-            '<div style="flex:1;min-width:0;">' +
-            '<div style="font-weight:700;font-size:14px;color:#f0f0f0;margin-bottom:4px;">New Reservation' + (count > 1 ? 's' : '') + '!</div>' +
-            '<div style="font-size:13px;color:#aaa;line-height:1.4;">' + msg + '</div>' +
-            '<button id="gspotResNotifView" style="margin-top:10px;padding:6px 14px;border-radius:8px;' +
-            'background:rgba(32,200,161,.2);border:1px solid rgba(32,200,161,.4);' +
-            'color:#20c8a1;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">'
-            + '<i class="fas fa-eye" style="margin-right:5px;"></i>View Reservations</button>' +
-            '</div>' +
-            '<button onclick="document.getElementById(\'gspotResNotif\').remove()" ' +
-            'style="background:none;border:none;color:#666;cursor:pointer;font-size:18px;padding:0;flex-shrink:0;line-height:1;">&times;</button>';
-
-        document.body.appendChild(toast);
-
-        // Wire "View Reservations" button
-        document.getElementById('gspotResNotifView').addEventListener('click', function() {
-            const navEl = document.querySelector('.nav-item[onclick*="\'reservations\'"]');
-            showPage('reservations', navEl);
-            toast.remove();
-        });
-
-        // Play a subtle ping sound
-        try {
-            const ctx2 = new (window.AudioContext || window.webkitAudioContext)();
-            const osc2  = ctx2.createOscillator();
-            const gain2 = ctx2.createGain();
-            osc2.connect(gain2); gain2.connect(ctx2.destination);
-            osc2.type = 'sine'; osc2.frequency.value = 660;
-            gain2.gain.setValueAtTime(0.3, ctx2.currentTime);
-            gain2.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.5);
-            osc2.start(); osc2.stop(ctx2.currentTime + 0.5);
-        } catch(e) {}
-
-        // Auto-dismiss after 15 s
-        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 15000);
-    }
-
-    // Start polling after 15 s (avoids false-positive on fresh page load)
+    // â”€â”€ BUG FIX #3: First poll at 3 s, then every 8 s (was 15 s / 30 s)
     setTimeout(function() {
         poll();
         setInterval(poll, POLL_MS);
-    }, 15000);
+    }, 3000);
 })();
 </script>
 </body>

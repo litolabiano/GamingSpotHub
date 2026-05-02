@@ -17,7 +17,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['shopkeeper', 'owner']);
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['shopkeeper', 'owner'])) {
+    echo json_encode(['success' => false, 'pending' => [], 'message' => 'Unauthorized.']);
+    exit;
+}
 
 // ── GET: return pending requests for a session ────────────────────────────
 if (isset($_GET['get_pending'])) {
