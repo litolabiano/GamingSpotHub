@@ -188,6 +188,26 @@ $myCancels = $cancelLog->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $myCancelCount = count($myCancels);
 
+// ── My Tournament Registrations ───────────────────────────────────────────
+$myTournaments = [];
+$tStmt = $conn->prepare(
+    "SELECT tp.participant_id, tp.tournament_id, tp.registration_date,
+            tp.payment_status, tp.ign, tp.contact_number, tp.notes,
+            tp.placement, tp.prize_amount,
+            t.tournament_name, t.game_name, t.console_type,
+            t.start_date, t.end_date, t.entry_fee, t.prize_pool,
+            t.status AS tournament_status
+       FROM tournament_participants tp
+       JOIN tournaments t ON tp.tournament_id = t.tournament_id
+      WHERE tp.user_id = ?
+      ORDER BY tp.registration_date DESC"
+);
+$tStmt->bind_param('i', $user_id);
+$tStmt->execute();
+$myTournaments     = $tStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$myTournamentCount = count($myTournaments);
+$myActiveTournamentCount = count(array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing'])));
+
 // Reason label map (shared with JS)
 $cancelReasonLabelMap = [
     'schedule_change'   => 'Schedule Changed',
@@ -803,6 +823,15 @@ function fmtMins(int $m): string {
             </span>
             <?php endif; ?>
         </button>
+        <button class="cd-nav-btn" onclick="cdShowPage('tournaments',this)" id="navTournaments">
+            <i class="fas fa-trophy"></i> My Tournaments
+            <?php if ($myActiveTournamentCount > 0): ?>
+            <span style="margin-left:auto;background:linear-gradient(135deg,#f1a83c,#fb566b);color:#fff;font-size:10px;font-weight:800;
+                padding:1px 7px;border-radius:10px;min-width:18px;text-align:center;">
+                <?= $myActiveTournamentCount ?>
+            </span>
+            <?php endif; ?>
+        </button>
 
         <div class="cd-nav-spacer"></div>
 
@@ -1065,6 +1094,45 @@ function fmtMins(int $m): string {
                 </table>
                 <?php endif; ?>
             </div>
+
+            <!-- Tournament snippet (show if registered) -->
+            <?php if (!empty($myTournaments)): $overviewTour = array_slice($myTournaments, 0, 2); ?>
+            <div class="cd-card" style="border-color:rgba(241,168,60,0.3);background:linear-gradient(135deg,rgba(10,33,81,0.6),rgba(8,14,26,0.7));">
+                <div class="cd-card-header">
+                    <div class="cd-card-title"><i class="fas fa-trophy" style="color:#f1a83c;"></i> My Tournaments</div>
+                    <button class="cd-btn cd-btn-ghost" onclick="cdShowPage('tournaments', document.getElementById('navTournaments'))">See all</button>
+                </div>
+                <div style="display:grid;gap:10px;">
+                <?php foreach ($overviewTour as $ot):
+                    $otStatus = $ot['tournament_status'];
+                    $otColor  = match($otStatus) { 'scheduled' => '#20c8a1', 'ongoing' => '#20c8a1', 'completed' => '#5f85da', default => '#fb566b' };
+                ?>
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(241,168,60,0.12);">
+                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.25);
+                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏆</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            <?= htmlspecialchars($ot['tournament_name']) ?>
+                        </div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">
+                            IGN: <span style="color:var(--mint);"><?= htmlspecialchars($ot['ign'] ?? '—') ?></span>
+                            &nbsp;&middot;&nbsp;<?= date('M d, Y', strtotime($ot['start_date'])) ?>
+                        </div>
+                    </div>
+                    <span style="background:<?= $otColor ?>22;color:<?= $otColor ?>;border:1px solid <?= $otColor ?>44;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap;">
+                        <?= ucfirst($otStatus) ?>
+                    </span>
+                </div>
+                <?php endforeach; ?>
+                </div>
+                <?php if ($myTournamentCount > 2): ?>
+                <div style="padding:10px 0 0;font-size:12px;color:var(--muted);text-align:right;">
+                    +<?= $myTournamentCount - 2 ?> more &mdash;
+                    <button onclick="cdShowPage('tournaments', document.getElementById('navTournaments'))" style="background:none;border:none;color:#f1a83c;font-size:12px;cursor:pointer;padding:0;">View all &rarr;</button>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
 
@@ -1759,6 +1827,206 @@ function fmtMins(int $m): string {
         })();
         </script>
 
+        <!-- ══ PAGE: MY TOURNAMENTS ════════════════════════════════════════ -->
+        <?php
+            $upcomingTournaments  = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing']));
+            $completedTournaments = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['completed','cancelled']));
+            $paidTournaments      = array_filter($myTournaments, fn($t) => $t['payment_status'] === 'paid');
+            $tournamentStatusMap  = [
+                'scheduled' => ['gold',   'clock',       'Scheduled'],
+                'ongoing'   => ['mint',   'circle',      'Ongoing'],
+                'completed' => ['blue',   'check-circle','Completed'],
+                'cancelled' => ['coral',  'times-circle','Cancelled'],
+                'upcoming'  => ['purple', 'calendar',    'Upcoming'],
+            ];
+        ?>
+        <div class="cd-page" id="page-tournaments">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+                <h2 class="cd-section-title" style="margin:0"><i class="fas fa-trophy"></i> My Tournaments</h2>
+                <a href="tournament_register.php" class="cd-btn cd-btn-primary">
+                    <i class="fas fa-plus"></i> Register for Tournament
+                </a>
+            </div>
+
+            <!-- Stat cards -->
+            <div class="cd-stats" style="margin-bottom:24px;">
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#f1a83c;"><?= $myTournamentCount ?></div>
+                            <div class="cd-stat-label">Total Registered</div>
+                        </div>
+                        <div class="cd-stat-icon gold"><i class="fas fa-trophy"></i></div>
+                    </div>
+                </div>
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#20c8a1;"><?= count($paidTournaments) ?></div>
+                            <div class="cd-stat-label">Entry Fees Paid</div>
+                        </div>
+                        <div class="cd-stat-icon mint"><i class="fas fa-check-circle"></i></div>
+                    </div>
+                </div>
+                <div class="cd-stat-card">
+                    <div class="cd-stat-top">
+                        <div>
+                            <div class="cd-stat-value" style="color:#b37bec;"><?= count($upcomingTournaments) ?></div>
+                            <div class="cd-stat-label">Active / Upcoming</div>
+                        </div>
+                        <div class="cd-stat-icon purple"><i class="fas fa-gamepad"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <?php if (empty($myTournaments)): ?>
+            <!-- Empty state -->
+            <div class="cd-card" style="border-color:rgba(241,168,60,0.3);">
+                <div class="cd-empty" style="padding:50px 20px;">
+                    <div style="width:70px;height:70px;border-radius:50%;background:rgba(241,168,60,0.12);border:2px solid rgba(241,168,60,0.3);
+                                display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px;color:#f1a83c;">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <p style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px;">No Tournament Registrations Yet</p>
+                    <p style="font-size:13px;margin-bottom:20px;">Join a tournament to compete for prizes and glory!</p>
+                    <a href="tournament_register.php" class="cd-btn cd-btn-primary" style="display:inline-flex;">
+                        <i class="fas fa-gamepad"></i> View Open Tournaments
+                    </a>
+                </div>
+            </div>
+
+            <?php else: ?>
+
+            <!-- Active / Upcoming Tournaments -->
+            <?php if (!empty($upcomingTournaments)): ?>
+            <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#20c8a1;box-shadow:0 0 0 3px rgba(32,200,161,0.3);animation:cdPulse 1.5s infinite;"></div>
+                <span style="font-size:13px;font-weight:700;color:#20c8a1;text-transform:uppercase;letter-spacing:.5px;">Active &amp; Upcoming</span>
+            </div>
+            <div style="display:grid;gap:16px;margin-bottom:28px;">
+            <?php foreach ($upcomingTournaments as $tr):
+                $tsm = $tournamentStatusMap[$tr['tournament_status']] ?? ['gray','circle',ucfirst($tr['tournament_status'])];
+            ?>
+            <div class="cd-card" style="border-color:rgba(32,200,161,0.3);background:linear-gradient(135deg,rgba(10,33,81,0.7),rgba(8,14,26,0.8));padding:0;overflow:hidden;">
+                <!-- Gold accent top bar -->
+                <div style="height:3px;background:linear-gradient(90deg,#f1a83c,#fb566b,#b37bec);"></div>
+                <div style="padding:20px 22px;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                                <span style="font-size:16px;font-weight:800;color:#fff;font-family:'Outfit',sans-serif;">
+                                    <?= htmlspecialchars($tr['tournament_name']) ?>
+                                </span>
+                                <span class="cd-badge <?= $tsm[0] ?>">
+                                    <i class="fas fa-<?= $tsm[1] ?>" style="margin-right:4px;"></i><?= $tsm[2] ?>
+                                </span>
+                            </div>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:14px;">
+                                <?php if ($tr['game_name']): ?>
+                                <span><i class="fas fa-gamepad" style="color:#5f85da;margin-right:4px;"></i><?= htmlspecialchars($tr['game_name']) ?></span>
+                                <?php endif; ?>
+                                <span>
+                                    <?php
+                                    $cType = $tr['console_type'];
+                                    $cColor = match($cType) { 'PS5' => '#00439c', 'PS4' => '#003087', 'Xbox Series X' => '#107c10', default => '#5f85da' };
+                                    ?>
+                                    <span style="background:<?= $cColor ?>22;color:<?= $cColor ?>;border:1px solid <?= $cColor ?>55;border-radius:6px;padding:2px 8px;font-weight:700;font-size:11px;">
+                                        <?= htmlspecialchars($cType) ?>
+                                    </span>
+                                </span>
+                                <span><i class="fas fa-calendar" style="color:#f1a83c;margin-right:4px;"></i><?= date('M d, Y', strtotime($tr['start_date'])) ?></span>
+                                <?php if ($tr['prize_pool'] > 0): ?>
+                                <span><i class="fas fa-gift" style="color:#20c8a1;margin-right:4px;"></i>Prize: ₱<?= number_format($tr['prize_pool'],0) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <!-- Player details row -->
+                            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                                <div style="background:rgba(32,200,161,0.08);border:1px solid rgba(32,200,161,0.2);border-radius:8px;padding:8px 14px;">
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Your IGN</div>
+                                    <div style="font-size:13px;font-weight:700;color:#20c8a1;"><?= htmlspecialchars($tr['ign'] ?? '—') ?></div>
+                                </div>
+                                <div style="background:rgba(95,133,218,0.08);border:1px solid rgba(95,133,218,0.2);border-radius:8px;padding:8px 14px;">
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Entry Fee</div>
+                                    <div style="font-size:13px;font-weight:700;color:#5f85da;">₱<?= number_format($tr['entry_fee'],0) ?></div>
+                                </div>
+                                <div style="background:rgba(32,200,161,0.06);border:1px solid rgba(32,200,161,0.15);border-radius:8px;padding:8px 14px;">
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Payment</div>
+                                    <div style="font-size:13px;font-weight:700;">
+                                        <?php if ($tr['payment_status'] === 'paid'): ?>
+                                        <span style="color:#20c8a1;"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Paid</span>
+                                        <?php else: ?>
+                                        <span style="color:#f1a83c;"><i class="fas fa-clock" style="margin-right:4px;"></i>Pending</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div style="background:rgba(179,123,236,0.08);border:1px solid rgba(179,123,236,0.2);border-radius:8px;padding:8px 14px;">
+                                    <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Registered</div>
+                                    <div style="font-size:13px;font-weight:700;color:#b37bec;"><?= date('M d, Y', strtotime($tr['registration_date'])) ?></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Trophy icon -->
+                        <div style="width:52px;height:52px;border-radius:14px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.3);
+                                    display:flex;align-items:center;justify-content:center;font-size:22px;color:#f1a83c;flex-shrink:0;">
+                            🏆
+                        </div>
+                    </div>
+                    <?php if ($tr['notes']): ?>
+                    <div style="margin-top:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:rgba(255,255,255,0.45);">
+                        <i class="fas fa-sticky-note" style="margin-right:5px;"></i><?= htmlspecialchars($tr['notes']) ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Past / Completed Tournaments -->
+            <?php if (!empty($completedTournaments)): ?>
+            <div style="margin-bottom:12px;">
+                <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;">
+                    <i class="fas fa-history" style="margin-right:6px;"></i>Past Tournaments
+                </span>
+            </div>
+            <div class="cd-card">
+                <div style="overflow-x:auto;">
+                <table class="cd-table">
+                    <thead><tr>
+                        <th>Tournament</th><th>Game</th><th>Date</th><th>IGN</th><th>Entry Fee</th><th>Status</th><th>Placement</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($completedTournaments as $tr):
+                        $tsm = $tournamentStatusMap[$tr['tournament_status']] ?? ['gray','circle',ucfirst($tr['tournament_status'])];
+                    ?>
+                    <tr>
+                        <td style="font-weight:600;"><?= htmlspecialchars($tr['tournament_name']) ?></td>
+                        <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: '—') ?></td>
+                        <td><?= date('M d, Y', strtotime($tr['start_date'])) ?></td>
+                        <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? '—') ?></span></td>
+                        <td style="color:var(--mint);font-weight:700;">₱<?= number_format($tr['entry_fee'],0) ?></td>
+                        <td><span class="cd-badge <?= $tsm[0] ?>"><i class="fas fa-<?= $tsm[1] ?>" style="margin-right:4px;"></i><?= $tsm[2] ?></span></td>
+                        <td>
+                            <?php if ($tr['placement']): ?>
+                            <span style="font-weight:700;color:#f1a83c;">#<?= $tr['placement'] ?></span>
+                            <?php if ($tr['prize_amount'] > 0): ?>
+                            <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+₱<?= number_format($tr['prize_amount'],0) ?></span>
+                            <?php endif; ?>
+                            <?php else: ?>
+                            <span style="color:var(--muted);">—</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php endif; ?>
+        </div><!-- /page-tournaments -->
+
     </main>
 </div>
 
@@ -1790,6 +2058,13 @@ function fmtMins(int $m): string {
         <span class="cd-bnav-badge coral"><?= $myCancelCount ?></span>
         <?php endif; ?>
     </button>
+    <button class="cd-bnav-btn" id="bnavTournaments" onclick="cdShowPage('tournaments', this)">
+        <i class="fas fa-trophy"></i>
+        <span>Events</span>
+        <?php if ($myActiveTournamentCount > 0): ?>
+        <span class="cd-bnav-badge" style="background:linear-gradient(135deg,#f1a83c,#fb566b);color:#fff;"><?= $myActiveTournamentCount ?></span>
+        <?php endif; ?>
+    </button>
 </nav>
 
 <script>
@@ -1800,10 +2075,12 @@ const BNAV_MAP = {
     reservations:  'bnavReservations',
     stats:         'bnavStats',
     cancellations: 'bnavCancellations',
+    tournaments:   'bnavTournaments',
 };
 const SIDEBAR_MAP = {
     overview: 'navOverview', sessions: 'navSessions',
-    reservations: 'navReservations', stats: 'navStats', cancellations: 'navCancellations'
+    reservations: 'navReservations', stats: 'navStats',
+    cancellations: 'navCancellations', tournaments: 'navTournaments'
 };
 
 function cdShowPage(page, el) {
@@ -1837,7 +2114,7 @@ function cdShowPage(page, el) {
 // Restore page from hash on load
 (function () {
     const hash = location.hash.replace('#', '');
-    const valid = ['overview','sessions','reservations','stats','cancellations'];
+    const valid = ['overview','sessions','reservations','stats','cancellations','tournaments'];
     if (hash && valid.includes(hash)) {
         cdShowPage(hash, null);
     }
