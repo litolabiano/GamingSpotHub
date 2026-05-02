@@ -27,10 +27,33 @@ ALTER TABLE tournament_participants
         COMMENT 'Uploaded GCash receipt filename (self-registrations only)',
     ADD COLUMN IF NOT EXISTS registered_by   INT          DEFAULT NULL
         COMMENT 'Staff user_id if admin-added; NULL for self-registration',
+    ADD COLUMN IF NOT EXISTS walkin_name     VARCHAR(100) DEFAULT NULL
+        COMMENT 'Display name for walk-in participants (user_id = 0)',
     ADD COLUMN IF NOT EXISTS notes           VARCHAR(255) DEFAULT NULL
         COMMENT 'Optional note from registrant or staff';
 
--- ── 3. FK for registered_by ──────────────────────────────────────────────────
+-- ── 3. Drop uk_tp_entry unique key ───────────────────────────────────────────
+-- The unique key prevents multiple walk-in entries (all share user_id = 0).
+-- Admin can add walk-ins by name without a registered account.
+-- Duplicate detection for registered users is handled at the application level.
+SET @uk_exists = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA  = 'gamingspothub'
+      AND TABLE_NAME    = 'tournament_participants'
+      AND INDEX_NAME    = 'uk_tp_entry'
+);
+
+SET @sql2 = IF(
+    @uk_exists > 0,
+    'ALTER TABLE tournament_participants DROP INDEX uk_tp_entry',
+    'SELECT 1 -- uk_tp_entry already removed, skip'
+);
+
+PREPARE stmt2 FROM @sql2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
+
+-- ── 4. FK for registered_by ──────────────────────────────────────────────────
 -- Only add the constraint if it does not already exist.
 -- ON DELETE SET NULL: if the staff account is removed, we keep the participant
 -- record but lose the "who added them" audit trail (acceptable).

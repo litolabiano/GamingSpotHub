@@ -490,30 +490,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ADMIN REGISTER PARTICIPANT
+    // ADMIN REGISTER PARTICIPANT (registered customer OR walk-in)
     elseif ($action === 'admin_register_participant') {
-        $tid            = (int)($_POST['tournament_id']  ?? 0);
-        $uid            = (int)($_POST['user_id']        ?? 0);
-        $pay_status     = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
-                          ? $_POST['payment_status'] : 'pending';
-        if ($tid && $uid) {
-            $stmt = $conn->prepare(
-                "INSERT INTO tournament_participants
-                    (tournament_id, user_id, payment_status, registered_by)
-                 VALUES (?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE payment_status = VALUES(payment_status)"
-            );
-            $stmt->bind_param('iisi', $tid, $uid, $pay_status, $user['user_id']);
-            if ($stmt->execute()) {
-                $message = 'Participant registered.';
-                $messageType = 'success';
+        $tid          = (int)($_POST['tournament_id']   ?? 0);
+        $mode         = $_POST['participant_mode']      ?? 'registered'; // 'registered' | 'walkin'
+        $pay_status   = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
+                        ? $_POST['payment_status'] : 'pending';
+        $ign          = trim($_POST['ign']              ?? '');
+        $contact      = trim($_POST['contact_number']   ?? '');
+        $notes        = trim($_POST['notes']            ?? '');
+        $staff_id     = (int)($user['user_id'] ?? 0);
+
+        if ($mode === 'walkin') {
+            // ── Walk-in: no user account required ────────────────────────────
+            $walkin_name = trim($_POST['walkin_name'] ?? '');
+            if ($tid && $walkin_name) {
+                $uid = 0; // walk-in system user
+                $stmt = $conn->prepare(
+                    "INSERT INTO tournament_participants
+                         (tournament_id, user_id, payment_status, ign, contact_number, walkin_name, notes, registered_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->bind_param('iisssssi', $tid, $uid, $pay_status, $ign, $contact, $walkin_name, $notes, $staff_id);
+                if ($stmt->execute()) {
+                    $message     = 'Walk-in participant registered.';
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Could not register walk-in: ' . $conn->error;
+                    $messageType = 'error';
+                }
             } else {
-                $message = 'Could not register participant: ' . $conn->error;
+                $message     = 'Please provide a tournament and the walk-in name.';
                 $messageType = 'error';
             }
         } else {
-            $message = 'Invalid tournament or user.';
-            $messageType = 'error';
+            // ── Registered customer ───────────────────────────────────────────
+            $uid = (int)($_POST['user_id'] ?? 0);
+            if ($tid && $uid) {
+                // Application-level duplicate check (uk_tp_entry was removed to support multiple walk-ins)
+                $dupChk = $conn->prepare("SELECT participant_id FROM tournament_participants WHERE tournament_id = ? AND user_id = ? AND user_id != 0");
+                $dupChk->bind_param('ii', $tid, $uid);
+                $dupChk->execute();
+                if ($dupChk->get_result()->num_rows > 0) {
+                    $message     = 'This customer is already registered for this tournament.';
+                    $messageType = 'error';
+                } else {
+                    $stmt = $conn->prepare(
+                        "INSERT INTO tournament_participants
+                             (tournament_id, user_id, payment_status, ign, contact_number, notes, registered_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    );
+                    $stmt->bind_param('iissssi', $tid, $uid, $pay_status, $ign, $contact, $notes, $staff_id);
+                    if ($stmt->execute()) {
+                        $message     = 'Participant registered.';
+                        $messageType = 'success';
+                    } else {
+                        $message     = 'Could not register participant: ' . $conn->error;
+                        $messageType = 'error';
+                    }
+                }
+            } else {
+                $message     = 'Invalid tournament or customer.';
+                $messageType = 'error';
+            }
         }
     }
 

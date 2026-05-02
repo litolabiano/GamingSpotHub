@@ -394,7 +394,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 
 <!-- ── ADD PARTICIPANT MODAL ──────────────────────────────────────────────────── -->
 <div class="modal" id="addParticipantModal">
-    <div class="modal-content" style="max-width:420px;">
+    <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
             <h3 class="modal-title">
                 <i class="fas fa-user-plus" style="color:#b37bec;margin-right:8px;"></i> Add Participant
@@ -405,25 +405,69 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
             <input type="hidden" name="action" value="admin_register_participant">
             <?= csrfField() ?>
             <input type="hidden" name="tournament_id" id="addParticipantTournamentId">
-            <div style="margin-bottom:12px;font-size:13px;color:#888;">
+            <div style="margin-bottom:14px;font-size:13px;color:#888;">
                 Tournament: <strong id="addParticipantTournamentName" style="color:#fff;"></strong>
             </div>
+
+            <!-- Mode toggle -->
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <button type="button" id="modeRegistered"
+                    onclick="setParticipantMode('registered')"
+                    style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(95,133,218,.5);background:rgba(95,133,218,.15);color:#5f85da;font-weight:700;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-user"></i> Registered Customer
+                </button>
+                <button type="button" id="modeWalkin"
+                    onclick="setParticipantMode('walkin')"
+                    style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#888;font-weight:700;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-walking"></i> Walk-in
+                </button>
+            </div>
+            <input type="hidden" name="participant_mode" id="participantModeInput" value="registered">
+
+            <!-- Registered customer fields -->
+            <div id="registeredFields">
+                <div class="form-group">
+                    <label>Select Customer *</label>
+                    <select name="user_id" id="customerSelect">
+                        <option value="" disabled selected>— Pick a customer —</option>
+                        <?php foreach ($customers as $c): ?>
+                        <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Walk-in fields -->
+            <div id="walkinFields" style="display:none;">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" name="walkin_name" id="walkinNameInput" placeholder="e.g. Juan Dela Cruz">
+                </div>
+            </div>
+
+            <!-- Shared fields -->
             <div class="form-group">
-                <label>Select Customer *</label>
-                <select name="user_id" required>
-                    <option value="" disabled selected>— Pick a customer —</option>
-                    <?php foreach ($customers as $c): ?>
-                    <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+                <label>IGN (In-Game Name)</label>
+                <input type="text" name="ign" placeholder="e.g. DarkFist99">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Contact Number</label>
+                    <input type="text" name="contact_number" placeholder="09XXXXXXXXX">
+                </div>
+                <div class="form-group">
+                    <label>Payment Status</label>
+                    <select name="payment_status">
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
             </div>
             <div class="form-group">
-                <label>Payment Status</label>
-                <select name="payment_status">
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                </select>
+                <label>Notes</label>
+                <input type="text" name="notes" placeholder="Optional remark…">
             </div>
+
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addParticipant')">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Register</button>
@@ -470,15 +514,20 @@ function viewParticipants(tournamentId, tournamentName) {
                 return;
             }
             let html = '<div style="overflow-x:auto;"><table class="table"><thead><tr>' +
-                '<th>#</th><th>Name</th><th>Email</th><th>Registered</th><th>Payment</th><th>Action</th>' +
+                '<th>#</th><th>Name</th><th>IGN</th><th>Contact</th><th>Registered</th><th>Payment</th><th>Proof</th><th>Action</th>' +
                 '</tr></thead><tbody>';
             data.participants.forEach((p, i) => {
-                const isPaid = p.payment_status === 'paid';
-                const fid    = 'rmPart_' + p.participant_id;
+                const isPaid    = p.payment_status === 'paid';
+                const fid       = 'rmPart_' + p.participant_id;
+                const dispName  = p.walkin_name ? `${escHtml(p.full_name)} <span style="font-size:10px;color:#f1a83c;background:rgba(241,168,60,.12);padding:2px 6px;border-radius:10px;margin-left:4px;">Walk-in: ${escHtml(p.walkin_name)}</span>` : escHtml(p.full_name);
+                const proofHtml = p.paymongo_source_id
+                    ? `<span style="color:#20c8a1;font-size:11px;font-weight:700;"><i class="fas fa-check-circle"></i> GCash Paid</span><br><span style="font-size:10px;color:#444;">${escHtml(p.paymongo_source_id)}</span>`
+                    : '<span style="color:#555;font-size:11px;">—</span>';
                 html += `<tr>
                     <td style="color:#888">${i + 1}</td>
-                    <td style="font-weight:600;color:#fff">${escHtml(p.full_name)}</td>
-                    <td style="color:#888;font-size:12px;">${escHtml(p.email)}</td>
+                    <td style="font-weight:600;color:#fff">${dispName}<br><span style="font-size:11px;color:#555;">${escHtml(p.email)}</span></td>
+                    <td style="color:#b37bec;font-size:12px;">${p.ign ? escHtml(p.ign) : '<span style="color:#555;">—</span>'}</td>
+                    <td style="color:#888;font-size:12px;">${p.contact_number ? escHtml(p.contact_number) : '<span style="color:#555;">—</span>'}</td>
                     <td style="color:#888;font-size:12px;">${p.registration_date}</td>
                     <td>
                         <form method="POST" style="display:inline;">
@@ -495,6 +544,7 @@ function viewParticipants(tournamentId, tournamentName) {
                             </button>
                         </form>
                     </td>
+                    <td>${proofHtml}</td>
                     <td>
                         <form method="POST" style="display:inline;" id="${fid}">
                             <input type="hidden" name="csrf_token" value="${escHtml(_CSRF)}">
@@ -524,9 +574,29 @@ function closeDrawer() {
     document.getElementById('participantsDrawer').style.display = 'none';
 }
 
+function setParticipantMode(mode) {
+    document.getElementById('participantModeInput').value = mode;
+    const isWalkin = mode === 'walkin';
+    document.getElementById('registeredFields').style.display = isWalkin ? 'none' : '';
+    document.getElementById('walkinFields').style.display     = isWalkin ? '' : 'none';
+    // Required attributes
+    document.getElementById('customerSelect').required   = !isWalkin;
+    document.getElementById('walkinNameInput').required  = isWalkin;
+    // Button styles
+    const btnReg    = document.getElementById('modeRegistered');
+    const btnWalkin = document.getElementById('modeWalkin');
+    btnReg.style.background    = isWalkin ? 'transparent' : 'rgba(95,133,218,.15)';
+    btnReg.style.borderColor   = isWalkin ? 'rgba(255,255,255,.12)' : 'rgba(95,133,218,.5)';
+    btnReg.style.color         = isWalkin ? '#888' : '#5f85da';
+    btnWalkin.style.background = isWalkin ? 'rgba(241,168,60,.15)' : 'transparent';
+    btnWalkin.style.borderColor= isWalkin ? 'rgba(241,168,60,.5)' : 'rgba(255,255,255,.12)';
+    btnWalkin.style.color      = isWalkin ? '#f1a83c' : '#888';
+}
+
 function openAddParticipant(id, name) {
     document.getElementById('addParticipantTournamentId').value = id;
     document.getElementById('addParticipantTournamentName').textContent = name;
+    setParticipantMode('registered'); // reset to default mode
     openModal('addParticipant');
 }
 

@@ -13,7 +13,8 @@ if (!$tournament_id) {
 
 $stmt = $conn->prepare("
     SELECT tp.participant_id, tp.payment_status, tp.registration_date,
-           tp.ign, tp.contact_number, tp.gcash_proof, tp.notes,
+           tp.ign, tp.contact_number, tp.walkin_name, tp.notes,
+           tp.paymongo_source_id, tp.paymongo_status,
            u.full_name, u.email
     FROM tournament_participants tp
     JOIN users u ON tp.user_id = u.user_id
