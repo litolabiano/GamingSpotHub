@@ -79,6 +79,15 @@ if (!empty($_GET['paymongo'])) {
 
             $payment_id = $cs['payment_id'] ?? null;
 
+            // In test mode PayMongo often doesn't include pay_xxx in the
+            // checkout session response. Fall back to the checkout session ID
+            // (cs_xxx) so the reference field is never blank.
+            $stored_ref = $payment_id ?: $session_id;
+
+            error_log('[Reserve PATH B] payment_id=' . ($payment_id ?? 'null')
+                . ' session_id=' . $session_id
+                . ' stored_ref=' . $stored_ref);
+
             // ── Create the reservation in DB ──────────────────────────────────
             $result = createReservation(
                 $user['user_id'],
@@ -98,6 +107,8 @@ if (!empty($_GET['paymongo'])) {
                 $res_id = $result['reservation_id'];
 
                 // ── Store PayMongo IDs on the reservation row ─────────────────
+                // paymongo_source_id  = the Checkout Session ID (cs_xxx) — always available
+                // paymongo_payment_id = pay_xxx if returned; else cs_xxx as fallback
                 $upd = $conn->prepare(
                     "UPDATE reservations
                         SET paymongo_source_id  = ?,
@@ -106,7 +117,7 @@ if (!empty($_GET['paymongo'])) {
                             downpayment_paid    = 1
                       WHERE reservation_id = ?"
                 );
-                $upd->bind_param('ssi', $session_id, $payment_id, $res_id);
+                $upd->bind_param('ssi', $session_id, $stored_ref, $res_id);
                 $upd->execute();
 
                 unset($_SESSION['pending_reservation']);

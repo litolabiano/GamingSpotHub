@@ -165,7 +165,11 @@ class PayMongoService
      */
     public static function getCheckoutSession(string $session_id): array
     {
-        $result = self::request('GET', '/checkout_sessions/' . $session_id);
+        // Include payments in the response — reduces the need for a second call
+        $result = self::request('GET', '/checkout_sessions/' . $session_id . '?include[]=payments');
+
+        // Always log the raw result so we can diagnose issues
+        error_log('[PayMongo] getCheckoutSession(' . $session_id . ') raw: ' . json_encode($result));
 
         if (!$result['success']) {
             return $result;
@@ -173,18 +177,62 @@ class PayMongoService
 
         $attrs = $result['data']['attributes'] ?? [];
 
-        // Grab the first payment ID from the nested payments array (if present)
-        $payments  = $attrs['payments'] ?? [];
-        $paymentId = !empty($payments) ? ($payments[0]['id'] ?? null) : null;
+        // ── payment_status on the session itself ──────────────────────────────
+        $paymentStatus = $attrs['payment_status'] ?? 'unpaid';
+
+        // ── Also check the nested payment_intent status ───────────────────────
+        // PayMongo sometimes updates the PI before the session-level status
+        $pi           = $attrs['payment_intent'] ?? [];
+        $piAttrs      = is_array($pi) ? ($pi['attributes'] ?? []) : [];
+        $piStatus     = $piAttrs['status'] ?? '';              // e.g. 'succeeded'
+        $piPayments   = $piAttrs['payments'] ?? [];
+        $piId         = is_array($pi) ? ($pi['id'] ?? null) : null;
+
+        // ── Also check top-level payments array ───────────────────────────────
+        $topPayments  = $attrs['payments'] ?? [];
+        $allPayments  = array_merge($topPayments, $piPayments);
+
+        // Grab first payment ID from whatever arrays we have
+        $paymentId = null;
+        foreach ($allPayments as $p) {
+            $pid = is_array($p) ? ($p['id'] ?? null) : null;
+            if ($pid) { $paymentId = $pid; break; }
+        }
+
+        // Mark as paid if EITHER the session status is 'paid'
+        // OR the payment intent reached 'succeeded'
+        $isPaid = ($paymentStatus === 'paid') || ($piStatus === 'succeeded');
+        if ($isPaid) {
+            $paymentStatus = 'paid';
+        }
+
+        // ── Fallback: if paid but no payment_id yet, fetch it from the PI ─────
+        // The checkout session may not embed the payments array even when paid.
+        // Fetching the Payment Intent directly always returns the payments list.
+        if ($isPaid && !$paymentId && $piId) {
+            $piResult = self::request('GET', '/payment_intents/' . $piId . '?include[]=payments');
+            if ($piResult['success']) {
+                $piData    = $piResult['data']['attributes'] ?? [];
+                $piPayList = $piData['payments'] ?? [];
+                foreach ($piPayList as $p) {
+                    $pid = is_array($p) ? ($p['id'] ?? null) : null;
+                    if ($pid) { $paymentId = $pid; break; }
+                }
+                error_log('[PayMongo] PI payments fetch for ' . $piId . ': payment_id=' . ($paymentId ?? 'null'));
+            }
+        }
 
         // Total line-items amount
         $lineItems = $attrs['line_items'] ?? [];
         $amount    = !empty($lineItems) ? ($lineItems[0]['amount'] ?? 0) : 0;
 
+        error_log('[PayMongo] session payment_status=' . $paymentStatus . ' pi_status=' . $piStatus . ' payment_id=' . ($paymentId ?? 'null'));
+
         return [
             'success'        => true,
             'session_id'     => $result['data']['id'] ?? $session_id,
-            'payment_status' => $attrs['payment_status'] ?? 'unpaid',
+            'payment_status' => $paymentStatus,
+            'pi_status'      => $piStatus,
             'payment_id'     => $paymentId,
             'amount'         => $amount,
         ];

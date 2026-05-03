@@ -107,7 +107,9 @@
                         '<?= $sess['rental_mode'] ?>',
                         <?= strtotime($sess['start_time']) ?>,
                         <?= (int)($sess['planned_minutes'] ?? 0) ?>,
-                        <?= (float)($sess['upfront_paid'] ?? 0) ?>)">
+                        <?= (float)($sess['upfront_paid'] ?? 0) ?>,
+                        <?= (float)($sess['reservation_downpayment'] ?? 0) ?>,
+                        <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay
                     </button>
                 </td>

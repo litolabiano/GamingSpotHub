@@ -363,8 +363,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'] . ' min' : '< 1 min')
                                 : '—' ?>
                         </td>
-
-                        <td class="cost-cell">
+                <td class="cost-cell">
                             <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 2) : '—' ?>
                         </td>
 
@@ -382,8 +381,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?= $startTs ?>,
                             <?= $bookedMinutes ?>,
                             <?= (float)($sess['upfront_paid'] ?? 0) ?>,
-                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>
-                        )">
+                            <?= (float)($sess['reservation_downpayment'] ?? 0) ?>,
+                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>,
+                            <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
