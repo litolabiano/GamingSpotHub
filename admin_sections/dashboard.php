@@ -174,7 +174,7 @@
                                 </button>
                             </form>
                             <?php endif; ?>
-                            <?php if (in_array($r['status'], ['pending','confirmed'])): ?>
+                            <?php if ($r['status'] === 'confirmed'): ?>
                             <button class="btn btn-success btn-sm" onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Convert to Session">
                                 <i class="fas fa-play"></i> Start
                             </button>

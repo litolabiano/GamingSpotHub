@@ -213,8 +213,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // SAVE SETTINGS
+    // SAVE SETTINGS — owner only
     elseif ($action === 'save_settings') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Access denied. Only the owner can change settings.';
+            $messageType = 'error';
+        } else {
         $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
                  'business_hours_open','business_hours_close','shop_phone',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
@@ -240,6 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $message = 'Settings saved and console rates updated.';
         $messageType = 'success';
+        } // end owner check
     }
 
     // CONFIRM RESERVATION
@@ -810,9 +815,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <style>
-        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        /* â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
            ADMIN DESIGN SYSTEM - CSS Custom Properties
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+        â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â•  */
         :root {
             --clr-mint:    #20c8a1;
             --clr-blue:    #5f85da;
@@ -1085,9 +1090,11 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         <?php endif; ?>
     </div>
 
+    <?php if ($user['role'] === 'owner'): ?>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
@@ -1197,7 +1204,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
 
-<?php include __DIR__ . '/admin_sections/settings.php'; ?>
+<?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
