@@ -60,28 +60,39 @@ function straight($x1,$y1,$x2,$y2,$many2=true,$many1=false){
   return $s;
 }
 function one_tick($ex,$ey,$fx,$fy){
-  // Perpendicular tick at endpoint (ex,ey), away from (fx,fy)
-  $len=7;
-  $dx=$ex-$fx; $dy=$ey-$fy; $d=max(sqrt($dx*$dx+$dy*$dy),0.01);
-  $nx=-$dy/$d; $ny=$dx/$d;
-  $ax=$ex+$nx*$len; $ay=$ey+$ny*$len;
-  $bx=$ex-$nx*$len; $by=$ey-$ny*$len;
-  return "<line x1='$ax' y1='$ay' x2='$bx' y2='$by' stroke='#555' stroke-width='1.5'/>";
+  // Single perpendicular bar at entity edge — offset by $gap so it clears the box border
+  $half=11; $gap=5; $sw=2;
+  $dx=$fx-$ex; $dy=$fy-$ey; $d=max(sqrt($dx*$dx+$dy*$dy),0.01);
+  $ux=$dx/$d; $uy=$dy/$d; // unit vector toward the line
+  $px=-$uy; $py=$ux;       // perpendicular
+  $bx=round($ex+$ux*$gap,1); $by=round($ey+$uy*$gap,1);
+  $ax1=round($bx+$px*$half,1); $ay1=round($by+$py*$half,1);
+  $ax2=round($bx-$px*$half,1); $ay2=round($by-$py*$half,1);
+  return "<line x1='$ax1' y1='$ay1' x2='$ax2' y2='$ay2' stroke='#444' stroke-width='$sw' stroke-linecap='round'/>";
 }
 function crow($ex,$ey,$fx,$fy){
-  // Crow-foot at endpoint (ex,ey) pointing toward (fx,fy)
-  $d2=8; $spread=7;
+  // Crow-foot at entity edge (ex,ey), line runs toward (fx,fy)
+  // Layout from entity outward:  entity-box | gap | fork-TIP ─── fork-BASE (with spread)
+  //                                                |─── perpendicular bar
+  $half=11;   // perpendicular half-length of spread and bar
+  $back=15;   // distance from tip to prong base (controls fork openness)
+  $gap=5;     // clearance from entity box border
+  $bar_off=21;// where the accompanying single bar sits (beyond gap)
+  $sw=2;
   $dx=$fx-$ex; $dy=$fy-$ey; $d=max(sqrt($dx*$dx+$dy*$dy),0.01);
-  $ux=$dx/$d; $uy=$dy/$d;
-  $nx=-$uy; $ny=$ux;
-  // Back point along the line
-  $bx=$ex+$ux*$d2; $by=$ey+$uy*$d2;
-  $s ="<line x1='$ex' y1='$ey' x2='".($bx+$nx*$spread)."' y2='".($by+$ny*$spread)."' stroke='#555' stroke-width='1.5'/>";
-  $s.="<line x1='$ex' y1='$ey' x2='".($bx-$nx*$spread)."' y2='".($by-$ny*$spread)."' stroke='#555' stroke-width='1.5'/>";
-  // Also draw the tick
-  $tx=$ex+$nx*7; $ty=$ey+$ny*7;
-  $ux2=$ex-$nx*7; $uy2=$ey-$ny*7;
-  $s.="<line x1='$tx' y1='$ty' x2='$ux2' y2='$uy2' stroke='#555' stroke-width='1.5'/>";
+  $ux=$dx/$d; $uy=$dy/$d;   // unit vector from entity toward line
+  $px=-$uy;   $py=$ux;       // perpendicular unit
+  // Fork tip (just outside entity border)
+  $tx=round($ex+$ux*$gap,1); $ty=round($ey+$uy*$gap,1);
+  // Prong base (further along the line)
+  $bx=round($tx+$ux*$back,1); $by=round($ty+$uy*$back,1);
+  // Three crow-foot prongs from tip outward
+  $s ="<line x1='$tx' y1='$ty' x2='".round($bx+$px*$half,1)."' y2='".round($by+$py*$half,1)."' stroke='#444' stroke-width='$sw' stroke-linecap='round'/>";
+  $s.="<line x1='$tx' y1='$ty' x2='$bx' y2='$by' stroke='#444' stroke-width='$sw' stroke-linecap='round'/>";
+  $s.="<line x1='$tx' y1='$ty' x2='".round($bx-$px*$half,1)."' y2='".round($by-$py*$half,1)."' stroke='#444' stroke-width='$sw' stroke-linecap='round'/>";
+  // Single perpendicular bar (the "one-or-more" marker on the many side)
+  $rx=round($ex+$ux*$bar_off,1); $ry=round($ey+$uy*$bar_off,1);
+  $s.="<line x1='".round($rx+$px*$half,1)."' y1='".round($ry+$py*$half,1)."' x2='".round($rx-$px*$half,1)."' y2='".round($ry-$py*$half,1)."' stroke='#444' stroke-width='$sw' stroke-linecap='round'/>";
   return $s;
 }
 
