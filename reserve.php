@@ -61,7 +61,19 @@ if (!empty($_GET['paymongo'])) {
     if ($pm_result === 'success' && $session_id && $pending) {
 
         // ── Verify payment via Checkout Session API ───────────────────────────
-        $cs = PayMongoService::getCheckoutSession($session_id);
+        // PayMongo may redirect to success_url a split-second before their
+        // servers update payment_status to 'paid'. Retry up to 4 times (1s apart).
+        $cs         = [];
+        $maxRetries = 4;
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $cs = PayMongoService::getCheckoutSession($session_id);
+            if (!empty($cs['success']) && $cs['payment_status'] === 'paid') {
+                break; // confirmed paid — stop polling
+            }
+            if ($attempt < $maxRetries) {
+                sleep(1); // wait 1 second before next check
+            }
+        }
 
         if ($cs['success'] && $cs['payment_status'] === 'paid') {
 
