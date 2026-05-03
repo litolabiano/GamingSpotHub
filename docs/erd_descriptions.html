@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GSpot Gaming Hub — ERD Entity Descriptions</title>
+<style>
+  @page { size: A4; margin: 18mm 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;
+         color: #222; background: #fff; padding: 20px 24px; }
+  h1 { font-size: 18px; color: #1a3a6a; border-bottom: 2px solid #4A8FC4;
+       padding-bottom: 6px; margin: 20px 0 12px; page-break-before: avoid; }
+  h2 { font-size: 14px; color: #fff; background: #4A8FC4;
+       padding: 6px 10px; margin: 22px 0 8px; border-radius: 4px;
+       page-break-after: avoid; }
+  h3 { font-size: 12px; color: #333; margin: 12px 0 4px; }
+  p { margin: 6px 0; line-height: 1.55; }
+  strong { font-weight: 700; }
+  code { font-family: Consolas, monospace; font-size: 10px;
+         background: #f0f4f8; padding: 1px 4px; border-radius: 3px; color: #c0392b; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px;
+          font-size: 10.5px; page-break-inside: avoid; }
+  th { background: #4A8FC4; color: #fff; padding: 5px 8px;
+       text-align: left; font-weight: 600; }
+  td { padding: 4px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f8fc; }
+  .cover { text-align: center; padding: 40px 0 30px; border-bottom: 3px solid #4A8FC4;
+           margin-bottom: 24px; page-break-after: avoid; }
+  .cover h1 { font-size: 22px; border: none; color: #1a3a6a; }
+  .cover p  { font-size: 12px; color: #666; margin-top: 6px; }
+  @media print {
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="cover">
+  <h1>GSpot Gaming Hub</h1>
+  <p>Entity Relationship Diagram &mdash; Entity Descriptions</p>
+  <p style="margin-top:4px;color:#888">Generated: <?= date('F j, Y') ?> | Total Entities: 12</p>
+</div>
+<h1>GSpot Gaming Hub — ERD Entity Descriptions</h1>
+
+<hr>
+
+<h2>ENTITY 1 — users</h2>
+
+<strong>Description:</strong>
+The central entity of the entire system. Stores all system accounts regardless of role — customers who make reservations, shopkeepers who manage sessions, and owners who access reports. Every other entity in the system either belongs to or is created by a user record.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>user_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique identifier for every user</td></tr>
+<tr><td><code>email</code></td><td>VARCHAR(100), UNIQUE</td><td>Login email address</td></tr>
+<tr><td><code>password_hash</code></td><td>VARCHAR(255)</td><td>Bcrypt-hashed password</td></tr>
+<tr><td><code>full_name</code></td><td>VARCHAR(100)</td><td>Display name</td></tr>
+<tr><td><code>phone</code></td><td>VARCHAR(20), NULLABLE</td><td>Contact number</td></tr>
+<tr><td><code>role</code></td><td>ENUM(customer, shopkeeper, owner)</td><td>Determines access level</td></tr>
+<tr><td><code>status</code></td><td>ENUM(active, inactive)</td><td>Account active/deactivated</td></tr>
+<tr><td><code>consecutive_cancellations</code></td><td>TINYINT UNSIGNED</td><td>Count of non-grace cancellations (3-strike rule)</td></tr>
+<tr><td><code>reservation_banned_until</code></td><td>DATETIME, NULLABLE</td><td>Booking ban expiry; NULL = not banned</td></tr>
+<tr><td><code>email_verified</code></td><td>TINYINT(1)</td><td>1 = email confirmed, 0 = pending</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>Account creation timestamp</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>user_id</code>
+<strong>Foreign Keys:</strong> None (top-level entity)
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>notifications</td><td>1-to-Many</td><td>One user receives many notifications</td></tr>
+<tr><td>reservations</td><td>1-to-Many</td><td>One user makes many reservations</td></tr>
+<tr><td>gaming_sessions</td><td>1-to-Many</td><td>One user has many gaming sessions</td></tr>
+<tr><td>reservation_cancellations</td><td>1-to-Many</td><td>One user has many cancellation log entries</td></tr>
+<tr><td>reschedules</td><td>1-to-Many</td><td>One user (admin) performs many reschedules</td></tr>
+<tr><td>transactions</td><td>1-to-Many</td><td>One user has many payment transactions</td></tr>
+<tr><td>tournament_participants</td><td>1-to-Many</td><td>One user joins many tournaments</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 user → 0..N reservations
+- 1 user → 0..N gaming_sessions
+- 1 user → 0..N transactions
+- 1 user → 0..N tournament_participants
+- 1 user → 0..N notifications
+
+<strong>Rules & Constraints:</strong>
+- Email must be unique across the system
+- <code>consecutive_cancellations</code> increments on each non-grace-period cancellation
+- When <code>consecutive_cancellations</code> reaches 3, <code>reservation_banned_until</code> is set to <code>NOW() + ban_duration</code>; the user cannot create new reservations until this timestamp passes
+- Streak resets to 0 after any successful completed gaming session
+- <code>role</code> determines system access: customers see the customer dashboard; shopkeepers and owners access the admin panel
+- Accounts with <code>status = inactive</code> cannot log in
+
+<hr>
+
+<h2>ENTITY 2 — consoles</h2>
+
+<strong>Description:</strong>
+Represents the physical gaming units available in the shop — PS5 and Xbox Series X consoles. Each unit has its own record so availability can be tracked per unit. Staff assigns a specific console to a session or reservation.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>console_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique unit identifier</td></tr>
+<tr><td><code>console_name</code></td><td>VARCHAR(50)</td><td>Human label (e.g., "PS5 Unit 1")</td></tr>
+<tr><td><code>console_type</code></td><td>ENUM(PS5, Xbox Series X)</td><td>Hardware type</td></tr>
+<tr><td><code>unit_number</code></td><td>VARCHAR(10), UNIQUE</td><td>Short code (e.g., "PS5-01")</td></tr>
+<tr><td><code>status</code></td><td>ENUM(available, in_use, maintenance)</td><td>Real-time availability</td></tr>
+<tr><td><code>hourly_rate</code></td><td>DECIMAL(10,2)</td><td>Rate charged per hour</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>When the unit was registered</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>console_id</code>
+<strong>Foreign Keys:</strong> None
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>reservations</td><td>1-to-Many</td><td>One console can have many reservations</td></tr>
+<tr><td>gaming_sessions</td><td>1-to-Many</td><td>One console can host many sessions over time</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 console → 0..N reservations (across different dates)
+- 1 console → 0..N gaming_sessions (across time)
+
+<strong>Rules & Constraints:</strong>
+- Only one active session can run per console at any time (<code>status = in_use</code>)
+- <code>unit_number</code> must be unique — no two units share the same code
+- Units with <code>status = maintenance</code> cannot be assigned to reservations or sessions
+- Deletion is restricted if active sessions or future reservations reference the unit
+
+<hr>
+
+<h2>ENTITY 3 — games</h2>
+
+<strong>Description:</strong>
+The game library — each record represents a title available to play on a specific console type. Used to associate tournaments with a specific game. Customers can also submit game requests referencing titles not yet in this library.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>game_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique game identifier</td></tr>
+<tr><td><code>game_name</code></td><td>VARCHAR(150)</td><td>Title of the game</td></tr>
+<tr><td><code>console_type</code></td><td>ENUM(PS5, Xbox Series X, Both)</td><td>Supported platform(s)</td></tr>
+<tr><td><code>genre</code></td><td>VARCHAR(50), NULLABLE</td><td>Game genre</td></tr>
+<tr><td><code>is_available</code></td><td>TINYINT(1)</td><td>1 = currently installed and playable</td></tr>
+<tr><td><code>is_new_release</code></td><td>TINYINT(1)</td><td>1 = flagged as new</td></tr>
+<tr><td><code>added_date</code></td><td>DATE</td><td>When added to the library</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>game_id</code>
+<strong>Foreign Keys:</strong> None
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>tournaments</td><td>1-to-Many</td><td>One game can be featured in many tournaments</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 game → 0..N tournaments
+
+<strong>Rules & Constraints:</strong>
+- A game cannot be deleted if it is referenced by an active or upcoming tournament
+- <code>is_available = 0</code> hides the game from the public game list but does not affect existing tournament records
+
+<hr>
+
+<h2>ENTITY 4 — notifications</h2>
+
+<strong>Description:</strong>
+Stores all system-generated messages sent to a specific user — booking confirmations, cancellation results, ban notices, reschedule alerts, and tournament updates. Displayed in the user's notification panel.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>notification_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique notification identifier</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>Recipient of the notification</td></tr>
+<tr><td><code>type</code></td><td>ENUM / VARCHAR</td><td>Category: reservation_confirmed, cancel_notice, ban_notice, reschedule_notice, tournament_update</td></tr>
+<tr><td><code>message</code></td><td>TEXT</td><td>Full notification text</td></tr>
+<tr><td><code>is_read</code></td><td>TINYINT(1)</td><td>0 = unread, 1 = read</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>When the notification was generated</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>notification_id</code>
+<strong>Foreign Keys:</strong> <code>user_id</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>users</td><td>Many-to-1</td><td>Many notifications belong to one user</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 user → 0..N notifications
+
+<strong>Rules & Constraints:</strong>
+- Notifications are user-scoped — a user only sees their own
+- System generates notifications automatically on: reservation confirmation, cancellation, ban, reschedule, tournament slot confirmed
+- <code>is_read</code> is set to 1 when the user opens or dismisses the notification
+
+<hr>
+
+<h2>ENTITY 5 — reservations</h2>
+
+<strong>Description:</strong>
+The core booking entity. When a customer books a gaming session in advance, a reservation record is created. It tracks which console type was booked, the date and time, the rental mode, downpayment details, and the lifecycle status. Staff converts confirmed reservations into live sessions.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>reservation_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique reservation identifier</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>Customer who made the booking</td></tr>
+<tr><td><code>console_id</code></td><td>INT, FK → consoles.console_id, NULLABLE</td><td>Specific unit assigned (nullable until staff assigns)</td></tr>
+<tr><td><code>created_by</code></td><td>INT, FK → users.user_id</td><td>Who submitted (customer = self, staff = admin ID)</td></tr>
+<tr><td><code>console_type</code></td><td>ENUM(PS5, Xbox Series X)</td><td>Console type requested</td></tr>
+<tr><td><code>rental_mode</code></td><td>ENUM(hourly, open_time, unlimited)</td><td>Billing mode</td></tr>
+<tr><td><code>planned_minutes</code></td><td>INT, NULLABLE</td><td>Duration in minutes (hourly mode only)</td></tr>
+<tr><td><code>reserved_date</code></td><td>DATE</td><td>Scheduled date</td></tr>
+<tr><td><code>reserved_time</code></td><td>TIME</td><td>Scheduled start time</td></tr>
+<tr><td><code>downpayment_amount</code></td><td>DECIMAL(10,2)</td><td>Amount paid as downpayment</td></tr>
+<tr><td><code>downpayment_method</code></td><td>ENUM(cash, gcash, credit_card), NULLABLE</td><td>How the downpayment was made</td></tr>
+<tr><td><code>status</code></td><td>ENUM(pending, confirmed, converted, cancelled, no_show)</td><td>Lifecycle status</td></tr>
+<tr><td><code>cancel_reason_type</code></td><td>ENUM(schedule_change, found_alternative, budget_issue, technical_issue, emergency, other, admin_decision), NULLABLE</td><td>Category of cancellation reason</td></tr>
+<tr><td><code>cancelled_by</code></td><td>ENUM(user, admin), NULLABLE</td><td>Who initiated the cancellation</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>When the reservation was submitted</td></tr>
+<tr><td><code>updated_at</code></td><td>DATETIME</td><td>Last modification timestamp</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>reservation_id</code>
+<strong>Foreign Keys:</strong>
+- <code>user_id</code> → <code>users.user_id</code>
+- <code>console_id</code> → <code>consoles.console_id</code> (SET NULL on delete)
+- <code>created_by</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>users</td><td>Many-to-1</td><td>Many reservations belong to one customer</td></tr>
+<tr><td>consoles</td><td>Many-to-1</td><td>Many reservations may be assigned to one console</td></tr>
+<tr><td>reservation_cancellations</td><td>1-to-1</td><td>One reservation has at most one cancellation log</td></tr>
+<tr><td>reschedules</td><td>1-to-1</td><td>One reservation may have one reschedule</td></tr>
+<tr><td>gaming_sessions</td><td>1-to-1</td><td>One confirmed reservation converts to one session</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- Many reservations → 1 user
+- Many reservations → 1 console (assigned)
+- 1 reservation → 0..1 cancellation record
+- 1 reservation → 0..1 reschedule record
+
+<strong>Rules & Constraints:</strong>
+- Booking date cannot be more than 1 month (31 days) from today
+- Only one active reservation per customer at a time is enforced at the application level
+- Availability is checked using duration-based overlap (<code>reserved_time + planned_minutes</code>), not a flat ±2-hour window
+- <strong>30-minute grace period:</strong> If cancelled within 30 minutes of <code>created_at</code>, the cancellation is penalty-free (<code>consecutive_cancellations</code> is not incremented)
+- If cancelled after 30 minutes, the cancellation is non-grace and the user's streak increments
+- <code>cancel_reason_type</code> and <code>cancelled_by</code> are required at the time of cancellation — blank reasons are rejected
+- <strong>No-Refund Policy:</strong> Downpayment is never refunded regardless of cancellation reason
+- Status <code>converted</code> means the reservation has become a live gaming session
+
+<hr>
+
+<h2>ENTITY 6 — reservation_cancellations</h2>
+
+<strong>Description:</strong>
+A dedicated audit log table. Every time a reservation is cancelled — whether by the customer or by an admin — a detailed record is written here. This is separate from the status field in <code>reservations</code> to preserve full history for reporting and the 3-strike enforcement logic.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>cancel_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique cancellation log ID</td></tr>
+<tr><td><code>reservation_id</code></td><td>INT, FK → reservations.reservation_id</td><td>The cancelled reservation</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>The customer who owned the reservation</td></tr>
+<tr><td><code>cancelled_by</code></td><td>ENUM(user, admin)</td><td>Who initiated the cancellation</td></tr>
+<tr><td><code>cancel_reason_type</code></td><td>ENUM(...)</td><td>Category of cancellation reason</td></tr>
+<tr><td><code>cancel_reason_detail</code></td><td>TEXT, NULLABLE</td><td>Free-text elaboration of reason</td></tr>
+<tr><td><code>is_within_grace (30min)</code></td><td>TINYINT(1)</td><td>1 = cancelled within 30-minute grace window</td></tr>
+<tr><td><code>reserved_date</code></td><td>DATE</td><td>The original booking date (snapshot)</td></tr>
+<tr><td><code>downpayment_amount</code></td><td>DECIMAL(10,2)</td><td>Downpayment at time of cancellation</td></tr>
+<tr><td><code>refund_issued</code></td><td>TINYINT(1)</td><td>Always 0 — No-Refund Policy</td></tr>
+<tr><td><code>cancelled_at</code></td><td>DATETIME</td><td>Exact timestamp of cancellation</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>cancel_id</code>
+<strong>Foreign Keys:</strong>
+- <code>reservation_id</code> → <code>reservations.reservation_id</code> (CASCADE DELETE)
+- <code>user_id</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>reservations</td><td>Many-to-1</td><td>One cancellation log belongs to one reservation</td></tr>
+<tr><td>users</td><td>Many-to-1</td><td>One cancellation log records one customer</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 reservation → 0..1 cancellation record
+- 1 user → 0..N cancellation records (one per cancellation event)
+
+<strong>Rules & Constraints:</strong>
+- <code>cancelled_by = admin</code> entries do NOT trigger streak increment — only <code>cancelled_by = user</code> outside the grace window does
+- <code>refund_issued</code> is always <code>0</code> — enforcing the No-Refund Policy at the data level
+- <code>is_within_grace</code> determines whether the cancellation counts against the 3-strike rule
+- The record is the source of truth for the "My Cancellations" history view
+- Reason detail cannot be blank — enforced at the application layer before write
+
+<hr>
+
+<h2>ENTITY 7 — reschedules</h2>
+
+<strong>Description:</strong>
+Stores every administrative rescheduling event. When an admin reschedules a reservation due to external reasons (typhoon, power outage, emergency), the original date/time is preserved and the new schedule is recorded. Rescheduling never affects the customer's cancellation streak.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>reschedule_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique reschedule identifier</td></tr>
+<tr><td><code>reservation_id</code></td><td>INT, FK → reservations.reservation_id</td><td>The affected reservation</td></tr>
+<tr><td><code>rescheduled_by</code></td><td>INT, FK → users.user_id</td><td>Admin who performed the reschedule</td></tr>
+<tr><td><code>original_date</code></td><td>DATE</td><td>The original reserved date</td></tr>
+<tr><td><code>original_time</code></td><td>TIME</td><td>The original reserved time</td></tr>
+<tr><td><code>new_date</code></td><td>DATE</td><td>The rescheduled date</td></tr>
+<tr><td><code>new_time</code></td><td>TIME</td><td>The rescheduled time</td></tr>
+<tr><td><code>reason_type</code></td><td>ENUM(typhoon, power_outage, emergency, other)</td><td>Category of reason</td></tr>
+<tr><td><code>reason_detail</code></td><td>TEXT, NULLABLE</td><td>Free-text elaboration</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>When the reschedule was recorded</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>reschedule_id</code>
+<strong>Foreign Keys:</strong>
+- <code>reservation_id</code> → <code>reservations.reservation_id</code>
+- <code>rescheduled_by</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>reservations</td><td>Many-to-1</td><td>One reschedule record belongs to one reservation</td></tr>
+<tr><td>users</td><td>Many-to-1</td><td>One admin (user) performs many reschedules</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 reservation → 0..1 reschedule record (one active reschedule per reservation)
+- 1 admin user → 0..N reschedule records
+
+<strong>Rules & Constraints:</strong>
+- <strong>Rescheduling does NOT increment <code>consecutive_cancellations</code></strong> — it is not treated as a cancellation
+- Only staff/admin (<code>role = shopkeeper</code> or <code>owner</code>) can create reschedule records
+- <code>reason_type</code> must be selected from the defined ENUM values
+- A notification is automatically sent to the customer when a reschedule is recorded
+- The original reservation record is updated with the new date/time; this table preserves the full audit trail
+
+<hr>
+
+<h2>ENTITY 8 — gaming_sessions</h2>
+
+<strong>Description:</strong>
+Tracks every live and completed gaming rental session. Created when staff starts a session — either by converting a confirmed reservation or by registering a walk-in customer. Records the full billing lifecycle including start time, end time, rental mode, cost, and any extensions.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>session_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique session identifier</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>Customer playing (or walk-in user ID)</td></tr>
+<tr><td><code>console_id</code></td><td>INT, FK → consoles.console_id</td><td>The assigned console unit</td></tr>
+<tr><td><code>created_by</code></td><td>INT, FK → users.user_id</td><td>Staff who started the session</td></tr>
+<tr><td><code>rental_mode</code></td><td>ENUM(hourly, open_time, unlimited)</td><td>Billing mode</td></tr>
+<tr><td><code>start_time</code></td><td>DATETIME</td><td>When the session began</td></tr>
+<tr><td><code>end_time</code></td><td>DATETIME, NULLABLE</td><td>When the session ended (NULL if still active)</td></tr>
+<tr><td><code>duration_minutes</code></td><td>INT, NULLABLE</td><td>Actual elapsed minutes at end</td></tr>
+<tr><td><code>extended_minutes</code></td><td>INT DEFAULT 0</td><td>Total minutes added via approved extensions</td></tr>
+<tr><td><code>total_cost</code></td><td>DECIMAL(10,2), NULLABLE</td><td>Final billed amount</td></tr>
+<tr><td><code>status</code></td><td>ENUM(active, completed, cancelled)</td><td>Session lifecycle status</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>session_id</code>
+<strong>Foreign Keys:</strong>
+- <code>user_id</code> → <code>users.user_id</code>
+- <code>console_id</code> → <code>consoles.console_id</code>
+- <code>created_by</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>users</td><td>Many-to-1</td><td>Many sessions belong to one customer</td></tr>
+<tr><td>consoles</td><td>Many-to-1</td><td>Many sessions run on one console (over time)</td></tr>
+<tr><td>session_extensions</td><td>1-to-Many</td><td>One session can have many extension requests</td></tr>
+<tr><td>transactions</td><td>1-to-Many</td><td>One session generates one or more transactions</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 user → 0..N sessions
+- 1 console → 0..N sessions (serially, not simultaneously)
+- 1 session → 0..N extensions
+- 1 session → 1..N transactions
+
+<strong>Rules & Constraints:</strong>
+- <strong>Only one active session per console at a time</strong> — validated before creating a new session
+- <strong>Starter rate:</strong> ₱50 for the first 30 minutes; ₱80/hr thereafter
+- <strong>Unlimited mode:</strong> flat fee regardless of duration
+- <strong>Bonus time:</strong> 30 free minutes awarded per every 2 hours of paid play
+- <code>extended_minutes</code> accumulates across all approved extension requests
+- Staff must end the session (<code>end_time</code> set) before a transaction can be finalized
+- After <code>end_time</code> is set, admin may retroactively correct it — triggering a full cost recalculation
+- Walk-in sessions may use a generic/guest user ID if the customer has no registered account
+
+<hr>
+
+<h2>ENTITY 9 — session_extensions</h2>
+
+<strong>Description:</strong>
+Tracks every request to extend an active gaming session's duration. Customers can request extensions; staff can also add them directly. Each extension has a status and records the extra minutes and cost charged.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>extension_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique extension identifier</td></tr>
+<tr><td><code>session_id</code></td><td>INT, FK → gaming_sessions.session_id</td><td>The session being extended</td></tr>
+<tr><td><code>requested_by</code></td><td>INT, FK → users.user_id</td><td>Who requested the extension</td></tr>
+<tr><td><code>approved_by</code></td><td>INT, FK → users.user_id, NULLABLE</td><td>Staff who approved (NULL if pending/denied)</td></tr>
+<tr><td><code>extra_minutes</code></td><td>INT</td><td>Minutes to add</td></tr>
+<tr><td><code>extra_cost</code></td><td>DECIMAL(10,2)</td><td>Cost of the extension</td></tr>
+<tr><td><code>payment_method</code></td><td>ENUM(cash, gcash, credit_card), NULLABLE</td><td>Set when payment is collected</td></tr>
+<tr><td><code>status</code></td><td>ENUM(pending, approved, denied)</td><td>Approval state</td></tr>
+<tr><td><code>requested_at</code></td><td>DATETIME</td><td>Timestamp of request</td></tr>
+<tr><td><code>resolved_at</code></td><td>DATETIME, NULLABLE</td><td>When staff approved or denied</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>extension_id</code>
+<strong>Foreign Keys:</strong>
+- <code>session_id</code> → <code>gaming_sessions.session_id</code> (CASCADE DELETE)
+- <code>requested_by</code> → <code>users.user_id</code>
+- <code>approved_by</code> → <code>users.user_id</code> (NULLABLE)
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>gaming_sessions</td><td>Many-to-1</td><td>Many extensions belong to one session</td></tr>
+<tr><td>users</td><td>Many-to-1</td><td>Many extensions requested by users; approved by staff</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 session → 0..N extension requests
+- 1 user → 0..N extension requests (as customer or staff)
+
+<strong>Rules & Constraints:</strong>
+- <strong>Extension rate:</strong> ₱40 per 30 minutes
+- Staff-direct extensions are inserted with <code>status = approved</code> immediately (no pending step)
+- Customer extension requests start as <code>status = pending</code> and require staff approval
+- <code>approved_by</code> is NULL until a staff member acts on the request
+- On approval, <code>gaming_sessions.extended_minutes</code> is incremented by <code>extra_minutes</code>
+- <strong>Free bonus time is not charged:</strong> 30 min free per 2 hours paid — this is applied at billing, not at the extension level
+
+<hr>
+
+<h2>ENTITY 10 — transactions</h2>
+
+<strong>Description:</strong>
+Records every payment event in the system. Each gaming session generates at least one transaction record. Captures the amount, payment method (GCash), processor, and whether the No-Refund Policy was acknowledged.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>transaction_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique transaction identifier</td></tr>
+<tr><td><code>session_id</code></td><td>INT, FK → gaming_sessions.session_id</td><td>The session this payment covers</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>The paying customer</td></tr>
+<tr><td><code>processed_by</code></td><td>INT, FK → users.user_id</td><td>Staff who processed the payment</td></tr>
+<tr><td><code>amount</code></td><td>DECIMAL(10,2)</td><td>Amount charged</td></tr>
+<tr><td><code>payment_method (gcash)</code></td><td>ENUM(cash, gcash, credit_card)</td><td>Payment method used</td></tr>
+<tr><td><code>payment_status</code></td><td>ENUM(pending, completed, failed)</td><td>Payment completion state</td></tr>
+<tr><td><code>no_refund_acknowledged</code></td><td>TINYINT(1)</td><td>1 = customer confirmed the no-refund policy</td></tr>
+<tr><td><code>transaction_date</code></td><td>DATETIME</td><td>When payment was processed</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>transaction_id</code>
+<strong>Foreign Keys:</strong>
+- <code>session_id</code> → <code>gaming_sessions.session_id</code>
+- <code>user_id</code> → <code>users.user_id</code>
+- <code>processed_by</code> → <code>users.user_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>gaming_sessions</td><td>Many-to-1</td><td>Many transactions can belong to one session (initial + extensions)</td></tr>
+<tr><td>users</td><td>Many-to-1</td><td>Many transactions tied to one customer</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 session → 1..N transactions
+- 1 user → 0..N transactions
+
+<strong>Rules & Constraints:</strong>
+- <strong>No-Refund Policy:</strong> Once <code>payment_status = completed</code>, no refund is issued under any circumstance
+- GCash (via PayMongo) is the preferred and promoted payment method for online flows
+- Walk-in sessions use <code>payment_method = cash</code>
+- <code>no_refund_acknowledged = 1</code> must be set before a reservation or session payment is finalized
+- <code>processed_by</code> references the staff user who collected or verified the payment
+
+<hr>
+
+<h2>ENTITY 11 — tournaments</h2>
+
+<strong>Description:</strong>
+Represents gaming competitions organized by the shop. Each tournament is tied to a specific game and console type, has a defined schedule and entry fee, and follows a lifecycle from upcoming through to completed.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>tournament_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique tournament identifier</td></tr>
+<tr><td><code>game_id</code></td><td>INT, FK → games.game_id</td><td>The featured game</td></tr>
+<tr><td><code>tournament_name</code></td><td>VARCHAR(150)</td><td>Name of the tournament</td></tr>
+<tr><td><code>console_type</code></td><td>ENUM(PS5, Xbox Series X)</td><td>Platform for this tournament</td></tr>
+<tr><td><code>start_date</code></td><td>DATETIME</td><td>Tournament start date and time</td></tr>
+<tr><td><code>end_date</code></td><td>DATETIME</td><td>Tournament end date and time</td></tr>
+<tr><td><code>entry_fee</code></td><td>DECIMAL(10,2)</td><td>Cost to register</td></tr>
+<tr><td><code>prize_pool</code></td><td>DECIMAL(10,2)</td><td>Total prize amount</td></tr>
+<tr><td><code>max_participants</code></td><td>INT</td><td>Maximum allowed participants</td></tr>
+<tr><td><code>status</code></td><td>ENUM(upcoming, scheduled, ongoing, completed, cancelled)</td><td>Lifecycle status</td></tr>
+<tr><td><code>announcement</code></td><td>TEXT, NULLABLE</td><td>Public announcement text</td></tr>
+<tr><td><code>created_at</code></td><td>DATETIME</td><td>When the tournament was created</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>tournament_id</code>
+<strong>Foreign Keys:</strong> <code>game_id</code> → <code>games.game_id</code>
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>games</td><td>Many-to-1</td><td>Many tournaments can feature one game</td></tr>
+<tr><td>tournament_participants</td><td>1-to-Many</td><td>One tournament has many registered participants</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 game → 0..N tournaments
+- 1 tournament → 0..N participants (up to <code>max_participants</code>)
+
+<strong>Rules & Constraints:</strong>
+- <strong>Minimum lead time:</strong> Tournament <code>start_date</code> must be at least 7 days from the creation date
+- Registration is only allowed when <code>status = scheduled</code> (open for registration)
+- Cannot exceed <code>max_participants</code>; capacity is re-verified at payment confirmation to prevent race conditions
+- Status transitions: <code>upcoming</code> → <code>scheduled</code> → <code>ongoing</code> → <code>completed</code>; cannot revert from <code>completed</code>
+- <code>entry_fee</code> must be set before registration opens
+- Only staff/admin can create or update tournaments
+
+<hr>
+
+<h2>ENTITY 12 — tournament_participants</h2>
+
+<strong>Description:</strong>
+The junction (bridge) entity connecting users to tournaments. Each record represents one registration — a user joining a specific tournament. Supports both online self-registration (with GCash proof upload) and walk-in registrations added by staff.
+
+<strong>Attributes:</strong>
+
+<table>
+<tr><th>Attribute</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>participant_id</code></td><td>INT, PK, AUTO_INCREMENT</td><td>Unique participant record ID</td></tr>
+<tr><td><code>tournament_id</code></td><td>INT, FK → tournaments.tournament_id</td><td>The tournament being joined</td></tr>
+<tr><td><code>user_id</code></td><td>INT, FK → users.user_id</td><td>The registering customer (0 for walk-in)</td></tr>
+<tr><td><code>registered_by</code></td><td>INT, FK → users.user_id, NULLABLE</td><td>Staff who added a walk-in (NULL for self-registration)</td></tr>
+<tr><td><code>ign</code></td><td>VARCHAR(100), NULLABLE</td><td>In-game name / alias</td></tr>
+<tr><td><code>contact_number</code></td><td>VARCHAR(20), NULLABLE</td><td>Contact number at registration</td></tr>
+<tr><td><code>gcash_proof</code></td><td>VARCHAR(255), NULLABLE</td><td>Uploaded GCash receipt filename</td></tr>
+<tr><td><code>payment_status</code></td><td>ENUM(pending, paid)</td><td>Whether entry fee was confirmed</td></tr>
+<tr><td><code>placement</code></td><td>INT, NULLABLE</td><td>Final finishing position</td></tr>
+<tr><td><code>prize_amount</code></td><td>DECIMAL(10,2), NULLABLE</td><td>Prize won (if any)</td></tr>
+<tr><td><code>registration_date</code></td><td>DATETIME</td><td>When registration was submitted</td></tr>
+</table>
+
+<strong>Primary Key:</strong> <code>participant_id</code>
+<strong>Foreign Keys:</strong>
+- <code>tournament_id</code> → <code>tournaments.tournament_id</code> (CASCADE DELETE)
+- <code>user_id</code> → <code>users.user_id</code>
+- <code>registered_by</code> → <code>users.user_id</code> (SET NULL on delete)
+
+<strong>Relationships:</strong>
+
+<table>
+<tr><th>Related Entity</th><th>Type</th><th>Description</th></tr>
+<tr><td>tournaments</td><td>Many-to-1</td><td>Many participants belong to one tournament</td></tr>
+<tr><td>users</td><td>Many-to-1</td><td>One user can join many tournaments (many participants per user)</td></tr>
+</table>
+
+<strong>Cardinality:</strong>
+- 1 tournament → 0..N participants
+- 1 user → 0..N tournament registrations
+- This is effectively a <strong>Many-to-Many</strong> relationship between <code>users</code> and <code>tournaments</code>, resolved through this junction table
+
+<strong>Rules & Constraints:</strong>
+- One registration per registered user per tournament (unique constraint enforced at application level; <code>user_id = 0</code> for walk-ins bypasses this)
+- <code>gcash_proof</code> upload is required for self-registered participants paying online
+- Registration slot is only confirmed (<code>payment_status = paid</code>) after GCash payment is verified via PayMongo
+- <strong>Capacity re-check:</strong> <code>max_participants</code> on the tournament is verified again at payment confirmation to prevent overbooking
+- Walk-in participants added by staff have <code>registered_by</code> set to the staff <code>user_id</code>; <code>user_id = 0</code>
+- <code>placement</code> and <code>prize_amount</code> are populated by admin after the tournament concludes
+
+<hr>
+
+<h2>RELATIONSHIP SUMMARY TABLE</h2>
+
+<table>
+<tr><th>From</th><th>Cardinality</th><th>To</th><th>Foreign Key</th></tr>
+<tr><td>users</td><td>1 → N</td><td>notifications</td><td>notifications.user_id</td></tr>
+<tr><td>users</td><td>1 → N</td><td>reservations</td><td>reservations.user_id</td></tr>
+<tr><td>users</td><td>1 → N</td><td>gaming_sessions</td><td>gaming_sessions.user_id</td></tr>
+<tr><td>users</td><td>1 → N</td><td>reservation_cancellations</td><td>reservation_cancellations.user_id</td></tr>
+<tr><td>users</td><td>1 → N</td><td>reschedules</td><td>reschedules.rescheduled_by</td></tr>
+<tr><td>users</td><td>1 → N</td><td>transactions</td><td>transactions.user_id</td></tr>
+<tr><td>users</td><td>1 → N</td><td>tournament_participants</td><td>tournament_participants.user_id</td></tr>
+<tr><td>consoles</td><td>1 → N</td><td>reservations</td><td>reservations.console_id</td></tr>
+<tr><td>consoles</td><td>1 → N</td><td>gaming_sessions</td><td>gaming_sessions.console_id</td></tr>
+<tr><td>reservations</td><td>1 → 0..1</td><td>reservation_cancellations</td><td>reservation_cancellations.reservation_id</td></tr>
+<tr><td>reservations</td><td>1 → 0..1</td><td>reschedules</td><td>reschedules.reservation_id</td></tr>
+<tr><td>gaming_sessions</td><td>1 → N</td><td>session_extensions</td><td>session_extensions.session_id</td></tr>
+<tr><td>gaming_sessions</td><td>1 → N</td><td>transactions</td><td>transactions.session_id</td></tr>
+<tr><td>games</td><td>1 → N</td><td>tournaments</td><td>tournaments.game_id</td></tr>
+<tr><td>tournaments</td><td>1 → N</td><td>tournament_participants</td><td>tournament_participants.tournament_id</td></tr>
+<tr><td>users ↔ tournaments</td><td>M → N</td><td>(via tournament_participants)</td><td>—</td></tr>
+</table>
+
+<hr>
+*Total: 12 entities | 15 direct relationships | 1 many-to-many resolved via junction table*
+
+</body>
+</html>
