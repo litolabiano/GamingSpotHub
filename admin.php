@@ -1964,23 +1964,6 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 String(remM).padStart(2,'0') + ':' + String(remS).padStart(2,'0');
 
             // â”€â”€ Consumed time & cost calculation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            const elapsedMin    = Math.floor(elapsed / 60);
-            const elH           = Math.floor(elapsedMin / 60);
-            const elM           = elapsedMin % 60;
-            const elapsedLabel  = (elH ? elH + 'h ' : '') + String(elM).padStart(2,'0') + 'm';
-
-            // Time cost alone (no extras - extras are a fixed charge, not time-based)
-            const timeCost      = _timedCost(elapsedMin);
-            const consumedCost  = timeCost + extras;   // total owed = time + fixed fees
-            // Non-refundable base: reservation downpayment is never returned
-            // (it is credited toward session cost, but not refundable on early exit)
-            const nonRefundBase = reservationDownpayment; // ₱0 for non-reservation sessions
-            // Refund = upfront paid minus total owed minus non-refundable base
-            const refundAmt     = Math.max(0, upfrontPaid - consumedCost - nonRefundBase);
-            const hasRefund     = refundAmt > 0;
-
-            // â”€â”€ Populate breakdown display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            document.getElementById('endEarlyElapsedStr').textContent  = '(' + elapsedLabel + ')';
             // Time Used row: show time-only cost (not extras)
             document.getElementById('endEarlyConsumedCost').textContent = '₱' + timeCost.toFixed(2);
             document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
