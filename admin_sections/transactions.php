@@ -1,21 +1,54 @@
 <!-- ════ TRANSACTIONS ══════════════════════════════════════════════════════════ -->
 <div class="page" id="transactions">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-exchange-alt" style="color:#20c8a1;margin-right:10px;"></i>Transactions</h2>
+            <p class="page-subtitle">Financial overview and payment history</p>
+        </div>
+    </div>
+
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">Today's Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">Today's Revenue</div>
+                </div>
+                <div class="stat-icon revenue"><i class="fas fa-peso-sign"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-calendar-day"></i> <?= date('F d, Y') ?></div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">This Month's Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">This Month's Revenue</div>
+                </div>
+                <div class="stat-icon sessions"><i class="fas fa-calendar-alt"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-chart-line"></i> <?= date('F Y') ?></div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
-            <div class="stat-label">All-Time Revenue</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-label">All-Time Revenue</div>
+                </div>
+                <div class="stat-icon bookings"><i class="fas fa-chart-bar"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-infinity"></i> All time</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value"><?= $finStats['total_transactions'] ?? 0 ?></div>
-            <div class="stat-label">Total Transactions</div>
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value"><?= $finStats['total_transactions'] ?? 0 ?></div>
+                    <div class="stat-label">Total Transactions</div>
+                </div>
+                <div class="stat-icon consoles"><i class="fas fa-receipt"></i></div>
+            </div>
+            <div class="stat-change up"><i class="fas fa-check-circle"></i> Completed</div>
         </div>
     </div>
 
@@ -121,19 +154,55 @@
     </div>
     <?php endif; ?>
 
-    <div class="card">
+        <div class="card">
         <div class="card-header"><h3 class="card-title">Transaction History</h3></div>
         <table class="data-table">
-            <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th></tr></thead>
+            <thead><tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>Console</th>
+                <th>Mode</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>PayMongo ID</th>
+                <th>Date</th>
+                <th>Status</th>
+            </tr></thead>
             <tbody>
-            <?php foreach ($transSessions as $t): ?>
+            <?php foreach ($transSessions as $t):
+                $pmPayId  = $t['paymongo_payment_id'] ?? null;
+                $pmSrcId  = $t['paymongo_source_id']  ?? null;
+                $pmId     = $pmPayId ?: $pmSrcId;  // prefer payment_id, fallback to session_id
+            ?>
             <tr>
                 <td>#<?= $t['transaction_id'] ?></td>
                 <td><?= htmlspecialchars($t['customer_name']) ?></td>
                 <td><?= htmlspecialchars($t['unit_number']) ?></td>
-                <td><?= match($t['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($t['rental_mode']) } ?></td>
-                <td style="color:#20c8a1;font-weight:700">₱<?= number_format($t['amount'],2) ?></td>
+                <td><?= match($t['rental_mode']) {
+                    'open_time'   => 'Open Time',
+                    'reservation' => '<span style="color:#20c8a1;font-weight:700;">Reservation</span>',
+                    'refund'      => '<span style="color:#fb566b;">Refund</span>',
+                    default       => ucfirst($t['rental_mode'])
+                } ?></td>
+                <td style="color:<?= (float)$t['amount'] < 0 ? '#fb566b' : '#20c8a1' ?>;font-weight:700">
+                    <?= (float)$t['amount'] < 0 ? '-' : '' ?>₱<?= number_format(abs((float)$t['amount']), 2) ?>
+                </td>
                 <td><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
+                <td style="font-size:11px;">
+                    <?php if ($pmId): ?>
+                        <span style="font-family:monospace;color:#20c8a1;font-weight:600;letter-spacing:.3px;"
+                              title="<?= htmlspecialchars($pmId) ?>">
+                            <?= htmlspecialchars($pmId) ?>
+                        </span>
+                        <?php if ($pmSrcId && $pmSrcId !== $pmPayId): ?>
+                        <br><span style="font-family:monospace;font-size:10px;color:#555;">
+                            <?= htmlspecialchars($pmSrcId) ?>
+                        </span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <span style="color:#444;">—</span>
+                    <?php endif; ?>
+                </td>
                 <td><?= date('M d, Y h:i A', strtotime($t['transaction_date'])) ?></td>
                 <td><span class="badge <?= $t['payment_status'] === 'completed' ? 'completed' : 'cancelled' ?>"><?= ucfirst($t['payment_status']) ?></span></td>
             </tr>

@@ -1,5 +1,14 @@
 <!-- ════ REPORTS ════════════════════════════════════════════════════════════ -->
 <div class="page" id="reports">
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-chart-bar" style="color:#b37bec;margin-right:10px;"></i>Analytics &amp; Reports</h2>
+            <p class="page-subtitle">Revenue trends, console usage, and cancellation analytics</p>
+        </div>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>

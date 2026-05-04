@@ -2,40 +2,39 @@
 /**
  * Good Spot Gaming Hub — Reserve a Console
  * Customer-facing reservation page. Login required.
+ *
+ * Payment flow:
+ *  A) Customer fills form → POST → validation → PayMongo GCash redirect
+ *  B) PayMongo redirects back → ?paymongo=success&source_id=src_xxx
+ *     → verify payment → createReservation() → success flash
+ *  B-alt) ?paymongo=failed → show error, let customer retry
+ *  C) Fallback: customer uploads screenshot instead (legacy path, kept as option)
  */
 require_once __DIR__ . '/includes/session_helper.php';
 require_once __DIR__ . '/includes/db_config.php';
 require_once __DIR__ . '/includes/db_functions.php';
+require_once __DIR__ . '/includes/PayMongoService.php';
 
 requireLogin();
 
-// Start session for flash messages if not already started
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 $user    = getCurrentUser();
 $success = '';
 $error   = '';
 
-// Fetch ALL consoles (including maintenance) so we can track per-type availability
-$allConsoles = getConsoles(); // null status = all, including maintenance
-
-// Counts of ALL units per type (for display)
+// ── Fetch consoles ────────────────────────────────────────────────────────────
+$allConsoles = getConsoles();
 $ps5Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'));
 $ps4Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'));
 $xboxCount   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X'));
-
-// Counts of maintenance units per type
-$ps5Maint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'           && $c['status'] === 'maintenance'));
-$ps4Maint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'           && $c['status'] === 'maintenance'));
-$xboxMaint  = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X' && $c['status'] === 'maintenance'));
-
-// True when every unit of that type is under maintenance
+$ps5Maint    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'           && $c['status'] === 'maintenance'));
+$ps4Maint    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'           && $c['status'] === 'maintenance'));
+$xboxMaint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X' && $c['status'] === 'maintenance'));
 $ps5AllMaint  = $ps5Count  > 0 && $ps5Maint  === $ps5Count;
 $ps4AllMaint  = $ps4Count  > 0 && $ps4Maint  === $ps4Count;
 $xboxAllMaint = $xboxCount > 0 && $xboxMaint === $xboxCount;
 
-// Group ALL consoles by type for the unit picker (JS uses this).
-// Maintenance units are included but flagged so JS can render them greyed out.
 $consolesByType = [];
 foreach ($allConsoles as $c) {
     $consolesByType[$c['console_type']][] = [
@@ -48,46 +47,121 @@ foreach ($allConsoles as $c) {
 }
 
 $unlimitedRate = getSetting('unlimited_rate') ?? 300;
+$gcashNumber   = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
 
-// Process form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $console_type       = $_POST['console_type']  ?? '';
-    $rental_mode        = $_POST['rental_mode']   ?? '';
-    $planned_minutes    = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
-    $reserved_date      = $_POST['reserved_date'] ?? '';
-    $reserved_time      = $_POST['reserved_time'] ?? '';
-    $notes              = trim($_POST['notes']     ?? '');
-    $preferred_unit_id  = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
-    $dp_amount          = (float)($_POST['downpayment_amount']  ?? 0);
-    $dp_method          = 'gcash'; // GCash is the only accepted method
+// ══════════════════════════════════════════════════════════════════════════════
+// PATH B — PayMongo Checkout Session redirect-back handler
+// ══════════════════════════════════════════════════════════════════════════════
+if (!empty($_GET['paymongo'])) {
+    $pm_result = $_GET['paymongo'];        // 'success' or 'failed'
+    $pending   = $_SESSION['pending_reservation'] ?? null;
+    // session_id is stored in the session when we created the checkout session
+    $session_id = $pending['session_id'] ?? trim($_GET['session_id'] ?? '');
 
-    // ── Handle GCash proof of payment upload ─────────────────────────────────────────────────────────────────────────────────────────────
-    $payment_proof_file = null;
-    $upload_error       = '';
-    if (!empty($_FILES['payment_proof']['name'])) {
-        $file     = $_FILES['payment_proof'];
-        $allowed  = ['image/jpeg','image/png','image/gif','image/webp'];
-        $maxSize  = 5 * 1024 * 1024; // 5 MB
-        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowed_ext = ['jpg','jpeg','png','gif','webp'];
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            $upload_error = 'Upload failed. Please try again.';
-        } elseif (!in_array($file['type'], $allowed) || !in_array($ext, $allowed_ext)) {
-            $upload_error = 'Invalid file type. Please upload a JPG, PNG, GIF, or WebP image.';
-        } elseif ($file['size'] > $maxSize) {
-            $upload_error = 'File too large. Maximum allowed size is 5 MB.';
-        } else {
-            $destDir  = __DIR__ . '/uploads/payment_proofs/';
-            $filename = 'proof_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-            if (move_uploaded_file($file['tmp_name'], $destDir . $filename)) {
-                $payment_proof_file = $filename;
-            } else {
-                $upload_error = 'Could not save file. Please contact support.';
+    if ($pm_result === 'success' && $session_id && $pending) {
+
+        // ── Verify payment via Checkout Session API ───────────────────────────
+        // PayMongo may redirect to success_url a split-second before their
+        // servers update payment_status to 'paid'. Retry up to 4 times (1s apart).
+        $cs         = [];
+        $maxRetries = 4;
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $cs = PayMongoService::getCheckoutSession($session_id);
+            if (!empty($cs['success']) && $cs['payment_status'] === 'paid') {
+                break; // confirmed paid — stop polling
+            }
+            if ($attempt < $maxRetries) {
+                sleep(1); // wait 1 second before next check
             }
         }
-    }
 
-    // ── Reservation ban check (3-strike rule) ──────────────────────────────
+        if ($cs['success'] && $cs['payment_status'] === 'paid') {
+
+            $payment_id = $cs['payment_id'] ?? null;
+
+            // In test mode PayMongo often doesn't include pay_xxx in the
+            // checkout session response. Fall back to the checkout session ID
+            // (cs_xxx) so the reference field is never blank.
+            $stored_ref = $payment_id ?: $session_id;
+
+            error_log('[Reserve PATH B] payment_id=' . ($payment_id ?? 'null')
+                . ' session_id=' . $session_id
+                . ' stored_ref=' . $stored_ref);
+
+            // ── Create the reservation in DB ──────────────────────────────────
+            $result = createReservation(
+                $user['user_id'],
+                $pending['console_type'],
+                $pending['rental_mode'],
+                $pending['planned_minutes'] ?? null,
+                $pending['reserved_date'],
+                $pending['reserved_time'],
+                $pending['notes'] ?: null,
+                (float)$pending['dp_amount'],
+                'gcash',
+                $pending['preferred_unit_id'] ?? null,
+                null   // no screenshot — PayMongo handled it
+            );
+
+            if ($result['success']) {
+                $res_id = $result['reservation_id'];
+
+                // ── Store PayMongo IDs on the reservation row ─────────────────
+                // paymongo_source_id  = the Checkout Session ID (cs_xxx) — always available
+                // paymongo_payment_id = pay_xxx if returned; else cs_xxx as fallback
+                $upd = $conn->prepare(
+                    "UPDATE reservations
+                        SET paymongo_source_id  = ?,
+                            paymongo_payment_id = ?,
+                            paymongo_status     = 'paid',
+                            downpayment_paid    = 1
+                      WHERE reservation_id = ?"
+                );
+                $upd->bind_param('ssi', $session_id, $stored_ref, $res_id);
+                $upd->execute();
+
+                unset($_SESSION['pending_reservation']);
+                $_SESSION['reserve_success'] =
+                    'Payment confirmed via GCash! Your reservation #' . $res_id .
+                    ' has been submitted. A staff member will confirm your slot shortly.';
+                header('Location: reserve.php');
+                exit;
+            } else {
+                $error = 'Payment was received but we could not save your reservation: ' .
+                         htmlspecialchars($result['message']) .
+                         ' — Please contact the shop with your GCash reference.';
+            }
+
+        } elseif ($cs['success'] && $cs['payment_status'] === 'unpaid') {
+            // Session exists but customer hasn't paid yet
+            $error = 'Your payment has not been completed yet. Please try again or contact the shop.';
+        } elseif ($cs['success'] && $cs['payment_status'] === 'expired') {
+            $error = 'Your checkout session expired. Please go back and try again.';
+        } else {
+            $error = 'We could not verify your payment. Please try again or use the manual screenshot option below.';
+        }
+
+    } elseif ($pm_result === 'failed') {
+        $error = 'Payment was cancelled or failed. Please try again below.';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PATH A — Initial form POST → validate → PayMongo redirect OR screenshot fallback
+// ══════════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $console_type      = $_POST['console_type']  ?? '';
+    $rental_mode       = $_POST['rental_mode']   ?? '';
+    $planned_minutes   = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
+    $reserved_date     = $_POST['reserved_date'] ?? '';
+    $reserved_time     = $_POST['reserved_time'] ?? '';
+    $notes             = trim($_POST['notes']    ?? '');
+    $preferred_unit_id = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
+    $dp_amount         = (float)($_POST['downpayment_amount']  ?? 0);
+    $pay_via           = $_POST['pay_via'] ?? 'paymongo';   // 'paymongo' or 'screenshot'
+
+    // ── Reservation ban check ─────────────────────────────────────────────────
     $banStmt = $conn->prepare(
         "SELECT reservation_banned_until, consecutive_cancellations FROM users WHERE user_id = ?"
     );
@@ -100,8 +174,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                . 'This restriction is automatically lifted on <strong>' . $banExpiry . '</strong>. '
                . 'You are still welcome to walk in and use any available unit.';
     }
-    // ── One active reservation limit ────────────────────────────────────────
-    elseif (!$error) {
+
+    // ── One active reservation limit ──────────────────────────────────────────
+    if (!$error) {
         $cntStmt = $conn->prepare(
             "SELECT reservation_id, reserved_date, reserved_time
                FROM reservations
@@ -119,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Validation
+    // ── Field validation ──────────────────────────────────────────────────────
     if (!$error && !in_array($console_type, ['PS5', 'PS4', 'Xbox Series X'])) {
         $error = 'Please select a valid console type.';
     } elseif (!$error && !in_array($rental_mode, ['hourly', 'unlimited'])) {
@@ -133,56 +208,135 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please provide both date and time.';
     } elseif (!$error && $reserved_date < date('Y-m-d')) {
         $error = 'Reservation date cannot be in the past.';
+    } elseif (!$error && $reserved_date > date('Y-m-d', strtotime('+1 month'))) {
+        $error = 'Reservations can only be made up to 1 month in advance.';
     } elseif (!$error && strtotime($reserved_date . ' ' . $reserved_time) < (time() + 3600)) {
         $error = 'Reservation must be at least 1 hour from now.';
     } elseif (!$error && (int)date('H', strtotime($reserved_time)) < 12) {
         $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
     } elseif (!$error && $reserved_time > '23:00') {
-        $error = 'Reservations must be no later than 11:00 PM — our last bookable time slot.';
-    } elseif (!$error && !$dp_method) {
-        $error = 'Please select a payment method for the reservation fee.';
-    } elseif (!$error && empty($payment_proof_file) && empty($_FILES['payment_proof']['name'])) {
-        $error = 'Please upload your GCash proof of payment screenshot.';
-    } elseif (!$error && $upload_error) {
-        $error = $upload_error;
-    } elseif (!$error && ($_POST['unit_transfer_agreed'] ?? '') !== '1') {
-        $error = 'You must acknowledge the Unit Transfer Policy before submitting your reservation.';
+        $error = 'Reservations must be no later than 11:00 PM.';
+    } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
+        $error = 'You must read and agree to the No-Refund Policy before submitting.';
     }
 
     if (!$error) {
-        $result = createReservation(
-            $user['user_id'], $console_type, $rental_mode, $planned_minutes,
-            $reserved_date, $reserved_time,
-            $notes ?: null,
-            $dp_amount, $dp_method,
-            $preferred_unit_id,
-            $payment_proof_file
-        );
 
-        if ($result['success']) {
-            // PRG pattern: store success flash in session, then redirect to GET
-            $_SESSION['reserve_success'] = 'Your reservation #' . $result['reservation_id'] . ' has been submitted! ' .
-                                           'A staff member will confirm it shortly.';
-            header('Location: reserve.php');
-            exit;
-        } else {
-            $error = 'Could not save reservation: ' . htmlspecialchars($result['message']);
+        // ── PATH A1: Pay via PayMongo Checkout Session ────────────────────
+        if ($pay_via === 'paymongo') {
+
+            // Build redirect URLs that PayMongo will use after checkout
+            $base        = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
+            $script_dir  = rtrim(dirname($_SERVER['PHP_SELF']),'/');
+            $success_url = $base . $script_dir . '/reserve.php?paymongo=success';
+            $cancel_url  = $base . $script_dir . '/reserve.php?paymongo=failed';
+
+            // Amount must be at least ₱1 (100 centavos)
+            $centavos = PayMongoService::pesosToCentavos($dp_amount > 0 ? $dp_amount : 20.0);
+
+            $modeLabel = ($rental_mode === 'unlimited') ? 'Unlimited session' :
+                         ($planned_minutes ? round($planned_minutes / 60, 1) . 'hr session' : 'session');
+            $desc = 'Reservation fee for ' . $modeLabel . ' on ' . $reserved_date . ' at ' . $reserved_time;
+
+            $pm = PayMongoService::createCheckoutSession(
+                $centavos,
+                $desc,
+                $success_url,
+                $cancel_url,
+                $user['email']     ?? '',
+                $user['full_name'] ?? 'Customer'
+            );
+
+            if ($pm['success'] && !empty($pm['checkout_url'])) {
+                // Stash reservation data in session so PATH B can pick it up
+                $_SESSION['pending_reservation'] = [
+                    'console_type'      => $console_type,
+                    'rental_mode'       => $rental_mode,
+                    'planned_minutes'   => $planned_minutes,
+                    'reserved_date'     => $reserved_date,
+                    'reserved_time'     => $reserved_time,
+                    'notes'             => $notes,
+                    'dp_amount'         => $dp_amount,
+                    'preferred_unit_id' => $preferred_unit_id,
+                    'session_id'        => $pm['session_id'],   // Checkout Session ID
+                    'created_at'        => time(),
+                ];
+
+                // Redirect to PayMongo hosted checkout page
+                header('Location: ' . $pm['checkout_url']);
+                exit;
+
+            } else {
+                // PayMongo API error — show the error, do not fall into screenshot check
+                $error = 'Could not connect to GCash payment gateway: ' .
+                         htmlspecialchars($pm['message'] ?? 'Unknown error') .
+                         '. Please try again, or use the "pay manually" link to upload a screenshot instead.';
+            }
+        }
+
+        // ── PATH A2: Screenshot fallback (only when customer explicitly chose it) ──
+        if (!$error && $pay_via === 'screenshot') {
+            $payment_proof_file = null;
+            $upload_error       = '';
+            if (!empty($_FILES['payment_proof']['name'])) {
+                $file        = $_FILES['payment_proof'];
+                $allowed     = ['image/jpeg','image/png','image/gif','image/webp'];
+                $allowed_ext = ['jpg','jpeg','png','gif','webp'];
+                $maxSize     = 5 * 1024 * 1024;
+                $ext         = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if ($file['error'] !== UPLOAD_ERR_OK) {
+                    $upload_error = 'Upload failed. Please try again.';
+                } elseif (!in_array($file['type'], $allowed) || !in_array($ext, $allowed_ext)) {
+                    $upload_error = 'Invalid file type. Please upload a JPG, PNG, GIF, or WebP image.';
+                } elseif ($file['size'] > $maxSize) {
+                    $upload_error = 'File too large. Maximum 5 MB.';
+                } else {
+                    $destDir  = __DIR__ . '/uploads/payment_proofs/';
+                    $filename = 'proof_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                    if (move_uploaded_file($file['tmp_name'], $destDir . $filename)) {
+                        $payment_proof_file = $filename;
+                    } else {
+                        $upload_error = 'Could not save file. Please contact support.';
+                    }
+                }
+            }
+
+            if ($upload_error) {
+                $error = $upload_error;
+            } elseif (empty($payment_proof_file)) {
+                $error = 'Please upload your GCash proof of payment screenshot, or use the GCash button above.';
+            } else {
+                $result = createReservation(
+                    $user['user_id'], $console_type, $rental_mode, $planned_minutes,
+                    $reserved_date, $reserved_time,
+                    $notes ?: null,
+                    $dp_amount, 'gcash',
+                    $preferred_unit_id,
+                    $payment_proof_file
+                );
+
+                if ($result['success']) {
+                    $_SESSION['reserve_success'] = 'Your reservation #' . $result['reservation_id'] .
+                        ' has been submitted! A staff member will verify your GCash screenshot and confirm it shortly.';
+                    header('Location: reserve.php');
+                    exit;
+                } else {
+                    $error = 'Could not save reservation: ' . htmlspecialchars($result['message']);
+                }
+            }
         }
     }
 }
 
-
-// Read and clear the flash success message (set after PRG redirect)
-$success = '';
+// ── Flash message ─────────────────────────────────────────────────────────────
 if (!empty($_SESSION['reserve_success'])) {
     $success = $_SESSION['reserve_success'];
     unset($_SESSION['reserve_success']);
 }
 
-// My reservations
+// ── My reservations + active check ───────────────────────────────────────────
 $myReservations = getMyReservations($user['user_id']);
 
-// Check if user already has an active reservation (for the page-level warning banner)
 $activeResCheck = $conn->prepare(
     "SELECT reservation_id, reserved_date, reserved_time, status
        FROM reservations
@@ -192,23 +346,21 @@ $activeResCheck = $conn->prepare(
 $activeResCheck->bind_param('i', $user['user_id']);
 $activeResCheck->execute();
 $activeReservation = $activeResCheck->get_result()->fetch_assoc();
-$todayStr = date('Y-m-d');
-// Earliest bookable datetime = now + 1 hour (rounded down to the minute)
+
+$todayStr    = date('Y-m-d');
 $minDateTime = date('Y-m-d\TH:i', strtotime('+1 hour'));
 
 // Pre-selected console type from URL (e.g. reserve.php?console=PS5)
-$presetConsole = '';
+$presetConsole     = '';
 $validConsoleTypes = ['PS5', 'PS4', 'Xbox Series X'];
 if (!empty($_GET['console'])) {
     $candidate = urldecode(trim($_GET['console']));
-    if (in_array($candidate, $validConsoleTypes)) {
-        $presetConsole = $candidate;
-    }
+    if (in_array($candidate, $validConsoleTypes)) $presetConsole = $candidate;
 }
-
-// GCash payment details
-$gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
 ?>
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1039,6 +1191,7 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                                         <input type="date" id="reservedDate" name="reserved_date"
                                                class="dt-native-input"
                                                min="<?= date('Y-m-d') ?>"
+                                               max="<?= date('Y-m-d', strtotime('+1 month')) ?>"
                                                value="<?= htmlspecialchars($_POST['reserved_date'] ?? '') ?>"
                                                onchange="onDateTimeChange(); updateDtBanner();" required>
                                         <div class="dt-field-sublabel" id="dateSublabel">Pick your visit date</div>
@@ -1165,106 +1318,171 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                         </div>
                     </div>
 
-                    <!-- ── Step 4: GCash Reservation Fee ── -->
+                    <!-- ── Step 4: Reservation Fee / GCash Payment ── -->
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
-                        <h2><i class="fas fa-peso-sign"></i> Step 4 &mdash; Reservation Fee <span style="font-size:12px;font-weight:600;background:rgba(0,174,90,.18);color:#00c96b;border-radius:20px;padding:2px 10px;margin-left:6px;">GCash Only</span></h2>
-                        <p style="color:#888;font-size:13px;margin-bottom:16px;">
-                            Pay via GCash and upload your receipt screenshot. Reservation is confirmed only after admin verifies your payment.
-                        </p>
+                        <h2><i class="fas fa-peso-sign"></i> Step 4 &mdash; Reservation Fee
+                            <span style="font-size:12px;font-weight:600;background:rgba(0,174,90,.18);color:#00c96b;border-radius:20px;padding:2px 10px;margin-left:6px;">GCash Only</span>
+                        </h2>
 
-                        <!-- Waiting state (no mode selected yet) -->
+                        <!-- Waiting state -->
                         <div id="gcashWaiting" style="text-align:center;padding:28px;color:#555;">
                             <i class="fas fa-mobile-alt" style="font-size:2.2rem;display:block;margin-bottom:10px;color:#333;"></i>
-                            <div style="font-size:13px;">Select a rental mode and duration above to see your GCash payment details.</div>
+                            <div style="font-size:13px;">Select a rental mode and duration above to see your payment details.</div>
                         </div>
 
-                        <!-- GCash payment panel (shown once fee is calculated) -->
+                        <!-- Payment panel (shown once fee is calculated) -->
                         <div id="gcashPanel" style="display:none;">
-                            <div style="
-                                background:linear-gradient(135deg,rgba(0,174,90,.12),rgba(32,200,161,.08));
-                                border:1.5px solid rgba(0,174,90,.4);
-                                border-radius:16px;padding:20px;margin-bottom:18px;">
 
-                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                                    <div style="background:#00ae5a;border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                        <i class="fas fa-mobile-alt" style="color:#fff;font-size:.95rem;"></i>
-                                    </div>
-                                    <div style="font-weight:800;color:#00c96b;font-size:14px;">GCash Payment Details</div>
-                                </div>
+                            <!-- ── Primary: PayMongo GCash Button ──────────────────── -->
+                            <div id="pmGcashBlock" style="
+                                background:linear-gradient(135deg,rgba(0,174,90,.14),rgba(32,200,161,.08));
+                                border:1.5px solid rgba(0,174,90,.45);
+                                border-radius:16px;padding:22px;margin-bottom:16px;">
 
-                                <!-- GCash number + amount -->
-                                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-                                    <div style="flex:1;min-width:140px;background:rgba(0,0,0,.3);border-radius:10px;padding:14px;text-align:center;">
-                                        <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">GCash Number</div>
-                                        <div style="font-size:1.2rem;font-weight:900;color:#fff;letter-spacing:1.5px;"><?= htmlspecialchars($gcashNumber) ?></div>
-                                        <div style="font-size:10px;color:#888;margin-top:4px;">Good Spot Gaming Hub</div>
+                                <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+                                    <div style="background:#00ae5a;border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        <i class="fas fa-mobile-alt" style="color:#fff;font-size:1rem;"></i>
                                     </div>
-                                    <div style="flex:1;min-width:140px;background:rgba(0,0,0,.3);border-radius:10px;padding:14px;text-align:center;">
-                                        <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Amount to Send</div>
-                                        <div id="gcashAmountDisplay" style="font-size:1.7rem;font-weight:900;color:#20c8a1;">&#8369;0</div>
-                                        <div style="font-size:10px;color:#888;margin-top:4px;">Exact amount only</div>
+                                    <div>
+                                        <div style="font-weight:800;color:#00c96b;font-size:14px;">Pay via GCash</div>
+                                        <div style="font-size:11px;color:#888;margin-top:2px;">Automatic — you'll be redirected to GCash, then back here.</div>
                                     </div>
                                 </div>
 
-                                <!-- Fee breakdown -->
-                                <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:12px;margin-bottom:16px;">
-                                    <div style="font-size:11px;color:#888;margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Fee Breakdown</div>
-                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#ccc;margin-bottom:3px;">
-                                        <span>Base fee</span><span>&#8369;20.00</span>
+                                <!-- Fee summary -->
+                                <div style="background:rgba(0,0,0,.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:4px;">
+                                        <span>Base fee</span><span>₱20.00</span>
                                     </div>
-                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#ccc;margin-bottom:6px;">
-                                        <span>5% of <span id="feeCostLabel">&#8369;0</span></span>
-                                        <span id="feePctAmount">&#8369;0.00</span>
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;">
+                                        <span>5% of <span id="feeCostLabel">₱0</span></span>
+                                        <span id="feePctAmount">₱0.00</span>
                                     </div>
-                                    <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:7px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;color:#20c8a1;">
-                                        <span>Total Reservation Fee</span>
-                                        <span id="feeTotalLabel">&#8369;0</span>
+                                    <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:8px;display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:#20c8a1;">
+                                        <span>Total to Pay</span>
+                                        <span id="feeTotalLabel">₱0</span>
                                     </div>
                                 </div>
 
-                                <!-- Step-by-step instructions -->
-                                <ol style="font-size:12px;color:#aaa;line-height:2.1;margin:0;padding-left:18px;">
-                                    <li>Open <strong style="color:#fff;">GCash</strong> &rarr; tap <strong style="color:#fff;">Send Money</strong>.</li>
-                                    <li>Enter number <strong style="color:#20c8a1;"><?= htmlspecialchars($gcashNumber) ?></strong> and send the <strong style="color:#20c8a1;">exact amount</strong> shown above.</li>
-                                    <li>Take a <strong style="color:#fff;">screenshot</strong> of the GCash transaction receipt.</li>
-                                    <li>Upload the screenshot below, then submit your reservation.</li>
-                                </ol>
-                            </div>
-
-                            <!-- Proof of payment upload -->
-                            <div class="dp-box">
-                                <div class="dp-title">
-                                    <span><i class="fas fa-image"></i> Upload GCash Receipt *</span>
+                                <!-- Fee locked-in notice — actual submit happens via the main button below -->
+                                <div id="feeLockedNotice" style="
+                                    background:rgba(0,174,90,.08);border:1px dashed rgba(0,174,90,.35);
+                                    border-radius:10px;padding:12px 16px;
+                                    display:flex;align-items:center;gap:10px;font-size:12px;color:#888;">
+                                    <i class="fas fa-check-circle" style="color:#00c96b;font-size:1.1rem;flex-shrink:0;"></i>
+                                    <span>Fee calculated. Click <strong style="color:#20c8a1;">Confirm &amp; Pay via GCash</strong> below to complete your booking.</span>
                                 </div>
-                                <label for="payment_proof" id="proofUploadLabel" style="
-                                    display:block;border:2px dashed rgba(32,200,161,.35);
-                                    border-radius:12px;padding:22px;text-align:center;
-                                    cursor:pointer;background:rgba(32,200,161,.03);
-                                    transition:border-color .2s,background .2s;"
-                                    onmouseover="this.style.borderColor='rgba(32,200,161,.7)';this.style.background='rgba(32,200,161,.07)'"
-                                    onmouseout="this.style.borderColor='rgba(32,200,161,.35)';this.style.background='rgba(32,200,161,.03)'">
-                                    <i class="fas fa-cloud-upload-alt" id="proofUploadIcon" style="font-size:2rem;color:#20c8a1;display:block;margin-bottom:8px;"></i>
-                                    <div id="proofFileName" style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Click to select screenshot</div>
-                                    <div style="font-size:11px;color:#666;">JPG, PNG, GIF or WebP &mdash; max 5 MB</div>
-                                </label>
-                                <input type="file" id="payment_proof" name="payment_proof"
-                                       accept="image/jpeg,image/png,image/gif,image/webp"
-                                       style="display:none;"
-                                       onchange="onProofSelected(this)">
-                                <!-- Preview -->
-                                <div id="proofPreview" style="display:none;margin-top:14px;text-align:center;">
-                                    <img id="proofImg" src="" alt="Receipt Preview"
-                                         style="max-width:100%;max-height:220px;border-radius:10px;border:2px solid rgba(32,200,161,.4);">
-                                    <div style="font-size:12px;color:#20c8a1;margin-top:8px;font-weight:700;">
-                                        <i class="fas fa-check-circle"></i> Screenshot ready to submit
-                                    </div>
+                                <div style="text-align:center;margin-top:10px;">
+                                    <button type="button" onclick="toggleScreenshotFallback()"
+                                        style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;">
+                                        Pay manually instead (upload screenshot)
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- Hidden amount input read by PHP -->
+                            <!-- ── Fallback: Screenshot Upload ─────────────────────── -->
+                            <div id="screenshotFallback" style="display:none;">
+                                <div class="dp-box">
+                                    <div class="dp-title">
+                                        <span><i class="fas fa-image"></i> Upload GCash Receipt *</span>
+                                        <span style="font-size:11px;color:#888;font-weight:400;margin-left:8px;">— manual verification by staff</span>
+                                    </div>
+
+                                    <!-- Shop number reference -->
+                                    <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                                        <div>
+                                            <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Send to GCash Number</div>
+                                            <div style="font-size:1.1rem;font-weight:900;color:#fff;letter-spacing:1.5px;"><?= htmlspecialchars($gcashNumber) ?></div>
+                                        </div>
+                                        <div style="text-align:right;">
+                                            <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Amount</div>
+                                            <div id="gcashAmountDisplay" style="font-size:1.3rem;font-weight:900;color:#20c8a1;">₱0</div>
+                                        </div>
+                                    </div>
+
+                                    <label for="payment_proof" id="proofUploadLabel" style="
+                                        display:block;border:2px dashed rgba(32,200,161,.35);
+                                        border-radius:12px;padding:22px;text-align:center;
+                                        cursor:pointer;background:rgba(32,200,161,.03);
+                                        transition:border-color .2s,background .2s;"
+                                        onmouseover="this.style.borderColor='rgba(32,200,161,.7)';this.style.background='rgba(32,200,161,.07)'"
+                                        onmouseout="this.style.borderColor='rgba(32,200,161,.35)';this.style.background='rgba(32,200,161,.03)'">
+                                        <i class="fas fa-cloud-upload-alt" id="proofUploadIcon" style="font-size:2rem;color:#20c8a1;display:block;margin-bottom:8px;"></i>
+                                        <div id="proofFileName" style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Click to select screenshot</div>
+                                        <div style="font-size:11px;color:#666;">JPG, PNG, GIF or WebP &mdash; max 5 MB</div>
+                                    </label>
+                                    <input type="file" id="payment_proof" name="payment_proof"
+                                           accept="image/jpeg,image/png,image/gif,image/webp"
+                                           style="display:none;"
+                                           onchange="onProofSelected(this)">
+                                    <div id="proofPreview" style="display:none;margin-top:14px;text-align:center;">
+                                        <img id="proofImg" src="" alt="Receipt Preview"
+                                             style="max-width:100%;max-height:220px;border-radius:10px;border:2px solid rgba(32,200,161,.4);">
+                                        <div style="font-size:12px;color:#20c8a1;margin-top:8px;font-weight:700;">
+                                            <i class="fas fa-check-circle"></i> Screenshot ready to submit
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="text-align:center;margin-top:-6px;margin-bottom:10px;">
+                                    <button type="button" onclick="toggleScreenshotFallback()"
+                                        style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;">
+                                        ← Back to GCash auto-pay
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Hidden inputs -->
                             <input type="hidden" name="downpayment_amount" id="dpAmount" value="0">
                             <input type="hidden" name="downpayment_method" value="gcash">
+                            <input type="hidden" name="pay_via" id="payViaInput" value="paymongo">
                         </div>
+                    </div>
+
+
+
+
+
+
+
+                    <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
+                    <div id="noRefundPolicyBox" style="
+                        background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
+                        border:1px solid rgba(251,86,107,.35);
+                        border-radius:16px;
+                        padding:20px 22px;
+                        margin-bottom:20px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                            <div style="width:38px;height:38px;border-radius:10px;
+                                background:rgba(251,86,107,.15);
+                                display:flex;align-items:center;justify-content:center;
+                                flex-shrink:0;color:#fb566b;font-size:1rem;">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
+                        </div>
+                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
+                            <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">&#8369;20 + 5% of your session cost</strong> is required to confirm every booking.</li>
+                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, and no-shows.</li>
+                            <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
+                            <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
+                            <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
+                        </ul>
+                        <label id="noRefundLabel" style="
+                            display:flex;align-items:flex-start;gap:12px;
+                            cursor:pointer;
+                            background:rgba(255,255,255,.04);
+                            border:1px solid rgba(255,255,255,.1);
+                            border-radius:10px;
+                            padding:12px 14px;
+                            transition:border-color .2s,background .2s;">
+                            <input type="checkbox" id="noRefundCheck" name="no_refund_agreed" value="1"
+                                   onchange="handleNoRefundCheck(this)"
+                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#fb566b;cursor:pointer;">
+                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
+                                I have read, understood, and agreed to the <strong style="color:#fb566b;">No-Refund Policy</strong> above.
+                                I acknowledge that any payment I make for this reservation will not be refunded for any reason.
+                            </span>
+                        </label>
                     </div>
 
                     <div class="reserve-card" style="margin-bottom:24px;">
@@ -1273,44 +1491,6 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                     </div>
 
 
-                    <!-- ── Unit Transfer Policy Acknowledgment ─────────────── -->
-                    <div id="unitTransferPolicyBox" style="
-                        background:linear-gradient(135deg,rgba(95,133,218,.08),rgba(32,200,161,.05));
-                        border:1px solid rgba(95,133,218,.35);
-                        border-radius:16px;
-                        padding:20px 22px;
-                        margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                            <div style="width:38px;height:38px;border-radius:10px;
-                                background:rgba(95,133,218,.15);
-                                display:flex;align-items:center;justify-content:center;
-                                flex-shrink:0;color:#5f85da;font-size:1rem;">
-                                <i class="fas fa-shuffle"></i>
-                            </div>
-                            <div style="font-weight:800;color:#5f85da;font-size:14px;letter-spacing:.3px;">Unit Transfer Policy</div>
-                        </div>
-                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
-                            <li>By making a reservation, you agree to be transferred to a <strong style="color:#fff;">different available unit</strong> if your originally reserved unit becomes unavailable at the time of your reservation.</li>
-                            <li>Staff will assign the best available alternative unit of the same console type.</li>
-                            <li>You will not be entitled to a cancellation or refund solely on the basis of a unit transfer.</li>
-                        </ul>
-                        <label id="unitTransferLabel" style="
-                            display:flex;align-items:flex-start;gap:12px;
-                            cursor:pointer;
-                            background:rgba(255,255,255,.04);
-                            border:1px solid rgba(255,255,255,.1);
-                            border-radius:10px;
-                            padding:12px 14px;
-                            transition:border-color .2s,background .2s;">
-                            <input type="checkbox" id="unitTransferCheck" name="unit_transfer_agreed" value="1"
-                                   onchange="handlePolicyChecks()"
-                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#5f85da;cursor:pointer;">
-                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
-                                I understand and agree that I may be <strong style="color:#5f85da;">transferred to a different unit</strong>
-                                if my reserved unit becomes unavailable. I will not dispute or request a refund on this basis.
-                            </span>
-                        </label>
-                    </div>
                     <div class="reserve-summary" id="summaryBox" style="display:none;">
                         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#20c8a1;margin-bottom:14px;">
                             <i class="fas fa-receipt"></i> Reservation Summary
@@ -1322,9 +1502,16 @@ $gcashNumber = getSetting('gcash_number') ?? '09XX-XXX-XXXX';
                         <div class="rs-row"><span class="rs-label">Reservation Fee</span><span class="rs-value" id="s-dp">—</span></div>
                     </div>
 
+                    <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
                     <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
-                        <i class="fas fa-calendar-check"></i> Submit Reservation
+                        <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
+                        <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
+                        <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
                     </button>
+                    <div style="text-align:center;margin-top:10px;font-size:11px;color:#555;">
+                        <i class="fas fa-lock" style="margin-right:4px;"></i>
+                        You will be redirected to GCash to complete payment. Your reservation is saved only after payment succeeds.
+                    </div>
                 </form>
                 <?php if ($activeReservation && !$success): ?></div><?php endif; ?>
             </div>
@@ -1759,7 +1946,10 @@ function setGcashFee(sessionCost, pct, fee) {
     document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
     document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
     document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee;
-    document.getElementById('gcashAmountDisplay').textContent = '\u20b1' + fee;
+    const gcashDisp = document.getElementById('gcashAmountDisplay');
+    if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee;
+    const pmBtn = document.getElementById('pmBtnAmount');
+    if (pmBtn) pmBtn.textContent = '\u20b1' + fee;
 }
 function showGcashPanel() {
     document.getElementById('gcashWaiting').style.display = 'none';
@@ -1781,6 +1971,42 @@ function onProofSelected(input) {
         document.getElementById('proofPreview').style.display = 'block';
     };
     reader.readAsDataURL(file);
+}
+
+/* ── Update submit button label when switching pay method ── */
+function updateSubmitBtn() {
+    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
+    const icon   = document.getElementById('submitBtnIcon');
+    const label  = document.getElementById('submitBtnLabel');
+    if (!icon || !label) return;
+    if (payVia === 'screenshot') {
+        icon.className  = 'fas fa-cloud-upload-alt';
+        label.innerHTML = 'Submit Reservation';
+    } else {
+        icon.className  = 'fas fa-mobile-alt';
+        label.innerHTML = 'Confirm &amp; Pay via GCash';
+    }
+}
+
+/* ── Screenshot fallback toggle ──────────────────────── */
+function toggleScreenshotFallback() {
+    const pmBlock  = document.getElementById('pmGcashBlock');
+    const fallback = document.getElementById('screenshotFallback');
+    const payVia   = document.getElementById('payViaInput');
+    const isShowing = fallback.style.display !== 'none';
+
+    if (isShowing) {
+        // Switch back to PayMongo
+        fallback.style.display = 'none';
+        pmBlock.style.display  = 'block';
+        payVia.value           = 'paymongo';
+    } else {
+        // Show screenshot upload
+        pmBlock.style.display  = 'none';
+        fallback.style.display = 'block';
+        payVia.value           = 'screenshot';
+    }
+    updateSubmitBtn();
 }
 
 /* ── Duration ───────────────────────────────────────── */
@@ -1818,21 +2044,24 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
-/* ── Policy checkbox — unit transfer must be ticked to enable Submit ── */
+/* ── Policy checkbox ─ no-refund must be ticked to enable Submit ───── */
 function handlePolicyChecks() {
     const btn           = document.getElementById('submitBtn');
-    const unitTransfer  = document.getElementById('unitTransferCheck');
-    const transferLabel = document.getElementById('unitTransferLabel');
+    const noRefund      = document.getElementById('noRefundCheck');
+    const noRefundLabel = document.getElementById('noRefundLabel');
 
-    if (transferLabel) {
-        transferLabel.style.borderColor = unitTransfer?.checked ? 'rgba(95,133,218,.6)' : 'rgba(255,255,255,.1)';
-        transferLabel.style.background  = unitTransfer?.checked ? 'rgba(95,133,218,.08)' : 'rgba(255,255,255,.04)';
+    if (noRefundLabel) {
+        noRefundLabel.style.borderColor = noRefund?.checked ? 'rgba(251,86,107,.6)' : 'rgba(255,255,255,.1)';
+        noRefundLabel.style.background  = noRefund?.checked ? 'rgba(251,86,107,.08)' : 'rgba(255,255,255,.04)';
     }
 
-    const allAgreed   = unitTransfer ? unitTransfer.checked : false;
+    const allAgreed   = noRefund ? noRefund.checked : false;
     btn.disabled      = !allAgreed;
     btn.style.opacity = allAgreed ? '1' : '0.5';
 }
+
+/* Alias — the no-refund checkbox calls this by name */
+function handleNoRefundCheck() { handlePolicyChecks(); }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour
@@ -2085,6 +2314,8 @@ function updateSummary() {
 
 /* ── Form validation ────────────────────────────────── */
 document.getElementById('reserveForm').addEventListener('submit', function(e) {
+    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
+
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
@@ -2092,39 +2323,39 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     const dateVal = document.getElementById('reservedDate').value;
     const timeVal = document.getElementById('reservedTime').value;
 
-    if (dateVal && timeVal) {
-        // Operating hours check
-        if (timeVal < OPEN_TIME) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
-        if (timeVal > CLOSE_TIME) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    if (!dateVal || !timeVal) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Please select a date and time.');
+        return;
+    }
 
-        // Check if slot is confirmed-locked (alert from availability check)
-        const lockAlert = document.getElementById('slotLockedAlert');
-        if (lockAlert && lockAlert.style.display === 'flex' && selectedConsoleType) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f This time slot is already fully reserved (confirmed) for ' + selectedConsoleType + '. Please choose a different time.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    // Operating hours check
+    if (timeVal < OPEN_TIME) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
+        return;
+    }
+    if (timeVal > CLOSE_TIME) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
+        return;
+    }
 
-        // 1-hour lead time check
-        const chosen   = new Date(dateVal + 'T' + timeVal);
-        const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
-        if (chosen < earliest) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f Reservations must be at least 1 hour from now. Please pick a later time.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    // Check if slot is confirmed-locked
+    const lockAlert = document.getElementById('slotLockedAlert');
+    if (lockAlert && lockAlert.style.display === 'flex' && selectedConsoleType) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f This time slot is already fully reserved (confirmed) for ' + selectedConsoleType + '. Please choose a different time.');
+        return;
+    }
+
+    // 1-hour lead time check
+    const chosen   = new Date(dateVal + 'T' + timeVal);
+    const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
+    if (chosen < earliest) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Reservations must be at least 1 hour from now. Please pick a later time.');
+        return;
     }
 
     const dp = parseFloat(document.getElementById('dpAmount').value) || 0;
@@ -2133,11 +2364,25 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         alert('\u26a0\ufe0f Please select a rental mode and duration to calculate your reservation fee.');
         return;
     }
-    const proofFile = document.getElementById('payment_proof');
-    if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
-        e.preventDefault();
-        alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
-        return;
+
+    // Screenshot path only: require proof file
+    if (payVia === 'screenshot') {
+        const proofFile = document.getElementById('payment_proof');
+        if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
+            return;
+        }
+    }
+
+    // PayMongo path: show loading state on button
+    if (payVia === 'paymongo') {
+        const btn   = document.getElementById('submitBtn');
+        const label = document.getElementById('submitBtnLabel');
+        const icon  = document.getElementById('submitBtnIcon');
+        if (btn)   { btn.disabled = true; btn.style.opacity = '.75'; }
+        if (icon)  icon.className = 'fas fa-spinner fa-spin';
+        if (label) label.textContent = 'Redirecting to GCash…';
     }
 });
 </script>

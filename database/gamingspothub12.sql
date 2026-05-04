@@ -126,6 +126,7 @@ CREATE TABLE `gaming_sessions` (
   `total_cost` decimal(10,2) DEFAULT NULL,
   `status` enum('active','completed','cancelled') NOT NULL DEFAULT 'active',
   `payment_status` enum('paid','unpaid','partial') DEFAULT NULL,
+  `extended_minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes added via approved extensions',
   `created_by` int(11) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

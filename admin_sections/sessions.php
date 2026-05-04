@@ -143,6 +143,16 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
 <div class="page" id="sessions">
 
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-group">
+            <h2 class="page-title"><i class="fas fa-play-circle" style="color:#5f85da;margin-right:10px;"></i>Session Management</h2>
+            <p class="page-subtitle">View, manage, and control all gaming sessions</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('startSession')">
+            <i class="fas fa-plus"></i> New Session
+        </button>
+    </div>
 
 
     <?php if (!empty($pendingSessions)): ?>
@@ -262,10 +272,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             <h3 class="card-title">All Sessions</h3>
             <div style="display:flex;gap:8px;align-items:center;">
                 <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
-                    style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#ccc;font-size:12px;">
-                    <i class="fas fa-sort-amount-down"></i> Default Sort
+                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#888;font-size:12px;">
+                    <i class="fas fa-sort-amount-down"></i>
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="openModal('startSession')"><i class="fas fa-plus"></i> New Session</button>
             </div>
         </div>
         <table class="data-table" id="sessionsTable">
@@ -354,8 +363,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'] . ' min' : '< 1 min')
                                 : '—' ?>
                         </td>
-
-                        <td class="cost-cell">
+                <td class="cost-cell">
                             <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 2) : '—' ?>
                         </td>
 
@@ -373,8 +381,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?= $startTs ?>,
                             <?= $bookedMinutes ?>,
                             <?= (float)($sess['upfront_paid'] ?? 0) ?>,
-                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>
-                        )">
+                            <?= (float)($sess['reservation_downpayment'] ?? 0) ?>,
+                            <?= (float)($settings['unlimited_rate'] ?? 300) ?>,
+                            <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
@@ -458,6 +467,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
                 fetch('ajax/recalculate_session.php', {
                         method: 'POST',
+                        credentials: 'same-origin',
                         body: fd
                     })
                     .then(r => r.json())

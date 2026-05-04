@@ -29,7 +29,10 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['shopkeeper', 'owner']);
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['shopkeeper', 'owner'])) {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
+    exit;
+}
 
 $session_id     = (int)  ($_POST['session_id']     ?? 0);
 $reservation_id = (int)  ($_POST['reservation_id'] ?? 0);
@@ -187,9 +190,33 @@ if ($action_type === 'early_end') {
     $cap            = $capStmt->get_result()->fetch_assoc();
     $max_refundable = max(0, (float)$cap['paid'] - (float)$cap['refunded']);
     $refund_amount  = min($refund_amount, $max_refundable);
+
+    // ── Balance still owed after early end ────────────────────────────
+    // If consumed cost exceeds what was paid upfront, the customer still
+    // owes the difference. Record it as a shortfall so Pending Payments
+    // picks it up correctly and the Pay button shows the right amount.
+    $totalCost   = (float)($endResult['total_cost'] ?? 0);
+    $paidUpfront = (float)$cap['paid'];
+    $stillOwed   = round($totalCost - $paidUpfront, 2);
+
+    if ($stillOwed > 0.01 && $paidUpfront > 0) {
+        // Record a pending shortfall transaction so it appears in
+        // Pending Payments with the exact owed amount.
+        recordTransaction(
+            $session_id,
+            $session['user_id'],
+            0,              // amount=0 so revenue stats are unaffected
+            'cash',         // placeholder — updated when staff collects
+            $staff_id,
+            0,              // tendered = 0 (not yet collected)
+            $stillOwed,     // shortfall = the amount still owed
+            'Early end – balance owed: ₱' . number_format($stillOwed, 2)
+              . ($refund_reason ? '; ' . $refund_reason : '')
+        );
+    }
 }
 
-// Record refund transaction
+// Record refund transaction (positive refund — money back to customer)
 if ($refund_amount > 0) {
     $note = ($action_type === 'early_end' ? 'Early end – refund for unused time' : 'Refund issued')
           . ($refund_reason ? ': ' . $refund_reason : '');
@@ -206,11 +233,24 @@ if ($refund_amount > 0) {
     );
 }
 
-$msg = $action_type === 'early_end'
-    ? ($refund_amount > 0
-        ? 'Session ended. Refund of ₱' . number_format($refund_amount, 2) . ' issued.'
-        : 'Session ended. No refund — nothing was paid upfront.')
-    : 'Refund of ₱' . number_format($refund_amount, 2) . ' issued successfully.';
+// Build the response message
+if ($action_type === 'early_end') {
+    $totalCostEnd  = (float)($endResult['total_cost'] ?? 0);
+    $paidUpfront   = (float)$cap['paid'];
+    $stillOwedFinal = round($totalCostEnd - $paidUpfront, 2);
+
+    if ($refund_amount > 0) {
+        $msg = 'Session ended. Refund of ₱' . number_format($refund_amount, 2) . ' issued.';
+    } elseif ($stillOwedFinal > 0.01 && $paidUpfront > 0) {
+        // Customer owes more than they paid — flag it clearly
+        $msg = 'Session ended. Customer still owes ₱' . number_format($stillOwedFinal, 2)
+             . ' — collect via Pending Payments.';
+    } else {
+        $msg = 'Session ended. No additional charge.';
+    }
+} else {
+    $msg = 'Refund of ₱' . number_format($refund_amount, 2) . ' issued successfully.';
+}
 
 if ($refund_reason) {
     $msg .= ' Reason: ' . htmlspecialchars($refund_reason);

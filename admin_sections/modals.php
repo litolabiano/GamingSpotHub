@@ -57,7 +57,158 @@
     from { opacity:0; transform:scale(.88) translateY(12px); }
     to   { opacity:1; transform:scale(1)  translateY(0); }
 }
+/* ── Modal design system ─────────────────────────────────────────── */
+.modal { display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px; }
+.modal.active { display:flex; }
+.modal-content {
+    background:linear-gradient(160deg,#0c1a38 0%,#080f1d 100%);
+    border:1px solid rgba(95,133,218,.22);
+    border-radius:20px;
+    width:100%;max-width:520px;
+    max-height:90vh;overflow-y:auto;overflow-x:hidden;
+    box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(32,200,161,.06);
+    animation:modalSlideIn .25s cubic-bezier(.34,1.36,.64,1);
+    scrollbar-width:thin;scrollbar-color:rgba(95,133,218,.25) transparent;
+}
+.modal-content::-webkit-scrollbar{width:4px}
+.modal-content::-webkit-scrollbar-thumb{background:rgba(95,133,218,.3);border-radius:4px}
+@keyframes modalSlideIn {
+    from { opacity:0; transform:translateY(20px) scale(.97); }
+    to   { opacity:1; transform:translateY(0)    scale(1); }
+}
+.modal-header {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px 24px 16px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    position:sticky;top:0;
+    background:linear-gradient(160deg,#0c1a38,#080f1d);
+    z-index:2;
+}
+.modal-title { font-size:16px;font-weight:700;color:#e8eaf6;margin:0;display:flex;align-items:center;gap:8px; }
+.modal-close {
+    width:32px;height:32px;border-radius:8px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+    color:#aaa;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:.15s;line-height:1;
+}
+.modal-close:hover { background:rgba(251,86,107,.15);border-color:rgba(251,86,107,.4);color:#fb566b; }
+.modal-body { padding:20px 24px 24px; }
+/* Inputs & Selects */
+.modal-body .form-group { margin-bottom:16px; }
+.modal-body .form-group:last-child { margin-bottom:0; }
+.modal-body label {
+    display:block;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.6px;
+    color:#6b7fa8;margin-bottom:7px;
+}
+.modal-body input[type="text"],
+.modal-body input[type="number"],
+.modal-body input[type="date"],
+.modal-body input[type="time"],
+.modal-body select,
+.modal-body textarea {
+    width:100%;box-sizing:border-box;
+    padding:11px 14px;border-radius:10px;
+    border:1px solid rgba(95,133,218,.2);
+    background:rgba(255,255,255,.04);
+    color:#e8eaf6;font-size:14px;
+    font-family:inherit;
+    transition:border-color .2s,box-shadow .2s,background .2s;
+    outline:none;
+}
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+    border-color:rgba(95,133,218,.6);
+    background:rgba(95,133,218,.07);
+    box-shadow:0 0 0 3px rgba(95,133,218,.12);
+}
+.modal-body input:invalid:not(:placeholder-shown) { border-color:rgba(251,86,107,.5); }
+.modal-body input[readonly] { cursor:not-allowed;opacity:.85; }
+.modal-body select option { background:#0d1a35;color:#e8eaf6; }
+/* Form rows */
+.modal-body .form-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+@media(max-width:480px){ .modal-body .form-row { grid-template-columns:1fr; } }
+/* Info banners */
+.modal-banner {
+    border-radius:12px;padding:14px 16px;margin-bottom:16px;
+    display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;
+}
+.modal-banner.info  { background:rgba(95,133,218,.09);border:1px solid rgba(95,133,218,.2);color:#8aa4e8; }
+.modal-banner.warn  { background:rgba(241,168,60,.09);border:1px solid rgba(241,168,60,.3);color:#f1a83c; }
+.modal-banner.danger{ background:rgba(251,86,107,.09);border:1px solid rgba(251,86,107,.3);color:#fb566b; }
+.modal-banner.success{background:rgba(32,200,161,.09);border:1px solid rgba(32,200,161,.25);color:#20c8a1; }
+.modal-banner i { margin-top:2px;flex-shrink:0; }
+/* Section divider */
+.modal-divider { border:none;border-top:1px solid rgba(255,255,255,.07);margin:18px 0; }
+/* Prominent cost display */
+.cost-display {
+    border-radius:14px;padding:18px 20px;margin-bottom:16px;text-align:center;
+    background:linear-gradient(135deg,rgba(32,200,161,.1),rgba(32,200,161,.04));
+    border:1px solid rgba(32,200,161,.3);
+}
+.cost-display .cost-label { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:6px; }
+.cost-display .cost-amount { font-size:42px;font-weight:900;color:#20c8a1;line-height:1;letter-spacing:-1px; }
+.cost-display.danger { background:linear-gradient(135deg,rgba(251,86,107,.12),rgba(241,168,60,.06));border-color:rgba(251,86,107,.3); }
+.cost-display.danger .cost-amount { color:#fb566b; }
+/* Locked-field style (pre-filled, read-only) */
+.field-locked {
+    border-color:rgba(95,133,218,.35)!important;
+    background:rgba(95,133,218,.07)!important;
+    color:#8aa4e8!important;
+    cursor:not-allowed!important;
+}
+.field-unlocked {
+    border-color:rgba(255,255,255,.2)!important;
+    background:rgba(255,255,255,.06)!important;
+    color:#fff!important;
+    cursor:text!important;
+}
+/* Change display pill */
+.change-pill {
+    border-radius:10px;padding:10px 14px;font-size:15px;font-weight:800;
+    margin-top:8px;display:none;
+}
+.change-pill.positive { background:rgba(32,200,161,.12);border:1px solid rgba(32,200,161,.3);color:#20c8a1; }
+.change-pill.negative { background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.3);color:#f1a83c; }
+/* Submit buttons */
+.modal-body .btn-full { width:100%;justify-content:center;padding:13px 20px;font-size:15px;font-weight:700;border-radius:12px; }
+/* Required star */
+.req { color:#fb566b;margin-left:2px; }
+/* Constraint hint */
+.field-hint { font-size:11px;color:#556;margin-top:5px;line-height:1.4; }
+.field-hint.warn { color:#8a6630; }
+/* Hide number spinner arrows */
+.modal-body input[type=number]::-webkit-inner-spin-button,
+.modal-body input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
+.modal-body input[type=number] { -moz-appearance:textfield; }
+/* Tendered wrapper states */
+.tendered-wrapper-locked  { border-color:rgba(95,133,218,.4)!important; background:rgba(95,133,218,.07)!important; }
+.tendered-wrapper-locked  .tendered-prefix { color:#5f85da!important; }
+.tendered-wrapper-locked  input { color:#8aa4e8!important; }
+.tendered-wrapper-locked  .tendered-lock  { color:#5f85da!important; }
+.tendered-wrapper-unlocked{ border-color:rgba(32,200,161,.5)!important; background:rgba(32,200,161,.05)!important; }
+.tendered-wrapper-unlocked .tendered-prefix { color:#20c8a1!important; }
+.tendered-wrapper-unlocked input { color:#fff!important; }
+.tendered-wrapper-unlocked .tendered-lock  { color:#20c8a1!important; }
+/* Shake animation for insufficient payment */
+@keyframes shakeX {
+    0%,100% { transform:translateX(0); }
+    20%     { transform:translateX(-8px); }
+    40%     { transform:translateX(8px); }
+    60%     { transform:translateX(-5px); }
+    80%     { transform:translateX(5px); }
+}
+/* Start Session button disabled state */
+#startSessionForm .btn-primary:disabled {
+    background:rgba(100,100,120,.3)!important;
+    box-shadow:none!important;
+    cursor:not-allowed!important;
+    opacity:.55!important;
+}
 </style>
+
 <script>
 (function(){
     const modal   = document.getElementById('gspotConfirmModal');
@@ -114,6 +265,7 @@
             <h3 class="modal-title"><i class="fas fa-play-circle" style="color:#20c8a1;margin-right:8px"></i>Start New Session</h3>
             <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
         </div>
+        <div class="modal-body">
         <form method="POST" id="startSessionForm">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="start_session">
@@ -196,11 +348,12 @@
                     <span style="font-size:13px;font-weight:600;color:#8aa4e8;">
                         <i class="fas fa-gamepad" style="margin-right:5px;"></i>
                         Controller Rental
-                        <span style="font-weight:400;color:#888;margin-left:6px;">
+                        <span id="controllerRentalConsoleNote" style="font-weight:400;color:#888;margin-left:6px;">
                             +&#8369;<?= number_format((float)($settings['controller_rental_fee'] ?? 20), 0) ?>/session
                         </span>
                     </span>
                 </label>
+                <p class="field-hint" id="controllerRentalHint">Only applicable for console units that require a physical controller.</p>
                 <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt"
                        value="<?= (float)($settings['controller_rental_fee'] ?? 20) ?>">
             </div>
@@ -225,10 +378,27 @@
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom:6px">
-                            <label>Amount Tendered (₱)</label>
-                            <input type="number" id="startTendered" name="start_tendered" min="0" step="1" placeholder="e.g. 200"
-                                   style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                                   oninput="calcChange('startTendered','startChangeDisplay','startCostAmt')">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                                    <input type="checkbox" id="startTenderedToggle"
+                                           style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
+                                           onchange="toggleTendered('startTendered','startTenderedToggle','startCostAmt','startChangeDisplay')">
+                                    <span style="color:#8aa4e8;">Different amount</span>
+                                </label>
+                            </div>
+                            <!-- Flex row: ₱ prefix | input | lock icon -->
+                            <div id="startTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                                <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                                <input type="number" id="startTendered" name="start_tendered" min="0" step="1" readonly
+                                       style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                                       oninput="calcChange('startTendered','startChangeDisplay','startCostAmt'); _syncStartBtn()">
+                                <i id="startTenderedIcon" class="fas fa-lock"
+                                   style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                                   title="Click to enter a different amount"
+                                   onclick="var cb=document.getElementById('startTenderedToggle');cb.checked=!cb.checked;toggleTendered('startTendered','startTenderedToggle','startCostAmt','startChangeDisplay');"></i>
+                            </div>
+                            <p class="field-hint" id="startTenderedHintText">Pre-filled with session cost. Tick to enter a different amount.</p>
                         </div>
                         <span id="startCostAmt" style="display:none">0</span>
                         <div id="startChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
@@ -254,10 +424,27 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom:6px">
-                        <label>Amount Tendered (₱)</label>
-                        <input type="number" id="unlimTendered" min="0" step="1" placeholder="e.g. 400"
-                               style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                               oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt')">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                                <input type="checkbox" id="unlimTenderedToggle"
+                                       style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
+                                       onchange="toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay')">
+                                <span style="color:#8aa4e8;">Different amount</span>
+                            </label>
+                        </div>
+                        <!-- Flex row: ₱ prefix | input | lock icon -->
+                        <div id="unlimTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(241,225,170,.4);background:rgba(241,225,170,.07);overflow:hidden;transition:.2s;">
+                            <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#f1e1aa;flex-shrink:0;line-height:1;">₱</span>
+                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="0" step="1" readonly
+                                   style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                                   oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
+                            <i id="unlimTenderedIcon" class="fas fa-lock"
+                               style="padding:0 16px;font-size:14px;color:#f1e1aa;flex-shrink:0;cursor:pointer;"
+                               title="Click to enter a different amount"
+                               onclick="var cb=document.getElementById('unlimTenderedToggle');cb.checked=!cb.checked;toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay');"></i>
+                        </div>
+                        <p class="field-hint" id="unlimTenderedHintText">Pre-filled with flat rate. Tick to enter a different amount.</p>
                     </div>
                     <div id="unlimChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
                     <!-- Hidden cost holder for JS -->
@@ -265,15 +452,17 @@
                 </div>
             </div>
 
+
             <!-- ── Open Time reminder ── -->
             <div id="openTimeNote" style="display:none;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#8aa4e8;">
                 <i class="fas fa-clock"></i> <strong>Open Time</strong> — no upfront payment needed. Cost is calculated and collected when the session ends.
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
+            <button type="submit" class="btn btn-primary btn-full">
                 <i class="fas fa-play"></i> Start Session
             </button>
         </form>
+        </div><!-- /.modal-body -->
     </div>
 </div>
 
@@ -285,9 +474,25 @@
             <button class="modal-close" onclick="closeModal('endSession')">&times;</button>
         </div>
 
+        <div class="modal-body">
         <!-- Session info summary -->
-        <div style="background:rgba(251,86,107,.08);border:1px solid rgba(251,86,107,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
+        <div class="modal-banner danger" style="font-size:14px;">
+            <i class="fas fa-stop-circle"></i>
             <strong id="endSessionSummary">—</strong>
+        </div>
+
+        <!-- Reservation-source notice (hidden until JS detects source_reservation_id > 0) -->
+        <div id="endSessionResNotice"
+             style="display:none;align-items:center;gap:10px;background:rgba(95,133,218,.1);
+                    border:1px solid rgba(95,133,218,.35);border-radius:10px;
+                    padding:10px 14px;margin-bottom:12px;font-size:13px;color:#8aa4e8;">
+            <i class="fas fa-calendar-check" style="font-size:16px;flex-shrink:0;"></i>
+            <div>
+                <span style="font-weight:700;color:#f1e1aa;">From Reservation</span>
+                <span class="res-notice-id" style="font-weight:700;color:#20c8a1;margin-left:4px;"></span>
+                — upfront payment includes the reservation downpayment.
+                <span class="res-nonrefundable-note" style="display:block;margin-top:3px;font-size:11px;color:#fb566b;font-weight:600;"></span>
+            </div>
         </div>
 
         <!-- ── Early-end warning (shown when hourly session still has time left) ── -->
@@ -409,12 +614,27 @@
                     <option value="gcash">📱 GCash</option>
                 </select>
 
-                <!-- Tendered amount -->
-                <div style="margin-top:12px">
-                    <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱)</label>
-                    <input type="number" id="endTendered" min="0" step="1" placeholder="e.g. 200"
-                           style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:18px;font-weight:700;"
-                           oninput="calcChange('endTendered','endChangeDisplay','endCostAmtHolder')">
+                <!-- Tendered amount with pre-fill + optional unlock -->
+                <div style="margin-top:14px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                            <input type="checkbox" id="endTenderedToggle" style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;" onchange="toggleTendered('endTendered','endTenderedToggle','endCostAmtHolder','endChangeDisplay')">
+                            <span style="color:#8aa4e8;">Different amount</span>
+                        </label>
+                    </div>
+                    <!-- Flex row: ₱ prefix | input | lock icon -->
+                    <div id="endTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                        <span style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                        <input type="number" id="endTendered" min="0" step="0.01" readonly
+                               style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                               oninput="calcChange('endTendered','endChangeDisplay','endCostAmtHolder')">
+                        <i id="endTenderedIcon" class="fas fa-lock"
+                           style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                           title="Click to enter a different amount"
+                           onclick="var cb=document.getElementById('endTenderedToggle');cb.checked=!cb.checked;toggleTendered('endTendered','endTenderedToggle','endCostAmtHolder','endChangeDisplay');"></i>
+                    </div>
+                    <p class="field-hint" id="endTenderedHintText">Pre-filled with amount due. Tick to enter a different amount.</p>
                     <input type="hidden" id="endCostAmtHolder" value="0">
                 </div>
                 <!-- Change / Insufficient display (warning only — does NOT block submission) -->
@@ -427,15 +647,15 @@
             </div>
 
             <!-- Shown for unlimited / fully-prepaid hourly -->
-            <div id="endPrepaidNote" style="display:none;background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#20c8a1;">
+            <div id="endPrepaidNote" style="display:none;" class="modal-banner success">
                 <i class="fas fa-check-circle"></i> <strong>Payment already collected at session start.</strong> No additional charge at end.
             </div>
 
-            <button type="submit" class="btn btn-danger" id="endSessionConfirmBtn"
-                    style="width:100%;justify-content:center;margin-top:4px;">
+            <button type="submit" class="btn btn-danger btn-full" id="endSessionConfirmBtn" style="margin-top:4px;">
                 <i class="fas fa-check-circle"></i> <span id="endSessionConfirmLabel">Confirm End &amp; Record Payment</span>
             </button>
         </form>
+        </div><!-- /.modal-body -->
     </div>
 </div>
 
@@ -449,8 +669,10 @@
             <button class="modal-close" onclick="closePayModal()">&times;</button>
         </div>
 
+        <div class="modal-body">
         <!-- Session info -->
-        <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.15);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px">
+        <div class="modal-banner success" style="font-size:14px;">
+            <i class="fas fa-peso-sign"></i>
             <strong id="paySessionSummary">—</strong>
         </div>
 
@@ -486,10 +708,25 @@
             </div>
 
             <div class="form-group" style="margin-bottom:6px">
-                <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱)</label>
-                <input type="number" id="payTendered" name="tendered_amount" min="0" step="1" placeholder="Enter customer's cash"
-                       style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:18px;font-weight:700;box-sizing:border-box;"
-                       oninput="calcChange('payTendered','payChangeDisplay','payAmount'); syncPayBtn()">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;">
+                        <input type="checkbox" id="payTenderedToggle" style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;" onchange="toggleTendered('payTendered','payTenderedToggle','payAmount','payChangeDisplay')">
+                        <span style="color:#8aa4e8;">Different amount</span>
+                    </label>
+                </div>
+                <!-- Flex row: ₱ prefix | input | lock icon -->
+                <div id="payTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
+                    <span style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#5f85da;flex-shrink:0;line-height:1;">₱</span>
+                    <input type="number" id="payTendered" name="tendered_amount" min="0" step="0.01" readonly
+                           style="flex:1;border:none;background:transparent;color:#8aa4e8;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                           oninput="calcChange('payTendered','payChangeDisplay','payAmount'); syncPayBtn()">
+                    <i id="payTenderedIcon" class="fas fa-lock"
+                       style="padding:0 16px;font-size:14px;color:#5f85da;flex-shrink:0;cursor:pointer;"
+                       title="Click to enter a different amount"
+                       onclick="var cb=document.getElementById('payTenderedToggle');cb.checked=!cb.checked;toggleTendered('payTendered','payTenderedToggle','payAmount','payChangeDisplay');"></i>
+                </div>
+                <p class="field-hint" id="payTenderedHintText">Pre-filled with balance due. Tick to enter a different amount.</p>
                 <!-- Hidden field — stores the balance due for calcChange -->
                 <input type="hidden" name="amount" id="payAmount" value="0">
             </div>
@@ -498,10 +735,11 @@
                 <i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>
                 <strong>Short payment</strong> — the remaining shortfall will be recorded.
             </div>
-            <button type="submit" id="payConfirmBtn" class="btn btn-primary" style="width:100%;justify-content:center;">
+            <button type="submit" id="payConfirmBtn" class="btn btn-primary btn-full">
                 <i class="fas fa-check-circle"></i> <span id="payConfirmLabel">Record Payment</span>
             </button>
         </form>
+        </div><!-- /.modal-body -->
     </div>
 </div>
 
@@ -515,9 +753,10 @@
             <button class="modal-close" onclick="closeModal('refundSession')">&times;</button>
         </div>
 
-        <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.25);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px">
+        <div class="modal-body">
+        <div class="modal-banner warn" style="font-size:14px;flex-direction:column;gap:6px;">
             <strong id="refundSessionSummary">—</strong>
-            <div style="margin-top:8px;font-size:13px;color:#888;">
+            <div style="font-size:13px;color:#888;">
                 Total paid so far: <strong id="refundPaidSoFar" style="color:#20c8a1;">₱0.00</strong>
             </div>
         </div>
@@ -548,8 +787,8 @@
                        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:14px;box-sizing:border-box;"
                        placeholder="e.g. Technical issue, customer complaint…">
             </div>
-            <div style="background:rgba(251,86,107,.07);border:1px solid rgba(251,86,107,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#fb566b;">
-                <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and cannot be undone.
+            <div class="modal-banner danger" style="margin-bottom:16px;font-size:12px;">
+                <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and <strong>cannot be undone</strong>.
             </div>
             <!-- Early-end note — shown only when triggered from early-end flow -->
             <div id="refundEarlyEndNote" style="display:none;background:rgba(241,168,60,.1);border:1px solid rgba(241,168,60,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#f1a83c;">
@@ -561,12 +800,12 @@
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
                 <span id="refundErrorText"></span>
             </div>
-            <button type="button" id="refundConfirmBtn" class="btn btn-danger" style="width:100%;justify-content:center;"
+            <button type="button" id="refundConfirmBtn" class="btn btn-danger btn-full"
                     onclick="_submitRefundAjax()">
                 <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
             </button>
         </form>
-
+        </div><!-- /.modal-body -->
     </div>
 </div>
 
@@ -635,10 +874,32 @@
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:6px">
-                    <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;">Amount Tendered (₱) <span style="font-weight:400;color:#666;">(optional)</span></label>
-                    <input type="number" id="extendTendered" name="tendered" min="0" step="1" placeholder="e.g. 100"
-                           style="width:100%;margin-top:6px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px;"
-                           oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                    <!-- Label row with checkbox toggle -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                        <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin:0;">Amount Tendered (₱)</label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                            <input type="checkbox" id="extendTenderedToggle"
+                                   style="width:14px;height:14px;accent-color:#8aa4e8;cursor:pointer;"
+                                   onchange="toggleExtendTendered(this)">
+                            <span style="color:#8aa4e8;">Optional — customer gave different amount</span>
+                        </label>
+                    </div>
+                    <!-- The input: pre-filled with cost, locked by default -->
+                    <div style="position:relative;">
+                        <input type="number" id="extendTendered" name="tendered" min="0" step="1"
+                               readonly
+                               style="width:100%;padding:10px 12px 10px 36px;border-radius:8px;
+                                      border:1px solid rgba(95,133,218,.35);background:rgba(95,133,218,.07);
+                                      color:#8aa4e8;font-size:16px;font-weight:700;cursor:not-allowed;
+                                      box-sizing:border-box;"
+                               oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
+                        <!-- Lock icon overlay -->
+                        <i id="extendTenderedLockIcon" class="fas fa-lock"
+                           style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
+                                  color:#5f85da;font-size:13px;pointer-events:none;"></i>
+                    </div>
+                    <p id="extendTenderedHint" style="font-size:11px;color:#666;margin:5px 0 0;"
+                    ><i class="fas fa-info-circle" style="margin-right:3px;"></i>Pre-filled with exact cost. Check the box above to enter a different amount.</p>
                 </div>
                 <div id="extendChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
             </div>
@@ -683,7 +944,7 @@
                 });
                 if (tendered) body.append('tendered', tendered);
 
-                fetch('ajax/extend_session.php', { method: 'POST', body })
+                fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body })
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         if (data.success) {
@@ -732,6 +993,9 @@ function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, ren
     document.getElementById('extendPaymentFields').style.display = 'none';
     document.getElementById('extendTendered').value = '';
     document.getElementById('extendChangeDisplay').style.display = 'none';
+    // Reset the tendered toggle to locked state
+    const toggle = document.getElementById('extendTenderedToggle');
+    if (toggle) { toggle.checked = false; _lockExtendTendered(); }
 
     // Load pending requests for this session
     loadPendingExtensions(sessionId);
@@ -745,7 +1009,7 @@ function loadPendingExtensions(sessionId) {
     section.style.display = 'none';
     list.innerHTML = '';
 
-    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`)
+    fetch(`ajax/approve_extension.php?get_pending=1&session_id=${sessionId}`, { credentials: 'same-origin' })
         .then(r => r.json())
         .then(function(data) {
             if (!data.pending || data.pending.length === 0) return;
@@ -787,13 +1051,18 @@ function updateExtendCost() {
         payFlds.style.display  = 'none';
         holder.value = '0';
     } else {
-        // Hourly: bracket billing (mirror computeTimedCost)
+        // Hourly: straight ₱80/hr
         const cost = computeExtCost(mins);
         costEl.textContent = '₱' + cost;
         freeNote.style.display = 'none';
         payFlds.style.display  = 'block';
         holder.value = cost;
-        document.getElementById('extendTendered').value = '';
+        // Pre-fill tendered with the exact cost; keep it locked
+        const tendInput = document.getElementById('extendTendered');
+        tendInput.value = cost;
+        // Reset the toggle checkbox so the field stays locked
+        const toggle = document.getElementById('extendTenderedToggle');
+        if (toggle) { toggle.checked = false; _lockExtendTendered(); }
         document.getElementById('extendChangeDisplay').style.display = 'none';
     }
 }
@@ -802,6 +1071,51 @@ function updateExtendCost() {
 function computeExtCost(mins) {
     // ₱80/hr straight — 30 min = ₱40, 60 min = ₱80, etc.
     return Math.round((mins / 60) * 80);
+}
+
+/* ── Tendered field lock/unlock helpers ──────────────────────────────── */
+function _lockExtendTendered() {
+    const inp  = document.getElementById('extendTendered');
+    const icon = document.getElementById('extendTenderedLockIcon');
+    const hint = document.getElementById('extendTenderedHint');
+    if (!inp) return;
+    inp.readOnly = true;
+    inp.style.borderColor  = 'rgba(95,133,218,.35)';
+    inp.style.background   = 'rgba(95,133,218,.07)';
+    inp.style.color        = '#8aa4e8';
+    inp.style.cursor       = 'not-allowed';
+    inp.style.paddingLeft  = '36px';
+    if (icon) { icon.className = 'fas fa-lock'; icon.style.color = '#5f85da'; }
+    if (hint) hint.style.display = 'block';
+    // Hide change display when locked
+    document.getElementById('extendChangeDisplay').style.display = 'none';
+}
+
+function toggleExtendTendered(cb) {
+    const inp  = document.getElementById('extendTendered');
+    const icon = document.getElementById('extendTenderedLockIcon');
+    const hint = document.getElementById('extendTenderedHint');
+    if (!inp) return;
+
+    if (cb.checked) {
+        // Unlock — editable, white style
+        inp.readOnly = false;
+        inp.style.borderColor  = 'rgba(255,255,255,.2)';
+        inp.style.background   = 'rgba(255,255,255,.06)';
+        inp.style.color        = '#fff';
+        inp.style.cursor       = 'text';
+        inp.style.paddingLeft  = '12px';
+        if (icon) { icon.className = 'fas fa-unlock'; icon.style.color = '#20c8a1'; }
+        if (hint) hint.style.display = 'none';
+        inp.focus();
+        inp.select();
+    } else {
+        // Re-lock and reset back to exact cost
+        const cost = document.getElementById('extendCostHolder').value;
+        inp.value = cost;
+        _lockExtendTendered();
+        document.getElementById('extendChangeDisplay').style.display = 'none';
+    }
 }
 
 function submitExtendSession() {
@@ -823,7 +1137,7 @@ function submitExtendSession() {
     fd.append('payment_method', method);
     if (tendered) fd.append('tendered', tendered);
 
-    fetch('ajax/extend_session.php', { method: 'POST', body: fd })
+    fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(data) {
             btn.disabled = false;
@@ -847,13 +1161,28 @@ function submitExtendSession() {
 }
 
 function approveExt(extId) {
-    const method = prompt('Payment method (cash / gcash / credit_card):', 'cash') || 'cash';
-    if (!method) return;
-    const fd = new FormData();
-    fd.append('action', 'approve');
-    fd.append('extension_id', extId);
-    fd.append('payment_method', method);
-    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+    // Show a mini inline prompt using gspotConfirm as backdrop, then submit
+    const method = 'cash'; // default; could be extended with a mini select
+    gspotConfirm('Approve extension — payment via Cash?', function() {
+        const fd = new FormData();
+        fd.append('action', 'approve');
+        fd.append('extension_id', extId);
+        fd.append('payment_method', method);
+        fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: fd })
+            .then(r => r.json())
+            .then(function(d) {
+                if (d.success) {
+                    showInlineToast('Extension approved!', 'success');
+                    loadPendingExtensions(document.getElementById('extendSessionId').value);
+                    setTimeout(() => location.reload(), 1800);
+                } else {
+                    showInlineToast(d.message || 'Failed to approve.', 'error');
+                }
+            });
+    }, { yesLabel: 'Approve', danger: false });
+}
+function _approveExtDummy() { // placeholder so old reference doesn't break
+    fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: new FormData() })
         .then(r => r.json())
         .then(function(d) {
             if (d.success) {
@@ -871,7 +1200,7 @@ function denyExt(extId) {
     fd.append('action', 'deny');
     fd.append('extension_id', extId);
     fd.append('note', 'Denied by staff');
-    fetch('ajax/approve_extension.php', { method: 'POST', body: fd })
+    fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(d) {
             if (d.success) {
@@ -943,14 +1272,17 @@ function denyExt(extId) {
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Date *</label>
-                    <input type="date" name="reserved_date" required min="<?= date('Y-m-d') ?>"
-                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;">
+                    <label>Date <span class="req">*</span></label>
+                    <input type="date" name="reserved_date" required
+                           min="<?= date('Y-m-d') ?>"
+                           max="<?= date('Y-m-d', strtotime('+90 days')) ?>">
+                    <p class="field-hint">Reservations accepted up to 90 days in advance.</p>
                 </div>
                 <div class="form-group">
-                    <label>Time *</label>
+                    <label>Time <span class="req">*</span></label>
                     <input type="time" name="reserved_time" required
-                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;">
+                           min="08:00" max="23:00" step="900">
+                    <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 8:00 AM – 11:00 PM</p>
                 </div>
             </div>
             <div class="form-group" id="adminDpGroup" style="display:none;">
@@ -978,7 +1310,7 @@ function denyExt(extId) {
                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;resize:vertical;"
                           placeholder="Any notes…"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+            <button type="submit" class="btn btn-primary btn-full">
                 <i class="fas fa-calendar-check"></i> Save Reservation
             </button>
         </form>
@@ -1010,7 +1342,12 @@ function denyExt(extId) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <button type="submit" class="btn btn-success" style="width:100%;justify-content:center;">
+            <div class="modal-banner info" style="margin-top:16px;margin-bottom:0;">
+                <i class="fas fa-info-circle"></i>
+                <span>Double-check the console unit matches the customer's reservation type. This action starts the timer immediately.</span>
+            </div>
+            <hr class="modal-divider">
+            <button type="submit" class="btn btn-success btn-full">
                 <i class="fas fa-play"></i> Start Session Now
             </button>
         </form>

@@ -18,7 +18,10 @@ require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_config.php';
 require_once __DIR__ . '/../includes/db_functions.php';
 
-requireRole(['owner', 'shopkeeper']);
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['owner', 'shopkeeper'])) {
+    echo json_encode(['html' => '']);
+    exit;
+}
 
 $allowed = ['dashboard', 'sessions', 'reservations', 'consoles',
             'transactions', 'reports', 'tournaments', 'settings'];
@@ -35,7 +38,7 @@ $user = getCurrentUser();
 
 // Settings
 $settings = [];
-$sRes = $conn->query("SELECT setting_key, setting_value FROM settings");
+$sRes = $conn->query("SELECT setting_key, setting_value FROM system_settings");
 if ($sRes) {
     while ($row = $sRes->fetch_assoc()) {
         $settings[$row['setting_key']] = $row['setting_value'];
@@ -46,46 +49,54 @@ if ($sRes) {
 $consolesResult = $conn->query("SELECT * FROM consoles ORDER BY console_type, unit_number");
 $consoles = $consolesResult ? $consolesResult->fetch_all(MYSQLI_ASSOC) : [];
 
-// Active sessions (with extras)
+// Dashboard-specific variables needed by dashboard.php
+$activeSessions   = getActiveSessions();
+$activeCount      = count($activeSessions);
+$allConsoles      = getConsoles();
+$availableCount   = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
+$inUseCount       = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
+$maintenanceCount = count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
+$todayStats       = getDailySalesReport(date('Y-m-d'));
+$todayBookings    = $todayStats['total_sessions'] ?? 0;
+$unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
+
+// Active + recent sessions (used by dashboard, sessions sections)
 $recentSessions = [];
 $rsQ = $conn->query(
-    "SELECT s.*, u.full_name AS customer_name, u.phone AS customer_phone,
+    "SELECT gs.*, u.full_name AS customer_name, u.phone AS customer_phone,
             c.console_type, c.unit_number,
+            gs.source_reservation_id,
+            COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(ar.extra_cost)
                         FROM additional_requests ar
-                       WHERE ar.session_id = s.session_id
-                         AND ar.status = 'approved'), 0) AS approved_extras
-       FROM sessions s
-       JOIN users u ON s.user_id = u.user_id
-       JOIN consoles c ON s.console_id = c.console_id
-      WHERE s.status IN ('active','paused')
-      ORDER BY s.start_time DESC"
+                       WHERE ar.session_id = gs.session_id
+                         AND ar.status = 'approved'), 0) AS approved_extras,
+            COALESCE((SELECT SUM(t.amount) FROM transactions t
+                       WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid
+       FROM gaming_sessions gs
+       JOIN users u ON gs.user_id = u.user_id
+       JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
+      WHERE gs.status IN ('active','paused')
+      ORDER BY gs.start_time DESC"
 );
 if ($rsQ) $recentSessions = $rsQ->fetch_all(MYSQLI_ASSOC);
 
-// Completed sessions (recent)
+// Completed sessions (recent 50)
 $completedSessions = [];
 $csQ = $conn->query(
-    "SELECT s.*, u.full_name AS customer_name, c.console_type, c.unit_number
-       FROM sessions s
-       JOIN users u ON s.user_id = u.user_id
-       JOIN consoles c ON s.console_id = c.console_id
-      WHERE s.status = 'completed'
-      ORDER BY s.end_time DESC LIMIT 50"
+    "SELECT gs.*, u.full_name AS customer_name, c.console_type, c.unit_number
+       FROM gaming_sessions gs
+       JOIN users u ON gs.user_id = u.user_id
+       JOIN consoles c ON gs.console_id = c.console_id
+      WHERE gs.status = 'completed'
+      ORDER BY gs.end_time DESC LIMIT 50"
 );
 if ($csQ) $completedSessions = $csQ->fetch_all(MYSQLI_ASSOC);
 
-// Reservations
-$upcomingReservations = [];
-$urQ = $conn->query(
-    "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone
-       FROM reservations r
-       JOIN users u ON r.user_id = u.user_id
-      WHERE r.status IN ('pending','confirmed')
-        AND r.reserved_date >= CURDATE()
-      ORDER BY r.reserved_date ASC, r.reserved_time ASC"
-);
-if ($urQ) $upcomingReservations = $urQ->fetch_all(MYSQLI_ASSOC);
+// Reservations — use same function as admin.php so all columns (unit_number, console_type etc.) are present
+$upcomingReservations = getUpcomingReservations();
+$pendingResCount      = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
 
 $cancelledReservations = [];
 $crQ = $conn->query(
@@ -101,10 +112,10 @@ if ($crQ) $cancelledReservations = $crQ->fetch_all(MYSQLI_ASSOC);
 $customers = [];
 $custQ = $conn->query(
     "SELECT u.user_id, u.full_name, u.email, u.phone, u.created_at, u.is_banned,
-            COUNT(DISTINCT s.session_id) AS total_sessions,
+            COUNT(DISTINCT gs.session_id) AS total_sessions,
             COALESCE(SUM(t.amount),0) AS total_spent
        FROM users u
-       LEFT JOIN sessions s ON s.user_id = u.user_id AND s.status = 'completed'
+       LEFT JOIN gaming_sessions gs ON gs.user_id = u.user_id AND gs.status = 'completed'
        LEFT JOIN transactions t ON t.user_id = u.user_id AND t.type = 'payment'
       WHERE u.role = 'customer'
       GROUP BY u.user_id
@@ -157,7 +168,7 @@ $tcQ = $conn->query("SELECT COUNT(*) AS n FROM users WHERE role='customer'");
 if ($tcQ) $totalCustomers = (int)$tcQ->fetch_assoc()['n'];
 
 $totalSessions = 0;
-$tsQ = $conn->query("SELECT COUNT(*) AS n FROM sessions WHERE status='completed'");
+$tsQ = $conn->query("SELECT COUNT(*) AS n FROM gaming_sessions WHERE status='completed'");
 if ($tsQ) $totalSessions = (int)$tsQ->fetch_assoc()['n'];
 
 $monthRevenue = 0;
@@ -172,8 +183,8 @@ $revenueByConsole = [];
 $rbcQ = $conn->query(
     "SELECT c.console_type, COALESCE(SUM(t.amount),0) AS total
        FROM transactions t
-       JOIN sessions s ON t.session_id = s.session_id
-       JOIN consoles c ON s.console_id = c.console_id
+       JOIN gaming_sessions gs ON t.session_id = gs.session_id
+       JOIN consoles c ON gs.console_id = c.console_id
       WHERE t.type = 'payment'
       GROUP BY c.console_type"
 );
@@ -182,8 +193,8 @@ if ($rbcQ) $revenueByConsole = $rbcQ->fetch_all(MYSQLI_ASSOC);
 $typeUsage = [];
 $tuQ = $conn->query(
     "SELECT c.console_type, COUNT(*) AS cnt
-       FROM sessions s JOIN consoles c ON s.console_id = c.console_id
-      WHERE s.status = 'completed'
+       FROM gaming_sessions gs JOIN consoles c ON gs.console_id = c.console_id
+      WHERE gs.status = 'completed'
       GROUP BY c.console_type"
 );
 if ($tuQ) $typeUsage = $tuQ->fetch_all(MYSQLI_ASSOC);
