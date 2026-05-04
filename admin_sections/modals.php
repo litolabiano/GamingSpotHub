@@ -209,6 +209,69 @@
 }
 </style>
 
+<!-- ════ CUSTOMER SEARCH WIDGET — shared CSS ═══════════════════════════ -->
+<style>
+/* ── Customer search widget ────────────────────────────────────────── */
+.cs-wrap        { position:relative; }
+.cs-input-row   { position:relative; display:flex; align-items:center; }
+.cs-icon        { position:absolute;left:13px;top:50%;transform:translateY(-50%);
+                  color:#5f85da;font-size:13px;pointer-events:none;z-index:1; }
+.cs-input       { width:100%;box-sizing:border-box;
+                  padding:11px 38px 11px 36px;border-radius:10px;
+                  border:1px solid rgba(95,133,218,.2);
+                  background:rgba(255,255,255,.04);
+                  color:#e8eaf6;font-size:14px;font-family:inherit;
+                  transition:border-color .2s,box-shadow .2s,background .2s;
+                  outline:none; }
+.cs-input:focus { border-color:rgba(95,133,218,.6);
+                  background:rgba(95,133,218,.07);
+                  box-shadow:0 0 0 3px rgba(95,133,218,.12); }
+.cs-clear       { position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                  background:none;border:none;color:#5f85da;cursor:pointer;
+                  font-size:15px;padding:4px;opacity:0;pointer-events:none;
+                  transition:opacity .15s; }
+.cs-clear.visible { opacity:1;pointer-events:auto; }
+.cs-dropdown    { position:absolute;top:calc(100% + 5px);left:0;right:0;
+                  background:linear-gradient(160deg,#0c1a38,#080f1d);
+                  border:1px solid rgba(95,133,218,.3);border-radius:12px;
+                  max-height:220px;overflow-y:auto;z-index:99999;
+                  box-shadow:0 12px 36px rgba(0,0,0,.65);
+                  scrollbar-width:thin;scrollbar-color:rgba(95,133,218,.25) transparent;
+                  display:none; }
+.cs-dropdown.open { display:block; }
+.cs-item        { padding:11px 14px;cursor:pointer;
+                  display:flex;align-items:center;gap:10px;
+                  border-bottom:1px solid rgba(255,255,255,.04);
+                  transition:background .12s; }
+.cs-item:last-child { border-bottom:none; }
+.cs-item:hover, .cs-item.active { background:rgba(95,133,218,.14); }
+.cs-item-avatar { width:30px;height:30px;border-radius:50%;
+                  background:linear-gradient(135deg,#5f85da,#20c8a1);
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:12px;font-weight:700;color:#fff;flex-shrink:0; }
+.cs-item-name   { font-size:13px;font-weight:600;color:#e8eaf6; }
+.cs-item-email  { font-size:11px;color:#667;margin-top:1px; }
+.cs-selected    { display:none;align-items:center;gap:10px;
+                  background:rgba(32,200,161,.08);
+                  border:1px solid rgba(32,200,161,.25);border-radius:10px;
+                  padding:10px 14px;margin-top:0; }
+.cs-selected.show { display:flex; }
+.cs-selected-avatar { width:34px;height:34px;border-radius:50%;
+                  background:linear-gradient(135deg,#20c8a1,#5f85da);
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:13px;font-weight:700;color:#fff;flex-shrink:0; }
+.cs-selected-info { flex:1;min-width:0; }
+.cs-selected-name  { font-size:13px;font-weight:700;color:#20c8a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.cs-selected-email { font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.cs-deselect    { background:none;border:none;color:#fb566b;cursor:pointer;
+                  font-size:16px;padding:4px;flex-shrink:0;transition:opacity .15s; }
+.cs-deselect:hover { opacity:.7; }
+.cs-status      { padding:12px 14px;font-size:12px;color:#667;text-align:center; }
+.cs-highlight   { color:#8aa4e8;font-weight:700; }
+/* Validation failure state */
+.cs-error       { border-color:rgba(251,86,107,.6)!important;box-shadow:0 0 0 3px rgba(251,86,107,.12)!important; }
+</style>
+
 <script>
 (function(){
     const modal   = document.getElementById('gspotConfirmModal');
@@ -270,14 +333,32 @@
             <?= csrfField() ?>
             <input type="hidden" name="action" value="start_session">
             <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
+            <input type="hidden" name="user_id" id="ssUserId" value="">
             <div class="form-group">
                 <label>Customer <span style="color:#888;font-size:11px;font-weight:400;">(optional — leave blank for walk-in)</span></label>
-                <select name="user_id">
-                    <option value="">— Walk-in / No account —</option>
-                    <?php foreach ($customers as $c): ?>
-                    <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+                <div class="cs-wrap" id="ssWrap">
+                    <div class="cs-input-row">
+                        <i class="fas fa-search cs-icon"></i>
+                        <input type="text" id="ssQuery" class="cs-input"
+                               placeholder="Search customer by name or email…"
+                               autocomplete="off"
+                               oninput="csSearch('ss')"
+                               onkeydown="csKeyNav(event,'ss')">
+                        <button type="button" class="cs-clear" id="ssClear"
+                                onclick="csDeselect('ss','walk-in')">&times;</button>
+                    </div>
+                    <div class="cs-dropdown" id="ssDropdown" role="listbox"></div>
+                    <div class="cs-selected" id="ssSelected">
+                        <div class="cs-selected-avatar" id="ssSelAvatar"></div>
+                        <div class="cs-selected-info">
+                            <div class="cs-selected-name" id="ssSelName"></div>
+                            <div class="cs-selected-email" id="ssSelEmail"></div>
+                        </div>
+                        <button type="button" class="cs-deselect" title="Change customer"
+                                onclick="csDeselect('ss','walk-in')">&times;</button>
+                    </div>
+                    <p class="field-hint" id="ssHint">Leave empty to record as a walk-in.</p>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -426,7 +507,7 @@
                     <div class="form-group" style="margin-bottom:6px">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                             <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;">
                                 <input type="checkbox" id="unlimTenderedToggle"
                                        style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
                                        onchange="toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay')">
@@ -1209,21 +1290,44 @@ function denyExt(extId) {
             </h3>
             <button class="modal-close" onclick="closeModal('addReservation')">&times;</button>
         </div>
+        <div class="modal-body">
         <form method="POST" id="addReservationForm">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add_reservation">
+            <!-- Hidden field carries the resolved user_id -->
+            <input type="hidden" name="user_id" id="arUserId" value="">
             <div class="form-group">
-                <label>Customer *</label>
-                <select name="user_id" required>
-                    <option value="" disabled selected>— Select customer —</option>
-                    <?php foreach ($customers as $c): ?>
-                    <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
+                <label>Customer <span class="req">*</span></label>
+                <!-- Customer search widget (prefix: ar) -->
+                <div class="cs-wrap" id="arWrap">
+                    <div class="cs-input-row">
+                        <i class="fas fa-search cs-icon"></i>
+                        <input type="text" id="arQuery" class="cs-input"
+                               placeholder="Search customer by name or email…"
+                               autocomplete="off"
+                               oninput="csSearch('ar')"
+                               onkeydown="csKeyNav(event,'ar')">
+                        <button type="button" class="cs-clear" id="arClear"
+                                onclick="csDeselect('ar','required')">&times;</button>
+                    </div>
+                    <div class="cs-dropdown" id="arDropdown" role="listbox"></div>
+                    <!-- Selected customer chip -->
+                    <div class="cs-selected" id="arSelected">
+                        <div class="cs-selected-avatar" id="arSelAvatar"></div>
+                        <div class="cs-selected-info">
+                            <div class="cs-selected-name" id="arSelName"></div>
+                            <div class="cs-selected-email" id="arSelEmail"></div>
+                        </div>
+                        <button type="button" class="cs-deselect" title="Change customer"
+                                onclick="csDeselect('ar','required')">&times;</button>
+                    </div>
+                    <p class="field-hint" id="arHint" style="color:#fb566b;display:none;">
+                        <i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>A registered customer must be selected.</p>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Console Type *</label>
+                    <label>Console Type <span class="req">*</span></label>
                     <select name="console_type" required>
                         <option value="" disabled selected>— Select —</option>
                         <option value="PS4">PS4</option>
@@ -1232,7 +1336,7 @@ function denyExt(extId) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Rental Mode *</label>
+                    <label>Rental Mode <span class="req">*</span></label>
                     <select name="rental_mode" id="resAdminModeSelect" required onchange="adminResOnModeChange()">
                         <option value="hourly">Hourly</option>
                         <option value="open_time">Open Time</option>
@@ -1241,19 +1345,19 @@ function denyExt(extId) {
                 </div>
             </div>
             <div id="adminResDurGroup" class="form-group">
-                <label>Duration *</label>
+                <label>Duration <span class="req">*</span></label>
                 <select name="planned_minutes" id="adminResPlannedMins" onchange="adminResCalcDownpayment()">
                     <option value="" disabled selected>— Select —</option>
-                    <option value="30">30 min — ₱50</option>
-                    <option value="60">1 hr — ₱80</option>
-                    <option value="90">1h 30m — ₱120</option>
-                    <option value="120">2 hrs — ₱160</option>
-                    <option value="150">2h 30m — ₱200</option>
-                    <option value="180">3 hrs — ₱240</option>
-                    <option value="240">4 hrs — ₱320</option>
-                    <option value="300">5 hrs — ₱400</option>
-                    <option value="360">6 hrs — ₱480</option>
-                    <option value="480">8 hrs — ₱640</option>
+                    <option value="30">30 min — &#8369;50</option>
+                    <option value="60">1 hr — &#8369;80</option>
+                    <option value="90">1h 30m — &#8369;120</option>
+                    <option value="120">2 hrs — &#8369;160</option>
+                    <option value="150">2h 30m — &#8369;200</option>
+                    <option value="180">3 hrs — &#8369;240</option>
+                    <option value="240">4 hrs — &#8369;320</option>
+                    <option value="300">5 hrs — &#8369;400</option>
+                    <option value="360">6 hrs — &#8369;480</option>
+                    <option value="480">8 hrs — &#8369;640</option>
                 </select>
             </div>
             <div class="form-row">
@@ -1273,33 +1377,29 @@ function denyExt(extId) {
             </div>
             <div class="form-group" id="adminDpGroup" style="display:none;">
                 <label style="display:flex;justify-content:space-between;align-items:center;">
-                    Payment Amount (₱)
+                    Payment Amount (&#8369;)
                     <span id="adminDpHint" style="font-size:11px;color:#20c8a1;font-weight:600;"></span>
                 </label>
                 <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="1"
-                       readonly
-                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(32,200,161,.35);
-                              background:rgba(32,200,161,.06);color:#20c8a1;font-size:15px;font-weight:700;
-                              cursor:not-allowed;">
-                <p style="font-size:11px;color:#888;margin:6px 0 0;"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of session cost — collected to secure the booking.</p>
+                       readonly>
+                <p class="field-hint"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of session cost — collected to secure the booking.</p>
             </div>
             <div class="form-group" id="adminDpMethodGroup" style="display:none;">
-                <label>Payment Method *</label>
+                <label>Payment Method <span class="req">*</span></label>
                 <select name="downpayment_method" id="adminDpMethodSelect">
-                    <option value="cash">💵 Cash</option>
-                    <option value="gcash">📱 GCash</option>
+                    <option value="cash">&#x1F4B5; Cash</option>
+                    <option value="gcash">&#x1F4F1; GCash</option>
                 </select>
             </div>
             <div class="form-group">
                 <label>Notes</label>
-                <textarea name="notes" rows="2"
-                          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:14px;resize:vertical;"
-                          placeholder="Any notes…"></textarea>
+                <textarea name="notes" rows="2" placeholder="Any notes…"></textarea>
             </div>
             <button type="submit" class="btn btn-primary btn-full">
                 <i class="fas fa-calendar-check"></i> Save Reservation
             </button>
         </form>
+        </div><!-- /.modal-body -->
     </div>
 </div>
 
@@ -1408,3 +1508,248 @@ function openConvertModal(res) {
     openModal('convertReservation');
 }
 </script>
+
+<script>
+/* ═════════════════════════════════════════════════════════
+   CUSTOMER SEARCH ENGINE
+   Shared by all cs-wrap widgets on the page.
+   Prefix convention: 'ss' = Start Session, 'ar' = Add Reservation
+   Public API: csSearch(pfx), csKeyNav(e,pfx), csSelect(pfx,id,name,email), csDeselect(pfx,mode)
+═════════════════════════════════════════════════════════ */
+(function () {
+    /* per-prefix debounce timer storage */
+    const _timers  = {};
+    /* currently keyboard-highlighted item index per prefix */
+    const _focusIdx = {};
+
+    /* ── helpers to get elements by prefix ───────────────────── */
+    function $q(pfx, id) { return document.getElementById(pfx + id); }
+
+    /* ── Bold-highlight the search term inside a string ──────────── */
+    function highlight(str, q) {
+        if (!q) return escHtml(str);
+        const re  = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+        return escHtml(str).replace(re, '<span class="cs-highlight">$1</span>');
+    }
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    /* ── Close the dropdown for a prefix ───────────────────────── */
+    function closeDropdown(pfx) {
+        const dd = $q(pfx,'Dropdown');
+        if (dd) { dd.classList.remove('open'); dd.innerHTML = ''; }
+        _focusIdx[pfx] = -1;
+    }
+
+    /* ── Main search handler (debounced 220ms) ─────────────────── */
+    window.csSearch = function (pfx) {
+        const inp = $q(pfx,'Query');
+        const clr = $q(pfx,'Clear');
+        const q   = inp ? inp.value.trim() : '';
+
+        /* show/hide clear button */
+        if (clr) clr.classList.toggle('visible', q.length > 0);
+
+        /* reset hidden id whenever user types */
+        const hid = $q(pfx,'UserId');
+        if (hid) hid.value = '';
+
+        if (!q) { closeDropdown(pfx); return; }
+
+        clearTimeout(_timers[pfx]);
+        _timers[pfx] = setTimeout(function () {
+            const dd = $q(pfx,'Dropdown');
+            if (!dd) return;
+            dd.innerHTML = '<div class="cs-status"><i class="fas fa-spinner fa-spin" style="margin-right:5px;"></i>Searching…</div>';
+            dd.classList.add('open');
+
+            fetch('ajax/search_customers.php?q=' + encodeURIComponent(q), { credentials:'same-origin' })
+                .then(function(r){ return r.json(); })
+                .then(function(results){ renderResults(pfx, results, q); })
+                .catch(function(){
+                    dd.innerHTML = '<div class="cs-status" style="color:#fb566b;"><i class="fas fa-exclamation-circle" style="margin-right:5px;"></i>Search error — try again.</div>';
+                });
+        }, 220);
+    };
+
+    /* ── Render search results into the dropdown ──────────────── */
+    function renderResults(pfx, results, q) {
+        const dd = $q(pfx,'Dropdown');
+        if (!dd) return;
+        _focusIdx[pfx] = -1;
+
+        if (!results.length) {
+            dd.innerHTML =
+                '<div class="cs-status">' +
+                '<i class="fas fa-user-slash" style="margin-right:5px;color:#fb566b;"></i>' +
+                'No registered customer found for "<strong>' + escHtml(q) + '</strong>".' +
+                '</div>';
+            return;
+        }
+
+        dd.innerHTML = '';
+        results.forEach(function(c, i) {
+            const div = document.createElement('div');
+            div.className = 'cs-item';
+            div.setAttribute('role','option');
+            div.dataset.idx = i;
+
+            const initials = (c.full_name || '?').split(' ').map(function(w){ return w[0]; }).slice(0,2).join('').toUpperCase();
+            div.innerHTML =
+                '<div class="cs-item-avatar">' + escHtml(initials) + '</div>' +
+                '<div>' +
+                '  <div class="cs-item-name">' + highlight(c.full_name, q) + '</div>' +
+                '  <div class="cs-item-email">' + highlight(c.email, q) + '</div>' +
+                '</div>';
+
+            div.addEventListener('mousedown', function(e) {
+                /* mousedown fires before blur so we can steal focus safely */
+                e.preventDefault();
+                csSelect(pfx, c.user_id, c.full_name, c.email);
+            });
+
+            dd.appendChild(div);
+        });
+        dd.classList.add('open');
+    }
+
+    /* ── Keyboard navigation (up/down/enter/escape) ───────────── */
+    window.csKeyNav = function (e, pfx) {
+        const dd    = $q(pfx,'Dropdown');
+        const items = dd ? Array.from(dd.querySelectorAll('.cs-item')) : [];
+        if (!items.length && e.key !== 'Escape') return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _focusIdx[pfx] = Math.min((_focusIdx[pfx] || -1) + 1, items.length - 1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _focusIdx[pfx] = Math.max((_focusIdx[pfx] || 0) - 1, 0);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const idx = _focusIdx[pfx] >= 0 ? _focusIdx[pfx] : 0;
+            if (items[idx]) items[idx].dispatchEvent(new MouseEvent('mousedown'));
+            return;
+        } else if (e.key === 'Escape') {
+            closeDropdown(pfx);
+            return;
+        } else {
+            return;
+        }
+
+        /* highlight active item */
+        items.forEach(function(it, i) {
+            it.classList.toggle('active', i === _focusIdx[pfx]);
+        });
+        if (items[_focusIdx[pfx]]) {
+            items[_focusIdx[pfx]].scrollIntoView({ block:'nearest' });
+        }
+    };
+
+    /* ── Select a customer ────────────────────────────────────── */
+    window.csSelect = function (pfx, userId, fullName, email) {
+        /* populate hidden input */
+        const hid = $q(pfx,'UserId');
+        if (hid) hid.value = userId;
+
+        /* hide search input, show selected chip */
+        const inp  = $q(pfx,'Query');
+        const clr  = $q(pfx,'Clear');
+        const chip = $q(pfx,'Selected');
+
+        if (inp)  { inp.value = ''; inp.style.display = 'none'; }
+        if (clr)  clr.classList.remove('visible');
+        if (chip) chip.classList.add('show');
+
+        /* fill chip */
+        const initials = (fullName || '?').split(' ').map(function(w){ return w[0]; }).slice(0,2).join('').toUpperCase();
+        const ava  = $q(pfx,'SelAvatar');
+        const nm   = $q(pfx,'SelName');
+        const em   = $q(pfx,'SelEmail');
+        if (ava) ava.textContent  = initials;
+        if (nm)  nm.textContent   = fullName;
+        if (em)  em.textContent   = email;
+
+        /* hide validation hint */
+        const hint = $q(pfx,'Hint');
+        if (hint) hint.style.display = 'none';
+
+        closeDropdown(pfx);
+    };
+
+    /* ── Deselect / clear ──────────────────────────────────────── */
+    window.csDeselect = function (pfx, mode) {
+        const hid  = $q(pfx,'UserId');
+        const inp  = $q(pfx,'Query');
+        const clr  = $q(pfx,'Clear');
+        const chip = $q(pfx,'Selected');
+
+        if (hid)  hid.value = '';
+        if (inp)  { inp.value = ''; inp.style.display = ''; inp.focus(); }
+        if (clr)  clr.classList.remove('visible');
+        if (chip) chip.classList.remove('show');
+        closeDropdown(pfx);
+    };
+
+    /* ── Close dropdown when clicking outside ─────────────────── */
+    document.addEventListener('click', function (e) {
+        ['ss','ar'].forEach(function(pfx) {
+            const wrap = $q(pfx,'Wrap');
+            if (wrap && !wrap.contains(e.target)) closeDropdown(pfx);
+        });
+    });
+
+    /* ── Add Reservation form: validate customer is selected before submit ── */
+    document.addEventListener('DOMContentLoaded', function() {
+        /* guard Add Reservation: user_id must be set */
+        const arForm = document.getElementById('addReservationForm');
+        if (arForm) {
+            arForm.addEventListener('submit', function(e) {
+                const uid  = document.getElementById('arUserId');
+                const hint = document.getElementById('arHint');
+                if (!uid || !uid.value) {
+                    e.preventDefault();
+                    if (hint) hint.style.display = 'block';
+                    const inp = document.getElementById('arQuery');
+                    if (inp) { inp.focus(); inp.classList.add('cs-error'); }
+                    return false;
+                }
+            });
+        }
+    });
+
+    /* ── Hook into openModal() to auto-reset customer search widgets ───────
+       This is more reliable than querySelectorAll with escaped quotes, and
+       works regardless of how the modal is opened (button, JS call, etc.)  */
+    const _origOpenModal = window.openModal;
+    window.openModal = function(name) {
+        if (name === 'addReservation') {
+            /* Reset the Add Reservation customer widget */
+            if (typeof csDeselect === 'function') csDeselect('ar', 'required');
+            /* Also reset the form fields */
+            const form = document.getElementById('addReservationForm');
+            if (form) {
+                const ct = form.querySelector('[name="console_type"]');
+                const rm = document.getElementById('resAdminModeSelect');
+                const pm = document.getElementById('adminResPlannedMins');
+                if (ct) ct.value = '';
+                if (rm) { rm.value = 'hourly'; adminResOnModeChange(); }
+                if (pm) pm.value = '';
+                const rdEl = form.querySelector('[name="reserved_date"]');
+                const rtEl = form.querySelector('[name="reserved_time"]');
+                const ntEl = form.querySelector('[name="notes"]');
+                if (rdEl) rdEl.value = '';
+                if (rtEl) rtEl.value = '';
+                if (ntEl) ntEl.value = '';
+            }
+        } else if (name === 'startSession') {
+            /* Reset the Start Session customer widget */
+            if (typeof csDeselect === 'function') csDeselect('ss', 'walk-in');
+        }
+        if (typeof _origOpenModal === 'function') _origOpenModal(name);
+    };
+
+})();
+</script>
+

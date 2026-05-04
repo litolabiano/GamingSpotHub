@@ -314,6 +314,21 @@ if (!empty($_SESSION['reserve_success'])) {
 // ── My reservations + active check ───────────────────────────────────────────
 $myReservations = getMyReservations($user['user_id']);
 
+// Build a set of reservation_ids that the customer has already self-rescheduled once
+$rescheduledIds = [];
+if (!empty($myReservations)) {
+    $uid_r = (int)$user['user_id'];
+    $rStmt = $conn->prepare(
+        "SELECT DISTINCT reservation_id FROM reservation_reschedules
+          WHERE user_id = ? AND rescheduled_by = ?"
+    );
+    $rStmt->bind_param('ii', $uid_r, $uid_r);
+    $rStmt->execute();
+    foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $rescheduledIds[$row['reservation_id']] = true;
+    }
+}
+
 $activeResCheck = $conn->prepare(
     "SELECT reservation_id, reserved_date, reserved_time, status
        FROM reservations
@@ -931,9 +946,72 @@ if (!empty($_GET['console'])) {
         color: rgba(255,255,255,.22);
         background: #0a1628;
     }
-    #timeSelect option[value=""] {
-        color: #555;
+    /* ── Action Buttons ──────────────────────────────────── */
+    .res-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.1);
+        color: #ddd;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .2s;
     }
+    .res-action-resched:hover:not(:disabled) {
+        border-color: #20c8a1;
+        background: rgba(32,200,161,.15);
+        color: #20c8a1;
+    }
+    .res-action-cancel:hover:not(:disabled) {
+        border-color: #fb566b;
+        background: rgba(251,86,107,.15);
+        color: #fb566b;
+    }
+
+    /* ── Modals ──────────────────────────────────────────── */
+    .ur-modal-backdrop {
+        position: fixed; top:0; left:0; right:0; bottom:0;
+        background: rgba(0,0,0,.75);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        align-items: center; justify-content: center;
+        padding: 20px;
+    }
+    .ur-modal-backdrop.active { display: flex; }
+    .ur-modal {
+        background: #0d1425;
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 16px;
+        width: 100%; max-width: 440px;
+        padding: 24px;
+        position: relative;
+        box-shadow: 0 10px 40px rgba(0,0,0,.5);
+        animation: urSlideIn .3s ease forwards;
+    }
+    @keyframes urSlideIn { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+    .ur-modal-close {
+        position: absolute; top: 16px; right: 16px;
+        background: none; border: none; color: #888;
+        font-size: 1.2rem; cursor: pointer; transition: color .2s;
+    }
+    .ur-modal-close:hover { color: #fff; }
+    .ur-modal h3 { margin-top:0; font-size:1.2rem; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+    .ur-modal-body { font-size:13px; color:#ccc; line-height:1.5; margin-bottom:20px; }
+    .ur-alert { background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.3); color:#fb566b; padding:12px; border-radius:8px; font-size:12px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start; }
+    .ur-alert i { margin-top:2px; }
+    .ur-btn-row { display: flex; justify-content: flex-end; gap: 10px; }
+    .ur-btn { padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; transition: all .2s; }
+    .ur-btn.sec { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #ddd; }
+    .ur-btn.sec:hover { background: rgba(255,255,255,.1); }
+    .ur-btn.dang { background: #fb566b; color: #fff; }
+    .ur-btn.dang:hover { filter: brightness(1.1); }
+    .ur-btn.prim { background: #20c8a1; color: #000; }
+    .ur-btn.prim:hover { filter: brightness(1.1); }
     </style>
 
 </head>
@@ -1549,20 +1627,31 @@ if (!empty($_GET['console'])) {
                         No reservations yet
                     </div>
                     <?php else: ?>
-                    <div style="overflow-x:auto;">
-                        <table class="my-res-table">
+                    <div class="my-res-table-wrap">
+                        <table class="my-res-table" style="min-width:520px;">
                             <thead>
                                 <tr>
                                     <th>Date &amp; Time</th>
                                     <th>Console</th>
                                     <th>Mode</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                            <?php foreach ($myReservations as $r): ?>
+                            <?php foreach ($myReservations as $r):
+                                $isActive     = in_array($r['status'], ['pending','confirmed']);
+                                $alreadyResched = !empty($rescheduledIds[$r['reservation_id']]);
+                                $rid          = (int)$r['reservation_id'];
+                                $rDate        = htmlspecialchars($r['reserved_date']);
+                                $rTime        = substr($r['reserved_time'], 0, 5);
+                                $rConsole     = htmlspecialchars($r['console_type']);
+                            ?>
                             <tr>
                                 <td style="white-space:nowrap;">
+                                    <?php if ($alreadyResched && $isActive): ?>
+                                        <span style="font-size:10px;color:#20c8a1;font-weight:700;display:block;">RESCHEDULED</span>
+                                    <?php endif; ?>
                                     <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
                                     <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                                 </td>
@@ -1574,6 +1663,32 @@ if (!empty($_GET['console'])) {
                                 </td>
                                 <td><?= match($r['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($r['rental_mode']) } ?></td>
                                 <td><span class="res-badge <?= $r['status'] ?>"><?= ucfirst($r['status']) ?></span></td>
+                                <td>
+                                <?php if ($isActive): ?>
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                                        <?php if ($alreadyResched): ?>
+                                            <button class="res-action-btn res-action-resched" disabled
+                                                title="You have already used your one-time reschedule for this reservation."
+                                                style="opacity:.45;cursor:not-allowed;">
+                                                <i class="fas fa-calendar-alt"></i> Rescheduled
+                                            </button>
+                                        <?php else: ?>
+                                            <button class="res-action-btn res-action-resched"
+                                                onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')"
+                                                title="Change your reservation date &amp; time (one-time only)">
+                                                <i class="fas fa-calendar-alt"></i> Reschedule
+                                            </button>
+                                        <?php endif; ?>
+                                        <button class="res-action-btn res-action-cancel"
+                                            onclick="openUserCancelModal(<?= $rid ?>)"
+                                            title="Cancel this reservation">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </button>
+                                    </div>
+                                <?php else: ?>
+                                    <span style="color:#444;font-size:12px;">—</span>
+                                <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -2349,6 +2464,249 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         return;
     }
 });
+
+// ── Cancel Modal Logic ──
+function openUserCancelModal(id) {
+    document.getElementById('cancelResId').value = id;
+    document.getElementById('cancelReasonDetailCont').style.display = 'none';
+    document.getElementById('cancelReason').value = '';
+    document.getElementById('cancelDetail').value = '';
+    document.getElementById('cancelError').style.display = 'none';
+    document.getElementById('userCancelModal').classList.add('active');
+}
+function closeUserCancelModal() {
+    document.getElementById('userCancelModal').classList.remove('active');
+}
+function onCancelReasonChange(sel) {
+    const cont = document.getElementById('cancelReasonDetailCont');
+    if (sel.value === 'other') {
+        cont.style.display = 'block';
+        document.getElementById('cancelDetail').required = true;
+    } else {
+        cont.style.display = 'none';
+        document.getElementById('cancelDetail').required = false;
+        document.getElementById('cancelDetail').value = '';
+    }
+}
+function submitUserCancel(e) {
+    e.preventDefault();
+    const btn = document.getElementById('cancelSubmitBtn');
+    const err = document.getElementById('cancelError');
+    
+    const rid = document.getElementById('cancelResId').value;
+    const type = document.getElementById('cancelReason').value;
+    const detail = document.getElementById('cancelDetail').value;
+
+    if (!type || (type === 'other' && !detail)) {
+        err.textContent = 'Please fill out all required fields.';
+        err.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    err.style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('reservation_id', rid);
+    fd.append('cancel_reason_type', type);
+    fd.append('cancel_reason_detail', detail);
+
+    fetch('ajax/cancel_reservation.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            err.textContent = data.message;
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = 'Yes, Cancel It';
+        }
+    })
+    .catch(ex => {
+        err.textContent = 'Network error. Please try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = 'Yes, Cancel It';
+    });
+}
+
+// ── Reschedule Modal Logic ──
+function openUserRescheduleModal(id, date, time, consoleType) {
+    document.getElementById('reschedResId').value = id;
+    document.getElementById('reschedConsoleLbl').textContent = consoleType;
+    document.getElementById('reschedDate').value = date;
+    
+    // Build time slots for the currently selected date
+    buildReschedTimeSelect();
+    
+    // Set the previous time if still valid
+    const sel = document.getElementById('reschedTime');
+    const tVal = time.length === 5 ? time : time.substr(0,5);
+    for(let i=0; i<sel.options.length; i++){
+        if(sel.options[i].value === tVal && !sel.options[i].disabled) {
+            sel.options[i].selected = true;
+            break;
+        }
+    }
+
+    document.getElementById('reschedError').style.display = 'none';
+    document.getElementById('userRescheduleModal').classList.add('active');
+}
+function closeUserRescheduleModal() {
+    document.getElementById('userRescheduleModal').classList.remove('active');
+}
+
+function buildReschedTimeSelect() {
+    const sel = document.getElementById('reschedTime');
+    const dateVal = document.getElementById('reschedDate').value || new Date().toISOString().slice(0,10);
+    const minT = getMinTimeForDate(dateVal); // uses existing function in reserve.php
+    
+    sel.innerHTML = '<option value="" disabled selected>Select a time...</option>';
+    TIME_SLOTS.forEach(slot => {
+        const opt = document.createElement('option');
+        opt.value = slot;
+        opt.textContent = fmtSlot(slot);
+        if (slot < minT) {
+            opt.disabled = true;
+        }
+        sel.appendChild(opt);
+    });
+}
+
+function submitUserReschedule(e) {
+    e.preventDefault();
+    const btn = document.getElementById('reschedSubmitBtn');
+    const err = document.getElementById('reschedError');
+    
+    const rid  = document.getElementById('reschedResId').value;
+    const date = document.getElementById('reschedDate').value;
+    const time = document.getElementById('reschedTime').value;
+
+    if (!rid || !date || !time) {
+        err.textContent = 'Please fill out all required fields.';
+        err.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    err.style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('reservation_id', rid);
+    fd.append('new_date', date);
+    fd.append('new_time', time);
+
+    fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            err.textContent = data.message;
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = 'Confirm Reschedule';
+        }
+    })
+    .catch(ex => {
+        err.textContent = 'Network error. Please try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = 'Confirm Reschedule';
+    });
+}
 </script>
+
+<!-- ── Cancel Modal ── -->
+<div class="ur-modal-backdrop" id="userCancelModal">
+    <div class="ur-modal">
+        <button class="ur-modal-close" onclick="closeUserCancelModal()"><i class="fas fa-times"></i></button>
+        <h3><i class="fas fa-exclamation-triangle" style="color:#fb566b;"></i> Cancel Reservation</h3>
+        <div class="ur-modal-body">
+            <p>Are you sure you want to cancel this reservation?</p>
+            <div class="ur-alert">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>Important:</strong> As per our No-Refund Policy, reservation fees are non-refundable. 
+                    Cancelling a reservation will result in the forfeiture of your fee.
+                </div>
+            </div>
+            <form id="userCancelForm" onsubmit="submitUserCancel(event)">
+                <input type="hidden" id="cancelResId">
+                <label style="display:block;margin-bottom:8px;font-weight:600;color:#ddd;font-size:12px;">Reason for Cancellation</label>
+                <select id="cancelReason" required class="res-input" style="padding:10px;font-size:13px;margin-bottom:12px;" onchange="onCancelReasonChange(this)">
+                    <option value="" disabled selected>Select a reason...</option>
+                    <option value="schedule_change">Change of schedule/Can't make it</option>
+                    <option value="found_alternative">Found alternative venue</option>
+                    <option value="budget_issue">Budget issues</option>
+                    <option value="other">Other</option>
+                </select>
+                
+                <div id="cancelReasonDetailCont" style="display:none;margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:8px;font-weight:600;color:#ddd;font-size:12px;">Please specify</label>
+                    <textarea id="cancelDetail" class="res-input" style="margin-bottom:0;" placeholder="Tell us more..."></textarea>
+                </div>
+
+                <div id="cancelError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
+
+                <div style="margin-top:20px;" class="ur-btn-row">
+                    <button type="button" class="ur-btn sec" onclick="closeUserCancelModal()">Keep Reservation</button>
+                    <button type="submit" class="ur-btn dang" id="cancelSubmitBtn">Yes, Cancel It</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Reschedule Modal ── -->
+<div class="ur-modal-backdrop" id="userRescheduleModal">
+    <div class="ur-modal">
+        <button class="ur-modal-close" onclick="closeUserRescheduleModal()"><i class="fas fa-times"></i></button>
+        <h3><i class="fas fa-calendar-alt" style="color:#20c8a1;"></i> Reschedule Reservation</h3>
+        <div class="ur-modal-body">
+            <div class="ur-alert" style="background:rgba(32,200,161,.1); border-color:rgba(32,200,161,.3); color:#20c8a1;">
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <strong>One-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>once</strong> per reservation.
+                </div>
+            </div>
+            <form id="userRescheduleForm" onsubmit="submitUserReschedule(event)">
+                <input type="hidden" id="reschedResId">
+                
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
+                    <div style="background:rgba(255,255,255,.05);padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;" id="reschedConsoleLbl"></div>
+                </div>
+
+                <div class="date-time-row" style="display:flex;gap:12px;margin-bottom:20px;">
+                    <div style="flex:1;">
+                        <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Date</label>
+                        <input type="date" id="reschedDate" class="res-input" style="margin-bottom:0;" required 
+                               min="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d', strtotime('+1 month')) ?>"
+                               onchange="buildReschedTimeSelect()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Time</label>
+                        <select id="reschedTime" class="res-input" style="margin-bottom:0;" required>
+                            <!-- options built via js -->
+                        </select>
+                    </div>
+                </div>
+
+                <div id="reschedError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
+
+                <div class="ur-btn-row">
+                    <button type="button" class="ur-btn sec" onclick="closeUserRescheduleModal()">Cancel</button>
+                    <button type="submit" class="ur-btn prim" id="reschedSubmitBtn">Confirm Reschedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 </body>
 </html>

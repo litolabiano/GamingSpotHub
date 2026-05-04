@@ -25,6 +25,20 @@ $sessionHistory = getUserSessionHistory($user_id, 50);
 // My reservations
 $myReservations = getMyReservations($user_id);
 
+// Build a set of reservation_ids that the customer has already self-rescheduled once
+$rescheduledIds = [];
+if (!empty($myReservations)) {
+    $rStmt = $conn->prepare(
+        "SELECT DISTINCT reservation_id FROM reservation_reschedules
+          WHERE user_id = ? AND rescheduled_by = ?"
+    );
+    $rStmt->bind_param('ii', $user_id, $user_id);
+    $rStmt->execute();
+    foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $rescheduledIds[$row['reservation_id']] = true;
+    }
+}
+
 // ── Cancellation ban / streak status ────────────────────────────────────────
 $banStmt = $conn->prepare("SELECT consecutive_cancellations, reservation_banned_until FROM users WHERE user_id = ?");
 $banStmt->bind_param('i', $user_id);
@@ -1309,15 +1323,39 @@ function fmtMins(int $m): string {
                         </td>
                         <td style="color:var(--muted)"><?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?></td>
                         <td>
-                            <?php if (in_array($r['status'], ['pending','confirmed'])): ?>
-                            <button class="cd-cancel-btn"
-                                    data-id="<?= $r['reservation_id'] ?>"
-                                    data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
-                                    data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
-                                    onclick="openCancelModal(this)"
-                                    title="Cancel this reservation">
-                                <i class="fas fa-times"></i> Cancel
-                            </button>
+                            <?php if (in_array($r['status'], ['pending','confirmed'])): 
+                                $rid          = (int)$r['reservation_id'];
+                                $rDate        = htmlspecialchars($r['reserved_date']);
+                                $rTime        = substr($r['reserved_time'], 0, 5);
+                                $rConsole     = htmlspecialchars($r['console_type']);
+                                $alreadyResched = !empty($rescheduledIds[$rid]);
+                            ?>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                                <?php if ($alreadyResched): ?>
+                                    <button class="cd-btn" disabled
+                                        title="You have already used your one-time reschedule for this reservation."
+                                        style="opacity:.45;cursor:not-allowed;padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;">
+                                        <i class="fas fa-calendar-alt"></i> Rescheduled
+                                    </button>
+                                <?php else: ?>
+                                    <button class="cd-btn"
+                                        onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')"
+                                        title="Change your reservation date &amp; time (one-time only)"
+                                        style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;"
+                                        onmouseover="this.style.background='rgba(32,200,161,.15)';this.style.color='#20c8a1';this.style.borderColor='#20c8a1'"
+                                        onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='#ddd';this.style.borderColor='rgba(255,255,255,.1)'">
+                                        <i class="fas fa-calendar-alt"></i> Reschedule
+                                    </button>
+                                <?php endif; ?>
+                                <button class="cd-cancel-btn"
+                                        data-id="<?= $r['reservation_id'] ?>"
+                                        data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
+                                        data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
+                                        onclick="openCancelModal(this)"
+                                        title="Cancel this reservation">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                            </div>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -2590,5 +2628,177 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </script>
 <?php endif; ?>
 
+<!-- ── Reschedule Modal ── -->
+<div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
+     align-items:center;justify-content:center;">
+    <div style="background:#0d1425;border:1px solid rgba(255,255,255,.1);border-radius:16px;
+                padding:24px;max-width:440px;width:94%;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+        
+        <button onclick="closeUserRescheduleModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'"><i class="fas fa-times"></i></button>
+        
+        <h3 style="margin-top:0;font-size:1.2rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+            <i class="fas fa-calendar-alt" style="color:#20c8a1;"></i> Reschedule Reservation
+        </h3>
+        
+        <div style="font-size:13px;color:#ccc;line-height:1.5;margin-bottom:20px;">
+            <div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.3);color:#20c8a1;padding:12px;border-radius:8px;font-size:12px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
+                <i class="fas fa-check-circle" style="margin-top:2px;"></i>
+                <div>
+                    <strong>One-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>once</strong> per reservation.
+                </div>
+            </div>
+            
+            <form id="userRescheduleForm" onsubmit="submitUserReschedule(event)">
+                <input type="hidden" id="reschedResId">
+                
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
+                    <div style="background:rgba(255,255,255,.05);padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;" id="reschedConsoleLbl"></div>
+                </div>
 
+                <div style="display:flex;gap:12px;margin-bottom:20px;">
+                    <div style="flex:1;">
+                        <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Date</label>
+                        <input type="date" id="reschedDate" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required 
+                               min="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d', strtotime('+1 month')) ?>"
+                               onchange="buildReschedTimeSelect()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Time</label>
+                        <select id="reschedTime" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
+                            <!-- options built via js -->
+                        </select>
+                    </div>
+                </div>
+
+                <div id="reschedError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button type="button" onclick="closeUserRescheduleModal()" style="padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#ddd;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='rgba(255,255,255,.05)'">Cancel</button>
+                    <button type="submit" id="reschedSubmitBtn" style="padding:10px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:none;background:#20c8a1;color:#000;transition:all .2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">Confirm Reschedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Valid slots 12:00–23:00 in 30-min steps
+const DASH_TIME_SLOTS = (function () {
+    const s = [];
+    for (let h = 12; h <= 23; h++) {
+        s.push(String(h).padStart(2,'0') + ':00');
+        if (h < 23) s.push(String(h).padStart(2,'00') + ':30');
+    }
+    return s;
+})();
+
+function fmtDashSlot(t) {
+    const [h, m] = t.split(':');
+    const hh = parseInt(h);
+    return `${hh % 12 || 12}:${m} ${hh >= 12 ? 'PM' : 'AM'}`;
+}
+
+function getDashMinTimeForDate(dateStr) {
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const OPEN_TIME = '12:00';
+    
+    if (dateStr === todayStr) {
+        const earliest = new Date(today.getTime() + 3600 * 1000); // +1 hour
+        const lead = String(earliest.getHours()).padStart(2,'0') + ':' + String(earliest.getMinutes()).padStart(2,'0');
+        return lead > OPEN_TIME ? lead : OPEN_TIME;
+    }
+    return OPEN_TIME;
+}
+
+function buildReschedTimeSelect() {
+    const sel = document.getElementById('reschedTime');
+    const dateVal = document.getElementById('reschedDate').value || new Date().toISOString().slice(0,10);
+    const minT = getDashMinTimeForDate(dateVal);
+    
+    sel.innerHTML = '<option value="" disabled selected>Select a time...</option>';
+    DASH_TIME_SLOTS.forEach(slot => {
+        const opt = document.createElement('option');
+        opt.value = slot;
+        opt.textContent = fmtDashSlot(slot);
+        if (slot < minT) {
+            opt.disabled = true;
+            opt.style.color = 'rgba(255,255,255,.22)';
+            opt.style.background = '#0a1628';
+        }
+        sel.appendChild(opt);
+    });
+}
+
+function openUserRescheduleModal(id, date, time, consoleType) {
+    document.getElementById('reschedResId').value = id;
+    document.getElementById('reschedConsoleLbl').textContent = consoleType;
+    document.getElementById('reschedDate').value = date;
+    
+    buildReschedTimeSelect();
+    
+    const sel = document.getElementById('reschedTime');
+    const tVal = time.length === 5 ? time : time.substr(0,5);
+    for(let i=0; i<sel.options.length; i++){
+        if(sel.options[i].value === tVal && !sel.options[i].disabled) {
+            sel.options[i].selected = true;
+            break;
+        }
+    }
+
+    document.getElementById('reschedError').style.display = 'none';
+    document.getElementById('userRescheduleModal').style.display = 'flex';
+}
+
+function closeUserRescheduleModal() {
+    document.getElementById('userRescheduleModal').style.display = 'none';
+}
+
+function submitUserReschedule(e) {
+    e.preventDefault();
+    const btn = document.getElementById('reschedSubmitBtn');
+    const err = document.getElementById('reschedError');
+    
+    const rid  = document.getElementById('reschedResId').value;
+    const date = document.getElementById('reschedDate').value;
+    const time = document.getElementById('reschedTime').value;
+
+    if (!rid || !date || !time) {
+        err.textContent = 'Please fill out all required fields.';
+        err.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    err.style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('reservation_id', rid);
+    fd.append('new_date', date);
+    fd.append('new_time', time);
+
+    fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            err.textContent = data.message;
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = 'Confirm Reschedule';
+        }
+    })
+    .catch(ex => {
+        err.textContent = 'Network error. Please try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = 'Confirm Reschedule';
+    });
+}
+</script>
 </html>
