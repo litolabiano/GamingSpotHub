@@ -25,17 +25,21 @@ $sessionHistory = getUserSessionHistory($user_id, 50);
 // My reservations
 $myReservations = getMyReservations($user_id);
 
-// Build a set of reservation_ids that the customer has already self-rescheduled once
-$rescheduledIds = [];
+// Build sets of rescheduled reservations
+$userRescheduledIds = [];
+$allRescheduledIds = [];
 if (!empty($myReservations)) {
     $rStmt = $conn->prepare(
-        "SELECT DISTINCT reservation_id FROM reservation_reschedules
-          WHERE user_id = ? AND rescheduled_by = ?"
+        "SELECT reservation_id, rescheduled_by FROM reservation_reschedules
+          WHERE user_id = ?"
     );
-    $rStmt->bind_param('ii', $user_id, $user_id);
+    $rStmt->bind_param('i', $user_id);
     $rStmt->execute();
     foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-        $rescheduledIds[$row['reservation_id']] = true;
+        $allRescheduledIds[$row['reservation_id']] = true;
+        if ((int)$row['rescheduled_by'] === (int)$user_id) {
+            $userRescheduledIds[$row['reservation_id']] = true;
+        }
     }
 }
 
@@ -1365,7 +1369,7 @@ function fmtMins(int $m): string {
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
-                                $alreadyResched = !empty($rescheduledIds[$rid]);
+                                $alreadyResched = !empty($userRescheduledIds[$rid]);
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                 <?php if ($alreadyResched): ?>
@@ -1429,10 +1433,19 @@ function fmtMins(int $m): string {
                                 'no_show'   => ['gray','ghost'],
                               ];
                               $sc2 = $stMap2[$r['status']] ?? ['gray','circle'];
+                              
+                              $displayStatus = ucfirst(str_replace('_',' ',$r['status']));
+                              if ($r['status'] === 'converted') {
+                                  if (!empty($allRescheduledIds[$r['reservation_id']])) {
+                                      $displayStatus = 'Rescheduled';
+                                  } else {
+                                      $displayStatus = 'Reserved';
+                                  }
+                              }
                             ?>
                             <span class="cd-badge <?= $sc2[0] ?>">
                                 <i class="fas fa-<?= $sc2[1] ?>" style="margin-right:4px"></i>
-                                <?= ucfirst(str_replace('_',' ',$r['status'])) ?>
+                                <?= $displayStatus ?>
                             </span>
                             <?php if ($r['status'] === 'cancelled' && !empty($r['cancelled_by'])): ?>
                             <div style="font-size:10px;color:#888;margin-top:3px;">
