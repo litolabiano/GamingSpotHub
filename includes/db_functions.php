@@ -680,11 +680,14 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
 function getActiveSessions() {
     global $conn;
     $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number,
+                   gs.source_reservation_id,
+                   COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
                    COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount < 0), 0) AS refunded_amount
             FROM gaming_sessions gs
             JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id
+            LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
             WHERE gs.status = 'active'
             ORDER BY gs.start_time DESC";
     $result = $conn->query($sql);
@@ -1150,22 +1153,61 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
     );
 
     if ($result['success']) {
-        // ── Credit the reservation downpayment against the new session ──
-        // The downpayment was physically collected at reservation time.
-        // Recording it here links it to the session so that every balance
-        // calculation (upfront_paid) correctly shows only the REMAINING amount.
+        // ── Link the existing reservation downpayment transaction to the new session ──
+        // createReservation() already recorded the downpayment with session_id = NULL.
+        // Instead of adding a duplicate transaction, we UPDATE that existing row to
+        // attach the real session_id and update the note — this keeps a single
+        // clean ledger entry and makes refund calculations work correctly.
         if (!empty($res['downpayment_amount']) && (float)$res['downpayment_amount'] > 0) {
-            recordTransaction(
-                $result['session_id'],
-                $res['user_id'],
-                (float)$res['downpayment_amount'],
-                $res['downpayment_method'] ?? 'cash',
-                $shopkeeper_id,
-                (float)$res['downpayment_amount'],
-                null,
-                'Downpayment transferred from reservation #' . $reservation_id
+            $existingNote = 'Downpayment for reservation #' . $reservation_id;
+            $newNote      = 'Downpayment transferred from reservation #' . $reservation_id;
+
+            // UPDATE the existing reservation downpayment transaction to link it to
+            // the new session. This avoids double-recording and ensures refund
+            // calculations (WHERE session_id = ?) correctly find the payment.
+            $linkStmt = $conn->prepare(
+                "UPDATE transactions
+                    SET session_id   = ?,
+                        processed_by = ?,
+                        payment_note = ?
+                  WHERE payment_note = ?
+                    AND user_id      = ?
+                    AND session_id IS NULL
+                  LIMIT 1"
             );
+            $linkStmt->bind_param('iissi',
+                $result['session_id'],
+                $shopkeeper_id,
+                $newNote,
+                $existingNote,
+                $res['user_id']
+            );
+            $linkStmt->execute();
+
+            // Safety net: if no existing transaction was found (old reservation
+            // created before this fix), insert one now so the refund system works.
+            if ($linkStmt->affected_rows === 0) {
+                recordTransaction(
+                    $result['session_id'],
+                    $res['user_id'],
+                    (float)$res['downpayment_amount'],
+                    $res['downpayment_method'] ?? 'cash',
+                    $shopkeeper_id,
+                    (float)$res['downpayment_amount'],
+                    null,
+                    'Downpayment transferred from reservation #' . $reservation_id
+                );
+            }
         }
+
+        // ── Stamp the session with its source reservation for auditability ──
+        // This allows the refund modal, reports, and billing to detect that this
+        // session originated from a pre-paid reservation.
+        $stampStmt = $conn->prepare(
+            "UPDATE gaming_sessions SET source_reservation_id = ? WHERE session_id = ?"
+        );
+        $stampStmt->bind_param('ii', $reservation_id, $result['session_id']);
+        $stampStmt->execute();
 
         // Mark reservation as converted
         updateReservationStatus($reservation_id, 'converted', $console_id);

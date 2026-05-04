@@ -562,6 +562,20 @@
             <strong id="endSessionSummary">—</strong>
         </div>
 
+        <!-- Reservation-source notice (hidden until JS detects source_reservation_id > 0) -->
+        <div id="endSessionResNotice"
+             style="display:none;align-items:center;gap:10px;background:rgba(95,133,218,.1);
+                    border:1px solid rgba(95,133,218,.35);border-radius:10px;
+                    padding:10px 14px;margin-bottom:12px;font-size:13px;color:#8aa4e8;">
+            <i class="fas fa-calendar-check" style="font-size:16px;flex-shrink:0;"></i>
+            <div>
+                <span style="font-weight:700;color:#f1e1aa;">From Reservation</span>
+                <span class="res-notice-id" style="font-weight:700;color:#20c8a1;margin-left:4px;"></span>
+                — upfront payment includes the reservation downpayment.
+                <span class="res-nonrefundable-note" style="display:block;margin-top:3px;font-size:11px;color:#fb566b;font-weight:600;"></span>
+            </div>
+        </div>
+
         <!-- ── Early-end warning (shown when hourly session still has time left) ── -->
         <div id="endEarlyWarning" style="display:none;background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.45);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">

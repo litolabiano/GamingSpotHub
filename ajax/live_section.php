@@ -65,6 +65,8 @@ $recentSessions = [];
 $rsQ = $conn->query(
     "SELECT gs.*, u.full_name AS customer_name, u.phone AS customer_phone,
             c.console_type, c.unit_number,
+            gs.source_reservation_id,
+            COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(ar.extra_cost)
                         FROM additional_requests ar
                        WHERE ar.session_id = gs.session_id
@@ -74,6 +76,7 @@ $rsQ = $conn->query(
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
       WHERE gs.status IN ('active','paused')
       ORDER BY gs.start_time DESC"
 );

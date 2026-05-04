@@ -50,29 +50,43 @@ $unlimitedRate = getSetting('unlimited_rate') ?? 300;
 $gcashNumber   = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PATH B — PayMongo redirect-back handler
+// PATH B — PayMongo Checkout Session redirect-back handler
 // ══════════════════════════════════════════════════════════════════════════════
 if (!empty($_GET['paymongo'])) {
     $pm_result = $_GET['paymongo'];        // 'success' or 'failed'
     $pending   = $_SESSION['pending_reservation'] ?? null;
-    // Read source_id from session — PayMongo does NOT inject {id} into redirect URLs
-    $source_id = $pending['source_id'] ?? trim($_GET['source_id'] ?? '');
+    // session_id is stored in the session when we created the checkout session
+    $session_id = $pending['session_id'] ?? trim($_GET['session_id'] ?? '');
 
-    if ($pm_result === 'success' && $source_id && $pending) {
+    if ($pm_result === 'success' && $session_id && $pending) {
 
-        // ── Verify payment status with PayMongo API ───────────────────────────
-        $src = PayMongoService::getSource($source_id);
+        // ── Verify payment via Checkout Session API ───────────────────────────
+        // PayMongo may redirect to success_url a split-second before their
+        // servers update payment_status to 'paid'. Retry up to 4 times (1s apart).
+        $cs         = [];
+        $maxRetries = 4;
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $cs = PayMongoService::getCheckoutSession($session_id);
+            if (!empty($cs['success']) && $cs['payment_status'] === 'paid') {
+                break; // confirmed paid — stop polling
+            }
+            if ($attempt < $maxRetries) {
+                sleep(1); // wait 1 second before next check
+            }
+        }
 
-        if ($src['success'] && in_array($src['status'], ['chargeable', 'consumed', 'paid'])) {
+        if ($cs['success'] && $cs['payment_status'] === 'paid') {
 
-            // ── Charge the source (create a Payment object) ───────────────────
-            $charge = PayMongoService::createPayment(
-                $source_id,
-                PayMongoService::pesosToCentavos((float)$pending['dp_amount']),
-                'Reservation fee — Good Spot Gaming Hub'
-            );
+            $payment_id = $cs['payment_id'] ?? null;
 
-            $payment_id = $charge['payment_id'] ?? null;
+            // In test mode PayMongo often doesn't include pay_xxx in the
+            // checkout session response. Fall back to the checkout session ID
+            // (cs_xxx) so the reference field is never blank.
+            $stored_ref = $payment_id ?: $session_id;
+
+            error_log('[Reserve PATH B] payment_id=' . ($payment_id ?? 'null')
+                . ' session_id=' . $session_id
+                . ' stored_ref=' . $stored_ref);
 
             // ── Create the reservation in DB ──────────────────────────────────
             $result = createReservation(
@@ -86,13 +100,15 @@ if (!empty($_GET['paymongo'])) {
                 (float)$pending['dp_amount'],
                 'gcash',
                 $pending['preferred_unit_id'] ?? null,
-                null   // no screenshot file — PayMongo handled it
+                null   // no screenshot — PayMongo handled it
             );
 
             if ($result['success']) {
                 $res_id = $result['reservation_id'];
 
                 // ── Store PayMongo IDs on the reservation row ─────────────────
+                // paymongo_source_id  = the Checkout Session ID (cs_xxx) — always available
+                // paymongo_payment_id = pay_xxx if returned; else cs_xxx as fallback
                 $upd = $conn->prepare(
                     "UPDATE reservations
                         SET paymongo_source_id  = ?,
@@ -101,7 +117,7 @@ if (!empty($_GET['paymongo'])) {
                             downpayment_paid    = 1
                       WHERE reservation_id = ?"
                 );
-                $upd->bind_param('ssi', $source_id, $payment_id, $res_id);
+                $upd->bind_param('ssi', $session_id, $stored_ref, $res_id);
                 $upd->execute();
 
                 unset($_SESSION['pending_reservation']);
@@ -116,15 +132,17 @@ if (!empty($_GET['paymongo'])) {
                          ' — Please contact the shop with your GCash reference.';
             }
 
-        } elseif ($src['success'] && $src['status'] === 'pending') {
-            // Source exists but not yet paid — rare edge case
-            $error = 'Your GCash payment is still processing. Please wait a moment and refresh this page, or contact the shop.';
+        } elseif ($cs['success'] && $cs['payment_status'] === 'unpaid') {
+            // Session exists but customer hasn't paid yet
+            $error = 'Your payment has not been completed yet. Please try again or contact the shop.';
+        } elseif ($cs['success'] && $cs['payment_status'] === 'expired') {
+            $error = 'Your checkout session expired. Please go back and try again.';
         } else {
-            $error = 'We could not verify your GCash payment. Please try again or use the manual screenshot option below.';
+            $error = 'We could not verify your payment. Please try again or use the manual screenshot option below.';
         }
 
     } elseif ($pm_result === 'failed') {
-        $error = 'GCash payment was cancelled or failed. Please try again below.';
+        $error = 'Payment was cancelled or failed. Please try again below.';
     }
 }
 
@@ -204,22 +222,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$error) {
 
-        // ── PATH A1: Pay via PayMongo GCash ───────────────────────────────────
+        // ── PATH A1: Pay via PayMongo Checkout Session ────────────────────
         if ($pay_via === 'paymongo') {
 
-            // Build redirect URLs that PayMongo will use after GCash checkout
-            $base           = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
-            $script_dir     = rtrim(dirname($_SERVER['PHP_SELF']),'/');
-            $success_url    = $base . $script_dir . '/reserve.php?paymongo=success';
-            $failed_url     = $base . $script_dir . '/reserve.php?paymongo=failed';
+            // Build redirect URLs that PayMongo will use after checkout
+            $base        = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
+            $script_dir  = rtrim(dirname($_SERVER['PHP_SELF']),'/');
+            $success_url = $base . $script_dir . '/reserve.php?paymongo=success';
+            $cancel_url  = $base . $script_dir . '/reserve.php?paymongo=failed';
 
             // Amount must be at least ₱1 (100 centavos)
             $centavos = PayMongoService::pesosToCentavos($dp_amount > 0 ? $dp_amount : 20.0);
-            $pm = PayMongoService::createGCashSource(
+
+            $modeLabel = ($rental_mode === 'unlimited') ? 'Unlimited session' :
+                         ($planned_minutes ? round($planned_minutes / 60, 1) . 'hr session' : 'session');
+            $desc = 'Reservation fee for ' . $modeLabel . ' on ' . $reserved_date . ' at ' . $reserved_time;
+
+            $pm = PayMongoService::createCheckoutSession(
                 $centavos,
-                'Reservation fee — Good Spot Gaming Hub',
+                $desc,
                 $success_url,
-                $failed_url,
+                $cancel_url,
                 $user['email']     ?? '',
                 $user['full_name'] ?? 'Customer'
             );
@@ -235,11 +258,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'notes'             => $notes,
                     'dp_amount'         => $dp_amount,
                     'preferred_unit_id' => $preferred_unit_id,
-                    'source_id'         => $pm['source_id'],
+                    'session_id'        => $pm['session_id'],   // Checkout Session ID
                     'created_at'        => time(),
                 ];
 
-                // Redirect to GCash — customer pays there
+                // Redirect to PayMongo hosted checkout page
                 header('Location: ' . $pm['checkout_url']);
                 exit;
 
@@ -1419,18 +1442,14 @@ if (!empty($_GET['console'])) {
                                     </div>
                                 </div>
 
-                                <!-- Big GCash Pay button — submits form with pay_via=paymongo -->
-                                <button type="button" id="pmPayBtn"
-                                    onclick="submitViaPaymongo()"
-                                    style="width:100%;padding:16px;
-                                           background:linear-gradient(135deg,#00ae5a,#00c96b);
-                                           border:none;border-radius:12px;
-                                           color:#fff;font-weight:800;font-size:16px;
-                                           cursor:pointer;transition:all .2s;
-                                           display:flex;align-items:center;justify-content:center;gap:10px;">
-                                    <i class="fas fa-mobile-alt"></i>
-                                    Pay <span id="pmBtnAmount">₱0</span> via GCash
-                                </button>
+                                <!-- Fee locked-in notice — actual submit happens via the main button below -->
+                                <div id="feeLockedNotice" style="
+                                    background:rgba(0,174,90,.08);border:1px dashed rgba(0,174,90,.35);
+                                    border-radius:10px;padding:12px 16px;
+                                    display:flex;align-items:center;gap:10px;font-size:12px;color:#888;">
+                                    <i class="fas fa-check-circle" style="color:#00c96b;font-size:1.1rem;flex-shrink:0;"></i>
+                                    <span>Fee calculated. Click <strong style="color:#20c8a1;">Confirm &amp; Pay via GCash</strong> below to complete your booking.</span>
+                                </div>
                                 <div style="text-align:center;margin-top:10px;">
                                     <button type="button" onclick="toggleScreenshotFallback()"
                                         style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;">
@@ -1561,9 +1580,16 @@ if (!empty($_GET['console'])) {
                         <div class="rs-row"><span class="rs-label">Reservation Fee</span><span class="rs-value" id="s-dp">—</span></div>
                     </div>
 
+                    <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
                     <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
-                        <i class="fas fa-calendar-check"></i> Submit Reservation
+                        <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
+                        <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
+                        <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
                     </button>
+                    <div style="text-align:center;margin-top:10px;font-size:11px;color:#555;">
+                        <i class="fas fa-lock" style="margin-right:4px;"></i>
+                        You will be redirected to GCash to complete payment. Your reservation is saved only after payment succeeds.
+                    </div>
                 </form>
                 <?php if ($activeReservation && !$success): ?></div><?php endif; ?>
             </div>
@@ -2062,26 +2088,19 @@ function onProofSelected(input) {
     reader.readAsDataURL(file);
 }
 
-/* ── PayMongo GCash button submit ────────────────────── */
-function submitViaPaymongo() {
-    // Quick client-side guard: ensure all required fields are ready
-    const consoleType = document.getElementById('hiddenConsoleType').value;
-    const rentalMode  = document.getElementById('hiddenRentalMode').value;
-    const date        = document.getElementById('reservedDate').value;
-    const time        = document.getElementById('reservedTime').value;
-    const agreed      = document.getElementById('noRefundCheck')?.checked;
-    const amount      = parseFloat(document.getElementById('dpAmount').value || '0');
-
-    if (!consoleType) { alert('Please select a console type.'); return; }
-    if (!rentalMode)  { alert('Please select a rental mode.'); return; }
-    if (rentalMode === 'hourly' && !document.getElementById('hiddenPlannedMinutes').value)
-        { alert('Please select a duration.'); return; }
-    if (!date || !time) { alert('Please select a date and time.'); return; }
-    if (!agreed)        { alert('Please read and agree to the No-Refund Policy before paying.'); return; }
-    if (amount <= 0)    { alert('Reservation fee not calculated yet.'); return; }
-
-    document.getElementById('payViaInput').value = 'paymongo';
-    document.getElementById('reserveForm').submit();
+/* ── Update submit button label when switching pay method ── */
+function updateSubmitBtn() {
+    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
+    const icon   = document.getElementById('submitBtnIcon');
+    const label  = document.getElementById('submitBtnLabel');
+    if (!icon || !label) return;
+    if (payVia === 'screenshot') {
+        icon.className  = 'fas fa-cloud-upload-alt';
+        label.innerHTML = 'Submit Reservation';
+    } else {
+        icon.className  = 'fas fa-mobile-alt';
+        label.innerHTML = 'Confirm &amp; Pay via GCash';
+    }
 }
 
 /* ── Screenshot fallback toggle ──────────────────────── */
@@ -2102,6 +2121,7 @@ function toggleScreenshotFallback() {
         fallback.style.display = 'block';
         payVia.value           = 'screenshot';
     }
+    updateSubmitBtn();
 }
 
 /* ── Duration ───────────────────────────────────────── */
@@ -2409,6 +2429,8 @@ function updateSummary() {
 
 /* ── Form validation ────────────────────────────────── */
 document.getElementById('reserveForm').addEventListener('submit', function(e) {
+    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
+
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
@@ -2416,39 +2438,39 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     const dateVal = document.getElementById('reservedDate').value;
     const timeVal = document.getElementById('reservedTime').value;
 
-    if (dateVal && timeVal) {
-        // Operating hours check
-        if (timeVal < OPEN_TIME) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
-        if (timeVal > CLOSE_TIME) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    if (!dateVal || !timeVal) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Please select a date and time.');
+        return;
+    }
 
-        // Check if slot is confirmed-locked (alert from availability check)
-        const lockAlert = document.getElementById('slotLockedAlert');
-        if (lockAlert && lockAlert.style.display === 'flex' && selectedConsoleType) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f This time slot is already fully reserved (confirmed) for ' + selectedConsoleType + '. Please choose a different time.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    // Operating hours check
+    if (timeVal < OPEN_TIME) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
+        return;
+    }
+    if (timeVal > CLOSE_TIME) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
+        return;
+    }
 
-        // 1-hour lead time check
-        const chosen   = new Date(dateVal + 'T' + timeVal);
-        const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
-        if (chosen < earliest) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f Reservations must be at least 1 hour from now. Please pick a later time.');
-            document.getElementById('reservedTime').focus();
-            return;
-        }
+    // Check if slot is confirmed-locked
+    const lockAlert = document.getElementById('slotLockedAlert');
+    if (lockAlert && lockAlert.style.display === 'flex' && selectedConsoleType) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f This time slot is already fully reserved (confirmed) for ' + selectedConsoleType + '. Please choose a different time.');
+        return;
+    }
+
+    // 1-hour lead time check
+    const chosen   = new Date(dateVal + 'T' + timeVal);
+    const earliest = new Date(Date.now() + MIN_LEAD_SECONDS * 1000);
+    if (chosen < earliest) {
+        e.preventDefault();
+        alert('\u26a0\ufe0f Reservations must be at least 1 hour from now. Please pick a later time.');
+        return;
     }
 
     const dp = parseFloat(document.getElementById('dpAmount').value) || 0;
@@ -2457,11 +2479,25 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         alert('\u26a0\ufe0f Please select a rental mode and duration to calculate your reservation fee.');
         return;
     }
-    const proofFile = document.getElementById('payment_proof');
-    if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
-        e.preventDefault();
-        alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
-        return;
+
+    // Screenshot path only: require proof file
+    if (payVia === 'screenshot') {
+        const proofFile = document.getElementById('payment_proof');
+        if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
+            e.preventDefault();
+            alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
+            return;
+        }
+    }
+
+    // PayMongo path: show loading state on button
+    if (payVia === 'paymongo') {
+        const btn   = document.getElementById('submitBtn');
+        const label = document.getElementById('submitBtnLabel');
+        const icon  = document.getElementById('submitBtnIcon');
+        if (btn)   { btn.disabled = true; btn.style.opacity = '.75'; }
+        if (icon)  icon.className = 'fas fa-spinner fa-spin';
+        if (label) label.textContent = 'Redirecting to GCash…';
     }
 });
 

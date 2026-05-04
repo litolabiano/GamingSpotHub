@@ -170,19 +170,47 @@ for ($i = 13; $i >= 0; $i--) {
 }
 
 // Spending by day (last 14 days) — for spend chart
+// Use LEFT JOIN so reservation downpayments (session_id IS NULL) are also counted.
 $spendData  = [];
 for ($i = 13; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-{$i} days"));
     $s = $conn->prepare(
         "SELECT COALESCE(SUM(t.amount),0) AS rev
            FROM transactions t
-           JOIN gaming_sessions gs ON t.session_id = gs.session_id
-          WHERE t.user_id=? AND DATE(t.transaction_date)=? AND t.payment_status='completed'"
+          WHERE t.user_id=? AND DATE(t.transaction_date)=? AND t.payment_status='completed'
+            AND t.amount > 0"
     );
     $s->bind_param('is', $user_id, $d);
     $s->execute();
     $spendData[] = (float) $s->get_result()->fetch_assoc()['rev'];
 }
+
+// ── My Payments (all transactions for this user) ────────────────────────────
+$myPaymentsStmt = $conn->prepare(
+    "SELECT t.*,
+            CASE
+              WHEN t.payment_note LIKE 'Downpayment%' THEN 'reservation'
+              WHEN t.amount < 0 THEN 'refund'
+              ELSE COALESCE(gs.rental_mode, 'other')
+            END AS tx_type,
+            c.unit_number,
+            r.reserved_date, r.paymongo_payment_id, r.paymongo_source_id
+       FROM transactions t
+       LEFT JOIN gaming_sessions gs ON t.session_id = gs.session_id
+       LEFT JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN reservations r
+             ON t.payment_note REGEXP 'reservation #[0-9]+'
+            AND r.reservation_id = CAST(
+                  REGEXP_REPLACE(t.payment_note, '^.*reservation #([0-9]+).*\$', '\$1')
+                AS UNSIGNED)
+      WHERE t.user_id = ?
+      ORDER BY t.transaction_date DESC
+      LIMIT 50"
+);
+$myPaymentsStmt->bind_param('i', $user_id);
+$myPaymentsStmt->execute();
+$myPayments = $myPaymentsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$myPaymentsCount = count($myPayments);
 
 // ── My Cancellations ────────────────────────────────────────────────────────
 $myCancels = [];
@@ -827,6 +855,15 @@ function fmtMins(int $m): string {
         </button>
         <button class="cd-nav-btn" onclick="cdShowPage('stats',this)" id="navStats">
             <i class="fas fa-trophy"></i> My Stats
+        </button>
+        <button class="cd-nav-btn" onclick="cdShowPage('payments',this)" id="navPayments">
+            <i class="fas fa-receipt"></i> My Payments
+            <?php if ($myPaymentsCount > 0): ?>
+            <span style="margin-left:auto;background:rgba(32,200,161,.9);color:#000;font-size:10px;font-weight:800;
+                padding:1px 7px;border-radius:10px;min-width:18px;text-align:center;">
+                <?= $myPaymentsCount ?>
+            </span>
+            <?php endif; ?>
         </button>
         <button class="cd-nav-btn" onclick="cdShowPage('cancellations',this)" id="navCancellations">
             <i class="fas fa-ban"></i> My Cancellations
@@ -2065,6 +2102,88 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </div><!-- /page-tournaments -->
 
+        <!-- ══ PAGE: MY PAYMENTS ══════════════════════════════════════════ -->
+        <div class="cd-page" id="page-payments">
+            <h2 class="cd-section-title"><i class="fas fa-receipt"></i> My Payments</h2>
+
+            <div class="cd-card">
+                <div class="cd-card-header">
+                    <div class="cd-card-title"><i class="fas fa-list-ul"></i> Transaction History</div>
+                    <span style="font-size:12px;color:var(--muted);">Last 50 transactions</span>
+                </div>
+
+                <?php if (empty($myPayments)): ?>
+                <div class="cd-empty">
+                    <i class="fas fa-receipt"></i>
+                    <p>No payment records yet.</p>
+                    <p style="margin-top:6px;">Payments will appear here after your first reservation or gaming session.</p>
+                </div>
+                <?php else: ?>
+                <div style="overflow-x:auto;">
+                <table class="cd-table">
+                    <thead><tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Method</th>
+                        <th>Amount</th>
+                        <th>Ref ID</th>
+                        <th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($myPayments as $pay):
+                        $isRefund   = (float)$pay['amount'] < 0;
+                        $pmId       = $pay['paymongo_payment_id'] ?? null;
+                        $pmSrc      = $pay['paymongo_source_id']  ?? null;
+                        $refDisplay = $pmId ?: $pmSrc;
+                        // Build description from payment_note or type
+                        $desc = $pay['payment_note'] ?? '';
+                        if (!$desc) {
+                            $desc = match(true) {
+                                $isRefund                         => 'Refund',
+                                $pay['tx_type'] === 'reservation' => 'Reservation Downpayment',
+                                $pay['tx_type'] === 'hourly'      => 'Hourly Session',
+                                $pay['tx_type'] === 'open_time'   => 'Open Time Session',
+                                $pay['tx_type'] === 'unlimited'   => 'Unlimited Session',
+                                default                           => 'Payment',
+                            };
+                        }
+                    ?>
+                    <tr>
+                        <td style="color:var(--muted);font-size:11px;">#<?= $pay['transaction_id'] ?></td>
+                        <td style="white-space:nowrap;font-size:12px;">
+                            <?= date('M d, Y', strtotime($pay['transaction_date'])) ?><br>
+                            <span style="color:var(--muted);font-size:11px;"><?= date('h:i A', strtotime($pay['transaction_date'])) ?></span>
+                        </td>
+                        <td style="font-size:13px;max-width:220px;"><?= htmlspecialchars($desc) ?></td>
+                        <td><span class="cd-badge blue"><?= ucfirst($pay['payment_method']) ?></span></td>
+                        <td style="font-weight:700;white-space:nowrap;
+                            <?= $isRefund ? 'color:var(--coral);' : 'color:var(--mint);' ?>">
+                            <?= $isRefund ? '−' : '+' ?>₱<?= number_format(abs((float)$pay['amount']), 2) ?>
+                        </td>
+                        <td style="font-size:11px;font-family:monospace;">
+                            <?php if ($refDisplay): ?>
+                                <span style="color:var(--mint);" title="<?= htmlspecialchars($refDisplay) ?>">
+                                    <?= htmlspecialchars(substr($refDisplay, 0, 20)) . (strlen($refDisplay) > 20 ? '…' : '') ?>
+                                </span>
+                            <?php else: ?>
+                                <span style="color:var(--muted);">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <span class="cd-badge <?= $pay['payment_status'] === 'completed' ? 'mint' : 'coral' ?>">
+                                <?= ucfirst($pay['payment_status']) ?>
+                            </span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div><!-- /page-payments -->
+
     </main>
 </div>
 
@@ -2089,11 +2208,11 @@ function fmtMins(int $m): string {
         <i class="fas fa-trophy"></i>
         <span>Rank</span>
     </button>
-    <button class="cd-bnav-btn" id="bnavCancellations" onclick="cdShowPage('cancellations', this)">
-        <i class="fas fa-user-circle"></i>
-        <span>Profile</span>
-        <?php if ($myCancelCount > 0): ?>
-        <span class="cd-bnav-badge coral"><?= $myCancelCount ?></span>
+    <button class="cd-bnav-btn" id="bnavPayments" onclick="cdShowPage('payments', this)">
+        <i class="fas fa-receipt"></i>
+        <span>Payments</span>
+        <?php if ($myPaymentsCount > 0): ?>
+        <span class="cd-bnav-badge"><?= $myPaymentsCount ?></span>
         <?php endif; ?>
     </button>
     <button class="cd-bnav-btn" id="bnavTournaments" onclick="cdShowPage('tournaments', this)">
@@ -2112,13 +2231,15 @@ const BNAV_MAP = {
     sessions:      'bnavSessions',
     reservations:  'bnavReservations',
     stats:         'bnavStats',
+    payments:      'bnavPayments',
     cancellations: 'bnavCancellations',
     tournaments:   'bnavTournaments',
 };
 const SIDEBAR_MAP = {
     overview: 'navOverview', sessions: 'navSessions',
     reservations: 'navReservations', stats: 'navStats',
-    cancellations: 'navCancellations', tournaments: 'navTournaments'
+    payments: 'navPayments', cancellations: 'navCancellations',
+    tournaments: 'navTournaments'
 };
 
 function cdShowPage(page, el) {
@@ -2152,7 +2273,7 @@ function cdShowPage(page, el) {
 // Restore page from hash on load
 (function () {
     const hash = location.hash.replace('#', '');
-    const valid = ['overview','sessions','reservations','stats','cancellations','tournaments'];
+    const valid = ['overview','sessions','reservations','stats','payments','cancellations','tournaments'];
     if (hash && valid.includes(hash)) {
         cdShowPage(hash, null);
     }
