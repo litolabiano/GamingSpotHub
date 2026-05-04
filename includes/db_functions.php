@@ -681,10 +681,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
                     return computeTimedCost($duration_minutes);
                 }
 
-                // Overtime: charge base planned cost + overtime surcharge
+                // computeTimedCost handles bonus-free cycles; raw multiplication
+                // incorrectly bills free bonus minutes at full rate.
                 $base_cost = ($planned_minutes <= 30)
                     ? $rules['session_min_charge']
-                    : (float) ($planned_minutes / 60 * $rules['hourly_rate']);
+                    : (float) computeTimedCost((int)$planned_minutes);
                 return $base_cost + computeTimedCost($overtime);
             }
             // No pre-booking data: fall back to open-time bracket pricing

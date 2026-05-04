@@ -1857,7 +1857,8 @@ function _timedCost(totalMin) {
 function _hourlyCost(duration, planned) {
     const rate     = PRICING.hourly_rate;
     const minChg   = PRICING.session_min_charge;
-    const base     = planned <= 30 ? minChg : (planned / 60 * rate);
+    // _timedCost correctly accounts for the bonus-free cycle.
+    const base     = planned <= 30 ? minChg : _timedCost(planned);
     const overtime = duration - planned;
     if (overtime <= 0) return base;
     return base + _timedCost(overtime);
@@ -2425,7 +2426,7 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
         costEl.textContent    = '₱' + totalCost.toFixed(2);
-        const baseCost  = plannedMinutes <= 30 ? 50 : (plannedMinutes / 60 * 80);
+        const baseCost  = plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
         const overtime  = Math.max(0, minutes - plannedMinutes);

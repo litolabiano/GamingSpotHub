@@ -94,9 +94,11 @@
                 } else {
                     if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
                         $pr = getPricingRules();
+                        // computeTimedCost walks the bonus cycle so free minutes
+                        // are not billed. e.g. 300 min (4hr paid+1hr free) → ₱320.
                         $psExpected = $ps['planned_minutes'] <= 30
                             ? $pr['session_min_charge']
-                            : (float)($ps['planned_minutes'] / 60 * $pr['hourly_rate']);
+                            : (float)computeTimedCost((int)$ps['planned_minutes']);
                         $psModeLabel = 'Hourly';
                     } else {
                         $psExpected  = $unlimitedRateVal;
