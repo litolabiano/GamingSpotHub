@@ -205,11 +205,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'update_console_status') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         $status     = $_POST['status'] ?? '';
-        $allowed    = ['available', 'in_use', 'maintenance'];
+        $allowed    = ['available', 'in_use', 'maintenance', 'archived'];
         if ($console_id && in_array($status, $allowed)) {
             updateConsoleStatus($console_id, $status);
             $message = 'Console status updated.';
             $messageType = 'success';
+        }
+    }
+    elseif ($action === 'add_console') {
+        $name = trim($_POST['console_name'] ?? '');
+        $type = $_POST['console_type'] ?? '';
+        $unit_number = trim($_POST['unit_number'] ?? '');
+        $rate = (float)($_POST['hourly_rate'] ?? 0);
+        
+        if ($name && in_array($type, ['PS5', 'Xbox Series X']) && $unit_number && $rate >= 0) {
+            if (addConsole($name, $type, $unit_number, $rate)) {
+                $message = 'Console added successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to add console. Ensure the Unit Number is unique.';
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Invalid input for new console.';
+            $messageType = 'error';
+        }
+    }
+    elseif ($action === 'delete_console') {
+        $console_id = (int)($_POST['console_id'] ?? 0);
+        if ($console_id) {
+            $res = deleteConsole($console_id);
+            if ($res['success']) {
+                $message = 'Console deleted permanently.';
+                $messageType = 'success';
+            } else {
+                $message = 'Cannot delete console. It likely has existing sessions/reservations associated with it. Keep it archived instead.';
+                $messageType = 'error';
+            }
         }
     }
 
@@ -603,6 +635,7 @@ $todayBookings   = $todayStats['total_sessions'] ?? 0;
 
 // All consoles
 $allConsoles = getConsoles();
+$archivedConsoles = getConsoles('archived');
 $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
