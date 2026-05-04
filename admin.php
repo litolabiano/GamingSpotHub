@@ -2238,11 +2238,15 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
     /* â”€â”€ HOURLY: prepaid base, overtime may apply â”€â”€ */
     } else if (mode === 'hourly' && plannedMinutes) {
-        const base    = plannedMinutes <= 30 ? PRICING.session_min_charge : (plannedMinutes / 60 * PRICING.hourly_rate);
+        // Use upfrontPaid as the true base cost (already paid by customer at start).
+        // This correctly handles bonus-minute promotions (e.g. 4 hrs + 1 free hr)
+        // where plannedMinutes includes free time that was NOT charged.
+        const base    = upfrontPaid > 0 ? upfrontPaid : (plannedMinutes <= 30 ? PRICING.session_min_charge : (plannedMinutes / 60 * PRICING.hourly_rate));
         const elapsed = Math.floor((Date.now() / 1000) - startTs);
         const minutes = Math.floor(elapsed / 60);
-        const overtime = minutes - plannedMinutes;
-        const cost    = _hourlyCost(minutes, plannedMinutes) + extras;
+        const overtime = minutes - plannedMinutes;  // overtime is after ALL booked time (incl. free bonus)
+        // Cost = base already paid + any overtime charges
+        const cost    = overtime > 0 ? base + _timedCost(overtime) + extras : base + extras;
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? `${ph}h ${pm}m` : `${ph}h`) : `${pm}m`;
 
