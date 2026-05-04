@@ -199,9 +199,9 @@ $myPaymentsStmt = $conn->prepare(
        LEFT JOIN gaming_sessions gs ON t.session_id = gs.session_id
        LEFT JOIN consoles c ON gs.console_id = c.console_id
        LEFT JOIN reservations r
-             ON t.payment_note REGEXP 'reservation #[0-9]+'
+             ON t.payment_note LIKE '%reservation #%'
             AND r.reservation_id = CAST(
-                  REGEXP_REPLACE(t.payment_note, '^.*reservation #([0-9]+).*\$', '\$1')
+                  SUBSTRING_INDEX(SUBSTRING_INDEX(t.payment_note, '#', -1), ' ', 1)
                 AS UNSIGNED)
       WHERE t.user_id = ?
       ORDER BY t.transaction_date DESC
