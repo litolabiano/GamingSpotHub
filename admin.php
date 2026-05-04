@@ -1973,12 +1973,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             const elapsedEl = document.getElementById('endEarlyElapsedStr');
             if (elapsedEl) elapsedEl.textContent = '(' + elapsedLabel + ')';
 
-            // Prorate cost for time actually used.
-            // upfrontPaid covers plannedMinutes; reservationDownpayment is non-refundable.
-            const ratePerMin   = plannedMinutes > 0
-                                 ? (upfrontPaid - reservationDownpayment) / plannedMinutes
-                                 : 0;
-            const timeCost     = Math.max(0, Math.round(ratePerMin * elapsedMin * 100) / 100);
+            // ── Bracket-based billing (mirrors PHP computeTimedCost) ──────────
+            // Uses _timedCost() which already matches backend logic exactly:
+            //   1-4 min  = ₱0  (grace — avoids brutal tiny charges)
+            //   5-19 min = ₱20, 20-34 = ₱40, 35-49 = ₱60, 50-59 = ₱80
+            // Brackets automatically adjust when hourly_rate changes in Settings.
+            const maxBillable  = Math.max(0, upfrontPaid - reservationDownpayment);
+            const timeCost     = Math.min(maxBillable, _timedCost(elapsedMin));
             const consumedCost = timeCost + extras;        // add extras (controller rental etc.)
             const nonRefundBase = reservationDownpayment;  // non-refundable portion
             const rawRefund    = upfrontPaid - consumedCost;
