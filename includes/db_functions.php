@@ -155,6 +155,8 @@ function getConsoles($status = null, $type = null) {
         $sql .= " AND status = ?";
         $params[] = $status;
         $types .= "s";
+    } else {
+        $sql .= " AND status != 'archived'";
     }
     if ($type) {
         $sql .= " AND console_type = ?";
@@ -188,6 +190,31 @@ function updateConsoleStatus($console_id, $status) {
     $stmt = $conn->prepare("UPDATE consoles SET status = ? WHERE console_id = ?");
     $stmt->bind_param("si", $status, $console_id);
     return $stmt->execute();
+}
+
+/**
+ * Add a new console to the database.
+ */
+function addConsole($name, $type, $unit_number, $rate) {
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, status) VALUES (?, ?, ?, ?, 'available')");
+    $stmt->bind_param("sssd", $name, $type, $unit_number, $rate);
+    return $stmt->execute();
+}
+
+/**
+ * Permanently delete a console. 
+ * Note: Will fail if the console has associated sessions/reservations due to FK constraints.
+ */
+function deleteConsole($console_id) {
+    global $conn;
+    $stmt = $conn->prepare("DELETE FROM consoles WHERE console_id = ?");
+    $stmt->bind_param("i", $console_id);
+    if ($stmt->execute()) {
+        return ['success' => true];
+    } else {
+        return ['success' => false, 'message' => $conn->error];
+    }
 }
 
 
