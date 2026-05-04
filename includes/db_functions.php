@@ -104,6 +104,34 @@ function paidToTotalMinutes(int $paid_minutes, ?array $rules = null): int {
 }
 
 /**
+ * Compute the base session cost for an hourly booking from its TOTAL planned minutes.
+ * planned_minutes in the DB stores total play time (paid + free bonus), so we must
+ * reverse-calculate the paid portion before applying the rate.
+ *
+ * e.g. planned=300 (4 paid hrs + 1 free hr) → paid=240 → ₱320
+ *      planned=150 (2 paid hrs + 30 free min) → paid=120 → ₱160
+ *      planned=30  (30 min, no bonus)          → session_min_charge
+ */
+function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null): float {
+    $rules = $rules ?? getPricingRules();
+    if ($total_minutes <= 0) return 0.0;
+    if ($total_minutes <= 30) return $rules['session_min_charge'];
+
+    $bp = $rules['bonus_paid_minutes'];  // e.g. 120
+    $bf = $rules['bonus_free_minutes'];  // e.g. 30
+
+    // Walk down from total_minutes to find the paid_minutes p such that
+    // paidToTotalMinutes(p) === total_minutes.
+    for ($p = $total_minutes; $p >= 0; $p--) {
+        if ($p + (int)floor($p / $bp) * $bf === $total_minutes) {
+            return (float)round($p / 60 * $rules['hourly_rate'], 2);
+        }
+    }
+    // Fallback: no bonus found — treat all minutes as paid (shouldn't happen)
+    return (float)round($total_minutes / 60 * $rules['hourly_rate'], 2);
+}
+
+/**
  * Generate the duration option list for hourly booking UIs.
  * Returns array of ['paid', 'total', 'cost', 'bonus', 'label_paid', 'label_total', 'label_bonus']
  * Step size is always 30 min; stops at max_hourly_minutes.

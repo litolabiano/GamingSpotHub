@@ -202,10 +202,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         } else {
                             // Active: estimate expected cost from DB-driven pricing rules + approved extras
                             if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
-                                $pr = getPricingRules();
-                                $psExpected = $ps['planned_minutes'] <= 30
-                                    ? $pr['session_min_charge']
-                                    : (float)($ps['planned_minutes'] / 60 * $pr['hourly_rate']);
+                                // computeHourlySessionBaseCost() reverses the free-bonus to get
+                                // the true PAID portion — avoids ₱400 for a 4hr+1hr-free session.
+                                $psExpected = computeHourlySessionBaseCost((int)$ps['planned_minutes']);
                                 $psModeLabel = 'Hourly';
                             } else {
                                 $psExpected  = $unlimitedRateVal;

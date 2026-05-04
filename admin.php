@@ -694,8 +694,21 @@ foreach ($recentSessions as $sess) {
     $paidSoFar      = (float)($sess['upfront_paid']    ?? 0); // positive payments only
     $refundedAmount = (float)($sess['refunded_amount'] ?? 0); // total refunded
 
-    if ($sess['status'] === 'active' && $paidSoFar > 0) {
-        // Active session with upfront payment - balance pending at end
+    if ($sess['status'] === 'active') {
+        // For hourly sessions: show in Pending if not fully paid.
+        // computeHourlySessionBaseCost() reverses the free-bonus so 4hr+1hr-free
+        // sessions correctly report ₱320 base (not ₱400).
+        // Include sessions with ₱0 upfront (need to collect full amount at end).
+        if ($sess['rental_mode'] === 'hourly' && !empty($sess['planned_minutes'])) {
+            $baseCost = computeHourlySessionBaseCost((int)$sess['planned_minutes']);
+            $extras   = (float)($sess['approved_extras'] ?? 0);
+            if ($paidSoFar >= $baseCost + $extras - 0.01) {
+                continue; // Fully paid — not a pending balance
+            }
+        } elseif ($sess['rental_mode'] === 'unlimited') {
+            continue; // Unlimited: flat rate already handled, skip
+        }
+        // open_time always needs end-of-session payment
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     } elseif ($sess['status'] === 'completed'
@@ -703,14 +716,11 @@ foreach ($recentSessions as $sess) {
         && $paidSoFar < (float)$sess['total_cost']  // paid less than consumed cost
         && $refundedAmount < $paidSoFar              // hasn't been fully refunded back
     ) {
-        // Completed session where total paid < total cost - outstanding balance
-        // This covers: short payments at session start AND early-ends where
-        // consumed cost exceeded the upfront amount (no refund, balance owed).
+        // Completed session where total paid < total cost — outstanding balance.
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
     }
-    // Walk-in sessions where nothing was paid at all (open_time/walk-in): skip.
-    // They are fully handled at end-of-session payment.
+    // Walk-in open_time sessions (nothing paid upfront): handled at end-of-session.
 }
 
 

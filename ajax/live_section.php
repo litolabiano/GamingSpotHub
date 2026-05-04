@@ -139,14 +139,28 @@ $tourQ = $conn->query("SELECT * FROM tournaments ORDER BY start_date DESC");
 if ($tourQ) $tournaments = $tourQ->fetch_all(MYSQLI_ASSOC);
 
 // Pending sessions (used by sessions.php)
+// Mirrors the filter in admin.php — only includes sessions with a genuine shortfall.
 $pendingSessions = [];
 foreach ($recentSessions as $s) {
+    $paidSoFar = (float)($s['upfront_paid'] ?? 0);
+    if ($s['rental_mode'] === 'hourly' && !empty($s['planned_minutes'])) {
+        // Only skip if FULLY paid (₱0 upfront = full amount still owed = show)
+        $baseCost = computeHourlySessionBaseCost((int)$s['planned_minutes']);
+        $extras   = (float)($s['approved_extras'] ?? 0);
+        if ($paidSoFar >= $baseCost + $extras - 0.01) continue; // fully paid
+    } elseif ($s['rental_mode'] === 'unlimited') {
+        continue; // unlimited flat rate: nothing to collect
+    }
+    // open_time and underpaid/unpaid hourly: needs collection
+    $s['paid_so_far'] = $paidSoFar;
     $pendingSessions[] = $s;
 }
 foreach ($completedSessions as $s) {
-    $expected = (float)($s['total_cost'] ?? 0);
-    $paid     = (float)($s['amount_paid'] ?? 0);
-    if ($expected > 0 && $paid < $expected) {
+    $paidSoFar = (float)($s['upfront_paid'] ?? $s['amount_paid'] ?? 0);
+    $expected  = (float)($s['total_cost'] ?? 0);
+    $refunded  = (float)($s['refunded_amount'] ?? 0);
+    if ($expected > 0 && $paidSoFar < $expected && $refunded < $paidSoFar) {
+        $s['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $s;
     }
 }
