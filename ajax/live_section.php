@@ -27,6 +27,13 @@ $allowed = ['dashboard', 'sessions', 'reservations', 'consoles',
             'transactions', 'reports', 'tournaments', 'settings'];
 $section = $_GET['section'] ?? '';
 
+// ── Role-Based Access Check ──
+if ($_SESSION['role'] === 'shopkeeper' && in_array($section, ['consoles', 'tournaments', 'settings'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Access Denied: You do not have permission to access this section.']);
+    exit;
+}
+
 if (!in_array($section, $allowed)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid section']);
