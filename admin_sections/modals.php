@@ -1834,10 +1834,10 @@ function openConvertModal(res) {
                         Current Inventory After Adding
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="font-size:28px;font-weight:900;color:#20c8a1;"><?= $ctrlTotal + 1 ?></div>
+                        <div style="font-size:28px;font-weight:900;color:#20c8a1;"><?= ($ctrlTotal ?? 0) + 1 ?></div>
                         <div style="font-size:13px;color:#ccc;">
                             total controllers<br>
-                            <span style="color:#20c8a1;font-weight:700;"><?= $ctrlAvailable + 1 ?> available</span>
+                            <span style="color:#20c8a1;font-weight:700;"><?= ($ctrlAvailable ?? 0) + 1 ?> available</span>
                             for rental
                         </div>
                     </div>
