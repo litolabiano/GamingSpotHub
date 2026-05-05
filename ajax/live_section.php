@@ -74,6 +74,35 @@ $todayStats       = getDailySalesReport(date('Y-m-d'));
 $todayBookings    = $todayStats['total_sessions'] ?? 0;
 $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
 
+// ── Controller Rental status per active console ──────────────────────────────
+$ctrlRentalByConsole = [];
+$_crQ = $conn->query(
+    "SELECT gs.console_id,
+            gs.session_id,
+            COUNT(ar.request_id)  AS qty,
+            SUM(ar.extra_cost)    AS total_cost,
+            MIN(ar.created_at)    AS rented_since
+       FROM gaming_sessions gs
+       JOIN additional_requests ar
+         ON ar.session_id = gs.session_id
+        AND ar.request_type = 'controller_rental'
+        AND ar.status = 'approved'
+      WHERE gs.status = 'active'
+      GROUP BY gs.console_id, gs.session_id"
+);
+if ($_crQ) {
+    while ($row = $_crQ->fetch_assoc()) {
+        $ctrlRentalByConsole[(int)$row['console_id']] = [
+            'qty'          => (int)$row['qty'],
+            'total_cost'   => (float)$row['total_cost'],
+            'session_id'   => (int)$row['session_id'],
+            'rented_since' => $row['rented_since'],
+        ];
+    }
+}
+unset($_crQ);
+
+
 // Active + recent sessions (used by dashboard, sessions sections)
 $recentSessions = [];
 $rsQ = $conn->query(

@@ -230,14 +230,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type = $_POST['console_type'] ?? '';
         $unit_number = trim($_POST['unit_number'] ?? '');
         $rate = (float)($_POST['hourly_rate'] ?? 0);
+        $compat_ctrl = $_POST['compatible_controller_type'] ?? null;
         
         if ($name && in_array($type, ['PS5', 'PS4', 'Xbox Series X', 'Xbox Controller']) && $unit_number && $rate >= 0) {
-            if (addConsole($name, $type, $unit_number, $rate)) {
-                $message = 'Console added successfully.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to add console. Ensure the Unit Number is unique.';
+            // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
+            $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
+            $checkStmt->bind_param("s", $unit_number);
+            $checkStmt->execute();
+            if ($checkStmt->get_result()->num_rows > 0) {
+                $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
+            } else {
+                if (addConsole($name, $type, $unit_number, $rate, $compat_ctrl)) {
+                    $message = 'Console added successfully.';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add console. An unexpected database error occurred.';
+                    $messageType = 'error';
+                }
             }
         } else {
             $message = 'Invalid input for new console.';
@@ -750,6 +760,34 @@ $archivedConsoles = getConsoles('archived');
 $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
+
+// ── Controller Rental status per active console ──────────────────────────────
+// Maps console_id => [ qty => int, total_cost => float, session_id => int ]
+$ctrlRentalByConsole = [];
+$crQ = $conn->query(
+    "SELECT gs.console_id,
+            gs.session_id,
+            COUNT(ar.request_id)     AS qty,
+            SUM(ar.extra_cost)       AS total_cost,
+            MIN(ar.created_at)       AS rented_since
+       FROM gaming_sessions gs
+       JOIN additional_requests ar
+         ON ar.session_id = gs.session_id
+        AND ar.request_type = 'controller_rental'
+        AND ar.status = 'approved'
+      WHERE gs.status = 'active'
+      GROUP BY gs.console_id, gs.session_id"
+);
+if ($crQ) {
+    while ($row = $crQ->fetch_assoc()) {
+        $ctrlRentalByConsole[(int)$row['console_id']] = [
+            'qty'         => (int)$row['qty'],
+            'total_cost'  => (float)$row['total_cost'],
+            'session_id'  => (int)$row['session_id'],
+            'rented_since'=> $row['rented_since'],
+        ];
+    }
+}
 
 // ── Controllers ──────────────────────────────────────────────────────────────
 $allControllers      = [];

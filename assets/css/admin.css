@@ -776,50 +776,106 @@ body {
     margin-top: 14px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
 }
 
-.console-actions .console-edit-row {
-    display: block;
+/* Row wrappers are transparent layout pass-throughs */
+.console-actions .console-edit-row,
+.console-actions .console-status-row,
+.console-actions .console-archive-row {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+/* Every form inside the action area stretches to full width */
+.console-actions form {
     width: 100%;
-}
-
-.console-actions .console-edit-row button,
-.console-actions .console-edit-row form button {
-    width: 100%;
-}
-
-.console-actions .console-status-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-}
-
-.console-actions .console-status-row form {
     margin: 0;
-    min-width: 0; /* prevent grid blowout */
+    min-width: 0;
 }
 
-.console-actions .console-status-row form button {
-    width: 100%;
-    font-size: 11px;
-    padding: 6px 4px;
-    gap: 4px;
+/* Every button inside .console-actions → same fixed dimensions */
+.console-actions button,
+.console-actions form button {
+    width: 100% !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    gap: 5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box;
+    border-radius: 7px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.15s ease;
 }
 
-/* Archive sits below the 2-col row, full width */
-.console-actions .console-archive-row {
-    display: block;
-    width: 100%;
+.console-actions button:hover,
+.console-actions form button:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
 }
 
-.console-actions .console-archive-row form,
-.console-actions .console-archive-row button {
-    width: 100%;
-    display: block;
+/* ── Controller Rental Status Badge ─────────────────────────────────────── */
+.ctrl-rental-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.ctrl-rental-active {
+    background: rgba(32, 200, 161, 0.12);
+    border: 1px solid rgba(32, 200, 161, 0.35);
+    color: #20c8a1;
+    box-shadow: 0 0 10px rgba(32, 200, 161, 0.1);
+}
+
+.ctrl-rental-active .ctrl-rental-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: rgba(32, 200, 161, 0.2);
+    border-radius: 6px;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.ctrl-rental-active .ctrl-rental-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #20c8a1;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.ctrl-rental-active .ctrl-rental-details {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(32, 200, 161, 0.75);
+    margin-top: 1px;
+}
+
+.ctrl-rental-none {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    gap: 6px;
+    font-size: 11px;
 }
 
 
