@@ -60,9 +60,18 @@ try {
         $upd_rs->execute();
 
         $reason = 'User rejected admin reschedule';
-        $upd_r = $conn->prepare("UPDATE reservations SET status = 'cancelled', cancelled_by = 'user', cancellation_reason = ?, cancel_reason_type = 'schedule_change', refund_issued = 0, updated_at = NOW() WHERE reservation_id = ?");
+        $upd_r = $conn->prepare("UPDATE reservations SET status = 'cancelled', cancelled_by = 'user', cancellation_reason = ?, refund_issued = 0, updated_at = NOW() WHERE reservation_id = ?");
         $upd_r->bind_param('si', $reason, $reservation_id);
         $upd_r->execute();
+
+        // Log the cancellation event to reservation_cancellations
+        $logStmt = $conn->prepare(
+            "INSERT INTO reservation_cancellations
+                 (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
+             VALUES (?, ?, 'user', 'schedule_change', 'User rejected admin reschedule', NOW())"
+        );
+        $logStmt->bind_param('ii', $reservation_id, $user_id);
+        $logStmt->execute();
 
         $message = 'Reschedule cancelled. The reservation has been forfeited in accordance with the no-refund policy.';
     }
