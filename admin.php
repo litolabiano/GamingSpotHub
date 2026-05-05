@@ -29,9 +29,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rental_mode     = $_POST['rental_mode'] ?? '';
         $planned_minutes = ($rental_mode === 'hourly') ? (int)($_POST['planned_minutes'] ?? 0) : null;
         $start_payment_method = $_POST['start_payment_method'] ?? 'cash';
+        $unlim_rate      = (float)(getSetting('unlimited_rate') ?? 400);
 
         if (!$console_id || !in_array($rental_mode, ['hourly','open_time','unlimited'])) {
             $message = 'Please select a console and rental mode.';
+            $messageType = 'error';
+        } elseif ($rental_mode === 'unlimited' && (!isset($_POST['unlimited_tendered']) || (float)$_POST['unlimited_tendered'] < $unlim_rate)) {
+            $message = 'Payment of ₱' . number_format($unlim_rate, 2) . ' is required upfront for Unlimited sessions. Please ensure sufficient amount is tendered.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
@@ -72,15 +76,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($rental_mode === 'unlimited') {
         $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
-        $upfront_cost      = (float)(getSetting('unlimited_rate') ?? 300);
-        $tendered          = isset($_POST['unlimited_tendered']) ? (float)$_POST['unlimited_tendered'] : null;
-        $shortfall         = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
+        $upfront_cost      = $unlim_rate;
+        $tendered          = (float)$_POST['unlimited_tendered'];
 
         recordTransaction(
             $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
             $tendered,
-            $shortfall,
-            $shortfall ? 'Short payment at session start - short by ₱' . number_format($shortfall, 2) : null
+            0,
+            null
         );
         $cost = number_format($upfront_cost, 2);
         $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
@@ -3368,15 +3371,15 @@ function _addNotifItems(newItems) {
 
     // ── BUG FIX #1: Never let localStorage INCREASE the baseline.
     // Old localStorage values from past sessions would block all future alerts.
-    let lastId = <?= $initMaxResId ?>;
-    const stored = parseInt(localStorage.getItem('gspot_last_res_id') || '0');
+    let lastTime = <?= time() ?>;
+    
     // Only use localStorage to SKIP re-alerting IDs already seen THIS session,
     // but only if stored is between our PHP baseline and max - not to raise it above PHP.
     // Simplest correct fix: always trust PHP baseline, ignore localStorage override.
-    localStorage.setItem('gspot_last_res_id', lastId);
+    
 
     function poll() {
-        fetch('ajax/poll_notifications.php?last_id=' + lastId, { credentials: 'same-origin' })
+        fetch('ajax/poll_notifications.php?last_time=' + lastTime, { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.new_count > 0) {
@@ -3393,9 +3396,9 @@ function _addNotifItems(newItems) {
                         osc.start(); osc.stop(ctx.currentTime + 0.5);
                     } catch(e) {}
                 }
-                if (data.max_id > lastId) {
-                    lastId = data.max_id;
-                    localStorage.setItem('gspot_last_res_id', lastId);
+                if (data.max_time > lastTime) {
+                    lastTime = data.max_time;
+                    
                 }
             })
             .catch(function() {});
