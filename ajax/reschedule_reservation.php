@@ -48,7 +48,7 @@ if ($new_time < '12:00' || $new_time > '23:00') {
 
 // Fetch current reservation
 $stmt = $conn->prepare(
-    "SELECT r.reservation_id, r.user_id, r.reserved_date, r.reserved_time, r.status, u.email, u.first_name, u.last_name
+    "SELECT r.reservation_id, r.user_id, r.reserved_date, r.reserved_time, r.status, u.email, u.full_name
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
       WHERE r.reservation_id = ? AND r.status IN ('pending','reserved')"
@@ -65,6 +65,11 @@ if (!$res) {
 $old_date = $res['reserved_date'];
 $old_time = $res['reserved_time'];
 $user_id  = (int)$res['user_id'];
+
+if ($new_date === $old_date && substr($new_time, 0, 5) === substr($old_time, 0, 5)) {
+    echo json_encode(['success' => false, 'message' => 'New date and time cannot be the same as the current reservation schedule.']);
+    exit;
+}
 
 $conn->begin_transaction();
 try {
@@ -97,7 +102,7 @@ try {
 
     $conn->commit();
 
-    $fullName = trim($res['first_name'] . ' ' . $res['last_name']);
+    $fullName = trim($res['full_name']);
     sendRescheduleNotificationEmail($res['email'], $fullName, $new_date, $new_time);
 
     $reason_labels = [

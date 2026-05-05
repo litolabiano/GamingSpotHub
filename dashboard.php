@@ -56,9 +56,10 @@ $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
             rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
-            r.console_type
+            r.console_type, c.unit_number
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
+       LEFT JOIN consoles c ON r.console_id = c.console_id
       WHERE rs.user_id = ? AND rs.seen_by_user = 0
       ORDER BY rs.created_at DESC"
 );
@@ -959,7 +960,7 @@ function fmtMins(int $m): string {
                         </div>
                         <div style="font-size:13px;color:#ccc;line-height:1.7;">
                             <strong style="color:#fff;">Reservation #<?= $rs['reservation_id'] ?></strong>
-                            (<?= htmlspecialchars($rs['console_type']) ?>) has been rescheduled by staff.<br>
+                            (<?= htmlspecialchars($rs['console_type']) ?><?= $rs['unit_number'] ? ' - ' . htmlspecialchars($rs['unit_number']) : '' ?>) has been rescheduled by staff.<br>
                             <span style="color:#888;">From:</span>
                             <strong style="color:#fff;"><?= date('M d, Y', strtotime($rs['old_date'])) ?> at <?= date('g:i A', strtotime($rs['old_time'])) ?></strong><br>
                             <span style="color:#888;">To:</span>
@@ -1387,8 +1388,18 @@ function fmtMins(int $m): string {
             <?php else: ?>
 
             <!-- Upcoming -->
-            <?php $upcoming = array_filter($myReservations, fn($r) => in_array($r['status'],['pending','reserved']));
-                  $past     = array_filter($myReservations, fn($r) => !in_array($r['status'],['pending','reserved']));
+            <?php 
+                $upcoming = array_filter($myReservations, fn($r) => in_array($r['status'],['pending','reserved']));
+                $past     = array_filter($myReservations, fn($r) => !in_array($r['status'],['pending','reserved']));
+                
+                $adminReschedReqs = [];
+                if (!empty($unseenReschedules)) {
+                    foreach ($unseenReschedules as $rs) {
+                        if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin') {
+                            $adminReschedReqs[$rs['reservation_id']] = $rs;
+                        }
+                    }
+                }
             ?>
             <?php if (!empty($upcoming)): ?>
             <div class="cd-card" style="border-color:rgba(32,200,161,0.35)">
@@ -1401,14 +1412,26 @@ function fmtMins(int $m): string {
                     <tbody>
                     <?php foreach ($upcoming as $r):
                         $isToday = ($r['reserved_date'] === date('Y-m-d'));
+                        $rid = (int)$r['reservation_id'];
+                        $pendingAdminResched = $adminReschedReqs[$rid] ?? null;
                     ?>
                     <tr class="<?= $isToday ? 'res-today' : '' ?>">
                         <td>
-                            <?php if ($isToday): ?>
+                            <?php if ($isToday && !$pendingAdminResched): ?>
                             <span style="color:var(--mint);font-size:10px;font-weight:700;display:block;">TODAY</span>
                             <?php endif; ?>
-                            <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
-                            <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
+                            <?php if ($pendingAdminResched): ?>
+                                <div style="text-decoration:line-through;color:var(--muted);font-size:11px;margin-bottom:4px;">
+                                    <?= date('M d, Y', strtotime($pendingAdminResched['old_date'])) ?> at <?= date('h:i A', strtotime($pendingAdminResched['old_time'])) ?>
+                                </div>
+                                <div style="color:var(--gold);">
+                                    <strong><?= date('M d, Y', strtotime($pendingAdminResched['new_date'])) ?></strong><br>
+                                    <span style="font-size:11px;"><?= date('h:i A', strtotime($pendingAdminResched['new_time'])) ?></span>
+                                </div>
+                            <?php else: ?>
+                                <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
+                                <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?= htmlspecialchars($r['console_type']) ?>
@@ -1422,40 +1445,58 @@ function fmtMins(int $m): string {
                             <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
                         </td>
-                        <td style="color:var(--muted)"><?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?></td>
+                        <td style="color:var(--muted)">
+                            <?php if ($pendingAdminResched): ?>
+                                <span style="color:var(--gold);font-weight:700;font-size:11px;display:block;margin-bottom:2px;">Admin Reschedule</span>
+                                <span style="font-size:10px;"><?= $rescheduleReasonLabels[$pendingAdminResched['reason']] ?? ucfirst($pendingAdminResched['reason']) ?></span>
+                                <?php if ($pendingAdminResched['reason_detail']): ?>
+                                    <br><span style="font-size:10px;color:var(--muted);">- <?= htmlspecialchars($pendingAdminResched['reason_detail']) ?></span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php if (in_array($r['status'], ['pending','reserved'])): 
-                                $rid          = (int)$r['reservation_id'];
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
                                 $alreadyResched = !empty($userRescheduledIds[$rid]);
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                                <?php if ($alreadyResched): ?>
-                                    <button class="cd-btn" disabled
-                                        title="You have already used your one-time reschedule for this reservation."
-                                        style="opacity:.45;cursor:not-allowed;padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;">
-                                        <i class="fas fa-calendar-alt"></i> Rescheduled
+                                <?php if ($pendingAdminResched): ?>
+                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'confirm')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;" onmouseover="this.style.background='rgba(32,200,161,.25)'" onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                                        <i class="fas fa-check"></i> Confirm
+                                    </button>
+                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;" onmouseover="this.style.background='rgba(251,86,107,.25)'" onmouseout="this.style.background='rgba(251,86,107,.15)'">
+                                        <i class="fas fa-times"></i> Cancel
                                     </button>
                                 <?php else: ?>
-                                    <button class="cd-btn"
-                                        onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')"
-                                        title="Change your reservation date &amp; time (one-time only)"
-                                        style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;"
-                                        onmouseover="this.style.background='rgba(32,200,161,.15)';this.style.color='#20c8a1';this.style.borderColor='#20c8a1'"
-                                        onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='#ddd';this.style.borderColor='rgba(255,255,255,.1)'">
-                                        <i class="fas fa-calendar-alt"></i> Reschedule
+                                    <?php if ($alreadyResched): ?>
+                                        <button class="cd-btn" disabled
+                                            title="You have already used your one-time reschedule for this reservation."
+                                            style="opacity:.45;cursor:not-allowed;padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;">
+                                            <i class="fas fa-calendar-alt"></i> Rescheduled
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="cd-btn"
+                                            onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')"
+                                            title="Change your reservation date &amp; time (one-time only)"
+                                            style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;"
+                                            onmouseover="this.style.background='rgba(32,200,161,.15)';this.style.color='#20c8a1';this.style.borderColor='#20c8a1'"
+                                            onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='#ddd';this.style.borderColor='rgba(255,255,255,.1)'">
+                                            <i class="fas fa-calendar-alt"></i> Reschedule
+                                        </button>
+                                    <?php endif; ?>
+                                    <button class="cd-cancel-btn"
+                                            data-id="<?= $r['reservation_id'] ?>"
+                                            data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
+                                            data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
+                                            onclick="openCancelModal(this)"
+                                            title="Cancel this reservation">
+                                        <i class="fas fa-times"></i> Cancel
                                     </button>
                                 <?php endif; ?>
-                                <button class="cd-cancel-btn"
-                                        data-id="<?= $r['reservation_id'] ?>"
-                                        data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
-                                        data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
-                                        onclick="openCancelModal(this)"
-                                        title="Cancel this reservation">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
                             </div>
                             <?php endif; ?>
                         </td>

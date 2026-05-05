@@ -805,10 +805,11 @@ $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r[
 
 // Pending User-Initiated Reschedule Requests
 $purStmt = $conn->query(
-    "SELECT rs.*, r.console_type, u.full_name AS customer_name
+    "SELECT rs.*, r.console_type, u.full_name AS customer_name, c.unit_number
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
+     LEFT JOIN consoles c ON r.console_id = c.console_id
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );

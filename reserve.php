@@ -317,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($result['success']) {
                     $_SESSION['reserve_success'] = 'Your reservation #' . $result['reservation_id'] .
-                        ' has been submitted! A staff member will verify your GCash screenshot and confirm it shortly.';
+                        ' has been successfully completed and your slot is reserved. A staff member will verify your GCash screenshot shortly.';
                     header('Location: reserve.php');
                     exit;
                 } else {
