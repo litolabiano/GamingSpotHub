@@ -213,13 +213,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     elseif ($action === 'add_console') {
-        $name = trim($_POST['console_name'] ?? '');
-        $type = $_POST['console_type'] ?? '';
-        $unit_number = trim($_POST['unit_number'] ?? '');
-        $rate = (float)($_POST['hourly_rate'] ?? 0);
-        
-        if ($name && in_array($type, ['PS5', 'Xbox Series X']) && $unit_number && $rate >= 0) {
-            if (addConsole($name, $type, $unit_number, $rate)) {
+        $name          = trim($_POST['console_name'] ?? '');
+        $type          = $_POST['console_type'] ?? '';
+        $unit_number   = trim($_POST['unit_number'] ?? '');
+        $rate          = (float)($_POST['hourly_rate'] ?? 0);
+        $compat_ctrl   = trim($_POST['compatible_controller_type'] ?? '') ?: null;
+
+        if ($name && $type && $unit_number && $rate >= 0) {
+            if (addConsole($name, $type, $unit_number, $rate, $compat_ctrl)) {
                 $message = 'Console added successfully.';
                 $messageType = 'success';
             } else {
@@ -247,6 +248,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
     elseif ($action === 'add_controller') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can add controllers.';
+            $messageType = 'error';
+        } else {
         $ctrl_name = trim($_POST['controller_name'] ?? '');
         $ctrl_type = $_POST['controller_type'] ?? '';
         $ctrl_unit = trim($_POST['ctrl_unit_number'] ?? '');
@@ -268,6 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $message = 'Invalid input for new controller.';
             $messageType = 'error';
+        }
         }
     }
     elseif ($action === 'update_controller_status') {
@@ -706,7 +712,15 @@ $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
-unset($_res);
+
+// Controller type enum values from DB schema (DB-driven, no hardcoding)
+$controllerTypeOptions = [];
+$_ctrlEnum = $conn->query("SHOW COLUMNS FROM controllers WHERE Field = 'controller_type'");
+$_ctrlRow  = $_ctrlEnum ? $_ctrlEnum->fetch_assoc() : null;
+if ($_ctrlRow && preg_match_all("/'([^']+)'/", $_ctrlRow['Type'], $_ctrlM)) {
+    $controllerTypeOptions = $_ctrlM[1];
+}
+unset($_res, $_ctrlEnum, $_ctrlRow, $_ctrlM);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
@@ -1575,22 +1589,51 @@ Hides/shows the controller rental checkbox depending on the selected
 console type. Only Xbox units support controller rentals.
 */
 function onConsoleChange() {
-    const sel    = document.getElementById('consoleSelect');
-    const opt    = sel ? sel.options[sel.selectedIndex] : null;
-    const type   = opt ? (opt.dataset.type || '') : '';
-    const isXbox = type.toLowerCase().includes('xbox');
-    const group  = document.getElementById('controllerRentalGroup');
-    const toggle = document.getElementById('controllerRentalToggle');
-    if (!group) return;
-    if (isXbox) {
-        group.style.display = 'block';
-    } else {
-        group.style.display = 'none';
-        if (toggle && toggle.checked) {
-            toggle.checked = false;
-            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-        }
+    const sel     = document.getElementById('consoleSelect');
+    const opt     = sel ? sel.options[sel.selectedIndex] : null;
+    const type    = opt ? (opt.dataset.type || '') : '';
+    const group   = document.getElementById('controllerRentalGroup');
+    const ctrlSel = document.getElementById('controllerSelect');
+    if (!group || !ctrlSel) return;
+
+    // Compatibility: console type → accepted controller types
+    const compatMap = {
+        'PS5':           ['DualSense'],
+        'PS4':           ['DualShock 4'],
+        'Xbox Series X': ['Xbox Controller'],
+    };
+    const compat = compatMap[type] || [];
+
+    // Pull from PHP-injected JS variable (status=available only)
+    const ctrlData = (typeof _availableControllers !== 'undefined') ? _availableControllers : [];
+    const filtered = compat.length
+        ? ctrlData.filter(c => compat.includes(c.controller_type))
+        : ctrlData; // fallback: show all if console type unknown
+
+    // Repopulate dropdown
+    ctrlSel.innerHTML = '<option value="">\u2014 No controller rental \u2014</option>';
+    filtered.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.controller_id;
+        o.textContent = c.unit_number + ' \u2014 ' + c.controller_name + ' (' + c.controller_type + ')';
+        ctrlSel.appendChild(o);
+    });
+
+    // Show section only when compatible controllers exist in the DB
+    group.style.display = filtered.length > 0 ? 'block' : 'none';
+    if (filtered.length === 0) {
+        ctrlSel.value = '';
+        onControllerSelect();
     }
+}
+
+/* Called whenever the controller dropdown changes */
+function onControllerSelect() {
+    const ctrlSel = document.getElementById('controllerSelect');
+    const toggle  = document.getElementById('controllerRentalToggle');
+    const selected = ctrlSel && ctrlSel.value !== '';
+    if (toggle) toggle.value = selected ? '1' : '0';
+    if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
 }
 
 /* Show/hide payment method when the optional checkbox is toggled */

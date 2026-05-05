@@ -223,10 +223,10 @@ function updateConsoleStatus($console_id, $status) {
 /**
  * Add a new console to the database.
  */
-function addConsole($name, $type, $unit_number, $rate) {
+function addConsole($name, $type, $unit_number, $rate, $compat_ctrl_type = null) {
     global $conn;
-    $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, status) VALUES (?, ?, ?, ?, 'available')");
-    $stmt->bind_param("sssd", $name, $type, $unit_number, $rate);
+    $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, status, compatible_controller_type) VALUES (?, ?, ?, ?, 'available', ?)");
+    $stmt->bind_param("sssds", $name, $type, $unit_number, $rate, $compat_ctrl_type);
     return $stmt->execute();
 }
 

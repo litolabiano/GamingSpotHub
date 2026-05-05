@@ -321,6 +321,11 @@
 })();
 </script>
 
+<!-- Controllers data for JS -->
+<script>
+const _availableControllers = <?= json_encode(array_values(array_filter($allControllers ?? [], fn($c) => $c['status'] === 'available'))) ?>;
+</script>
+
 <!-- Start Session Modal -->
 <div class="modal" id="startSessionModal">
     <div class="modal-content">
@@ -421,22 +426,24 @@
             </div>
 
             <!-- ── Controller Rental Add-on ── -->
-            <div id="controllerRentalGroup" style="margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px 14px;">
-                    <input type="checkbox" id="controllerRentalToggle" name="controller_rental" value="1"
-                           onchange="recalcSessionPreview()"
-                           style="width:16px;height:16px;accent-color:#5f85da;cursor:pointer;">
-                    <span style="font-size:13px;font-weight:600;color:#8aa4e8;">
-                        <i class="fas fa-gamepad" style="margin-right:5px;"></i>
-                        Controller Rental
-                        <span id="controllerRentalConsoleNote" style="font-weight:400;color:#888;margin-left:6px;">
-                            +&#8369;<?= number_format((float)($settings['controller_rental_fee'] ?? 20), 0) ?>/session
-                        </span>
+            <div id="controllerRentalGroup" style="margin-bottom:12px;display:none;">
+                <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7fa8;margin-bottom:7px;">
+                    <i class="fas fa-gamepad" style="margin-right:4px;"></i>
+                    Controller Rental
+                    <span id="controllerRentalConsoleNote" style="font-weight:400;color:#888;margin-left:6px;">
+                        +&#8369;<?= number_format((float)($settings['controller_rental_fee'] ?? 20), 0) ?>/session
                     </span>
                 </label>
-                <p class="field-hint" id="controllerRentalHint">Only applicable for console units that require a physical controller.</p>
+                <select id="controllerSelect" name="rented_controller_id"
+                        style="width:100%;box-sizing:border-box;padding:11px 14px;border-radius:10px;border:1px solid rgba(95,133,218,.2);background:rgba(255,255,255,.04);color:#e8eaf6;font-size:14px;font-family:inherit;"
+                        onchange="onControllerSelect()">
+                    <option value="">— No controller rental —</option>
+                </select>
+                <p class="field-hint" id="controllerRentalHint" style="margin-top:6px;">Select a controller to add the rental fee to this session.</p>
+                <!-- Hidden inputs kept for recalcSessionPreview() compatibility -->
+                <input type="hidden" name="controller_rental" id="controllerRentalToggle" value="0">
                 <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt"
-                       value="<?= (float)($settings['controller_rental_fee'] ?? 20) ?>">
+                       value="<?= (float)($settings['controller_rental_fee'] ?? 20) ?>"></div>
             </div>
 
             <!-- ── Optional upfront payment (hourly only) ── -->
