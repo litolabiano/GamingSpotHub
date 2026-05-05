@@ -1364,7 +1364,7 @@ function getCancelledReservations() {
            JOIN users u ON r.user_id = u.user_id
            LEFT JOIN consoles c ON r.console_id = c.console_id
           WHERE r.status = 'cancelled'
-          ORDER BY r.reserved_date DESC, r.reserved_time DESC"
+          ORDER BY r.updated_at DESC"
     );
     $stmt->execute();
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
