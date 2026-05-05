@@ -182,8 +182,133 @@
         <?php endif; ?>
         </div>
     </div>
-    
-</div>
+
+    <!-- ── Xbox Controller Inventory (INSIDE #consoles so it only shows here) ── -->
+    <?php
+        $allControllers = [];
+        $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
+        if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
+        unset($_res);
+
+        $ctrl_available   = count(array_filter($allControllers, fn($c) => $c['status'] === 'available'));
+        $ctrl_in_use      = count(array_filter($allControllers, fn($c) => $c['status'] === 'in_use'));
+        $ctrl_maintenance = count(array_filter($allControllers, fn($c) => $c['status'] === 'maintenance'));
+        $ctrl_total       = count($allControllers);
+    ?>
+    <div style="margin-top:36px;">
+        <div class="page-header" style="align-items:center;margin-bottom:20px;">
+            <div class="page-title-group" style="flex:1;">
+                <h2 class="page-title">
+                    <i class="fa-solid fa-gamepad" style="color:#20c8a1;margin-right:10px;"></i>
+                    Xbox Controller Inventory
+                </h2>
+                <p class="page-subtitle">Manage physical controllers available for rental</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('addController')">
+                <i class="fas fa-plus"></i> Add Controller
+            </button>
+        </div>
+
+        <!-- Stats row -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+            <div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.25);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
+                <div style="font-size:26px;font-weight:800;color:#20c8a1;"><?= $ctrl_available ?></div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">Available</div>
+            </div>
+            <div style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.25);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
+                <div style="font-size:26px;font-weight:800;color:#8aa4e8;"><?= $ctrl_in_use ?></div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">In Use</div>
+            </div>
+            <div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.25);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
+                <div style="font-size:26px;font-weight:800;color:#fb566b;"><?= $ctrl_maintenance ?></div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">Maintenance</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
+                <div style="font-size:26px;font-weight:800;color:#f0f0f0;"><?= $ctrl_total ?></div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">Total</div>
+            </div>
+        </div>
+
+        <!-- Controllers table -->
+        <div style="background:var(--clr-surface);border:1px solid var(--clr-border);border-radius:var(--radius-md);overflow:hidden;">
+            <table class="data-table" style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:rgba(10,33,81,.6);">
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Unit #</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Name</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Type</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Status</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Notes</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($allControllers)): ?>
+                    <tr>
+                        <td colspan="6" style="text-align:center;padding:40px;color:#555;">
+                            <i class="fa-solid fa-gamepad" style="font-size:28px;display:block;margin-bottom:10px;opacity:.3;"></i>
+                            No controllers found.
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($allControllers as $ctrl): ?>
+                    <tr style="border-top:1px solid rgba(255,255,255,.05);">
+                        <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
+                        <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_name']) ?></td>
+                        <td style="padding:12px 16px;">
+                            <span class="console-type-badge xbox">
+                                <i class="fa-solid fa-gamepad"></i> <?= htmlspecialchars($ctrl['controller_type']) ?>
+                            </span>
+                        </td>
+                        <td style="padding:12px 16px;">
+                            <span class="status-dot <?= $ctrl['status'] ?>"></span>
+                            <?= ucfirst(str_replace('_',' ',$ctrl['status'])) ?>
+                        </td>
+                        <td style="padding:12px 16px;color:#888;font-size:13px;"><?= htmlspecialchars($ctrl['notes'] ?? '-') ?></td>
+                        <td style="padding:12px 16px;">
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                <form method="POST" action="admin.php#consoles" style="display:flex;gap:6px;align-items:center;">
+                                    <input type="hidden" name="action" value="update_controller_status">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                    <select name="status" onchange="this.form.submit()"
+                                            style="background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.25);
+                                                   color:#f0f0f0;padding:5px 10px;border-radius:7px;font-size:13px;
+                                                   font-family:inherit;cursor:pointer;">
+                                        <option value="available"   <?= $ctrl['status']==='available'   ? 'selected':'' ?>>Available</option>
+                                        <option value="in_use"      <?= $ctrl['status']==='in_use'      ? 'selected':'' ?>>In Use</option>
+                                        <option value="maintenance" <?= $ctrl['status']==='maintenance' ? 'selected':'' ?>>Maintenance</option>
+                                        <?php if ($user['role'] === 'owner'): ?>
+                                        <option value="archived"    <?= $ctrl['status']==='archived'    ? 'selected':'' ?>>Archive</option>
+                                        <?php endif; ?>
+                                    </select>
+                                </form>
+                                <?php if ($user['role'] === 'owner'): ?>
+                                <form method="POST" action="admin.php#consoles"
+                                      onsubmit="return confirm('Permanently delete this controller?')">
+                                    <input type="hidden" name="action" value="delete_controller">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                    <button type="submit"
+                                            style="background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.3);
+                                                   color:#fb566b;padding:5px 12px;border-radius:7px;font-size:12px;
+                                                   cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
+                                        <i class="fas fa-archive"></i> Archive
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- ── END Xbox Controller Inventory ── -->
+
+</div><!-- /#consoles — CLOSED HERE after controller inventory -->
 
 <!-- Add Console Modal -->
 <div class="modal" id="addConsoleModal">
