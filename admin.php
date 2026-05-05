@@ -2009,12 +2009,14 @@ const PRICING = <?= json_encode(getPricingRules()) ?>;
 const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
 function _bracketCost(partialMin) {
-    // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
-    if (partialMin <=  4) return 0;   // grace
-    if (partialMin <= 19) return 20;
-    if (partialMin <= 34) return 40;
-    if (partialMin <= 49) return 60;
-    return 80;
+    if (partialMin <= 0) return 0;
+    const tiers = PRICING.pricing_tiers || [];
+    for (let i = 0; i < tiers.length; i++) {
+        if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
+            return tiers[i].charge;
+        }
+    }
+    return PRICING.hourly_rate;
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
@@ -2034,12 +2036,13 @@ function _timedCost(totalMin) {
     return cost;
 }
 function _hourlyCost(duration, planned) {
-    const rate     = PRICING.hourly_rate;
-    const minChg   = PRICING.session_min_charge;
-    // _timedCost correctly accounts for the bonus-free cycle.
-    const base     = planned <= 30 ? minChg : _timedCost(planned);
     const overtime = duration - planned;
-    if (overtime <= 0) return base;
+    if (overtime <= 0) {
+        // Early or exact end — bill only actual elapsed time
+        return duration <= 0 ? 0 : _timedCost(duration);
+    }
+    // Overtime — base (planned cost) + overtime brackets
+    const base = planned <= 30 ? PRICING.session_min_charge : _timedCost(planned);
     return base + _timedCost(overtime);
 }
 
@@ -2386,6 +2389,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
     function hideAmountDue() {
         amountDueBox.style.display = 'none';
         tenderedEl.value = '';
+        changeDisp.style.display = 'none';
     }
 
     const modeLabel = mode === 'open_time' ? 'Open Time'
@@ -2427,17 +2431,26 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         tick();
         _endModalTimer = setInterval(tick, 1000);
 
-    /* ── HOURLY: prepaid base, overtime may apply ── */
+    /* ── HOURLY: charge actual elapsed time; overtime if beyond booked ── */
     } else if (mode === 'hourly' && plannedMinutes) {
-        // Use upfrontPaid as the true base cost (already paid by customer at start).
-        // This correctly handles bonus-minute promotions (e.g. 4 hrs + 1 free hr)
-        // where plannedMinutes includes free time that was NOT charged.
-        const base    = upfrontPaid > 0 ? upfrontPaid : (plannedMinutes <= 30 ? PRICING.session_min_charge : (plannedMinutes / 60 * PRICING.hourly_rate));
-        const elapsed = Math.floor((Date.now() / 1000) - startTs);
-        const minutes = Math.floor(elapsed / 60);
-        const overtime = minutes - plannedMinutes;  // overtime is after ALL booked time (incl. free bonus)
-        // Cost = base already paid + any overtime charges
-        const cost    = overtime > 0 ? base + _timedCost(overtime) + extras : base + extras;
+        const elapsed  = Math.floor((Date.now() / 1000) - startTs);
+        const minutes  = Math.floor(elapsed / 60);
+        const overtime = minutes - plannedMinutes; // positive = over booked time
+
+        // Actual cost = what we bill RIGHT NOW based on elapsed time
+        // Early end  → _timedCost(elapsed minutes)   [matches PHP computeRentalFee early-end path]
+        // Overtime   → planned base + overtime bracket charge
+        let cost;
+        if (overtime > 0) {
+            const base = upfrontPaid > 0
+                ? upfrontPaid
+                : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
+            cost = base + _timedCost(overtime) + extras;
+        } else {
+            // Early or exact end — charge only actual consumed time
+            cost = (minutes <= 0 ? 0 : _timedCost(minutes)) + extras;
+        }
+
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? `${ph}h ${pm}m` : `${ph}h`) : `${pm}m`;
 
@@ -2449,20 +2462,25 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const remaining = Math.max(0, cost - upfrontPaid);
 
         if (remaining > 0) {
-            setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
-            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Collect Payment';
             if (overtime > 0) {
-                noteEl.innerHTML  = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
-                                  + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
+                const base = upfrontPaid > 0
+                    ? upfrontPaid
+                    : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
+                setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
             } else {
-                noteEl.innerHTML  = `<i class="fas fa-coins"></i> Collect remaining balance of <strong>₱${remaining.toFixed(2)}</strong> now.`;
+                // Early end — collect actual time cost only
+                setAmountDue(remaining, `Actual time used: ${minutes}m → ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end — charged for <strong>${minutes} min</strong> used. Collect <strong>₱${remaining.toFixed(2)}</strong> now.`;
             }
+            titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Collect Payment';
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
             payLabel.textContent      = 'Payment Method';
             confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
         } else {
-            // Session fully paid
+            // Session fully paid (upfront ≥ actual cost)
             hideAmountDue();
             costHolder.value = '0';
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Paid in Full';
@@ -2605,13 +2623,17 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
         costEl.textContent    = '₱' + totalCost.toFixed(2);
-        const baseCost  = plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes);
+        const overtime  = Math.max(0, minutes - plannedMinutes);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
-        const overtime  = Math.max(0, minutes - plannedMinutes);
-        let sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ')';
+        let sublabel;
+        if (overtime > 0) {
+            const baseCost = plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes);
+            sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ') + ' + overtime + 'min overtime';
+        } else {
+            sublabel = 'Actual time used: ' + minutes + 'min → ₱' + timeCost.toFixed(2);
+        }
         if (upfrontPaid > 0) sublabel += ' - Prepaid ₱' + upfrontPaid.toFixed(2);
-        if (overtime > 0)    sublabel += ' - +' + overtime + 'min overtime';
         if (extras > 0) {
             const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
             sublabel += ' - +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');

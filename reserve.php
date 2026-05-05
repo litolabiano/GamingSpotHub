@@ -1762,6 +1762,34 @@ const unlimitedRate    = <?= (int)$unlimitedRate ?>;
 const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 
+function _bracketCost(partialMin) {
+    if (partialMin <= 0) return 0;
+    const tiers = PRICING.pricing_tiers || [];
+    for (let i = 0; i < tiers.length; i++) {
+        if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
+            return tiers[i].charge;
+        }
+    }
+    return PRICING.hourly_rate;
+}
+function _timedCost(totalMin) {
+    if (totalMin <= 0) return 0;
+    const bp       = PRICING.bonus_paid_minutes;
+    const bf       = PRICING.bonus_free_minutes;
+    const rate     = PRICING.hourly_rate;
+    const cyclePay = bp / 60 * rate;
+    const cycleLen = bp + bf;
+    const full     = Math.floor(totalMin / cycleLen);
+    const rem      = totalMin % cycleLen;
+    let cost       = full * cyclePay;
+    if (rem > bp) {
+        cost += cyclePay;
+    } else {
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
+    }
+    return cost;
+}
+
 /* ── Time select helpers ────────────────────────── */
 // Valid slots 12:00–23:00 in 30-min steps
 const TIME_SLOTS = (function () {
@@ -2134,7 +2162,7 @@ function selectDuration(mins) {
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
-    const fullCost = btn ? parseFloat(btn.dataset.cost || 0) : (mins <= 30 ? PRICING.session_min_charge : mins / 60 * PRICING.hourly_rate);
+    const fullCost = mins <= 30 ? PRICING.session_min_charge : _timedCost(mins);
 
     // Reservation fee = \u20b120 + 5% of session cost
     const pct = Math.round(fullCost * 0.05);
@@ -2409,7 +2437,7 @@ function updateSummary() {
     let durText = '—';
     if (selectedMode === 'hourly' && selectedDuration) {
         const h = Math.floor(selectedDuration/60), m = selectedDuration%60;
-        const cost = selectedDuration <= 30 ? PRICING.session_min_charge : selectedDuration/60*PRICING.hourly_rate;
+        const cost = selectedDuration <= 30 ? PRICING.session_min_charge : _timedCost(selectedDuration);
         durText = (h ? h+'h ' : '') + (m ? m+'m ' : '') + '— ₱' + cost.toFixed(0) + ' (session cost)';
     } else if (selectedMode === 'unlimited') {
         durText = 'Unlimited — ₱' + unlimitedRate;

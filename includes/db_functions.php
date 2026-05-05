@@ -64,8 +64,10 @@ function getPricingRules(): array {
         'hourly_rate'        => 80.0,  // ₱80/hr default
         'session_min_charge' => 50.0,  // ₱50 for ≤30 min start
         'xbox_hourly_rate'   => 80.0,  // Xbox rate (may differ)
+        'pricing_tiers'      => []     // Dynamic tiers
     ];
 
+    // Fetch system settings
     $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate','xbox_hourly_rate','session_min_charge'";
     $res  = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($keys)");
     if ($res) {
@@ -78,6 +80,18 @@ function getPricingRules(): array {
                 case 'xbox_hourly_rate':   $rules['xbox_hourly_rate']   = (float)$row['setting_value']; break;
                 case 'session_min_charge': $rules['session_min_charge'] = (float)$row['setting_value']; break;
             }
+        }
+    }
+
+    // Fetch pricing tiers
+    $resTiers = $conn->query("SELECT min_minutes, max_minutes, charge FROM pricing_tiers ORDER BY min_minutes ASC");
+    if ($resTiers) {
+        while ($row = $resTiers->fetch_assoc()) {
+            $rules['pricing_tiers'][] = [
+                'min'    => (int)$row['min_minutes'],
+                'max'    => (int)$row['max_minutes'],
+                'charge' => (float)$row['charge']
+            ];
         }
     }
 
@@ -349,7 +363,7 @@ function endSession($session_id) {
     $end_time = date_create('now', new DateTimeZone('Asia/Manila'))->format('Y-m-d H:i:s');
     $start = new DateTime($session['start_time']);
     $end = new DateTime($end_time);
-    $duration = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
+    $duration = (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60);
 
     // Calculate cost based on rental mode
     $total_cost = computeRentalFee($session['rental_mode'], $duration, $session['hourly_rate'], $session['unlimited_rate'] ?? 300, $session['planned_minutes'] ?? null);
@@ -659,12 +673,20 @@ function denyExtension($extension_id, $denied_by, $note = null) {
  *           20–34 min = ₱40, 35–49 min = ₱60, 50–59 min = ₱80.
  */
 function computePartialPeriodCost($minutes) {
-    if ($minutes <= 0)  return 0;
-    if ($minutes <= 4)  return 0;   // grace period
-    if ($minutes <= 19) return 20;
-    if ($minutes <= 34) return 40;
-    if ($minutes <= 49) return 60;
-    return 80; // 50–59 min = full hour charge
+    if ($minutes <= 0) return 0;
+    
+    $rules = getPricingRules();
+    $tiers = $rules['pricing_tiers'] ?? [];
+    
+    // Sort just in case, but getPricingRules already orders by min_minutes
+    foreach ($tiers as $tier) {
+        if ($minutes >= $tier['min'] && $minutes <= $tier['max']) {
+            return $tier['charge'];
+        }
+    }
+    
+    // Fallback to hourly rate if no tier matches (shouldn't happen with 0-59 covered)
+    return $rules['hourly_rate'];
 }
 
 /**

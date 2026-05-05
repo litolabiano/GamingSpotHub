@@ -422,9 +422,12 @@
                 </div>
             </div>
 
-            <?php
+<?php
 $ctrlAvailCount = $conn->query(
     "SELECT COUNT(*) AS n FROM controllers WHERE status = 'available' AND controller_type = 'Xbox Controller'"
+)->fetch_assoc()['n'] ?? 0;
+$ctrlTotal = $conn->query(
+    "SELECT COUNT(*) AS n FROM controllers WHERE controller_type = 'Xbox Controller'"
 )->fetch_assoc()['n'] ?? 0;
 ?>
 <div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
@@ -538,7 +541,7 @@ $ctrlAvailCount = $conn->query(
                         <!-- Flex row: ₱ prefix | input | lock icon -->
                         <div id="unlimTenderedWrapper" class="tendered-wrapper-unlocked" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(241,225,170,.4);background:rgba(241,225,170,.07);overflow:hidden;transition:.2s;">
                             <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#f1e1aa;flex-shrink:0;line-height:1;">₱</span>
-                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="<?=\htmlspecialchars($settings['unlimited_rate'] ?? 400)?>" step="1" required
+                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="<?=\htmlspecialchars($settings['unlimited_rate'] ?? 400)?>" step="1"
                                    style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;" placeholder="Enter amount..."
                                    oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
                             
