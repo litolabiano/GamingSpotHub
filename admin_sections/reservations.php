@@ -90,7 +90,12 @@
                         <tr>
                             <td style="color:#888;">#<?= $pr['reservation_id'] ?></td>
                             <td><strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong></td>
-                            <td><?= htmlspecialchars($pr['console_type']) ?></td>
+                            <td>
+                                <?= htmlspecialchars($pr['console_type']) ?>
+                                <?php if (!empty($pr['unit_number'])): ?>
+                                    <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($pr['unit_number']) ?></span>
+                                <?php endif; ?>
+                            </td>
                             <td style="color:#aaa;">
                                 <?= date('M d, Y', strtotime($pr['old_date'])) ?><br>
                                 <span style="font-size:11px;"><?= date('h:i A', strtotime($pr['old_time'])) ?></span>
@@ -480,6 +485,8 @@ function openRescheduleModal(resId, customerName, oldDate, oldTime) {
         'Reservation #' + resId + ' — ' + customerName;
     document.getElementById('rescheduleReason').value  = '';
     document.getElementById('rescheduleDetail').value  = '';
+    document.getElementById('rescheduleDate').dataset.oldDate = oldDate;
+    document.getElementById('rescheduleTime').dataset.oldTime = oldTime.substring(0,5);
     document.getElementById('rescheduleDate').value    = oldDate;  // pre-fill with current date
     document.getElementById('rescheduleTime').value    = oldTime.substring(0,5);
     document.getElementById('rescheduleResModal').style.display = 'flex';
@@ -506,6 +513,13 @@ function submitReschedule() {
     if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
     if (!date)   { alert('Please select a new date.'); return; }
     if (!time)   { alert('Please select a new time.'); return; }
+
+    const oldDate = document.getElementById('rescheduleDate').dataset.oldDate;
+    const oldTime = document.getElementById('rescheduleTime').dataset.oldTime;
+    if (date === oldDate && time === oldTime) {
+        alert('New date and time cannot be the same as the current reservation schedule.');
+        return;
+    }
 
     const btn = document.getElementById('rescheduleSubmitBtn');
     btn.disabled = true;

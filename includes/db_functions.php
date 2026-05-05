@@ -1085,7 +1085,7 @@ function createReservation(
             (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
              notes, downpayment_amount, downpayment_method, downpayment_paid,
              payment_proof, payment_proof_status, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
         'iississsdsissi',
