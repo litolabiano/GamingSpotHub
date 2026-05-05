@@ -60,15 +60,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      VALUES (?, 'controller_rental', 'Controller rental fee', ?, 'approved')"
                 );
                 $arStmt->bind_param('id', $result['session_id'], $ctrl_fee);
-                $arStmt->execute();
-                $arStmt->execute();
+                $arStmt->execute(); // execute once only
 
-        // ── Mark one Xbox controller as in_use ──────────────
-        $conn->query(
-            "UPDATE controllers SET status = 'in_use'
-             WHERE status = 'available' AND controller_type = 'Xbox Controller'
-             ORDER BY unit_number ASC LIMIT 1"
-        );
+                // Mark the specific rented controller as in_use (from the dropdown selection)
+                $rented_ctrl_id = (int)($_POST['rented_controller_id'] ?? 0);
+                if ($rented_ctrl_id > 0) {
+                    $ctrlUpd = $conn->prepare(
+                        "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
+                    );
+                    $ctrlUpd->bind_param('i', $rented_ctrl_id);
+                    $ctrlUpd->execute();
+                }
             }
         }
 
@@ -437,8 +439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // ── Log to reservation_cancellations audit table ──────────────
             $logFetch = $conn->prepare(
-                "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount
-                   FROM reservations WHERE reservation_id = ?"
+                "SELECT user_id FROM reservations WHERE reservation_id = ?"
             );
             $logFetch->bind_param('i', $res_id);
             $logFetch->execute();
@@ -446,19 +447,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($logRow) {
                 $logStmt = $conn->prepare(
                     "INSERT INTO reservation_cancellations
-                         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
-                          console_type, rental_mode, reserved_date, downpayment_amount, cancelled_at)
-                     VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, NOW())"
+                         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
+                     VALUES (?, ?, 'admin', ?, ?, NOW())"
                 );
                 $logStmt->execute([
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
                     $reasonDetail,
-                    $logRow['console_type'],
-                    $logRow['rental_mode'],
-                    $logRow['reserved_date'],
-                    $logRow['downpayment_amount'],
                 ]);
             }
 
@@ -763,7 +759,11 @@ $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
-unset($_res);
+
+// Available controllers for the Start Session rental dropdown (injected to JS)
+$_avRes = $conn->query("SELECT controller_id, controller_name, controller_type, unit_number FROM controllers WHERE status = 'available' ORDER BY unit_number");
+$availableControllers = $_avRes ? $_avRes->fetch_all(MYSQLI_ASSOC) : [];
+unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
@@ -905,10 +905,11 @@ $usageReport = getConsoleUsageReport('2020-01-01', $today);
 $cancelStatsRow = $conn->query(
     "SELECT
         COUNT(*)                                                      AS total_cancels,
-        SUM(cancelled_by = 'user')                                    AS user_cancels,
-        SUM(cancelled_by = 'admin')                                   AS admin_cancels,
-        COALESCE(SUM(downpayment_amount),0)                           AS total_downpayments
-     FROM reservation_cancellations"
+        SUM(rc.cancelled_by = 'user')                                 AS user_cancels,
+        SUM(rc.cancelled_by = 'admin')                                AS admin_cancels,
+        COALESCE(SUM(r.downpayment_amount),0)                         AS total_downpayments
+     FROM reservation_cancellations rc
+     JOIN reservations r ON rc.reservation_id = r.reservation_id"
 )->fetch_assoc();
 
 // Reasons breakdown (for doughnut chart)
@@ -921,9 +922,10 @@ $cancelReasons = $conn->query(
 
 // Cancellations by console type
 $cancelByConsole = $conn->query(
-    "SELECT console_type, COUNT(*) AS cnt
-       FROM reservation_cancellations
-      GROUP BY console_type
+    "SELECT r.console_type, COUNT(*) AS cnt
+       FROM reservation_cancellations rc
+       JOIN reservations r ON rc.reservation_id = r.reservation_id
+      GROUP BY r.console_type
       ORDER BY cnt DESC"
 )->fetch_all(MYSQLI_ASSOC);
 
@@ -2003,6 +2005,8 @@ document.querySelectorAll('.modal').forEach(m => {
  * _bracketCost / _timedCost are unchanged in shape - only their constants move.
  */
 const PRICING = <?= json_encode(getPricingRules()) ?>;
+// Available controllers for the rental dropdown — populated from DB on page load
+const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
 function _bracketCost(partialMin) {
     // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
@@ -2056,7 +2060,7 @@ function playSessionEndSound() {
             const gain = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.type = 'sine';
+            osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(880, ctx.currentTime + delay);
             gain.gain.setValueAtTime(0.38, ctx.currentTime + delay);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);

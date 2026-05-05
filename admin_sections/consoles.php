@@ -406,6 +406,16 @@
                     <label>Hourly Rate (₱)</label>
                     <input type="number" name="hourly_rate" class="form-control" required min="0" step="0.01" value="100.00">
                 </div>
+                <div class="form-group">
+                    <label>Compatible Controller Type <span style="color:#888;font-size:11px;">(optional)</span></label>
+                    <select name="compatible_controller_type" class="form-control">
+                        <option value="">— None (no controller needed) —</option>
+                        <?php foreach ($controllerTypeOptions as $ct): ?>
+                        <option value="<?= htmlspecialchars($ct) ?>"><?= htmlspecialchars($ct) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p style="font-size:11px;color:#556;margin-top:5px;">Controls which controllers appear when starting a session on this console.</p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addConsole')">Cancel</button>

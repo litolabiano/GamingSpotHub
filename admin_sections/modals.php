@@ -366,7 +366,9 @@
                     <select name="console_id" id="consoleSelect" required onchange="onConsoleChange()">
                         <option value="" disabled selected>— Select console —</option>
                         <?php foreach ($availableConsoles as $con): ?>
-                        <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
+                        <option value="<?= $con['console_id'] ?>"
+                                data-type="<?= htmlspecialchars($con['console_type']) ?>"
+                                data-compat="<?= htmlspecialchars($con['compatible_controller_type'] ?? '') ?>">
                             <?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)
                         </option>
                         <?php endforeach; ?>
