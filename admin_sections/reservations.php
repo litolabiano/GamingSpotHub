@@ -16,7 +16,7 @@
     <div class="stats-grid" style="margin-bottom:24px;">
         <?php
         $resPending   = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
-        $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'confirmed'));
+        $resConfirmed = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'reserved'));
         $resRescheduled = 0;
         try {
             $rrStat = $conn->query("SELECT COUNT(*) AS cnt FROM reservation_reschedules");
@@ -61,6 +61,71 @@
         </div>
     </div>
 
+    <!-- Pending User Reschedules -->
+    <?php if (!empty($pendingUserReschedules)): ?>
+    <div class="card" style="border-left:3px solid #f1a83c;margin-bottom:24px;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h3 class="card-title" style="margin:0;">
+                <i class="fas fa-clock" style="color:#f1a83c;margin-right:8px;"></i>Customer Reschedule Requests
+                <span style="background:rgba(241,168,60,.2);color:#f1a83c;border:1px solid rgba(241,168,60,.35);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px;">
+                    <?= count($pendingUserReschedules) ?> Pending
+                </span>
+            </h3>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Customer</th>
+                        <th>Console</th>
+                        <th>Requested From</th>
+                        <th>Requested To</th>
+                        <th>Reason</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($pendingUserReschedules as $pr): ?>
+                        <tr>
+                            <td style="color:#888;">#<?= $pr['reservation_id'] ?></td>
+                            <td><strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong></td>
+                            <td><?= htmlspecialchars($pr['console_type']) ?></td>
+                            <td style="color:#aaa;">
+                                <?= date('M d, Y', strtotime($pr['old_date'])) ?><br>
+                                <span style="font-size:11px;"><?= date('h:i A', strtotime($pr['old_time'])) ?></span>
+                            </td>
+                            <td>
+                                <strong style="color:#20c8a1;"><?= date('M d, Y', strtotime($pr['new_date'])) ?></strong><br>
+                                <span style="font-size:11px;color:#20c8a1;"><?= date('h:i A', strtotime($pr['new_time'])) ?></span>
+                            </td>
+                            <td>
+                                <span style="font-size:12px;color:#f1a83c;font-weight:600;">User Request</span>
+                                <?php if ($pr['reason_detail']): ?>
+                                    <br><span style="font-size:11px;color:#888;"><?= htmlspecialchars($pr['reason_detail']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="display:flex;gap:6px;">
+                                    <button class="btn btn-success btn-sm" title="Approve"
+                                        onclick="adminRespondReschedule(<?= $pr['reschedule_id'] ?>, 'approve')">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                    <button class="btn btn-sm" title="Reject"
+                                        style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.4);"
+                                        onclick="adminRespondReschedule(<?= $pr['reschedule_id'] ?>, 'reject')">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Upcoming Reservations Table -->
     <div class="card" style="border-left:3px solid #20c8a1;margin-bottom:24px;">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -83,7 +148,7 @@
                 <select class="asb-select" id="resStatusFilter" title="Filter by status">
                     <option value="">All Statuses</option>
                     <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
+                    <option value="reserved">Confirmed</option>
                 </select>
                 <span class="asb-count" id="resCount"></span>
             </div>
@@ -115,7 +180,7 @@
                             $isToday = ($r['reserved_date'] === date('Y-m-d'));
                             $statusColors = [
                                 'pending'   => ['bg' => 'rgba(241,168,60,.12)',  'text' => '#f1a83c',  'border' => 'rgba(241,168,60,.3)'],
-                                'confirmed' => ['bg' => 'rgba(32,200,161,.12)',  'text' => '#20c8a1',  'border' => 'rgba(32,200,161,.3)'],
+                                'reserved' => ['bg' => 'rgba(32,200,161,.12)',  'text' => '#20c8a1',  'border' => 'rgba(32,200,161,.3)'],
                             ];
                             $sc = $statusColors[$r['status']] ?? ['bg' => 'rgba(100,100,100,.1)', 'text' => '#888', 'border' => 'rgba(100,100,100,.2)'];
                         ?>
@@ -543,4 +608,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     cancelPag.apply();
 });
+
+function adminRespondReschedule(rescheduleId, action) {
+    if (!confirm('Are you sure you want to ' + action + ' this request?')) return;
+    fetch('ajax/admin_respond_reschedule.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'reschedule_id=' + rescheduleId + '&action=' + action
+    }).then(r => r.json()).then(d => {
+        if (typeof showAdminToast === 'function') {
+            showAdminToast(d.message, d.success ? 'success' : 'error');
+        } else {
+            alert((d.success ? '✓ ' : '✕ ') + d.message);
+        }
+        if (d.success) setTimeout(() => location.reload(), 1500);
+    }).catch(e => {
+        alert('Network error. Please try again.');
+    });
+}
 </script>

@@ -170,10 +170,12 @@ foreach ($recentSessions as $s) {
     $pendingSessions[] = $s;
 }
 foreach ($completedSessions as $s) {
+    if (empty($s['total_cost']) || $s['total_cost'] <= 0) continue;
     $paidSoFar = (float)($s['upfront_paid'] ?? $s['amount_paid'] ?? 0);
-    $expected  = (float)($s['total_cost'] ?? 0);
-    $refunded  = (float)($s['refunded_amount'] ?? 0);
-    if ($expected > 0 && $paidSoFar < $expected && $refunded < $paidSoFar) {
+    $expected  = round((float)$s['total_cost'], 2);
+    $paid      = round($paidSoFar, 2);
+    
+    if ($paid < $expected) {
         $s['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $s;
     }

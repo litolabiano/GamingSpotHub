@@ -45,7 +45,7 @@ $sql = "
         -- Count pending+confirmed reservations whose session window overlaps the requested slot
         (SELECT COUNT(*) FROM reservations r
             WHERE r.console_id = c.console_id
-              AND r.status IN ('pending','confirmed')
+              AND r.status IN ('pending','reserved')
               AND r.reserved_date = ?
               AND CONCAT(r.reserved_date,' ',r.reserved_time) <= ?
               AND DATE_ADD(CONCAT(r.reserved_date,' ',r.reserved_time),
@@ -54,7 +54,7 @@ $sql = "
         -- Count ONLY confirmed reservations (slot is definitively locked)
         (SELECT COUNT(*) FROM reservations r
             WHERE r.console_id = c.console_id
-              AND r.status = 'confirmed'
+              AND r.status = 'reserved'
               AND r.reserved_date = ?
               AND CONCAT(r.reserved_date,' ',r.reserved_time) <= ?
               AND DATE_ADD(CONCAT(r.reserved_date,' ',r.reserved_time),

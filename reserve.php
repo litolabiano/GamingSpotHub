@@ -180,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cntStmt = $conn->prepare(
             "SELECT reservation_id, reserved_date, reserved_time
                FROM reservations
-              WHERE user_id = ? AND status IN ('pending','confirmed')
+              WHERE user_id = ? AND status IN ('pending','reserved')
               LIMIT 1"
         );
         $cntStmt->bind_param('i', $user['user_id']);
@@ -355,7 +355,7 @@ if (!empty($myReservations)) {
 $activeResCheck = $conn->prepare(
     "SELECT reservation_id, reserved_date, reserved_time, status
        FROM reservations
-      WHERE user_id = ? AND status IN ('pending','confirmed')
+      WHERE user_id = ? AND status IN ('pending','reserved')
       LIMIT 1"
 );
 $activeResCheck->bind_param('i', $user['user_id']);
@@ -1666,7 +1666,7 @@ if (!empty($_GET['console'])) {
                             </thead>
                             <tbody>
                             <?php foreach ($myReservations as $r):
-                                $isActive     = in_array($r['status'], ['pending','confirmed']);
+                                $isActive     = in_array($r['status'], ['pending','reserved']);
                                 $alreadyResched = !empty($rescheduledIds[$r['reservation_id']]);
                                 $rid          = (int)$r['reservation_id'];
                                 $rDate        = htmlspecialchars($r['reserved_date']);

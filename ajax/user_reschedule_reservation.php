@@ -84,7 +84,7 @@ if (!$res) {
     echo json_encode(['success' => false, 'message' => 'Reservation not found.']);
     exit;
 }
-if (!in_array($res['status'], ['pending', 'confirmed'])) {
+if (!in_array($res['status'], ['pending', 'reserved'])) {
     echo json_encode(['success' => false, 'message' => 'Only pending or confirmed reservations can be rescheduled.']);
     exit;
 }
@@ -117,7 +117,7 @@ $avail = $conn->prepare(
     "SELECT reservation_id FROM reservations
       WHERE console_type = ?
         AND reserved_date = ?
-        AND status IN ('pending','confirmed')
+        AND status IN ('pending','reserved')
         AND reservation_id != ?
         AND (
               -- New slot starts inside an existing reservation window
@@ -139,30 +139,28 @@ if ($avail->get_result()->num_rows > 0) {
     exit;
 }
 
-// ── All checks pass — update the reservation and log it ───────────────────────
+// ── All checks pass — set to pending and create request ───────────────────────
 $old_date = $res['reserved_date'];
 $old_time = $res['reserved_time'];
 
 $conn->begin_transaction();
 try {
-    // 1. Update the reservation date/time
+    // 1. Set the reservation to pending (do not change date/time yet)
     $upd = $conn->prepare(
-        "UPDATE reservations SET reserved_date = ?, reserved_time = ?, updated_at = NOW()
+        "UPDATE reservations SET status = 'pending', updated_at = NOW()
           WHERE reservation_id = ?"
     );
-    $upd->bind_param('ssi', $new_date, $new_time, $res_id);
+    $upd->bind_param('i', $res_id);
     $upd->execute();
 
-    // 2. Log the reschedule — rescheduled_by = uid (the customer themselves)
-    //    reason = 'other' to satisfy the enum constraint;
-    //    reason_detail notes that it was customer-initiated.
-    $reason        = 'other';
-    $reason_detail = 'Customer self-reschedule.';
+    // 2. Log the reschedule request — initiated_by = 'user', status = 'pending'
+    $reason        = 'user_request';
+    $reason_detail = 'Customer self-reschedule request.';
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
             (reservation_id, user_id, old_date, old_time, new_date, new_time,
-             reason, reason_detail, rescheduled_by, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)"
+             reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
         'iissssssi',
@@ -182,7 +180,7 @@ try {
 
     echo json_encode([
         'success'          => true,
-        'message'          => 'Your reservation has been rescheduled to ' . $newDateDisplay . ' at ' . $newTimeDisplay . '.',
+        'message'          => 'Your reschedule request to ' . $newDateDisplay . ' at ' . $newTimeDisplay . ' has been submitted and is pending admin approval.',
         'new_date_display' => $newDateDisplay,
         'new_time_display' => $newTimeDisplay,
         'new_date'         => $new_date,

@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/session_helper.php';
 require_once __DIR__ . '/../includes/db_config.php';
 require_once __DIR__ . '/../includes/db_functions.php';
+require_once __DIR__ . '/../includes/mail_helper.php';
 
 header('Content-Type: application/json');
 
@@ -47,9 +48,10 @@ if ($new_time < '12:00' || $new_time > '23:00') {
 
 // Fetch current reservation
 $stmt = $conn->prepare(
-    "SELECT reservation_id, user_id, reserved_date, reserved_time, status
-       FROM reservations
-      WHERE reservation_id = ? AND status IN ('pending','confirmed')"
+    "SELECT r.reservation_id, r.user_id, r.reserved_date, r.reserved_time, r.status, u.email, u.first_name, u.last_name
+       FROM reservations r
+       JOIN users u ON r.user_id = u.user_id
+      WHERE r.reservation_id = ? AND r.status IN ('pending','reserved')"
 );
 $stmt->bind_param('i', $reservation_id);
 $stmt->execute();
@@ -66,9 +68,9 @@ $user_id  = (int)$res['user_id'];
 
 $conn->begin_transaction();
 try {
-    // Update the reservation date/time
+    // Update the reservation date/time and set status to pending
     $upd = $conn->prepare(
-        "UPDATE reservations SET reserved_date = ?, reserved_time = ?, updated_at = NOW()
+        "UPDATE reservations SET reserved_date = ?, reserved_time = ?, status = 'pending', updated_at = NOW()
           WHERE reservation_id = ?"
     );
     $upd->bind_param('ssi', $new_date, $new_time, $reservation_id);
@@ -78,8 +80,8 @@ try {
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
             (reservation_id, user_id, old_date, old_time, new_date, new_time,
-             reason, reason_detail, rescheduled_by, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)"
+             reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
     );
     $staff_id = (int)$user['user_id'];
     $log->bind_param(
@@ -91,8 +93,12 @@ try {
         $staff_id
     );
     $log->execute();
+    $reschedule_id = $conn->insert_id;
 
     $conn->commit();
+
+    $fullName = trim($res['first_name'] . ' ' . $res['last_name']);
+    sendRescheduleNotificationEmail($res['email'], $fullName, $new_date, $new_time);
 
     $reason_labels = [
         'typhoon'       => 'Typhoon / Bad Weather',

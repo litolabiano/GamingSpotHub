@@ -29,14 +29,7 @@
                 <span style="font-size:13px;display:flex;align-items:center;gap:6px;">
                     <span class="status-dot maintenance"></span><?= $maintenanceCount ?> Maintenance
                 </span>
-                <?php
-                    $xboxControllerCount = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Controller' && $c['status'] === 'available'));
-                    $xboxControllerTotal = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Controller'));
-                ?>
-                <span style="font-size:13px;display:flex;align-items:center;gap:6px; margin-left: auto; background:rgba(32,200,161,.1); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(32,200,161,.3); color: #20c8a1;">
-                    <i class="fa-solid fa-gamepad"></i>
-                    <?= $xboxControllerCount ?> / <?= $xboxControllerTotal ?> Xbox Controllers Available
-                </span>
+
             </div>
         </div>
 
@@ -184,6 +177,7 @@
     </div>
 
     <!-- ── Xbox Controller Inventory (INSIDE #consoles so it only shows here) ── -->
+    <div id="activeControllersSection">
     <?php
         $allControllers = [];
         $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
@@ -285,8 +279,9 @@
                                 </form>
                                 <?php if ($user['role'] === 'owner'): ?>
                                 <form method="POST" action="admin.php#consoles"
-                                      onsubmit="return confirm('Permanently delete this controller?')">
-                                    <input type="hidden" name="action" value="delete_controller">
+                                      onsubmit="return confirm('Archive this controller? It will be moved to the Archived section.')">
+                                    <input type="hidden" name="action" value="update_controller_status">
+                                    <input type="hidden" name="status" value="archived">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
                                     <button type="submit"
@@ -305,8 +300,77 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Archived controllers (collapsible) -->
+        <?php
+            $archivedControllers = [];
+            $_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
+            if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
+            unset($_res);
+        ?>
+        <div style="margin-top:20px;">
+            <button onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'block':'none'"
+                    style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;padding:0;">
+                <i class="fas fa-archive" style="margin-right:5px;"></i>
+                Show <?= count($archivedControllers) ?> archived controller(s)
+            </button>
+            <div style="display:none;margin-top:12px;">
+                <?php if (empty($archivedControllers)): ?>
+                    <div style="padding:20px;text-align:center;color:#666;background:rgba(255,255,255,.02);border-radius:8px;border:1px dashed rgba(255,255,255,.1);">
+                        No controllers have been archived yet.
+                    </div>
+                <?php else: ?>
+                <table class="data-table" style="width:100%;opacity:.6;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:rgba(10,33,81,.6);">
+                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Unit #</th>
+                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Name</th>
+                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($archivedControllers as $ctrl): ?>
+                        <tr style="border-top:1px solid rgba(255,255,255,.05);">
+                            <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
+                            <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_name']) ?></td>
+                            <td style="padding:12px 16px;">
+                                <div style="display:flex;gap:6px;">
+                                    <form method="POST" action="admin.php#consoles" style="display:inline;">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="action" value="update_controller_status">
+                                        <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                        <input type="hidden" name="status" value="available">
+                                        <button type="submit"
+                                                style="background:rgba(32,200,161,.15);color:#20c8a1;border:1px solid rgba(32,200,161,.3);
+                                                       padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;">
+                                            <i class="fas fa-undo"></i> Restore
+                                        </button>
+                                    </form>
+                                    <?php if ($user['role'] === 'owner'): ?>
+                                    <form method="POST" action="admin.php#consoles" style="display:inline;"
+                                          onsubmit="return confirm('Permanently delete this controller? This cannot be undone.')">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="action" value="delete_controller">
+                                        <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                        <button type="submit"
+                                                style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
+                                                       padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
+        </div>
     </div>
     <!-- ── END Xbox Controller Inventory ── -->
+    </div>
 
 </div><!-- /#consoles — CLOSED HERE after controller inventory -->
 
@@ -411,6 +475,8 @@ function openEditConsoleModal(id, name, type, unit, rate) {
 <script>
 function toggleArchiveSection(showArchive) {
     document.getElementById('activeConsolesSection').style.display = showArchive ? 'none' : 'block';
+    const ctrlSection = document.getElementById('activeControllersSection');
+    if(ctrlSection) ctrlSection.style.display = showArchive ? 'none' : 'block';
     document.getElementById('archivedConsolesSection').style.display = showArchive ? 'block' : 'none';
 }
 

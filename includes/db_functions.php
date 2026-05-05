@@ -1052,7 +1052,7 @@ function createReservation(
     $activeCheck = $conn->prepare(
         "SELECT reservation_id, reserved_date, reserved_time
            FROM reservations
-          WHERE user_id = ? AND status IN ('pending','confirmed')
+          WHERE user_id = ? AND status IN ('pending','reserved')
           LIMIT 1"
     );
     $activeCheck->bind_param('i', $user_id);
@@ -1212,7 +1212,7 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
     if (!$res) {
         return ['success' => false, 'message' => 'Reservation not found'];
     }
-    if (!in_array($res['status'], ['pending', 'confirmed'])) {
+    if (!in_array($res['status'], ['pending', 'reserved'])) {
         return ['success' => false, 'message' => 'Reservation cannot be converted in its current status'];
     }
 
@@ -1312,7 +1312,7 @@ function getUpcomingReservations($days = null) {
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
               WHERE r.reserved_date BETWEEN ? AND ?
-                AND r.status IN ('pending','confirmed')
+                AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
         );
         $stmt->bind_param('ss', $today, $until);
@@ -1325,7 +1325,7 @@ function getUpcomingReservations($days = null) {
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
               WHERE r.reserved_date >= ?
-                AND r.status IN ('pending','confirmed')
+                AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
         );
         $stmt->bind_param('s', $today);

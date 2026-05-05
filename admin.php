@@ -397,7 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $res_id    = (int)($_POST['reservation_id'] ?? 0);
         $console_id = (int)($_POST['console_id'] ?? 0) ?: null;
         if ($res_id) {
-            updateReservationStatus($res_id, 'confirmed', $console_id ?: null);
+            updateReservationStatus($res_id, 'reserved', $console_id ?: null);
             $message = 'Reservation confirmed.';
             $messageType = 'success';
         }
@@ -796,10 +796,21 @@ $customers = $customersResult->fetch_all(MYSQLI_ASSOC);
 // Available consoles for start session
 $availableConsoles = getAvailableConsoles();
 
-// Reservations - upcoming (pending/confirmed) + cancelled (for refund management)
+// Reservations - upcoming (pending/reserved) + cancelled (for refund management)
 $upcomingReservations  = getUpcomingReservations();
 $cancelledReservations = getCancelledReservations();
 $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r['status'] === 'pending'));
+
+// Pending User-Initiated Reschedule Requests
+$purStmt = $conn->query(
+    "SELECT rs.*, r.console_type, u.full_name AS customer_name
+     FROM reservation_reschedules rs
+     JOIN reservations r ON rs.reservation_id = r.reservation_id
+     JOIN users u ON rs.user_id = u.user_id
+     WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
+     ORDER BY rs.created_at ASC"
+);
+$pendingUserReschedules = $purStmt ? $purStmt->fetch_all(MYSQLI_ASSOC) : [];
 
 
 // Financial stats
@@ -866,14 +877,16 @@ foreach ($recentSessions as $sess) {
         // open_time always needs end-of-session payment
         $sess['paid_so_far'] = $paidSoFar;
         $pendingSessions[] = $sess;
-    } elseif ($sess['status'] === 'completed'
-        && $sess['total_cost'] > 0
-        && $paidSoFar < (float)$sess['total_cost']  // paid less than consumed cost
-        && $refundedAmount < $paidSoFar              // hasn't been fully refunded back
-    ) {
-        // Completed session where total paid < total cost — outstanding balance.
-        $sess['paid_so_far'] = $paidSoFar;
-        $pendingSessions[] = $sess;
+    } elseif ($sess['status'] === 'completed' && $sess['total_cost'] > 0) {
+        // Completed session: check if total paid is less than total cost
+        // Note: Do not subtract refundedAmount. If they paid enough upfront and were refunded the difference, it's settled.
+        $expected = round((float)$sess['total_cost'], 2);
+        $paid     = round($paidSoFar, 2);
+        
+        if ($paid < $expected) {
+            $sess['paid_so_far'] = $paidSoFar;
+            $pendingSessions[] = $sess;
+        }
     }
     // Walk-in open_time sessions (nothing paid upfront): handled at end-of-session.
 }

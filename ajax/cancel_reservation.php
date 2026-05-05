@@ -64,7 +64,7 @@ if (!$r) {
     echo json_encode(['success' => false, 'message' => 'Reservation not found.']);
     exit;
 }
-if (!in_array($r['status'], ['pending', 'confirmed'])) {
+if (!in_array($r['status'], ['pending', 'reserved'])) {
     echo json_encode([
         'success' => false,
         'message' => 'This reservation cannot be cancelled (status: ' . $r['status'] . ').',
