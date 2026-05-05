@@ -253,10 +253,6 @@ CREATE TABLE `reservation_cancellations` (
   `cancelled_by` enum('user','admin') NOT NULL DEFAULT 'user',
   `cancel_reason_type` enum('schedule_change','found_alternative','budget_issue','technical_issue','emergency','other','admin_decision') NOT NULL DEFAULT 'other',
   `cancel_reason_detail` text DEFAULT NULL,
-  `console_type` enum('PS5','PS4','Xbox Series X') NOT NULL,
-  `rental_mode` enum('hourly','open_time','unlimited') NOT NULL DEFAULT 'hourly',
-  `reserved_date` date NOT NULL,
-  `downpayment_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `refund_issued` tinyint(1) NOT NULL DEFAULT 0,
   `cancelled_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -265,16 +261,16 @@ CREATE TABLE `reservation_cancellations` (
 -- Dumping data for table `reservation_cancellations`
 --
 
-INSERT INTO `reservation_cancellations` (`cancel_id`, `reservation_id`, `user_id`, `cancelled_by`, `cancel_reason_type`, `cancel_reason_detail`, `console_type`, `rental_mode`, `reserved_date`, `downpayment_amount`, `refund_issued`, `cancelled_at`) VALUES
-(1, 1, 27, 'user', 'schedule_change', NULL, 'PS5', 'hourly', '2026-05-01', 32.00, 0, '2026-05-01 19:57:31'),
-(2, 2, 27, 'admin', 'admin_decision', 'event that day nigga', 'PS5', 'hourly', '2026-05-01', 24.00, 0, '2026-05-01 20:49:16'),
-(3, 4, 27, 'user', 'budget_issue', NULL, 'PS5', 'hourly', '2026-05-03', 26.00, 0, '2026-05-03 19:43:41'),
-(4, 5, 27, 'user', 'other', 'no', 'PS5', 'hourly', '2026-05-03', 24.00, 0, '2026-05-03 20:49:26'),
-(5, 6, 27, 'user', 'budget_issue', NULL, 'PS5', 'hourly', '2026-05-03', 24.00, 0, '2026-05-03 21:12:23'),
-(6, 8, 27, 'admin', 'found_alternative', NULL, 'PS5', 'hourly', '2026-05-03', 34.00, 0, '2026-05-03 21:23:35'),
-(7, 19, 27, 'user', 'found_alternative', NULL, 'PS5', 'hourly', '2026-05-04', 24.00, 0, '2026-05-04 12:36:49'),
-(8, 21, 32, 'user', 'budget_issue', NULL, 'PS5', 'hourly', '2026-05-08', 36.00, 0, '2026-05-05 18:37:37'),
-(9, 22, 32, 'user', 'emergency', NULL, 'Xbox Series X', 'hourly', '2026-05-07', 36.00, 0, '2026-05-05 20:11:33');
+INSERT INTO `reservation_cancellations` (`cancel_id`, `reservation_id`, `user_id`, `cancelled_by`, `cancel_reason_type`, `cancel_reason_detail`, `refund_issued`, `cancelled_at`) VALUES
+(1, 1, 27, 'user', 'schedule_change', NULL, 0, '2026-05-01 19:57:31'),
+(2, 2, 27, 'admin', 'admin_decision', 'event that day nigga', 0, '2026-05-01 20:49:16'),
+(3, 4, 27, 'user', 'budget_issue', NULL, 0, '2026-05-03 19:43:41'),
+(4, 5, 27, 'user', 'other', 'no', 0, '2026-05-03 20:49:26'),
+(5, 6, 27, 'user', 'budget_issue', NULL, 0, '2026-05-03 21:12:23'),
+(6, 8, 27, 'admin', 'found_alternative', NULL, 0, '2026-05-03 21:23:35'),
+(7, 19, 27, 'user', 'found_alternative', NULL, 0, '2026-05-04 12:36:49'),
+(8, 21, 32, 'user', 'budget_issue', NULL, 0, '2026-05-05 18:37:37'),
+(9, 22, 32, 'user', 'emergency', NULL, 0, '2026-05-05 20:11:33');
 
 -- --------------------------------------------------------
 
@@ -438,21 +434,6 @@ INSERT INTO `tournament_participants` (`participant_id`, `tournament_id`, `user_
 (1, 1, 27, '2026-05-02 15:14:51', 'paid', NULL, NULL, 'dark fist', '09916310227', NULL, NULL, NULL, 'note', 'src_Cymsv6YwZLgaJhwZhidpawe7', 'pay_3g5WGQgYiqiZwWXQP4vTS24U', 'paid');
 
 -- --------------------------------------------------------
-
---
--- Table structure for table `tournament_registrations`
---
-
-CREATE TABLE `tournament_registrations` (
-  `reg_id` int(11) NOT NULL,
-  `full_name` varchar(100) NOT NULL,
-  `ign` varchar(100) NOT NULL,
-  `contact_number` varchar(20) NOT NULL,
-  `gcash_proof` varchar(255) NOT NULL,
-  `tournament` varchar(150) NOT NULL DEFAULT 'Tekken 8 Tournament',
-  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-  `registered_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -717,12 +698,6 @@ ALTER TABLE `tournament_participants`
   ADD KEY `fk_tp_registered_by` (`registered_by`);
 
 --
--- Indexes for table `tournament_registrations`
---
-ALTER TABLE `tournament_registrations`
-  ADD PRIMARY KEY (`reg_id`);
-
---
 -- Indexes for table `transactions`
 --
 ALTER TABLE `transactions`
@@ -817,12 +792,6 @@ ALTER TABLE `tournaments`
 --
 ALTER TABLE `tournament_participants`
   MODIFY `participant_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `tournament_registrations`
---
-ALTER TABLE `tournament_registrations`
-  MODIFY `reg_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `transactions`

@@ -85,34 +85,13 @@ $stmt2->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
 $stmt2->execute();
 
 // ── Log this cancellation event to reservation_cancellations ─────────────────
-// Fetch the reservation details needed for the log (console_type, rental_mode, reserved_date, downpayment)
-$logFetch = $conn->prepare(
-    "SELECT console_type, rental_mode, reserved_date, downpayment_amount
-       FROM reservations WHERE reservation_id = ?"
+$logStmt = $conn->prepare(
+    "INSERT INTO reservation_cancellations
+         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
+     VALUES (?, ?, 'user', ?, ?, NOW())"
 );
-$logFetch->bind_param('i', $res_id);
-$logFetch->execute();
-$logRow = $logFetch->get_result()->fetch_assoc();
-if ($logRow) {
-    $logStmt = $conn->prepare(
-        "INSERT INTO reservation_cancellations
-             (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
-              console_type, rental_mode, reserved_date, downpayment_amount, cancelled_at)
-         VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?, NOW())"
-    );
-    $logStmt->bind_param(
-        'iisssss' . 's',
-        $res_id,
-        $uid,
-        $reasonType,
-        $reasonDetail,
-        $logRow['console_type'],
-        $logRow['rental_mode'],
-        $logRow['reserved_date'],
-        $logRow['downpayment_amount']
-    );
-    $logStmt->execute();
-}
+$logStmt->bind_param('iiss', $res_id, $uid, $reasonType, $reasonDetail);
+$logStmt->execute();
 
 // ── Grace-period check: did the user cancel within 30 minutes of booking? ─────────
 // If yes → skip streak / ban logic entirely (no penalty).

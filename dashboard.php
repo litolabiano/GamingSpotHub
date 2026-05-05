@@ -222,9 +222,11 @@ $myCancels = [];
 $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
             rc.cancel_reason_type, rc.cancel_reason_detail,
-            rc.console_type, rc.rental_mode, rc.reserved_date,
-            rc.downpayment_amount, rc.cancelled_at
+            rc.cancelled_at, rc.refund_issued,
+            r.console_type, r.rental_mode, r.reserved_date,
+            r.downpayment_amount
        FROM reservation_cancellations rc
+       JOIN reservations r ON rc.reservation_id = r.reservation_id
       WHERE rc.user_id = ?
       ORDER BY rc.cancelled_at DESC
       LIMIT 50"

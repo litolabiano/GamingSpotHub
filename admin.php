@@ -439,8 +439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // ── Log to reservation_cancellations audit table ──────────────
             $logFetch = $conn->prepare(
-                "SELECT user_id, console_type, rental_mode, reserved_date, downpayment_amount
-                   FROM reservations WHERE reservation_id = ?"
+                "SELECT user_id FROM reservations WHERE reservation_id = ?"
             );
             $logFetch->bind_param('i', $res_id);
             $logFetch->execute();
@@ -448,19 +447,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($logRow) {
                 $logStmt = $conn->prepare(
                     "INSERT INTO reservation_cancellations
-                         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail,
-                          console_type, rental_mode, reserved_date, downpayment_amount, cancelled_at)
-                     VALUES (?, ?, 'admin', ?, ?, ?, ?, ?, ?, NOW())"
+                         (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
+                     VALUES (?, ?, 'admin', ?, ?, NOW())"
                 );
                 $logStmt->execute([
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
                     $reasonDetail,
-                    $logRow['console_type'],
-                    $logRow['rental_mode'],
-                    $logRow['reserved_date'],
-                    $logRow['downpayment_amount'],
                 ]);
             }
 
@@ -911,10 +905,11 @@ $usageReport = getConsoleUsageReport('2020-01-01', $today);
 $cancelStatsRow = $conn->query(
     "SELECT
         COUNT(*)                                                      AS total_cancels,
-        SUM(cancelled_by = 'user')                                    AS user_cancels,
-        SUM(cancelled_by = 'admin')                                   AS admin_cancels,
-        COALESCE(SUM(downpayment_amount),0)                           AS total_downpayments
-     FROM reservation_cancellations"
+        SUM(rc.cancelled_by = 'user')                                 AS user_cancels,
+        SUM(rc.cancelled_by = 'admin')                                AS admin_cancels,
+        COALESCE(SUM(r.downpayment_amount),0)                         AS total_downpayments
+     FROM reservation_cancellations rc
+     JOIN reservations r ON rc.reservation_id = r.reservation_id"
 )->fetch_assoc();
 
 // Reasons breakdown (for doughnut chart)
@@ -927,9 +922,10 @@ $cancelReasons = $conn->query(
 
 // Cancellations by console type
 $cancelByConsole = $conn->query(
-    "SELECT console_type, COUNT(*) AS cnt
-       FROM reservation_cancellations
-      GROUP BY console_type
+    "SELECT r.console_type, COUNT(*) AS cnt
+       FROM reservation_cancellations rc
+       JOIN reservations r ON rc.reservation_id = r.reservation_id
+      GROUP BY r.console_type
       ORDER BY cnt DESC"
 )->fetch_all(MYSQLI_ASSOC);
 
