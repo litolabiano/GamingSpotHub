@@ -83,8 +83,24 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 
 <!-- Tournament List -->
 <div class="card">
-    <div class="card-header">
+    <div class="card-header" style="flex-wrap:wrap;gap:10px;">
         <h3 class="card-title"><i class="fas fa-list"></i> All Tournaments</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="asb-search" style="max-width:220px;">
+                <i class="fas fa-search"></i>
+                <input type="text" class="asb-input" id="tournSearch" placeholder="Search tournament, game…" autocomplete="off">
+                <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+            </div>
+            <select class="asb-select" id="tournStatusFilter" title="Filter by status">
+                <option value="">All Statuses</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="scheduled">Open Reg.</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <span class="asb-count" id="tournCount"></span>
+        </div>
     </div>
     <?php if (empty($allTournaments)): ?>
     <div class="empty-state">
@@ -93,7 +109,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
     </div>
     <?php else: ?>
     <div style="overflow-x:auto;">
-    <table class="data-table">
+    <table class="data-table" id="tournTable">
         <thead>
             <tr>
                 <th>Tournament</th>
@@ -235,6 +251,8 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
         <?php endforeach; ?>
         </tbody>
     </table>
+    <div class="asb-no-results" id="tournSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No tournaments match your search.</div>
+    <div id="tournPagination"></div>
     </div>
     <?php endif; ?>
 </div>
@@ -605,5 +623,41 @@ function escHtml(str) {
     d.appendChild(document.createTextNode(str || ''));
     return d.innerHTML;
 }
+
+/* ── Tournaments live search + status filter + pagination ─────────────────── */
+(function() {
+    const tournSearch  = document.getElementById('tournSearch');
+    const tournStatus  = document.getElementById('tournStatusFilter');
+    const tournTable   = document.getElementById('tournTable');
+
+    const pag = new AdminPaginator('tournTable', {
+        pageSize:      10,
+        pageSizes:     [10, 25, 50],
+        paginationSel: '#tournPagination',
+        noResultsSel:  '#tournSearch_noResults',
+        countSel:      '#tournCount',
+    });
+
+    function filterTourn() {
+        if (!tournTable) return;
+        const q  = (tournSearch?.value || '').trim().toLowerCase();
+        const st = (tournStatus?.value || '').toLowerCase();
+        tournTable.querySelectorAll('tbody tr').forEach(row => {
+            const hay = row.innerText.toLowerCase();
+            const match = (!q || hay.includes(q)) && (!st || hay.includes(st));
+            row.classList.toggle('asb-hidden', !match);
+        });
+        const cb = tournSearch?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        pag.reset();
+    }
+
+    if (tournSearch) tournSearch.addEventListener('input', filterTourn);
+    if (tournStatus) tournStatus.addEventListener('change', filterTourn);
+    const tournClear = tournSearch?.parentElement?.querySelector('.asb-clear');
+    if (tournClear) tournClear.addEventListener('click', () => { tournSearch.value = ''; filterTourn(); tournSearch.focus(); });
+
+    pag.apply();
+})();
 </script>
 

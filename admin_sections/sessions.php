@@ -267,13 +267,24 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     <?php endif; ?>
 
     <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
             <h3 class="card-title">All Sessions</h3>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;justify-content:flex-end;">
+                <div class="asb-search" style="max-width:260px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="asb-input" id="sessionsSearch" placeholder="Search customer, console, mode…" autocomplete="off">
+                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                </div>
+                <select class="asb-select" id="sessionsStatusFilter" title="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                </select>
                 <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
                     style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#888;font-size:12px;">
                     <i class="fas fa-sort-amount-down"></i>
                 </button>
+                <span class="asb-count" id="sessionsCount"></span>
             </div>
         </div>
         <table class="data-table" id="sessionsTable">
@@ -406,6 +417,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <div class="asb-no-results" id="sessionsSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:28px;margin-bottom:8px;opacity:.4;"></i>No sessions match your search.</div>
+        <div id="sessionsPagination"></div>
     </div>
 </div>
 
@@ -614,7 +627,60 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         // Reset Sort button
         resetBtn.addEventListener('click', function() {
             applyDefaultSort();
+            if (window._sessionsPag) window._sessionsPag.reset();
         });
+    })();
+
+    /* ── Sessions live search + status filter + pagination ─────────────────── */
+    (function() {
+        const searchInput  = document.getElementById('sessionsSearch');
+        const statusFilter = document.getElementById('sessionsStatusFilter');
+        const table        = document.getElementById('sessionsTable');
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+
+        /* Paginator — 10 rows per page */
+        const pag = new AdminPaginator('sessionsTable', {
+            pageSize:      10,
+            pageSizes:     [10, 25, 50],
+            paginationSel: '#sessionsPagination',
+            noResultsSel:  '#sessionsSearch_noResults',
+            countSel:      '#sessionsCount',
+        });
+        window._sessionsPag = pag; // expose for sort reset
+
+        function filterRows() {
+            const q  = (searchInput?.value || '').trim().toLowerCase();
+            const st = (statusFilter?.value || '').toLowerCase();
+            tbody.querySelectorAll('tr').forEach(row => {
+                const hay = [
+                    row.dataset.customer || '',
+                    row.dataset.console  || '',
+                    row.dataset.mode     || '',
+                    row.dataset.id       || '',
+                    row.dataset.status === '1' ? 'active' : 'completed'
+                ].join(' ').toLowerCase();
+                const statusText = row.dataset.status === '1' ? 'active' : 'completed';
+                const match = (!q || hay.includes(q)) && (!st || statusText === st);
+                row.classList.toggle('asb-hidden', !match);
+            });
+            /* Update clear-btn visibility */
+            const cb = searchInput?.parentElement?.querySelector('.asb-clear');
+            if (cb) cb.style.display = q ? 'block' : 'none';
+            pag.reset();
+        }
+
+        if (searchInput)  searchInput.addEventListener('input', filterRows);
+        if (statusFilter) statusFilter.addEventListener('change', filterRows);
+        const clearBtn = searchInput?.parentElement?.querySelector('.asb-clear');
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            filterRows();
+            searchInput.focus();
+        });
+
+        /* Initial render */
+        pag.apply();
     })();
 
     /* ── Inline toast helper (replaces browser alert) ── */

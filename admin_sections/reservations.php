@@ -74,6 +74,19 @@
                     </span>
                 <?php endif; ?>
             </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div class="asb-search" style="max-width:240px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="asb-input" id="resSearch" placeholder="Search customer, console…" autocomplete="off">
+                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                </div>
+                <select class="asb-select" id="resStatusFilter" title="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                </select>
+                <span class="asb-count" id="resCount"></span>
+            </div>
         </div>
 
         <?php if (empty($upcomingReservations)): ?>
@@ -84,7 +97,7 @@
             </div>
         <?php else: ?>
             <div style="overflow-x:auto;">
-                <table class="data-table">
+                <table class="data-table" id="resTable">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -165,6 +178,8 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <div class="asb-no-results" id="resSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No reservations match your search.</div>
+                <div id="resPagination"></div>
             </div>
         <?php endif; ?>
     </div>
@@ -189,9 +204,17 @@
                         <i class="fas fa-ban" style="color:#fb566b;margin-right:8px;"></i>Cancelled Reservations
                     </h3>
                 </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <div class="asb-search" style="max-width:220px;">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="asb-input" id="cancelResSearch" placeholder="Search…" autocomplete="off">
+                        <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                    </div>
+                    <span class="asb-count" id="cancelResCount"></span>
+                </div>
             </div>
             <div style="overflow-x:auto;">
-                <table class="data-table">
+                <table class="data-table" id="cancelResTable">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -276,6 +299,8 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <div class="asb-no-results" id="cancelResSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No cancelled reservations match your search.</div>
+                <div id="cancelResPagination"></div>
             </div>
         </div>
     <?php endif; ?>
@@ -449,4 +474,73 @@ function submitReschedule() {
         btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
     });
 }
+</script>
+
+<script>
+/* ── Reservations search + pagination ─────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+
+    /* ── Upcoming Reservations ── */
+    const resSearch = document.getElementById('resSearch');
+    const resStatus = document.getElementById('resStatusFilter');
+    const resTable  = document.getElementById('resTable');
+
+    const resPag = new AdminPaginator('resTable', {
+        pageSize:      10,
+        pageSizes:     [10, 25, 50],
+        paginationSel: '#resPagination',
+        noResultsSel:  '#resSearch_noResults',
+        countSel:      '#resCount',
+    });
+
+    function filterRes() {
+        if (!resTable) return;
+        const q  = (resSearch?.value || '').trim().toLowerCase();
+        const st = (resStatus?.value || '').toLowerCase();
+        resTable.querySelectorAll('tbody tr').forEach(row => {
+            const hay = row.innerText.toLowerCase();
+            const match = (!q || hay.includes(q)) && (!st || hay.includes(st));
+            row.classList.toggle('asb-hidden', !match);
+        });
+        const cb = resSearch?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        resPag.reset();
+    }
+
+    if (resSearch) resSearch.addEventListener('input', filterRes);
+    if (resStatus) resStatus.addEventListener('change', filterRes);
+    const resClear = resSearch?.parentElement?.querySelector('.asb-clear');
+    if (resClear) resClear.addEventListener('click', () => { resSearch.value = ''; filterRes(); resSearch.focus(); });
+
+    resPag.apply();
+
+    /* ── Cancelled Reservations ── */
+    const cancelSearch = document.getElementById('cancelResSearch');
+    const cancelTable  = document.getElementById('cancelResTable');
+
+    const cancelPag = new AdminPaginator('cancelResTable', {
+        pageSize:      10,
+        pageSizes:     [10, 25, 50],
+        paginationSel: '#cancelResPagination',
+        noResultsSel:  '#cancelResSearch_noResults',
+        countSel:      '#cancelResCount',
+    });
+
+    function filterCancel() {
+        if (!cancelTable) return;
+        const q = (cancelSearch?.value || '').trim().toLowerCase();
+        cancelTable.querySelectorAll('tbody tr').forEach(row => {
+            row.classList.toggle('asb-hidden', q && !row.innerText.toLowerCase().includes(q));
+        });
+        const cb = cancelSearch?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        cancelPag.reset();
+    }
+
+    if (cancelSearch) cancelSearch.addEventListener('input', filterCancel);
+    const cancelClear = cancelSearch?.parentElement?.querySelector('.asb-clear');
+    if (cancelClear) cancelClear.addEventListener('click', () => { cancelSearch.value = ''; filterCancel(); cancelSearch.focus(); });
+
+    cancelPag.apply();
+});
 </script>

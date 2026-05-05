@@ -12,7 +12,7 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = trim($_POST['full_name'] ?? '');
     $email     = trim($_POST['email'] ?? '');
-    $phone     = trim($_POST['phone'] ?? '');
+    $phone     = preg_replace('/\D/', '', trim($_POST['phone'] ?? ''));
     $password  = $_POST['password'] ?? '';
     $confirm   = $_POST['confirm_password'] ?? '';
 
@@ -22,6 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please fill in all required fields.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
+    } elseif ($phone !== '' && !preg_match('/^\d{10,11}$/', $phone)) {
+        $error = 'Phone number must contain digits only and be 10–11 digits (e.g. 09171234567).';
     } elseif (strlen($password) < 8) {
         $error = 'Password must be at least 8 characters long.';
     } elseif ($password !== $confirm) {
@@ -221,8 +223,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label for="phone">Phone Number <span style="color: rgba(255,255,255,0.25); font-weight: 400; text-transform: none;">(optional)</span></label>
                             <div class="input-wrapper">
                                 <i class="fas fa-phone"></i>
-                                <input type="tel" class="form-control" id="phone" name="phone" placeholder="09171234567" value="<?= htmlspecialchars($phone ?? '') ?>">
+                                <input type="tel" class="form-control" id="phone" name="phone"
+                                    placeholder="09171234567"
+                                    value="<?= htmlspecialchars($phone ?? '') ?>"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{10,11}"
+                                    maxlength="11"
+                                    oninput="this.value=this.value.replace(/[^0-9]/g,'')">
                             </div>
+                            <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:4px;padding-left:2px;">Digits only &mdash; 10 or 11 numbers (e.g. 09171234567)</div>
                         </div>
 
                         <div class="form-group">

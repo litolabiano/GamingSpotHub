@@ -32,7 +32,23 @@
             </div>
         </div>
 
-        <div class="console-grid">
+        <!-- Live search bar for consoles -->
+        <div class="asb-wrap" style="margin:0 0 16px;">
+            <div class="asb-search" style="max-width:260px;">
+                <i class="fas fa-search"></i>
+                <input type="text" class="asb-input" id="consoleSearch" placeholder="Search unit, name, type…" autocomplete="off">
+                <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+            </div>
+            <select class="asb-select" id="consoleStatusFilter" title="Filter by status">
+                <option value="">All Statuses</option>
+                <option value="available">Available</option>
+                <option value="in_use">In Use</option>
+                <option value="maintenance">Maintenance</option>
+            </select>
+            <span class="asb-count" id="consoleCount"></span>
+        </div>
+
+        <div class="console-grid" id="consoleGrid">
         <?php foreach ($allConsoles as $con): ?>
             <div class="console-card <?= $con['status'] ?>">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
@@ -89,7 +105,8 @@
         <?php if(empty($allConsoles)): ?>
             <div style="grid-column:1/-1;text-align:center;padding:40px;color:#888;background:rgba(255,255,255,.02);border-radius:12px;">No active consoles found.</div>
         <?php endif; ?>
-        </div>
+        </div><!-- /#consoleGrid -->
+        <div id="consolePagination"></div>
     </div>
 
     <!-- Archived Consoles Section -->
@@ -197,4 +214,44 @@ function toggleArchiveSection(showArchive) {
     document.getElementById('activeConsolesSection').style.display = showArchive ? 'none' : 'block';
     document.getElementById('archivedConsolesSection').style.display = showArchive ? 'block' : 'none';
 }
+
+/* ── Consoles live search + status filter + pagination ─────────────────────── */
+(function() {
+    const searchInput  = document.getElementById('consoleSearch');
+    const statusFilter = document.getElementById('consoleStatusFilter');
+    const grid         = document.getElementById('consoleGrid');
+
+    const pag = new AdminCardPaginator('#consoleGrid', '.console-card', {
+        pageSize:      12,
+        pageSizes:     [12, 24, 48],
+        paginationSel: '#consolePagination',
+        countSel:      '#consoleCount',
+    });
+
+    function filterCards() {
+        if (!grid) return;
+        const q  = (searchInput?.value || '').trim().toLowerCase();
+        const st = (statusFilter?.value || '').toLowerCase();
+        grid.querySelectorAll('.console-card').forEach(card => {
+            const hay        = card.innerText.toLowerCase();
+            const cardStatus = ['available','in_use','maintenance'].find(s => card.classList.contains(s)) || '';
+            const match = (!q || hay.includes(q)) && (!st || cardStatus === st);
+            card.classList.toggle('asb-hidden', !match);
+        });
+        const cb = searchInput?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        pag.reset();
+    }
+
+    if (searchInput)  searchInput.addEventListener('input', filterCards);
+    if (statusFilter) statusFilter.addEventListener('change', filterCards);
+    const clearBtn = searchInput?.parentElement?.querySelector('.asb-clear');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        filterCards();
+        searchInput.focus();
+    });
+
+    pag.apply();
+})();
 </script>

@@ -797,6 +797,33 @@ function fmtMins(int $m): string {
             .cd-bottom-nav  { display: none !important; }
         }
 
+        /* ── Profile Edit Form ─────────────────────────────────────────── */
+        .pf-field-group { display: flex; flex-direction: column; gap: 6px; }
+        .pf-label {
+            font-size: 12px; font-weight: 600;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase; letter-spacing: .5px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .pf-input {
+            background: rgba(10,33,81,0.4);
+            border: 1px solid rgba(95,133,218,0.25);
+            border-radius: 10px;
+            padding: 11px 14px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .pf-input:focus {
+            border-color: rgba(32,200,161,0.55);
+            box-shadow: 0 0 0 3px rgba(32,200,161,0.08);
+        }
+        .pf-input::placeholder { color: rgba(255,255,255,0.25); }
+
         /* Flash */
         .cd-flash {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
@@ -886,6 +913,10 @@ function fmtMins(int $m): string {
                 <?= $myActiveTournamentCount ?>
             </span>
             <?php endif; ?>
+        </button>
+
+        <button class="cd-nav-btn" onclick="cdShowPage('account',this)" id="navAccount">
+            <i class="fas fa-user-cog"></i> My Account
         </button>
 
         <div class="cd-nav-spacer"></div>
@@ -2197,6 +2228,98 @@ function fmtMins(int $m): string {
             </div>
         </div><!-- /page-payments -->
 
+
+        <!-- ══ PAGE: MY ACCOUNT ════════════════════════════════════════════ -->
+        <div class="cd-page" id="page-account">
+            <h2 class="cd-section-title"><i class="fas fa-user-cog"></i> My Account</h2>
+
+            <div class="cd-card" style="max-width:560px;">
+                <div class="cd-card-header">
+                    <div class="cd-card-title"><i class="fas fa-id-card"></i> Profile Information</div>
+                </div>
+
+                <!-- Current info display -->
+                <div id="profileDisplay" style="margin-bottom:22px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div>
+                            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Full Name</div>
+                            <div id="dispName" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['full_name']) ?></div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Phone Number</div>
+                            <div id="dispPhone" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['phone'] ?? '—') ?></div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Email</div>
+                            <div style="font-weight:600;color:var(--blue);font-size:14px;"><?= htmlspecialchars($user['email']) ?></div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Role</div>
+                            <div style="font-weight:600;color:var(--mint);font-size:14px;">Gamer</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:18px;">
+                        <button class="cd-btn cd-btn-primary" id="startEditBtn" onclick="startProfileEdit()">
+                            <i class="fas fa-pen"></i> Edit Profile
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Edit form (hidden by default) -->
+                <form id="profileEditForm" style="display:none;" onsubmit="submitProfileEdit(event)">
+                    <div style="display:grid;gap:16px;">
+
+                        <div class="pf-field-group">
+                            <label class="pf-label" for="pf_name"><i class="fas fa-user" style="color:var(--mint);width:14px;"></i> Full Name</label>
+                            <input class="pf-input" type="text" id="pf_name" name="full_name"
+                                value="<?= htmlspecialchars($user['full_name']) ?>" required placeholder="Juan Dela Cruz">
+                        </div>
+
+                        <div class="pf-field-group">
+                            <label class="pf-label" for="pf_phone"><i class="fas fa-phone" style="color:var(--mint);width:14px;"></i> Phone Number <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+                            <input class="pf-input" type="tel" id="pf_phone" name="phone"
+                                value="<?= htmlspecialchars($user['phone'] ?? '') ?>"
+                                placeholder="09171234567"
+                                inputmode="numeric"
+                                pattern="[0-9]{10,11}"
+                                maxlength="11"
+                                oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Digits only &mdash; 10 or 11 numbers (e.g. 09171234567)</div>
+                        </div>
+
+                        <div class="pf-field-group" style="padding-top:4px;border-top:1px solid rgba(95,133,218,0.12);">
+                            <label class="pf-label" for="pf_curpass">
+                                <i class="fas fa-lock" style="color:var(--coral);width:14px;"></i>
+                                Current Password <span style="color:var(--coral);font-size:11px;font-weight:400;">required to save</span>
+                            </label>
+                            <div style="position:relative;">
+                                <input class="pf-input" type="password" id="pf_curpass" name="current_password"
+                                    placeholder="Enter your current password" required
+                                    autocomplete="current-password" style="padding-right:42px;">
+                                <button type="button" onclick="pfTogglePass()" id="pfToggleBtn"
+                                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                                    background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.45);font-size:14px;padding:4px;">
+                                    <i class="fas fa-eye" id="pfEyeIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="pf_alert" style="display:none;border-radius:9px;padding:11px 14px;font-size:13px;font-weight:500;display:none;align-items:center;gap:10px;"></div>
+
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button type="submit" class="cd-btn cd-btn-primary" id="pfSaveBtn">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <button type="button" class="cd-btn" onclick="cancelProfileEdit()"
+                                style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div><!-- /page-account -->
+
     </main>
 </div>
 
@@ -2235,6 +2358,10 @@ function fmtMins(int $m): string {
         <span class="cd-bnav-badge" style="background:linear-gradient(135deg,#f1a83c,#fb566b);color:#fff;"><?= $myActiveTournamentCount ?></span>
         <?php endif; ?>
     </button>
+    <button class="cd-bnav-btn" id="bnavAccount" onclick="cdShowPage('account', this)">
+        <i class="fas fa-user-cog"></i>
+        <span>Account</span>
+    </button>
 </nav>
 
 <script>
@@ -2247,12 +2374,13 @@ const BNAV_MAP = {
     payments:      'bnavPayments',
     cancellations: 'bnavCancellations',
     tournaments:   'bnavTournaments',
+    account:       'bnavAccount',
 };
 const SIDEBAR_MAP = {
     overview: 'navOverview', sessions: 'navSessions',
     reservations: 'navReservations', stats: 'navStats',
     payments: 'navPayments', cancellations: 'navCancellations',
-    tournaments: 'navTournaments'
+    tournaments: 'navTournaments', account: 'navAccount'
 };
 
 function cdShowPage(page, el) {
@@ -2933,6 +3061,96 @@ function submitUserReschedule(e) {
         btn.disabled = false;
         btn.innerHTML = 'Confirm Reschedule';
     });
+}
+</script>
+
+<script>
+/* ══ My Account – Profile Edit ══════════════════════════════════════════════ */
+
+function startProfileEdit() {
+    document.getElementById('profileDisplay').style.display = 'none';
+    const form = document.getElementById('profileEditForm');
+    form.style.display = 'block';
+    pfShowAlert(false);
+    document.getElementById('pf_curpass').value = '';
+    document.getElementById('pf_name').focus();
+}
+
+function cancelProfileEdit() {
+    document.getElementById('profileDisplay').style.display = 'block';
+    document.getElementById('profileEditForm').style.display = 'none';
+    pfShowAlert(false);
+    document.getElementById('pf_curpass').value = '';
+}
+
+function pfTogglePass() {
+    const inp  = document.getElementById('pf_curpass');
+    const icon = document.getElementById('pfEyeIcon');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        inp.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+function pfShowAlert(show, success, msg) {
+    const el = document.getElementById('pf_alert');
+    if (!show) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    el.style.background = success
+        ? 'rgba(32,200,161,0.12)' : 'rgba(251,86,107,0.12)';
+    el.style.border = success
+        ? '1px solid rgba(32,200,161,0.35)' : '1px solid rgba(251,86,107,0.35)';
+    el.style.color  = success ? '#20c8a1' : '#fb566b';
+    el.innerHTML = (success
+        ? '<i class="fas fa-check-circle"></i>'
+        : '<i class="fas fa-exclamation-circle"></i>') + ' <span>' + msg + '</span>';
+}
+
+function submitProfileEdit(e) {
+    e.preventDefault();
+    pfShowAlert(false);
+
+    const phone = document.getElementById('pf_phone').value;
+    if (phone !== '' && !/^\d{10,11}$/.test(phone)) {
+        pfShowAlert(true, false, 'Phone must be 10–11 digits (numbers only).');
+        return;
+    }
+
+    const btn = document.getElementById('pfSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+    const form = document.getElementById('profileEditForm');
+    const data = new FormData(form);
+
+    fetch('ajax/update_profile.php', { method: 'POST', body: data })
+        .then(r => r.json())
+        .then(res => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            if (res.success) {
+                // Update display values
+                document.getElementById('dispName').textContent  = res.full_name;
+                document.getElementById('dispPhone').textContent = res.phone || '—';
+                // Update sidebar avatar name
+                const avatarName = document.querySelector('.cd-avatar-name');
+                if (avatarName) avatarName.textContent = res.full_name;
+
+                pfShowAlert(true, true, res.message);
+                // Auto-close form after short delay
+                setTimeout(() => cancelProfileEdit(), 1600);
+            } else {
+                pfShowAlert(true, false, res.message);
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            pfShowAlert(true, false, 'Network error. Please try again.');
+        });
 }
 </script>
 </html>

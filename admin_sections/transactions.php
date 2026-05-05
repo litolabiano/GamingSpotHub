@@ -156,9 +156,31 @@
     </div>
     <?php endif; ?>
 
-        <div class="card">
-        <div class="card-header"><h3 class="card-title">Transaction History</h3></div>
-        <table class="data-table">
+    <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+            <h3 class="card-title">Transaction History</h3>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;justify-content:flex-end;">
+                <div class="asb-search" style="max-width:240px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="asb-input" id="txSearch" placeholder="Search customer, console…" autocomplete="off">
+                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                </div>
+                <select class="asb-select" id="txMethodFilter" title="Filter by method">
+                    <option value="">All Methods</option>
+                    <option value="cash">Cash</option>
+                    <option value="gcash">GCash</option>
+                    <option value="paymongo">PayMongo</option>
+                </select>
+                <select class="asb-select" id="txStatusFilter" title="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+                <span class="asb-count" id="txCount"></span>
+            </div>
+        </div>
+        <table class="data-table" id="txTable">
             <thead><tr>
                 <th>#</th>
                 <th>Customer</th>
@@ -211,5 +233,48 @@
             <?php endforeach; ?>
             </tbody>
         </table>
+        <div class="asb-no-results" id="txSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No transactions match your search.</div>
+        <div id="txPagination"></div>
     </div>
 </div>
+
+<script>
+/* ── Transactions search + pagination ────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+    const txSearch = document.getElementById('txSearch');
+    const txMethod = document.getElementById('txMethodFilter');
+    const txStatus = document.getElementById('txStatusFilter');
+    const txTable  = document.getElementById('txTable');
+
+    const txPag = new AdminPaginator('txTable', {
+        pageSize:      10,
+        pageSizes:     [10, 25, 50],
+        paginationSel: '#txPagination',
+        noResultsSel:  '#txSearch_noResults',
+        countSel:      '#txCount',
+    });
+
+    function filterTx() {
+        if (!txTable) return;
+        const q  = (txSearch?.value || '').trim().toLowerCase();
+        const m  = (txMethod?.value || '').toLowerCase();
+        const st = (txStatus?.value || '').toLowerCase();
+        txTable.querySelectorAll('tbody tr').forEach(row => {
+            const hay = row.innerText.toLowerCase();
+            const match = (!q || hay.includes(q)) && (!m || hay.includes(m)) && (!st || hay.includes(st));
+            row.classList.toggle('asb-hidden', !match);
+        });
+        const cb = txSearch?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        txPag.reset();
+    }
+
+    if (txSearch) txSearch.addEventListener('input', filterTx);
+    if (txMethod) txMethod.addEventListener('change', filterTx);
+    if (txStatus) txStatus.addEventListener('change', filterTx);
+    const txClear = txSearch?.parentElement?.querySelector('.asb-clear');
+    if (txClear) txClear.addEventListener('click', () => { txSearch.value = ''; filterTx(); txSearch.focus(); });
+
+    txPag.apply();
+});
+</script>

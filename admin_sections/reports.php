@@ -21,8 +21,18 @@
     </div>
 
     <div class="card">
-        <div class="card-header"><h3 class="card-title">Console Usage Report (All Time)</h3></div>
-        <table class="data-table">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+            <h3 class="card-title">Console Usage Report (All Time)</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <div class="asb-search" style="max-width:220px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="asb-input" id="usageSearch" placeholder="Search unit or type…" autocomplete="off">
+                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                </div>
+                <span class="asb-count" id="usageCount"></span>
+            </div>
+        </div>
+        <table class="data-table" id="usageTable">
             <thead><tr><th>Unit</th><th>Type</th><th>Total Sessions</th><th>Total Hours</th><th>Revenue</th></tr></thead>
             <tbody>
             <?php foreach ($usageReport as $u): ?>
@@ -36,6 +46,8 @@
             <?php endforeach; ?>
             </tbody>
         </table>
+        <div class="asb-no-results" id="usageSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No consoles match your search.</div>
+        <div id="usagePagination"></div>
     </div>
 
     <!-- ══ CANCELLATION ANALYTICS ═══════════════════════════════════════════ -->
@@ -319,4 +331,41 @@
     });
     <?php endif; ?>
 })();
+</script>
+
+<script>
+/* ── Reports: Usage Table search + pagination ───────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+    const usageSearch = document.getElementById('usageSearch');
+    const usageTable  = document.getElementById('usageTable');
+
+    const usagePag = new AdminPaginator('usageTable', {
+        pageSize:      10,
+        pageSizes:     [10, 25, 50],
+        paginationSel: '#usagePagination',
+        noResultsSel:  '#usageSearch_noResults',
+        countSel:      '#usageCount',
+    });
+
+    function filterUsage() {
+        if (!usageTable) return;
+        const q = (usageSearch?.value || '').trim().toLowerCase();
+        usageTable.querySelectorAll('tbody tr').forEach(row => {
+            row.classList.toggle('asb-hidden', q && !row.innerText.toLowerCase().includes(q));
+        });
+        const cb = usageSearch?.parentElement?.querySelector('.asb-clear');
+        if (cb) cb.style.display = q ? 'block' : 'none';
+        usagePag.reset();
+    }
+
+    if (usageSearch) usageSearch.addEventListener('input', filterUsage);
+    const usageClear = usageSearch?.parentElement?.querySelector('.asb-clear');
+    if (usageClear) usageClear.addEventListener('click', () => {
+        usageSearch.value = '';
+        filterUsage();
+        usageSearch.focus();
+    });
+
+    usagePag.apply();
+});
 </script>
