@@ -12,8 +12,31 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 ?>
 
 <style>
+    /* ── Controller Rental inline badge (Console column) ───────────────────── */
+    .sess-ctrl-badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        padding: 2px 7px;
+        background: rgba(32, 200, 161, 0.12);
+        border: 1px solid rgba(32, 200, 161, 0.3);
+        border-radius: 20px;
+        color: #20c8a1;
+        font-size: 10.5px;
+        font-weight: 700;
+        white-space: nowrap;
+        width: fit-content;
+        letter-spacing: 0.2px;
+    }
+
+    .sess-ctrl-badge i {
+        font-size: 10px;
+    }
+
     /* ── Sortable table headers ─────────────────────────────────────────── */
     #sessionsTable thead th {
+
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
@@ -220,7 +243,15 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
                             <td>#<?= $ps['session_id'] ?></td>
                             <td><?= sessionCustomerLabel($ps) ?></td>
-                            <td><?= htmlspecialchars($ps['unit_number']) ?></td>
+                            <td>
+                                <?= htmlspecialchars($ps['unit_number']) ?>
+                                <?php if (!empty($ctrlRentalByConsole[$ps['console_id'] ?? 0])): ?>
+                                    <span class="sess-ctrl-badge">
+                                        <i class="fa-solid fa-gamepad"></i>
+                                        <?= $ctrlRentalByConsole[$ps['console_id']]['qty'] ?>&#xd7; Controller Rental
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                             <td><?= $psModeLabel ?></td>
                             <td><?= date('h:i A', $psStart) ?></td>
                             <td>
@@ -329,7 +360,16 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         data-status="<?= $isLive ?>">
                         <td>#<?= $sess['session_id'] ?></td>
                         <td><?= sessionCustomerLabel($sess) ?></td>
-                        <td><?= htmlspecialchars($sess['unit_number']) ?></td>
+                        <td>
+                            <?= htmlspecialchars($sess['unit_number']) ?>
+                            <?php if (!empty($ctrlRentalByConsole[$sess['console_id'] ?? 0])): ?>
+                                <?php $cr = $ctrlRentalByConsole[$sess['console_id']]; ?>
+                                <span class="sess-ctrl-badge">
+                                    <i class="fa-solid fa-gamepad"></i>
+                                    <?= $cr['qty'] ?>&#xd7; Controller &middot; &#x20b1;<?= number_format($cr['total_cost'], 2) ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= match ($sess['rental_mode']) {
                                 'open_time' => 'Open Time',
                                 default => ucfirst($sess['rental_mode'])
