@@ -531,25 +531,17 @@ $ctrlAvailCount = $conn->query(
                     <div class="form-group" style="margin-bottom:6px">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                             <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;">
-                                <input type="checkbox" id="unlimTenderedToggle"
-                                       style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;"
-                                       onchange="toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay')">
-                                <span style="color:#8aa4e8;">Different amount</span>
-                            </label>
+                            
                         </div>
                         <!-- Flex row: ₱ prefix | input | lock icon -->
-                        <div id="unlimTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(241,225,170,.4);background:rgba(241,225,170,.07);overflow:hidden;transition:.2s;">
+                        <div id="unlimTenderedWrapper" class="tendered-wrapper-unlocked" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(241,225,170,.4);background:rgba(241,225,170,.07);overflow:hidden;transition:.2s;">
                             <span class="tendered-prefix" style="padding:0 4px 0 16px;font-size:22px;font-weight:900;color:#f1e1aa;flex-shrink:0;line-height:1;">₱</span>
-                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="0" step="1" readonly
-                                   style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;"
+                            <input type="number" id="unlimTendered" name="unlimited_tendered" min="<?=\htmlspecialchars($settings['unlimited_rate'] ?? 400)?>" step="1" required
+                                   style="flex:1;border:none;background:transparent;color:#f1e1aa;font-size:22px;font-weight:800;padding:14px 8px;outline:none;appearance:none;-moz-appearance:textfield;min-width:0;" placeholder="Enter amount..."
                                    oninput="calcChange('unlimTendered','unlimChangeDisplay','unlimCostAmt'); _syncStartBtn()">
-                            <i id="unlimTenderedIcon" class="fas fa-lock"
-                               style="padding:0 16px;font-size:14px;color:#f1e1aa;flex-shrink:0;cursor:pointer;"
-                               title="Click to enter a different amount"
-                               onclick="var cb=document.getElementById('unlimTenderedToggle');cb.checked=!cb.checked;toggleTendered('unlimTendered','unlimTenderedToggle','unlimCostAmt','unlimChangeDisplay');"></i>
+                            
                         </div>
-                        <p class="field-hint" id="unlimTenderedHintText">Pre-filled with flat rate. Tick to enter a different amount.</p>
+                        <p class="field-hint" id="unlimTenderedHintText">Exact or greater amount must be paid upfront.</p>
                     </div>
                     <div id="unlimChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:4px;"></div>
                     <!-- Hidden cost holder for JS -->
@@ -815,10 +807,7 @@ $ctrlAvailCount = $conn->query(
             <div class="form-group" style="margin-bottom:6px">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                     <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Amount Tendered</label>
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:400;">
-                        <input type="checkbox" id="payTenderedToggle" style="width:13px;height:13px;accent-color:#8aa4e8;cursor:pointer;" onchange="toggleTendered('payTendered','payTenderedToggle','payAmount','payChangeDisplay')">
-                        <span style="color:#8aa4e8;">Different amount</span>
-                    </label>
+                    
                 </div>
                 <!-- Flex row: ₱ prefix | input | lock icon -->
                 <div id="payTenderedWrapper" style="display:flex;align-items:center;border-radius:12px;border:1.5px solid rgba(95,133,218,.4);background:rgba(95,133,218,.07);overflow:hidden;transition:.2s;">
