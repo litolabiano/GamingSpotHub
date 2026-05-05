@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 05, 2026 at 08:28 AM
+-- Generation Time: May 04, 2026 at 03:40 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -46,10 +46,11 @@ CREATE TABLE `additional_requests` (
 CREATE TABLE `consoles` (
   `console_id` int(11) NOT NULL,
   `console_name` varchar(50) NOT NULL,
-  `console_type` enum('PS5','PS4','Xbox Series X') NOT NULL,
+  `console_type` varchar(50) NOT NULL,
   `unit_number` varchar(10) NOT NULL,
-  `status` enum('available','in_use','maintenance') NOT NULL DEFAULT 'available',
+  `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `compatible_controller_type` varchar(50) DEFAULT NULL COMMENT 'Controller type compatible with this console unit',
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -57,15 +58,15 @@ CREATE TABLE `consoles` (
 -- Dumping data for table `consoles`
 --
 
-INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
-(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
-(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
-(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
-(6, 'PS4 Unit 6', 'PS4', 'PS4-07', 'maintenance', 80.00, '2026-02-21 19:55:41'),
-(7, 'Xbox Unit 2', 'Xbox Series X', 'XBX-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(8, 'Xbox Unit 3', 'Xbox Series X', 'XBX-03', 'available', 80.00, '2026-02-21 19:55:41');
+INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `compatible_controller_type`, `created_at`) VALUES
+(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'in_use', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'in_use', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(6, 'PS4 Unit 6', 'PS4', 'PS4-07', 'maintenance', 80.00, 'DualShock 4', '2026-02-21 19:55:41'),
+(7, 'Xbox Unit 2', 'Xbox Series X', 'XBX-02', 'available', 80.00, 'Xbox Controller', '2026-02-21 19:55:41'),
+(8, 'Xbox Unit 3', 'Xbox Series X', 'XBX-03', 'available', 80.00, 'Xbox Controller', '2026-02-21 19:55:41');
 
 -- --------------------------------------------------------
 
@@ -76,12 +77,12 @@ INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_numb
 CREATE TABLE `controllers` (
   `controller_id` int(11) NOT NULL,
   `controller_name` varchar(100) NOT NULL,
-  `controller_type` enum('DualSense','DualShock 4','Xbox Controller','Other') NOT NULL DEFAULT 'DualSense',
+  `controller_type` enum('DualSense','DualShock 4','Xbox Controller','Other') NOT NULL,
   `unit_number` varchar(20) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `notes` text DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -131,8 +132,8 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (16, 26, 3, 'hourly', 60, '2026-05-03 23:49:15', '2026-05-03 23:49:22', 0, 80.00, 0.00, 'completed', NULL, 12, '2026-05-03 23:49:15', 0, NULL),
 (17, 27, 2, 'hourly', 60, '2026-05-04 00:00:39', '2026-05-04 00:01:08', 0, 80.00, 0.00, 'completed', NULL, 12, '2026-05-04 00:00:39', 0, 17),
 (18, 27, 2, 'hourly', 60, '2026-05-04 00:06:31', '2026-05-04 00:19:13', 13, 80.00, 20.00, 'completed', NULL, 12, '2026-05-04 00:06:31', 0, 18),
-(19, 0, 3, 'open_time', NULL, '2026-05-04 16:19:39', '2026-05-05 14:27:43', 1328, 80.00, 1440.00, 'completed', NULL, 12, '2026-05-04 16:19:39', 0, NULL),
-(20, 0, 2, 'hourly', 300, '2026-05-04 16:23:45', '2026-05-05 14:27:46', 1324, 80.00, 1440.00, 'completed', NULL, 12, '2026-05-04 16:23:45', 0, NULL);
+(19, 0, 3, 'open_time', NULL, '2026-05-04 16:19:39', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-05-04 16:19:39', 0, NULL),
+(20, 0, 2, 'hourly', 300, '2026-05-04 16:23:45', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-05-04 16:23:45', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -487,9 +488,7 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (51, 18, 27, -36.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 11m (₱20.00), refunding unused time (₱36.00)', '', 'completed', '2026-05-04 00:19:13', 12, '2026-05-04 00:19:13'),
 (52, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #19', 'gcash', 'completed', '2026-05-04 12:35:27', 27, '2026-05-04 12:35:27'),
 (53, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #20', 'gcash', 'completed', '2026-05-04 16:11:04', 27, '2026-05-04 16:11:04'),
-(54, 20, 0, 320.00, 320.00, NULL, NULL, 'cash', 'completed', '2026-05-04 16:23:45', 12, '2026-05-04 16:23:45'),
-(55, 19, 0, 1440.00, 1440.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-05 14:27:43', 12, '2026-05-05 14:27:43'),
-(56, 20, 0, 1120.00, 1120.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-05 14:27:46', 12, '2026-05-05 14:27:46');
+(54, 20, 0, 320.00, 320.00, NULL, NULL, 'cash', 'completed', '2026-05-04 16:23:45', 12, '2026-05-04 16:23:45');
 
 -- --------------------------------------------------------
 
@@ -553,14 +552,17 @@ ALTER TABLE `consoles`
   ADD PRIMARY KEY (`console_id`),
   ADD UNIQUE KEY `unit_number` (`unit_number`),
   ADD KEY `idx_consoles_status` (`status`),
-  ADD KEY `idx_consoles_type` (`console_type`);
+  ADD KEY `idx_consoles_type` (`console_type`),
+  ADD KEY `idx_consoles_compat_ctrl` (`compatible_controller_type`);
 
 --
 -- Indexes for table `controllers`
 --
 ALTER TABLE `controllers`
   ADD PRIMARY KEY (`controller_id`),
-  ADD UNIQUE KEY `uk_ctrl_unit` (`unit_number`);
+  ADD UNIQUE KEY `unit_number` (`unit_number`),
+  ADD KEY `idx_ctrl_status` (`status`),
+  ADD KEY `idx_ctrl_type` (`controller_type`);
 
 --
 -- Indexes for table `gaming_sessions`
@@ -694,7 +696,7 @@ ALTER TABLE `additional_requests`
 -- AUTO_INCREMENT for table `consoles`
 --
 ALTER TABLE `consoles`
-  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3212;
+  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `controllers`
@@ -766,7 +768,7 @@ ALTER TABLE `tournament_registrations`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
 
 --
 -- AUTO_INCREMENT for table `users`

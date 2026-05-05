@@ -1591,31 +1591,26 @@ console type. Only Xbox units support controller rentals.
 function onConsoleChange() {
     const sel     = document.getElementById('consoleSelect');
     const opt     = sel ? sel.options[sel.selectedIndex] : null;
-    const type    = opt ? (opt.dataset.type || '') : '';
     const group   = document.getElementById('controllerRentalGroup');
     const ctrlSel = document.getElementById('controllerSelect');
     if (!group || !ctrlSel) return;
 
-    // Compatibility: console type → accepted controller types
-    const compatMap = {
-        'PS5':           ['DualSense'],
-        'PS4':           ['DualShock 4'],
-        'Xbox Series X': ['Xbox Controller'],
-    };
-    const compat = compatMap[type] || [];
+    // Read compatible controller type directly from the console's data-compat attribute
+    // (populated from consoles.compatible_controller_type in the DB — no hardcoded map)
+    const compat = opt && opt.dataset.compat ? [opt.dataset.compat] : [];
 
     // Pull from PHP-injected JS variable (status=available only)
     const ctrlData = (typeof _availableControllers !== 'undefined') ? _availableControllers : [];
     const filtered = compat.length
         ? ctrlData.filter(c => compat.includes(c.controller_type))
-        : ctrlData; // fallback: show all if console type unknown
+        : ctrlData; // show all if no compat set on this console
 
     // Repopulate dropdown
-    ctrlSel.innerHTML = '<option value="">\u2014 No controller rental \u2014</option>';
+    ctrlSel.innerHTML = '<option value="">— No controller rental —</option>';
     filtered.forEach(c => {
         const o = document.createElement('option');
         o.value = c.controller_id;
-        o.textContent = c.unit_number + ' \u2014 ' + c.controller_name + ' (' + c.controller_type + ')';
+        o.textContent = c.unit_number + ' — ' + c.controller_name + ' (' + c.controller_type + ')';
         ctrlSel.appendChild(o);
     });
 
