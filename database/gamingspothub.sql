@@ -46,7 +46,7 @@ CREATE TABLE `additional_requests` (
 CREATE TABLE `consoles` (
   `console_id` int(11) NOT NULL,
   `console_name` varchar(50) NOT NULL,
-  `console_type` varchar(50) NOT NULL,
+  `console_type` enum('PS5','PS4','Xbox Series X') NOT NULL,
   `unit_number` varchar(10) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0.00,

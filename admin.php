@@ -56,15 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      VALUES (?, 'controller_rental', 'Controller rental fee', ?, 'approved')"
                 );
                 $arStmt->bind_param('id', $result['session_id'], $ctrl_fee);
-                $arStmt->execute();
-                $arStmt->execute();
+                $arStmt->execute(); // execute once only
 
-        // ── Mark one Xbox controller as in_use ──────────────
-        $conn->query(
-            "UPDATE controllers SET status = 'in_use'
-             WHERE status = 'available' AND controller_type = 'Xbox Controller'
-             ORDER BY unit_number ASC LIMIT 1"
-        );
+                // Mark the specific rented controller as in_use (from the dropdown selection)
+                $rented_ctrl_id = (int)($_POST['rented_controller_id'] ?? 0);
+                if ($rented_ctrl_id > 0) {
+                    $ctrlUpd = $conn->prepare(
+                        "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
+                    );
+                    $ctrlUpd->bind_param('i', $rented_ctrl_id);
+                    $ctrlUpd->execute();
+                }
             }
         }
 
