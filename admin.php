@@ -762,7 +762,11 @@ $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
-unset($_res);
+
+// Available controllers for the Start Session rental dropdown (injected to JS)
+$_avRes = $conn->query("SELECT controller_id, controller_name, controller_type, unit_number FROM controllers WHERE status = 'available' ORDER BY unit_number");
+$availableControllers = $_avRes ? $_avRes->fetch_all(MYSQLI_ASSOC) : [];
+unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
@@ -2002,6 +2006,8 @@ document.querySelectorAll('.modal').forEach(m => {
  * _bracketCost / _timedCost are unchanged in shape - only their constants move.
  */
 const PRICING = <?= json_encode(getPricingRules()) ?>;
+// Available controllers for the rental dropdown — populated from DB on page load
+const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
 function _bracketCost(partialMin) {
     // Partial-hour bracket for minutes 0–59 (fixed brackets, not rate-dependent)
@@ -2055,7 +2061,7 @@ function playSessionEndSound() {
             const gain = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.type = 'sine';
+            osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(880, ctx.currentTime + delay);
             gain.gain.setValueAtTime(0.38, ctx.currentTime + delay);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
