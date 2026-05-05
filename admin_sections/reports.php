@@ -9,6 +9,51 @@
         </div>
     </div>
 
+    <!-- ══ REPORT GENERATION ════════════════════════════════════════════════════ -->
+    <div class="card" style="margin-bottom:20px; border-left: 3px solid #20c8a1;">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-file-invoice-dollar" style="color:#20c8a1;margin-right:8px;"></i> Generate Financial & Operations Report</h3></div>
+        <div style="padding: 20px;">
+            <form action="report_receipt.php" method="GET" target="_blank" style="display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;">
+                <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+                    <label style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Report Type</label>
+                    <select name="type" id="reportTypeSelect" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" onchange="updateReportDateInput()">
+                        <option value="daily" style="background:#0d1117;">Daily Report</option>
+                        <option value="monthly" style="background:#0d1117;">Monthly Report</option>
+                        <option value="yearly" style="background:#0d1117;">Yearly Report</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+                    <label id="reportDateLabel" style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Select Date</label>
+                    <input type="date" name="date" id="reportDateInput" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" required value="<?= date('Y-m-d') ?>">
+                </div>
+                <button type="submit" style="height:41px;background:linear-gradient(135deg,#20c8a1,#5f85da);color:#fff;border:none;border-radius:8px;padding:0 24px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(32,200,161,.2);">
+                    <i class="fas fa-print"></i> Generate & Print
+                </button>
+            </form>
+        </div>
+    </div>
+    <script>
+    function updateReportDateInput() {
+        const t = document.getElementById('reportTypeSelect').value;
+        const i = document.getElementById('reportDateInput');
+        const l = document.getElementById('reportDateLabel');
+        if (t === 'daily') {
+            i.type = 'date';
+            l.textContent = 'Select Date';
+            i.value = '<?= date('Y-m-d') ?>';
+        } else if (t === 'monthly') {
+            i.type = 'month';
+            l.textContent = 'Select Month';
+            i.value = '<?= date('Y-m') ?>';
+        } else if (t === 'yearly') {
+            i.type = 'number';
+            i.min = 2020; i.max = 2050; i.placeholder = 'YYYY';
+            l.textContent = 'Select Year';
+            i.value = '<?= date('Y') ?>';
+        }
+    }
+    </script>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>
@@ -49,6 +94,8 @@
         <div class="asb-no-results" id="usageSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No consoles match your search.</div>
         <div id="usagePagination"></div>
     </div>
+
+
 
     <!-- ══ CANCELLATION ANALYTICS ═══════════════════════════════════════════ -->
     <?php

@@ -63,7 +63,7 @@ if ($endDt <= $startDt) {
 
 $new_end_time = $endDt->format('Y-m-d H:i:s');   // e.g. "2026-04-14 14:35:00"
 
-$duration = (int) round(($endDt->getTimestamp() - $startDt->getTimestamp()) / 60);
+$duration = (int) floor(($endDt->getTimestamp() - $startDt->getTimestamp()) / 60);
 
 if ($duration <= 0) {
     echo json_encode(['success' => false, 'message' => 'End time must be after start time']);

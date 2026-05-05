@@ -66,50 +66,63 @@
                 <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
                 
-                <div class="console-actions" style="margin-top:15px;display:flex;flex-wrap:wrap;gap:8px;">
-            <!-- Edit button -->
-                    <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>)"
-                            style="width:100%;background:rgba(95,133,218,.15);color:#8aa4e8;border:1px solid rgba(95,133,218,.3);
-                                   padding:7px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;
-                                   display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px;">
-                        <i class="fas fa-edit"></i> Edit Console
-                    </button>
-                    
-                    <?php if ($con['status'] !== 'available'): ?>
-                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;">
-                        <input type="hidden" name="action" value="update_console_status">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <input type="hidden" name="status" value="available">
-                        <button type="submit" class="btn btn-success btn-sm" style="width:100%;" title="Set as Available">
-                            <i class="fas fa-check"></i> Available
+                <div class="console-actions">
+
+                    <!-- Row 1: Edit (always full width) -->
+                    <div class="console-edit-row">
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>)"
+                                class="btn btn-sm"
+                                style="background:rgba(95,133,218,.15);color:#8aa4e8;border:1px solid rgba(95,133,218,.3);">
+                            <i class="fas fa-edit"></i> Edit Console
                         </button>
-                    </form>
-                    <?php endif; ?>
-                    
-                    <?php if ($con['status'] !== 'maintenance'): ?>
-                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;">
-                        <input type="hidden" name="action" value="update_console_status">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <input type="hidden" name="status" value="maintenance">
-                        <button type="submit" class="btn btn-secondary btn-sm" style="width:100%;background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.3);color:#fb566b;" title="Set to Maintenance">
-                            <i class="fas fa-wrench"></i> Maintenance
-                        </button>
-                    </form>
-                    <?php endif; ?>
-                    
-                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;" onsubmit="return confirm('Are you sure you want to archive this console? It will be removed from active reservations.')">
-                        <input type="hidden" name="action" value="update_console_status">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <input type="hidden" name="status" value="archived">
-                        <button type="submit" class="btn btn-secondary btn-sm" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ccc;" title="Archive Console">
-                            <i class="fas fa-archive"></i> Archive
-                        </button>
-                    </form>
+                    </div>
+
+                    <!-- Row 2: Status toggle buttons (2-col grid, only shows if NOT that status) -->
+                    <div class="console-status-row">
+                        <?php if ($con['status'] !== 'available'): ?>
+                        <form method="POST" action="admin.php#consoles">
+                            <input type="hidden" name="action" value="update_console_status">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
+                            <input type="hidden" name="status" value="available">
+                            <button type="submit" class="btn btn-success btn-sm" title="Set as Available">
+                                <i class="fas fa-check"></i> Available
+                            </button>
+                        </form>
+                        <?php endif; ?>
+
+                        <?php if ($con['status'] !== 'maintenance'): ?>
+                        <form method="POST" action="admin.php#consoles">
+                            <input type="hidden" name="action" value="update_console_status">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
+                            <input type="hidden" name="status" value="maintenance">
+                            <button type="submit" class="btn btn-sm" title="Set to Maintenance"
+                                    style="background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.3);color:#fb566b;">
+                                <i class="fas fa-wrench"></i> Maintenance
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Row 3: Archive (always full width) -->
+                    <div class="console-archive-row">
+                        <form method="POST" action="admin.php#consoles"
+                              onsubmit="return confirm('Archive this console? It will be removed from active reservations.')">
+                            <input type="hidden" name="action" value="update_console_status">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
+                            <input type="hidden" name="status" value="archived">
+                            <button type="submit" class="btn btn-sm" title="Archive Console"
+                                    style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#aaa;">
+                                <i class="fas fa-archive"></i> Archive
+                            </button>
+                        </form>
+                    </div>
+
                 </div>
             </div>
+
         <?php endforeach; ?>
         <?php if(empty($allConsoles)): ?>
             <div style="grid-column:1/-1;text-align:center;padding:40px;color:#888;background:rgba(255,255,255,.02);border-radius:12px;">No active consoles found.</div>

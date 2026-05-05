@@ -705,10 +705,18 @@ body {
     cursor: pointer;
     font-weight: 600;
     font-size: 14px;
+    font-family: inherit;
+    line-height: 1.2;
     transition: var(--transition);
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .btn-primary {
@@ -757,9 +765,63 @@ body {
 }
 
 .btn-sm {
-    padding: 6px 12px;
+    padding: 6px 10px;
     font-size: 12px;
+    gap: 5px;
+    white-space: nowrap;
 }
+
+/* ── Console card action buttons ─────────────────────────────────────── */
+.console-actions {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.console-actions .console-edit-row {
+    display: block;
+    width: 100%;
+}
+
+.console-actions .console-edit-row button,
+.console-actions .console-edit-row form button {
+    width: 100%;
+}
+
+.console-actions .console-status-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.console-actions .console-status-row form {
+    margin: 0;
+    min-width: 0; /* prevent grid blowout */
+}
+
+.console-actions .console-status-row form button {
+    width: 100%;
+    font-size: 11px;
+    padding: 6px 4px;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Archive sits below the 2-col row, full width */
+.console-actions .console-archive-row {
+    display: block;
+    width: 100%;
+}
+
+.console-actions .console-archive-row form,
+.console-actions .console-archive-row button {
+    width: 100%;
+    display: block;
+}
+
 
 /* Badge */
 .badge {
