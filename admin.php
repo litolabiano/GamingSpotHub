@@ -245,6 +245,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
+    elseif ($action === 'add_controller') {
+        $ctrl_name = trim($_POST['controller_name'] ?? '');
+        $ctrl_type = $_POST['controller_type'] ?? '';
+        $ctrl_unit = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes= trim($_POST['controller_notes'] ?? '');
+        $valid_types = ['DualSense', 'DualShock 4', 'Xbox Controller', 'Other'];
+        if ($ctrl_name && in_array($ctrl_type, $valid_types) && $ctrl_unit) {
+            $stmt = $conn->prepare(
+                "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
+            );
+            $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
+            if ($stmt->execute()) {
+                $message = 'Controller added successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to add controller. Ensure the Unit Number is unique.';
+                $messageType = 'error';
+            }
+            $stmt->close();
+        } else {
+            $message = 'Invalid input for new controller.';
+            $messageType = 'error';
+        }
+    }
+    elseif ($action === 'update_controller_status') {
+        $ctrl_id = (int)($_POST['controller_id'] ?? 0);
+        $status  = $_POST['status'] ?? '';
+        $allowed = ['available', 'in_use', 'maintenance', 'archived'];
+        // Archive is owner-only
+        if ($status === 'archived' && $user['role'] !== 'owner') {
+            $message = 'Only the owner can archive controllers.';
+            $messageType = 'error';
+        } elseif ($ctrl_id && in_array($status, $allowed)) {
+            $stmt = $conn->prepare("UPDATE controllers SET status=? WHERE controller_id=?");
+            $stmt->bind_param('si', $status, $ctrl_id);
+            $stmt->execute();
+            $stmt->close();
+            $message = 'Controller status updated.';
+            $messageType = 'success';
+        }
+    }
+    elseif ($action === 'delete_controller') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can permanently delete controllers.';
+            $messageType = 'error';
+        } else {
+            $ctrl_id = (int)($_POST['controller_id'] ?? 0);
+            if ($ctrl_id) {
+                $stmt = $conn->prepare("DELETE FROM controllers WHERE controller_id=?");
+                $stmt->bind_param('i', $ctrl_id);
+                $stmt->execute();
+                $stmt->close();
+                $message = 'Controller deleted permanently.';
+                $messageType = 'success';
+            }
+        }
+    }
+
     // SAVE SETTINGS — owner only
     elseif ($action === 'save_settings') {
         if ($user['role'] !== 'owner') {
@@ -640,6 +699,15 @@ $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
 
+// ── Controllers ──────────────────────────────────────────────────────────────
+$allControllers      = [];
+$archivedControllers = [];
+$_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
+if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
+$_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
+if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
+unset($_res);
+
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
     "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
@@ -857,6 +925,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
+    <script src="assets/js/admin_search.js"></script>
     <style>
         /* â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
            ADMIN DESIGN SYSTEM - CSS Custom Properties
@@ -1253,7 +1322,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
 <!-- Ã¢â€â‚¬Ã¢â€â‚¬ JavaScript Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ -->
 <script src="assets/libs/aos/aos.js"></script>
-<script src="assets/js/admin_search.js"></script>
 <script>
 // Ã¢â€â‚¬Ã¢â€â‚¬ Navigation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function showPage(page, el) {
