@@ -65,9 +65,41 @@
                 <div class="console-unit"><?= htmlspecialchars($con['unit_number']) ?></div>
                 <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
-                
-                <div class="console-actions">
 
+                <?php
+                    $rental = $ctrlRentalByConsole[$con['console_id']] ?? null;
+                ?>
+                <?php if ($con['status'] === 'in_use'): ?>
+                    <?php if ($rental): ?>
+                        <?php
+                            $rentedAgo = '';
+                            if (!empty($rental['rented_since'])) {
+                                $diff = (new DateTime())->diff(new DateTime($rental['rented_since']));
+                                $h = $diff->h + ($diff->days * 24);
+                                $m = $diff->i;
+                                $rentedAgo = $h > 0 ? "{$h}h {$m}m" : "{$m}m";
+                            }
+                        ?>
+                        <div class="ctrl-rental-badge ctrl-rental-active" title="Controller Rental Active">
+                            <span class="ctrl-rental-icon"><i class="fa-solid fa-gamepad"></i></span>
+                            <div class="ctrl-rental-info">
+                                <div class="ctrl-rental-label">With Controller Rental</div>
+                                <div class="ctrl-rental-details">
+                                    <?= $rental['qty'] ?> controller<?= $rental['qty'] > 1 ? 's' : '' ?> &middot;
+                                    ₱<?= number_format($rental['total_cost'], 2) ?>
+                                    <?php if ($rentedAgo): ?>&middot; <?= $rentedAgo ?><?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="ctrl-rental-badge ctrl-rental-none" title="No Controller Rental">
+                            <i class="fa-solid fa-gamepad" style="opacity:.4"></i>
+                            <span>No Controller Rental</span>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+                <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
                         <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>)"
@@ -394,7 +426,7 @@
             <h3><i class="fas fa-plus" style="color:#20c8a1;"></i> Add New Console</h3>
             <span class="modal-close" onclick="closeModal('addConsole')"><i class="fas fa-times"></i></span>
         </div>
-        <form method="POST" action="admin.php#consoles">
+        <form method="POST" action="admin.php#consoles" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';">
             <input type="hidden" name="action" value="add_console">
             <?= csrfField() ?>
             <div class="modal-body">
@@ -445,7 +477,7 @@
             <h3><i class="fas fa-edit" style="color:#8aa4e8;margin-right:8px;"></i>Edit Console</h3>
             <span class="modal-close" onclick="closeModal('editConsole')"><i class="fas fa-times"></i></span>
         </div>
-        <form method="POST" action="admin.php#consoles">
+        <form method="POST" action="admin.php#consoles" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';">
             <input type="hidden" name="action" value="edit_console">
             <?= csrfField() ?>
             <input type="hidden" name="console_id" id="editConsoleId">
