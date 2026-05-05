@@ -55,7 +55,7 @@ $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 // ── Reschedule notifications (unseen reschedules for this user) ──────────────
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
-            rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at,
+            rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
             r.console_type
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
@@ -155,7 +155,7 @@ $modStmt->execute();
 $favMode = $modStmt->get_result()->fetch_assoc();
 
 // Upcoming reservations (pending/confirmed) for this user
-$upcomingRes = array_filter($myReservations, fn($r) => in_array($r['status'], ['pending','confirmed']));
+$upcomingRes = array_filter($myReservations, fn($r) => in_array($r['status'], ['pending','reserved']));
 
 // Sessions by day (last 14 days) — for activity chart
 $activityData = [];
@@ -969,8 +969,25 @@ function fmtMins(int $m): string {
                             <?php if ($rs['reason_detail']): ?>
                             — <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
                             <?php endif; ?>
+                            <?php if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin'): ?>
+                                <div style="margin-top:12px; display:flex; gap:10px;">
+                                    <button onclick="respondReschedule(<?= $rs['reschedule_id'] ?>, 'confirm')"
+                                        style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;"
+                                        onmouseover="this.style.background='rgba(32,200,161,.25)'"
+                                        onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                                        <i class="fas fa-check"></i> Confirm
+                                    </button>
+                                    <button onclick="respondReschedule(<?= $rs['reschedule_id'] ?>, 'cancel')"
+                                        style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;"
+                                        onmouseover="this.style.background='rgba(251,86,107,.25)'"
+                                        onmouseout="this.style.background='rgba(251,86,107,.15)'">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
+                    <?php if ($rs['status'] !== 'pending'): ?>
                     <button onclick="dismissReschedule(<?= $rs['reschedule_id'] ?>)"
                         style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
                         color:#aaa;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;
@@ -980,6 +997,7 @@ function fmtMins(int $m): string {
                         title="Dismiss this notification">
                         <i class="fas fa-times"></i>
                     </button>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -992,6 +1010,17 @@ function fmtMins(int $m): string {
                 }).then(() => {
                     const el = document.getElementById('rn-' + id);
                     if (el) { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }
+                });
+            }
+            function respondReschedule(id, action) {
+                if (action === 'cancel' && !confirm('Are you sure you want to cancel? Your reservation will be forfeited and the fee is non-refundable.')) return;
+                fetch('ajax/respond_reschedule.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'reschedule_id=' + id + '&action=' + action
+                }).then(r => r.json()).then(d => {
+                    alert(d.message);
+                    if (d.success) location.reload();
                 });
             }
             </script>
@@ -1144,7 +1173,7 @@ function fmtMins(int $m): string {
                         <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' – <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td>
-                            <?php $statusMap = ['pending'=>['gold','clock'],'confirmed'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
+                            <?php $statusMap = ['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sm[0] ?>"><i class="fas fa-<?= $sm[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
                         </td>
                     </tr>
@@ -1358,8 +1387,8 @@ function fmtMins(int $m): string {
             <?php else: ?>
 
             <!-- Upcoming -->
-            <?php $upcoming = array_filter($myReservations, fn($r) => in_array($r['status'],['pending','confirmed']));
-                  $past     = array_filter($myReservations, fn($r) => !in_array($r['status'],['pending','confirmed']));
+            <?php $upcoming = array_filter($myReservations, fn($r) => in_array($r['status'],['pending','reserved']));
+                  $past     = array_filter($myReservations, fn($r) => !in_array($r['status'],['pending','reserved']));
             ?>
             <?php if (!empty($upcoming)): ?>
             <div class="cd-card" style="border-color:rgba(32,200,161,0.35)">
@@ -1390,12 +1419,12 @@ function fmtMins(int $m): string {
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱'.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">–</span>' ?></td>
                         <td>
-                            <?php $sm=['pending'=>['gold','clock'],'confirmed'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
+                            <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
                         </td>
                         <td style="color:var(--muted)"><?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?></td>
                         <td>
-                            <?php if (in_array($r['status'], ['pending','confirmed'])): 
+                            <?php if (in_array($r['status'], ['pending','reserved'])): 
                                 $rid          = (int)$r['reservation_id'];
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);

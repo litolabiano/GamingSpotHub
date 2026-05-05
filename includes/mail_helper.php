@@ -152,4 +152,66 @@ function sendPasswordResetEmail($email, $fullName, $token) {
         return ['success' => false, 'message' => $mail->ErrorInfo];
     }
 }
+
+/**
+ * Send admin-initiated reschedule notification.
+ */
+function sendRescheduleNotificationEmail($email, $fullName, $newDate, $newTime) {
+    try {
+        $mail = createMailer();
+        $mail->addAddress($email, $fullName);
+        $mail->Subject = '📅 Action Required: Your Reservation was Rescheduled';
+
+        $dashUrl = SITE_URL . '/dashboard.php';
+
+        $mail->Body = '
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { margin: 0; padding: 0; font-family: "Inter", "Segoe UI", sans-serif; background: #0d1117; }
+                .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; border-radius: 16px; overflow: hidden; }
+                .header { background: linear-gradient(135deg, #f1a83c, #1a1a2e); padding: 40px 30px; text-align: center; }
+                .header h1 { color: #fff; font-size: 24px; margin: 0; }
+                .header p { color: #eee; margin-top: 8px; font-size: 14px; }
+                .body { padding: 30px; color: #e0e0e0; }
+                .body p { line-height: 1.6; margin-bottom: 16px; }
+                .btn { display: inline-block; background: linear-gradient(135deg, #f1a83c, #fb566b); color: white !important; padding: 14px 32px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 16px; }
+                .btn-wrap { text-align: center; margin: 30px 0; }
+                .footer { padding: 20px 30px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.05); }
+                .highlight { background: rgba(241,168,60,0.1); border: 1px solid rgba(241,168,60,0.3); padding: 10px; border-radius: 8px; font-weight: bold; color: #f1a83c; text-align: center; margin-bottom: 16px; }
+            </style>
+        </head>
+        <body>
+            <div style="padding: 20px; background: #0d1117;">
+                <div class="container">
+                    <div class="header">
+                        <h1>📅 Reservation Rescheduled</h1>
+                        <p>Action Required</p>
+                    </div>
+                    <div class="body">
+                        <p>Hey <strong>' . htmlspecialchars($fullName) . '</strong>,</p>
+                        <p>Our admin has rescheduled your upcoming reservation. Your new schedule is:</p>
+                        <div class="highlight">' . date('M d, Y', strtotime($newDate)) . ' at ' . date('h:i A', strtotime($newTime)) . '</div>
+                        <p>Please log in to your dashboard to <strong>Confirm</strong> or <strong>Cancel</strong> this new schedule.</p>
+                        <div class="btn-wrap">
+                            <a href="' . $dashUrl . '" class="btn">View Dashboard</a>
+                        </div>
+                        <p style="font-size: 13px; color: #888;">You have <strong>24 hours</strong> to respond. If you cancel, the reservation will be forfeited as per our no-refund policy.</p>
+                    </div>
+                    <div class="footer">
+                        <p>Good Spot Gaming Hub &bull; Don Placido Avenue, Dasmariñas</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>';
+
+        $mail->AltBody = "Hi $fullName, your reservation was rescheduled to $newDate at $newTime. Log in to your dashboard to confirm or cancel. You have 24 hours.";
+        $mail->send();
+        return ['success' => true];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => $mail->ErrorInfo];
+    }
+}
 ?>

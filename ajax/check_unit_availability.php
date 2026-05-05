@@ -52,7 +52,7 @@ $stmtRes = $conn->prepare(
        JOIN users u ON r.user_id = u.user_id
       WHERE r.console_id   = ?
         AND r.reserved_date = ?
-        AND r.status IN ('pending','confirmed')
+        AND r.status IN ('pending','reserved')
       LIMIT 1"
 );
 
@@ -64,7 +64,7 @@ $stmtUnassigned = $conn->prepare(
       WHERE r.console_type  = ?
         AND r.reserved_date  = ?
         AND r.console_id     IS NULL
-        AND r.status IN ('pending','confirmed')"
+        AND r.status IN ('pending','reserved')"
 );
 $stmtUnassigned->bind_param('ss', $console_type, $date);
 $stmtUnassigned->execute();

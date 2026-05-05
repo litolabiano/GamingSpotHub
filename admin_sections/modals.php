@@ -934,7 +934,7 @@ $ctrlAvailCount = $conn->query(
             </div>
         </div>
 
-        <form id="extendSessionForm">
+        <form id="extendSessionForm" onsubmit="event.preventDefault(); submitExtendSession();">
             <!-- Hidden state fields used by openExtendModal() JS helper -->
             <input type="hidden" name="action" value="extend_session">
             <input type="hidden" name="session_id" id="extendSessionId">
@@ -971,48 +971,9 @@ $ctrlAvailCount = $conn->query(
                 </span>
             </div>
 
-            <!-- Payment fields (shown for hourly extensions) -->
-            <div id="extendPaymentFields">
-                <div class="form-group">
-                    <label>Payment Method</label>
-                    <select name="payment_method" id="extendPaymentMethod">
-                        <option value="cash">💵 Cash</option>
-                        <option value="gcash">📱 GCash</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:6px">
-                    <!-- Label row with checkbox toggle -->
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                        <label style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin:0;">Amount Tendered (₱)</label>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#888;cursor:pointer;font-weight:400;">
-                            <input type="checkbox" id="extendTenderedToggle"
-                                   style="width:14px;height:14px;accent-color:#8aa4e8;cursor:pointer;"
-                                   onchange="toggleExtendTendered(this)">
-                            <span style="color:#8aa4e8;">Optional — customer gave different amount</span>
-                        </label>
-                    </div>
-                    <!-- The input: pre-filled with cost, locked by default -->
-                    <div style="position:relative;">
-                        <input type="number" id="extendTendered" name="tendered" min="0" step="1"
-                               readonly
-                               style="width:100%;padding:10px 12px 10px 36px;border-radius:8px;
-                                      border:1px solid rgba(95,133,218,.35);background:rgba(95,133,218,.07);
-                                      color:#8aa4e8;font-size:16px;font-weight:700;cursor:not-allowed;
-                                      box-sizing:border-box;"
-                               oninput="calcChange('extendTendered','extendChangeDisplay','extendCostHolder')">
-                        <!-- Lock icon overlay -->
-                        <i id="extendTenderedLockIcon" class="fas fa-lock"
-                           style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
-                                  color:#5f85da;font-size:13px;pointer-events:none;"></i>
-                    </div>
-                    <p id="extendTenderedHint" style="font-size:11px;color:#666;margin:5px 0 0;"
-                    ><i class="fas fa-info-circle" style="margin-right:3px;"></i>Pre-filled with exact cost. Check the box above to enter a different amount.</p>
-                </div>
-                <div id="extendChangeDisplay" style="display:none;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;margin-bottom:12px;"></div>
-            </div>
-
+            <!-- Extension cost information -->
             <div style="background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#8aa4e8;">
-                <i class="fas fa-info-circle"></i> Extension cost is collected immediately for hourly sessions. Open Time and Unlimited sessions have no extension charge.
+                <i class="fas fa-info-circle"></i> Extension costs for hourly sessions are automatically added to the customer's Outstanding Balance and collected at the end of the session.
             </div>
             <div id="extendErrorMsg" style="display:none;background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.35);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fb566b;">
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
@@ -1022,63 +983,7 @@ $ctrlAvailCount = $conn->query(
                 <i class="fas fa-clock"></i> <span id="extendConfirmLabel">Extend Session</span>
             </button>
         </form>
-        <script>
-        (function() {
-            document.getElementById('extendSessionForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                const sessionId    = document.getElementById('extendSessionId').value;
-                const extraMinutes = document.getElementById('extendMinutes').value;
-                const payMethod    = document.getElementById('extendPaymentMethod').value;
-                const tendered     = document.getElementById('extendTendered').value;
-                const errBox       = document.getElementById('extendErrorMsg');
-                const errText      = document.getElementById('extendErrorText');
-                const btn          = document.getElementById('extendConfirmBtn');
-                const lbl          = document.getElementById('extendConfirmLabel');
-
-                if (!extraMinutes) {
-                    errText.textContent = 'Please select additional time.';
-                    errBox.style.display = 'block';
-                    return;
-                }
-                errBox.style.display = 'none';
-                btn.disabled = true;
-                lbl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
-
-                const body = new URLSearchParams({
-                    session_id:     sessionId,
-                    extra_minutes:  extraMinutes,
-                    payment_method: payMethod,
-                });
-                if (tendered) body.append('tendered', tendered);
-
-                fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body })
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        if (data.success) {
-                            closeModal('extendSession');
-                            // Show toast then reload
-                            const toastMsg = data.message || ('Session extended by ' + extraMinutes + ' min.');
-                            const toast = document.createElement('div');
-                            toast.className = 'flash-msg success';
-                            toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + toastMsg;
-                            document.body.appendChild(toast);
-                            setTimeout(function() { location.reload(); }, 1400);
-                        } else {
-                            errText.textContent = data.message || 'Failed to extend session.';
-                            errBox.style.display = 'block';
-                            btn.disabled = false;
-                            lbl.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
-                        }
-                    })
-                    .catch(function() {
-                        errText.textContent = 'Network error — please try again.';
-                        errBox.style.display = 'block';
-                        btn.disabled = false;
-                        lbl.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
-                    });
-            });
-        })();
-        </script>
+        
     </div>
 </div>
 
@@ -1229,12 +1134,12 @@ function submitExtendSession() {
     const sessionId = document.getElementById('extendSessionId').value;
     const mins      = document.getElementById('extendMinutes').value;
     const mode      = document.getElementById('extendSessionMode').value;
-    const method    = document.getElementById('extendPayMethod').value;
-    const tendered  = document.getElementById('extendTendered').value;
+    const method    = 'cash';
+    const tendered  = 0;
 
     if (!mins) { showInlineToast('Please select how much time to add.', 'error'); return; }
 
-    const btn = document.getElementById('extendSubmitBtn');
+    const btn = document.getElementById('extendConfirmBtn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
 
@@ -1242,65 +1147,113 @@ function submitExtendSession() {
     fd.append('session_id',     sessionId);
     fd.append('extra_minutes',  mins);
     fd.append('payment_method', method);
-    if (tendered) fd.append('tendered', tendered);
+    fd.append('tendered', tendered);
 
     fetch('ajax/extend_session.php', { method: 'POST', credentials: 'same-origin', body: fd })
         .then(r => r.json())
         .then(function(data) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            btn.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
             if (data.success) {
                 closeModal('extendSession');
-                const toastMsg = data.message
-                    ? data.message
-                    : 'Session extended! ₱' + (data.extra_cost || 0) + ' charged.';
+                const toastMsg = data.message ? data.message : 'Session extended! ₱' + (data.extra_cost || 0) + ' added to balance.';
                 showInlineToast(toastMsg, 'success');
-                setTimeout(() => location.reload(), 2200);
+                
+                if (typeof updateTimers === 'function') {
+                    const row = document.querySelector(`tr[data-id="${sessionId}"]`);
+                    if (row && mode === 'hourly') {
+                        let curBooked = parseInt(row.dataset.booked) || 0;
+                        curBooked += parseInt(data.total_added || mins);
+                        row.dataset.booked = curBooked;
+                        const h = Math.floor(curBooked / 60);
+                        const m = curBooked % 60;
+                        if (row.cells[4]) {
+                            row.cells[4].textContent = h ? (m ? h+'h '+m+'m' : h+'h') : m+'m';
+                        }
+                        const extendBtn = row.querySelector('button[title="Extend Session"]');
+                        if (extendBtn) {
+                            const newOnclick = extendBtn.getAttribute('onclick').replace(/(openExtendModal\([^,]+,[^,]+,[^,]+,)\s*\d+/, `$1 ${curBooked}`);
+                            extendBtn.setAttribute('onclick', newOnclick);
+                        }
+                    }
+                }
+                
+                if (typeof updateLiveSection === 'function') {
+                    updateLiveSection();
+                } else {
+                    fetch(location.href).then(res => res.text()).then(html => {
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const newPending = doc.getElementById('pendingPaymentsTable');
+                        const oldPending = document.getElementById('pendingPaymentsTable');
+                        if (newPending && oldPending) {
+                            oldPending.innerHTML = newPending.innerHTML;
+                        }
+                    });
+                }
             } else {
                 showInlineToast(data.message || 'Extension failed.', 'error');
             }
         })
         .catch(function() {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-clock"></i> Apply Extension';
+            btn.innerHTML = '<i class="fas fa-clock"></i> Extend Session';
             showInlineToast('Network error — please try again.', 'error');
         });
 }
 
+
 function approveExt(extId) {
-    // Show a mini inline prompt using gspotConfirm as backdrop, then submit
-    const method = 'cash'; // default; could be extended with a mini select
-    gspotConfirm('Approve extension — payment via Cash?', function() {
+    const method = 'cash';
+    gspotConfirm('Approve extension?', function() {
         const fd = new FormData();
         fd.append('action', 'approve');
         fd.append('extension_id', extId);
         fd.append('payment_method', method);
+        fd.append('tendered', 0);
         fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: fd })
             .then(r => r.json())
             .then(function(d) {
                 if (d.success) {
-                    showInlineToast('Extension approved!', 'success');
+                    showInlineToast('Extension approved! Added to balance.', 'success');
                     loadPendingExtensions(document.getElementById('extendSessionId').value);
-                    setTimeout(() => location.reload(), 1800);
+                    if (typeof updateLiveSection === 'function') updateLiveSection();
+                    else {
+                        fetch(location.href).then(res => res.text()).then(html => {
+                            const doc = new DOMParser().parseFromString(html, 'text/html');
+                            const newPending = doc.getElementById('pendingPaymentsTable');
+                            const oldPending = document.getElementById('pendingPaymentsTable');
+                            if (newPending && oldPending) oldPending.innerHTML = newPending.innerHTML;
+                        });
+                    }
                 } else {
                     showInlineToast(d.message || 'Failed to approve.', 'error');
                 }
             });
     }, { yesLabel: 'Approve', danger: false });
 }
-function _approveExtDummy() { // placeholder so old reference doesn't break
+
+function _approveExtDummy() {
     fetch('ajax/approve_extension.php', { method: 'POST', credentials: 'same-origin', body: new FormData() })
         .then(r => r.json())
         .then(function(d) {
             if (d.success) {
-                showInlineToast('Extension approved!', 'success');
+                showInlineToast('Extension approved! Added to balance.', 'success');
                 loadPendingExtensions(document.getElementById('extendSessionId').value);
-                setTimeout(() => location.reload(), 1800);
+                if (typeof updateLiveSection === 'function') updateLiveSection();
+                else {
+                    fetch(location.href).then(res => res.text()).then(html => {
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const newPending = doc.getElementById('pendingPaymentsTable');
+                        const oldPending = document.getElementById('pendingPaymentsTable');
+                        if (newPending && oldPending) oldPending.innerHTML = newPending.innerHTML;
+                    });
+                }
             } else {
                 showInlineToast(d.message || 'Failed to approve.', 'error');
             }
         });
 }
+
 
 function denyExt(extId) {
     const fd = new FormData();
@@ -1836,10 +1789,10 @@ function openConvertModal(res) {
                         Current Inventory After Adding
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <div style="font-size:28px;font-weight:900;color:#20c8a1;"><?= $ctrlTotal + 1 ?></div>
+                        <div style="font-size:28px;font-weight:900;color:#20c8a1;"><?= ($ctrlTotal ?? 0) + 1 ?></div>
                         <div style="font-size:13px;color:#ccc;">
                             total controllers<br>
-                            <span style="color:#20c8a1;font-weight:700;"><?= $ctrlAvailable + 1 ?> available</span>
+                            <span style="color:#20c8a1;font-weight:700;"><?= ($ctrlAvailable ?? 0) + 1 ?> available</span>
                             for rental
                         </div>
                     </div>

@@ -154,7 +154,7 @@
                 <thead><tr><th>Time</th><th>Customer</th><th>Console</th><th>Mode</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                 <?php foreach ($todayRes as $r):
-                    $sc = ['pending' => ['#f1a83c','rgba(241,168,60,.15)'], 'confirmed' => ['#20c8a1','rgba(32,200,161,.15)']][$r['status']] ?? ['#888','rgba(100,100,100,.1)'];
+                    $sc = ['pending' => ['#f1a83c','rgba(241,168,60,.15)'], 'reserved' => ['#20c8a1','rgba(32,200,161,.15)']][$r['status']] ?? ['#888','rgba(100,100,100,.1)'];
                 ?>
                 <tr>
                     <td style="font-weight:600;color:#f1e1aa;white-space:nowrap;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></td>
@@ -175,7 +175,7 @@
                                 </button>
                             </form>
                             <?php endif; ?>
-                            <?php if ($r['status'] === 'confirmed'): ?>
+                            <?php if ($r['status'] === 'reserved'): ?>
                             <button class="btn btn-success btn-sm" onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Convert to Session">
                                 <i class="fas fa-play"></i> Start
                             </button>
