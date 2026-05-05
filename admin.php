@@ -7,6 +7,11 @@ require_once __DIR__ . '/includes/session_helper.php';
 requireRole(['owner', 'shopkeeper']);
 require_once __DIR__ . '/includes/db_functions.php';
 
+// Prevent back-button access after logout by disabling browser cache
+header("Cache-Control: no-cache, no-store, must-revalidate"); 
+header("Pragma: no-cache"); 
+header("Expires: 0"); 
+
 $user = getCurrentUser();
 $message = '';
 $messageType = '';
@@ -1222,7 +1227,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             display:none; position:absolute; right:0; top:calc(100% + 8px);
             min-width:220px; background:#0d1b3e;
             border:1px solid rgba(95,133,218,.25); border-radius:var(--radius-md);
-            box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:9999;
+            box-shadow:0 16px 48px rgba(0,0,0,.5); z-index:10000;
             overflow:hidden; animation:fadeInDown .18s ease;
         }
         .admin-user-dropdown.open .admin-user-menu { display:block; }
@@ -1274,12 +1279,14 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <div class="nav-item active" onclick="showPage('dashboard', this)">
         <i class="fas fa-chart-line"></i><span>Dashboard</span>
     </div>
+    <?php if ($user['role'] !== 'shopkeeper'): ?>
     <div class="nav-item" onclick="showPage('consoles', this)">
         <i class="fas fa-desktop"></i><span>Consoles</span>
         <?php if ($maintenanceCount > 0): ?>
         <span <?= $navBadge ?>><?= $maintenanceCount ?></span>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
     <div class="nav-item" data-tooltip="Sessions" onclick="showPage('sessions', this)">
         <i class="fas fa-play-circle"></i><span>Sessions</span>
         <?php if ($activeCount > 0): ?>
@@ -1301,6 +1308,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <div class="nav-item" data-tooltip="Reports" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
     </div>
+    <?php if ($user['role'] !== 'shopkeeper'): ?>
     <div class="nav-item" data-tooltip="Tournaments" onclick="showPage('tournaments', this)">
         <i class="fas fa-trophy"></i><span>Tournaments</span>
         <?php
@@ -1311,6 +1319,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         <span <?= $navBadge ?>><?= $openTourCount ?></span>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
     <div class="nav-item" onclick="showPage('settings', this)">
@@ -1389,8 +1398,8 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         </div>
 
         <!-- Admin user dropdown -->
-        <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px">
-            <button class="admin-user-toggle" id="adminUserBtn">
+        <div class="admin-user-dropdown" id="adminUserDropdown" style="margin-left:12px; cursor:pointer;">
+            <button class="admin-user-toggle" id="adminUserBtn" style="cursor:pointer; pointer-events:auto;">
                 <div class="user-avatar"><?= getUserInitials() ?></div>
                 <div>
                     <div style="font-weight:600;font-size:14px;line-height:1.2"><?= htmlspecialchars($user['full_name']) ?></div>
@@ -1407,7 +1416,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
                     </div>
                 </div>
                 <div class="admin-dropdown-divider"></div>
-                <a href="<?= getBaseUrl() ?>/auth/logout.php" class="admin-dropdown-item admin-dropdown-danger">
+                <a href="auth/logout.php" class="admin-dropdown-item admin-dropdown-danger" id="logoutLink" onclick="window.location.href='auth/logout.php';">
                     <i class="fas fa-sign-out-alt"></i> Sign Out
                 </a>
             </div>
@@ -1419,12 +1428,12 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <div class="main-content">
 
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
-<?php include __DIR__ . '/admin_sections/consoles.php'; ?>
+<?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/consoles.php'; endif; ?>
 <?php include __DIR__ . '/admin_sections/sessions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
-<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
+<?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
 
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
 
@@ -1433,8 +1442,38 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <!-- ── JavaScript ── -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
+// ── Admin user dropdown (Moved to top for reliability) ──
+(function () {
+    const btn      = document.getElementById('adminUserBtn');
+    const dropdown = document.getElementById('adminUserDropdown');
+    if (!btn || !dropdown) return;
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+        if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+})();
+
 // ── Navigation ──
 function showPage(page, el) {
+    // ── Role-Based Access Check ──
+    const userRole = '<?= $user['role'] ?>';
+    const restricted = ['consoles', 'tournaments'];
+    if (userRole === 'shopkeeper' && restricted.includes(page)) {
+        console.warn('[GSpot Access] Shopkeeper access denied to:', page);
+        // Redirect to dashboard if attempting restricted page
+        showPage('dashboard', document.querySelector('.nav-item[onclick*="dashboard"]'));
+        // Optionally show a toast/alert
+        if (typeof showInlineToast === 'function') {
+            showInlineToast('Access Denied: You do not have permission to view this section.', 'error');
+        } else {
+            alert('Access Denied: You do not have permission to view this section.');
+        }
+        return;
+    }
+
     document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
         p.style.opacity = '';
@@ -1566,8 +1605,16 @@ var _currentSection = 'dashboard';
 
 (function () {
     const hash = window.location.hash.replace('#', '');
+    const userRole = '<?= $user['role'] ?>';
     const validPages = ['dashboard','consoles','sessions','reservations','transactions','financial','reports','settings','tournaments'];
-    if (hash && validPages.includes(hash)) {
+    
+    // Filter valid pages based on role
+    const allowedPages = validPages.filter(p => {
+        if (userRole === 'shopkeeper' && ['consoles', 'tournaments', 'settings'].includes(p)) return false;
+        return true;
+    });
+
+    if (hash && allowedPages.includes(hash)) {
         const navItems = document.querySelectorAll('.nav-item[onclick]');
         let matchEl = null;
         navItems.forEach(n => {
@@ -3272,21 +3319,7 @@ function renderCharts() {
 
 AOS.init({ duration: 600, once: true });
 
-// ── Admin user dropdown ──────────────────────────────────────────────
-(function () {
-    const btn      = document.getElementById('adminUserBtn');
-    const dropdown = document.getElementById('adminUserDropdown');
-    if (!btn || !dropdown) return;
-    btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', function (e) {
-        if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
-    });
-})();
-
-// ── Bell notification icon - styles ──────────────────────────────────
+// ── Bell notification icon - styles ──
 (function injectNotifStyles() {
     const s = document.createElement('style');
     s.textContent = `
