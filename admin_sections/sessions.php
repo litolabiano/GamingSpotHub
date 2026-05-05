@@ -437,6 +437,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
+                                    <?php if ($sess['rental_mode'] !== 'unlimited'): ?>
                                     <button class="btn btn-sm" title="Extend Session"
                                         style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(
@@ -448,6 +449,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             )">
                                         <i class="fas fa-clock"></i> Extend
                                     </button>
+                                    <?php endif; ?>
                                 </div>
 
                                 <?php else: ?>—<?php endif; ?>
