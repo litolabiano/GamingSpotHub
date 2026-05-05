@@ -74,6 +74,14 @@
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
                 
                 <div class="console-actions" style="margin-top:15px;display:flex;flex-wrap:wrap;gap:8px;">
+            <!-- Edit button -->
+                    <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>)"
+                            style="width:100%;background:rgba(95,133,218,.15);color:#8aa4e8;border:1px solid rgba(95,133,218,.3);
+                                   padding:7px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;
+                                   display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px;">
+                        <i class="fas fa-edit"></i> Edit Console
+                    </button>
+                    
                     <?php if ($con['status'] !== 'available'): ?>
                     <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;">
                         <input type="hidden" name="action" value="update_console_status">
@@ -199,7 +207,6 @@
                         <option value="PS5">PlayStation 5</option>
                         <option value="PS4">PlayStation 4</option>
                         <option value="Xbox Series X">Xbox Series X</option>
-                        <option value="Xbox Controller">Xbox Controller</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -218,6 +225,63 @@
         </form>
     </div>
 </div>
+
+<!-- Edit Console Modal -->
+<div class="modal" id="editConsoleModal">
+    <div class="modal-content" style="max-width:450px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit" style="color:#8aa4e8;margin-right:8px;"></i>Edit Console</h3>
+            <span class="modal-close" onclick="closeModal('editConsole')"><i class="fas fa-times"></i></span>
+        </div>
+        <form method="POST" action="admin.php#consoles">
+            <input type="hidden" name="action" value="edit_console">
+            <?= csrfField() ?>
+            <input type="hidden" name="console_id" id="editConsoleId">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Console Name / Description</label>
+                    <input type="text" name="console_name" id="editConsoleName"
+                           class="form-control" required placeholder="e.g. VIP Console">
+                </div>
+                <div class="form-group">
+                    <label>Console Type</label>
+                    <select name="console_type" id="editConsoleType" class="form-control" required>
+                        <option value="PS5">PlayStation 5</option>
+                        <option value="PS4">PlayStation 4</option>
+                        <option value="Xbox Series X">Xbox Series X</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
+                    <input type="text" name="unit_number" id="editConsoleUnit"
+                           class="form-control" required maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>Hourly Rate (₱)</label>
+                    <input type="number" name="hourly_rate" id="editConsoleRate"
+                           class="form-control" required min="0" step="0.01">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editConsole')">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditConsoleModal(id, name, type, unit, rate) {
+    document.getElementById('editConsoleId').value   = id;
+    document.getElementById('editConsoleName').value = name;
+    document.getElementById('editConsoleType').value = type;
+    document.getElementById('editConsoleUnit').value = unit;
+    document.getElementById('editConsoleRate').value = parseFloat(rate).toFixed(2);
+    openModal('editConsole');
+}
+</script>
 
 <script>
 function toggleArchiveSection(showArchive) {

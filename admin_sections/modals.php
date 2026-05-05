@@ -420,24 +420,48 @@
                 </div>
             </div>
 
-            <!-- ── Controller Rental Add-on ── -->
-            <div id="controllerRentalGroup" style="margin-bottom:12px;">
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px 14px;">
-                    <input type="checkbox" id="controllerRentalToggle" name="controller_rental" value="1"
-                           onchange="recalcSessionPreview()"
-                           style="width:16px;height:16px;accent-color:#5f85da;cursor:pointer;">
-                    <span style="font-size:13px;font-weight:600;color:#8aa4e8;">
-                        <i class="fas fa-gamepad" style="margin-right:5px;"></i>
+            <?php
+$ctrlAvailCount = $conn->query(
+    "SELECT COUNT(*) AS n FROM controllers WHERE status = 'available' AND controller_type = 'Xbox Controller'"
+)->fetch_assoc()['n'] ?? 0;
+?>
+<div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
+    <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
+                border-radius:12px;padding:14px 16px;">
+        <div class="form-check" style="margin:0;">
+            <input type="checkbox" id="controllerRentalToggle"
+                   name="controller_rental" value="1"
+                   onchange="recalcSessionPreview()"
+                   <?= $ctrlAvailCount === 0 ? 'disabled' : '' ?>>
+            <input type="hidden" name="controller_rental_fee_amt"
+                   id="controllerFeeAmt"
+                   value="<?= htmlspecialchars(getSetting('controller_rental_fee') ?? 20) ?>">
+            <label for="controllerRentalToggle" style="display:flex;align-items:center;gap:10px;cursor:<?= $ctrlAvailCount === 0 ? 'not-allowed' : 'pointer' ?>;">
+                <i class="fas fa-gamepad" style="color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;font-size:16px;"></i>
+                <div>
+                    <div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;
+                                color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;">
                         Controller Rental
-                        <span id="controllerRentalConsoleNote" style="font-weight:400;color:#888;margin-left:6px;">
-                            +&#8369;<?= number_format((float)($settings['controller_rental_fee'] ?? 20), 0) ?>/session
+                        <span style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
+                            +₱<?= getSetting('controller_rental_fee') ?? 20 ?>/session
                         </span>
-                    </span>
-                </label>
-                <p class="field-hint" id="controllerRentalHint">Only applicable for console units that require a physical controller.</p>
-                <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt"
-                       value="<?= (float)($settings['controller_rental_fee'] ?? 20) ?>">
-            </div>
+                    </div>
+                    <div style="font-size:11px;margin-top:3px;
+                                color:<?= $ctrlAvailCount > 0 ? '#888' : '#fb566b' ?>;">
+                        <?php if ($ctrlAvailCount > 0): ?>
+                            <i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>
+                            <strong style="color:#20c8a1;"><?= $ctrlAvailCount ?></strong>
+                            of <?= $ctrlTotal ?> controller<?= $ctrlTotal !== 1 ? 's' : '' ?> available
+                        <?php else: ?>
+                            <i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>
+                            No controllers available right now
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </label>
+        </div>
+    </div>
+</div>
 
             <!-- ── Optional upfront payment (hourly only) ── -->
             <div id="startPaymentGroup" style="display:none;">
@@ -1767,3 +1791,67 @@ function openConvertModal(res) {
 })();
 </script>
 
+<!-- ── Add Controller Modal ──────────────────────────────────────────── -->
+<div class="modal" id="addControllerModal">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-gamepad" style="color:var(--clr-mint);margin-right:8px;"></i>Add Xbox Controller</h3>
+            <button class="modal-close" onclick="closeModal('addController')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="add_controller">
+            <input type="hidden" name="controller_type" value="Xbox Controller">
+
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Controller Name *</label>
+                        <input type="text" name="controller_name" required
+                               placeholder="e.g. Xbox Controller"
+                               value="Xbox Controller">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit Number *</label>
+                        <input type="text" name="ctrl_unit_number" required
+                               placeholder="e.g. CTRL-01">
+                        <div class="form-hint">Must be unique (e.g. CTRL-01, CTRL-02)</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notes <span style="color:#666;font-weight:400;">(optional)</span></label>
+                    <textarea name="controller_notes" rows="2"
+                              placeholder="e.g. Minor stick drift, Cable-only..."></textarea>
+                </div>
+
+                <!-- Live inventory preview -->
+                <div style="background:rgba(32,200,161,.08);border:1px solid rgba(32,200,161,.2);
+                            border-radius:10px;padding:14px 16px;margin-top:4px;">
+                    <div style="font-size:12px;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">
+                        Current Inventory After Adding
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="font-size:28px;font-weight:900;color:#20c8a1;"><?= $ctrlTotal + 1 ?></div>
+                        <div style="font-size:13px;color:#ccc;">
+                            total controllers<br>
+                            <span style="color:#20c8a1;font-weight:700;"><?= $ctrlAvailable + 1 ?> available</span>
+                            for rental
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('addController')" class="btn btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Controller
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -57,6 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $arStmt->bind_param('id', $result['session_id'], $ctrl_fee);
                 $arStmt->execute();
+                $arStmt->execute();
+
+        // ── Mark one Xbox controller as in_use ──────────────
+        $conn->query(
+            "UPDATE controllers SET status = 'in_use'
+             WHERE status = 'available' AND controller_type = 'Xbox Controller'
+             ORDER BY unit_number ASC LIMIT 1"
+        );
             }
         }
 
@@ -231,6 +239,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         }
     }
+    elseif ($action === 'edit_console') {
+        $console_id = (int)($_POST['console_id'] ?? 0);
+        $name       = trim($_POST['console_name'] ?? '');
+        $type       = $_POST['console_type'] ?? '';
+        $unit       = trim($_POST['unit_number'] ?? '');
+        $rate       = (float)($_POST['hourly_rate'] ?? 0);
+    
+        if ($console_id && $name && in_array($type, ['PS5', 'PS4', 'Xbox Series X']) && $unit && $rate >= 0) {
+            // Check for duplicate unit number (exclude current console)
+            $dupCheck = $conn->prepare(
+                "SELECT console_id FROM consoles WHERE unit_number = ? AND console_id != ?"
+            );
+            $dupCheck->bind_param('si', $unit, $console_id);
+            $dupCheck->execute();
+            if ($dupCheck->get_result()->num_rows > 0) {
+                $message     = 'Unit number "' . htmlspecialchars($unit) . '" is already used by another console.';
+                $messageType = 'error';
+            } else {
+                $stmt = $conn->prepare(
+                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?
+                      WHERE console_id = ?"
+                );
+                $stmt->bind_param('sssdi', $name, $type, $unit, $rate, $console_id);
+                if ($stmt->execute()) {
+                    $message     = 'Console updated successfully.';
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Failed to update console: ' . $conn->error;
+                    $messageType = 'error';
+                }
+            }
+        } else {
+            $message     = 'Invalid input for console update.';
+            $messageType = 'error';
+        }
+    }
     elseif ($action === 'delete_console') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         if ($console_id) {
@@ -247,24 +291,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
     elseif ($action === 'add_controller') {
-        $ctrl_name = trim($_POST['controller_name'] ?? '');
-        $ctrl_type = $_POST['controller_type'] ?? '';
-        $ctrl_unit = trim($_POST['ctrl_unit_number'] ?? '');
-        $ctrl_notes= trim($_POST['controller_notes'] ?? '');
+        $ctrl_name  = trim($_POST['controller_name'] ?? '');
+        $ctrl_type  = $_POST['controller_type'] ?? '';
+        $ctrl_unit  = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes = trim($_POST['controller_notes'] ?? '');
         $valid_types = ['DualSense', 'DualShock 4', 'Xbox Controller', 'Other'];
         if ($ctrl_name && in_array($ctrl_type, $valid_types) && $ctrl_unit) {
-            $stmt = $conn->prepare(
-                "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
-            );
-            $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
-            if ($stmt->execute()) {
-                $message = 'Controller added successfully.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to add controller. Ensure the Unit Number is unique.';
+            // Check for duplicate unit number first
+            $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
+            $dupCheck->bind_param('s', $ctrl_unit);
+            $dupCheck->execute();
+            if ($dupCheck->get_result()->num_rows > 0) {
+                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists. Please use a different unit number (e.g. CTRL-02, CTRL-03).';
                 $messageType = 'error';
+            } else {
+                $stmt = $conn->prepare(
+                    "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
+                );
+                $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
+                if ($stmt->execute()) {
+                    $message = 'Controller added successfully.';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add controller: ' . $conn->error;
+                    $messageType = 'error';
+                }
+                $stmt->close();
             }
-            $stmt->close();
+            $dupCheck->close();
         } else {
             $message = 'Invalid input for new controller.';
             $messageType = 'error';
