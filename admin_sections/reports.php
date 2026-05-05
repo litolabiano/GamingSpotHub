@@ -9,47 +9,6 @@
         </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>
-            <canvas id="revChart" height="200"></canvas>
-        </div>
-        <div class="card">
-            <div class="card-header"><h3 class="card-title">Sessions by Console Type</h3></div>
-            <canvas id="typeChart" height="200"></canvas>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
-            <h3 class="card-title">Console Usage Report (All Time)</h3>
-            <div style="display:flex;gap:8px;align-items:center;">
-                <div class="asb-search" style="max-width:220px;">
-                    <i class="fas fa-search"></i>
-                    <input type="text" class="asb-input" id="usageSearch" placeholder="Search unit or type…" autocomplete="off">
-                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
-                </div>
-                <span class="asb-count" id="usageCount"></span>
-            </div>
-        </div>
-        <table class="data-table" id="usageTable">
-            <thead><tr><th>Unit</th><th>Type</th><th>Total Sessions</th><th>Total Hours</th><th>Revenue</th></tr></thead>
-            <tbody>
-            <?php foreach ($usageReport as $u): ?>
-            <tr>
-                <td><?= htmlspecialchars($u['unit_number']) ?></td>
-                <td><?= htmlspecialchars($u['console_type']) ?></td>
-                <td><?= $u['total_sessions'] ?></td>
-                <td><?= number_format($u['total_minutes']/60, 1) ?> hrs</td>
-                <td style="color:#20c8a1">₱<?= number_format($u['total_revenue'], 2) ?></td>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        <div class="asb-no-results" id="usageSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No consoles match your search.</div>
-        <div id="usagePagination"></div>
-    </div>
-
     <!-- ══ REPORT GENERATION ════════════════════════════════════════════════════ -->
     <div class="card" style="margin-bottom:20px; border-left: 3px solid #20c8a1;">
         <div class="card-header"><h3 class="card-title"><i class="fas fa-file-invoice-dollar" style="color:#20c8a1;margin-right:8px;"></i> Generate Financial & Operations Report</h3></div>
@@ -94,6 +53,49 @@
         }
     }
     </script>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Revenue — Last 7 Days</h3></div>
+            <canvas id="revChart" height="200"></canvas>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Sessions by Console Type</h3></div>
+            <canvas id="typeChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+            <h3 class="card-title">Console Usage Report (All Time)</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <div class="asb-search" style="max-width:220px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="asb-input" id="usageSearch" placeholder="Search unit or type…" autocomplete="off">
+                    <button class="asb-clear" title="Clear"><i class="fas fa-times"></i></button>
+                </div>
+                <span class="asb-count" id="usageCount"></span>
+            </div>
+        </div>
+        <table class="data-table" id="usageTable">
+            <thead><tr><th>Unit</th><th>Type</th><th>Total Sessions</th><th>Total Hours</th><th>Revenue</th></tr></thead>
+            <tbody>
+            <?php foreach ($usageReport as $u): ?>
+            <tr>
+                <td><?= htmlspecialchars($u['unit_number']) ?></td>
+                <td><?= htmlspecialchars($u['console_type']) ?></td>
+                <td><?= $u['total_sessions'] ?></td>
+                <td><?= number_format($u['total_minutes']/60, 1) ?> hrs</td>
+                <td style="color:#20c8a1">₱<?= number_format($u['total_revenue'], 2) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <div class="asb-no-results" id="usageSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:24px;margin-bottom:8px;opacity:.4;"></i>No consoles match your search.</div>
+        <div id="usagePagination"></div>
+    </div>
+
+
 
     <!-- ══ CANCELLATION ANALYTICS ═══════════════════════════════════════════ -->
     <?php
