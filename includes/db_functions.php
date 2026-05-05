@@ -374,6 +374,23 @@ function endSession($session_id) {
         // Mark console as available
         updateConsoleStatus($session['console_id'], 'available');
 
+        // ── Restore controller if one was rented for this session ──────────
+        $checkCtrl = $conn->prepare(
+            "SELECT COUNT(*) AS n FROM additional_requests
+             WHERE session_id = ? AND request_type = 'controller_rental' AND status = 'approved'"
+        );
+        $checkCtrl->bind_param('i', $session_id);
+        $checkCtrl->execute();
+        $hadCtrl = (int)$checkCtrl->get_result()->fetch_assoc()['n'];
+        if ($hadCtrl > 0) {
+            $conn->query(
+                "UPDATE controllers SET status = 'available'
+                 WHERE status = 'in_use' AND controller_type = 'Xbox Controller'
+                 ORDER BY unit_number ASC LIMIT 1"
+            );
+        }
+        // ──────────────────────────────────────────────────────────────────
+
         $conn->commit();
         return ['success' => true, 'duration_minutes' => $duration, 'total_cost' => $total_cost];
     } catch (Exception $e) {

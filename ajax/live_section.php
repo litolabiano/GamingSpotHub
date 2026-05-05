@@ -49,6 +49,20 @@ if ($sRes) {
 $consolesResult = $conn->query("SELECT * FROM consoles ORDER BY console_type, unit_number");
 $consoles = $consolesResult ? $consolesResult->fetch_all(MYSQLI_ASSOC) : [];
 
+// Controllers (needed by consoles section)
+$allControllers      = [];
+$archivedControllers = [];
+$_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
+if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
+$_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
+if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
+unset($_res);
+
+$ctrlAvailable   = count(array_filter($allControllers, fn($c) => $c['status'] === 'available'));
+$ctrlInUse       = count(array_filter($allControllers, fn($c) => $c['status'] === 'in_use'));
+$ctrlMaintenance = count(array_filter($allControllers, fn($c) => $c['status'] === 'maintenance'));
+$ctrlTotal       = count($allControllers);
+$ctrlAvailCount  = $ctrlAvailable;
 // Dashboard-specific variables needed by dashboard.php
 $activeSessions   = getActiveSessions();
 $activeCount      = count($activeSessions);
@@ -111,7 +125,7 @@ if ($crQ) $cancelledReservations = $crQ->fetch_all(MYSQLI_ASSOC);
 // Customers
 $customers = [];
 $custQ = $conn->query(
-    "SELECT u.user_id, u.full_name, u.email, u.phone, u.created_at, u.is_banned,
+    "SELECT u.user_id, u.full_name, u.email, u.phone, u.created_at, u.status,
             COUNT(DISTINCT gs.session_id) AS total_sessions,
             COALESCE(SUM(t.amount),0) AS total_spent
        FROM users u
@@ -226,9 +240,13 @@ ob_start();
 include __DIR__ . '/../admin_sections/' . $section . '.php';
 $html = ob_get_clean();
 
-// Strip any <script> tags to avoid re-registering event listeners
-// (keep data-only; action buttons still work via onclick attributes)
-// We keep inline onclick= handlers but strip <script>…</script> blocks
+// Strip <script> tags to avoid re-registering event listeners
 $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
+
+// Strip the outer <div class="page" id="..."> wrapper so that when JS
+// injects this into container.innerHTML it doesn't double-nest the page div,
+// which causes sections like the controller inventory to bleed into other pages.
+$html = preg_replace('/^\s*<div[^>]+class="[^"]*page[^"]*"[^>]*>\s*/i', '', $html);
+$html = preg_replace('/\s*<\/div>\s*$/i', '', $html);
 
 echo json_encode(['html' => $html]);
