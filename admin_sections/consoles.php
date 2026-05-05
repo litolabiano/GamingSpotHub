@@ -11,7 +11,7 @@
             </div>
             
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="openModal('addConsoleModal')">
+                <button class="btn btn-primary" onclick="openModal('addConsole')">
                     <i class="fas fa-plus"></i> Add Console
                 </button>
                 <button class="btn btn-secondary" onclick="toggleArchiveSection(true)">
@@ -28,6 +28,14 @@
                 </span>
                 <span style="font-size:13px;display:flex;align-items:center;gap:6px;">
                     <span class="status-dot maintenance"></span><?= $maintenanceCount ?> Maintenance
+                </span>
+                <?php
+                    $xboxControllerCount = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Controller' && $c['status'] === 'available'));
+                    $xboxControllerTotal = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Controller'));
+                ?>
+                <span style="font-size:13px;display:flex;align-items:center;gap:6px; margin-left: auto; background:rgba(32,200,161,.1); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(32,200,161,.3); color: #20c8a1;">
+                    <i class="fa-solid fa-gamepad"></i>
+                    <?= $xboxControllerCount ?> / <?= $xboxControllerTotal ?> Xbox Controllers Available
                 </span>
             </div>
         </div>
@@ -54,10 +62,10 @@
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <?php
                         $badgeClass = match($con['console_type']) { 'PS5' => 'ps5', 'PS4' => 'ps4', default => 'xbox' };
-                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', default => 'xbox' };
+                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', 'Xbox Controller' => 'gamepad', default => 'xbox' };
                     ?>
                     <span class="console-type-badge <?= $badgeClass ?>">
-                        <i class="fab fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
+                        <i class="fa-solid fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
                     </span>
                     <span class="badge <?= $con['status'] ?>"><?= ucfirst(str_replace('_',' ',$con['status'])) ?></span>
                 </div>
@@ -67,7 +75,7 @@
                 
                 <div class="console-actions" style="margin-top:15px;display:flex;flex-wrap:wrap;gap:8px;">
                     <?php if ($con['status'] !== 'available'): ?>
-                    <form method="POST" style="flex:1;min-width:90px;">
+                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;">
                         <input type="hidden" name="action" value="update_console_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
@@ -79,7 +87,7 @@
                     <?php endif; ?>
                     
                     <?php if ($con['status'] !== 'maintenance'): ?>
-                    <form method="POST" style="flex:1;min-width:90px;">
+                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;">
                         <input type="hidden" name="action" value="update_console_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
@@ -90,7 +98,7 @@
                     </form>
                     <?php endif; ?>
                     
-                    <form method="POST" style="flex:1;min-width:90px;" onsubmit="return confirm('Are you sure you want to archive this console? It will be removed from active reservations.')">
+                    <form method="POST" action="admin.php#consoles" style="flex:1;min-width:90px;" onsubmit="return confirm('Are you sure you want to archive this console? It will be removed from active reservations.')">
                         <input type="hidden" name="action" value="update_console_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
@@ -128,10 +136,10 @@
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <?php
                         $badgeClass = match($con['console_type']) { 'PS5' => 'ps5', 'PS4' => 'ps4', default => 'xbox' };
-                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', default => 'xbox' };
+                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', 'Xbox Controller' => 'gamepad', default => 'xbox' };
                     ?>
                     <span class="console-type-badge <?= $badgeClass ?>">
-                        <i class="fab fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
+                        <i class="fa-solid fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
                     </span>
                     <span class="badge gray">Archived</span>
                 </div>
@@ -140,7 +148,7 @@
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
                 
                 <div class="console-actions" style="margin-top:15px;display:flex;gap:8px;">
-                    <form method="POST" style="flex:1;">
+                    <form method="POST" action="admin.php#consoles" style="flex:1;">
                         <input type="hidden" name="action" value="update_console_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
@@ -150,7 +158,7 @@
                         </button>
                     </form>
                     
-                    <form method="POST" style="flex:1;" onsubmit="return confirm('WARNING: Permanently delete this console? This cannot be undone.')">
+                    <form method="POST" action="admin.php#consoles" style="flex:1;" onsubmit="return confirm('WARNING: Permanently delete this console? This cannot be undone.')">
                         <input type="hidden" name="action" value="delete_console">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
@@ -174,9 +182,9 @@
     <div class="modal-content" style="max-width:450px;">
         <div class="modal-header">
             <h3><i class="fas fa-plus" style="color:#20c8a1;"></i> Add New Console</h3>
-            <span class="modal-close" onclick="closeModal('addConsoleModal')"><i class="fas fa-times"></i></span>
+            <span class="modal-close" onclick="closeModal('addConsole')"><i class="fas fa-times"></i></span>
         </div>
-        <form method="POST">
+        <form method="POST" action="admin.php#consoles">
             <input type="hidden" name="action" value="add_console">
             <?= csrfField() ?>
             <div class="modal-body">
@@ -189,12 +197,14 @@
                     <select name="console_type" class="form-control" required>
                         <option value="" disabled selected>Select Type</option>
                         <option value="PS5">PlayStation 5</option>
+                        <option value="PS4">PlayStation 4</option>
                         <option value="Xbox Series X">Xbox Series X</option>
+                        <option value="Xbox Controller">Xbox Controller</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
-                    <input type="text" name="unit_number" class="form-control" required placeholder="e.g. PS5-01">
+                    <input type="text" name="unit_number" class="form-control" required maxlength="20" placeholder="e.g. PS5-01">
                 </div>
                 <div class="form-group">
                     <label>Hourly Rate (₱)</label>
@@ -202,7 +212,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addConsoleModal')">Cancel</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addConsole')">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Console</button>
             </div>
         </form>

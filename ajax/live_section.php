@@ -111,7 +111,7 @@ if ($crQ) $cancelledReservations = $crQ->fetch_all(MYSQLI_ASSOC);
 // Customers
 $customers = [];
 $custQ = $conn->query(
-    "SELECT u.user_id, u.full_name, u.email, u.phone, u.created_at, u.is_banned,
+    "SELECT u.user_id, u.full_name, u.email, u.phone, u.created_at, u.status,
             COUNT(DISTINCT gs.session_id) AS total_sessions,
             COALESCE(SUM(t.amount),0) AS total_spent
        FROM users u

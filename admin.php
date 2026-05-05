@@ -218,7 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unit_number = trim($_POST['unit_number'] ?? '');
         $rate = (float)($_POST['hourly_rate'] ?? 0);
         
-        if ($name && in_array($type, ['PS5', 'Xbox Series X']) && $unit_number && $rate >= 0) {
+        if ($name && in_array($type, ['PS5', 'PS4', 'Xbox Series X', 'Xbox Controller']) && $unit_number && $rate >= 0) {
             if (addConsole($name, $type, $unit_number, $rate)) {
                 $message = 'Console added successfully.';
                 $messageType = 'success';
