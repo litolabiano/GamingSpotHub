@@ -752,7 +752,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ─── DATA FETCHING ──────────────────────────────────────────────────────────
 
 // Dashboard stats
-$today = date('Y-m-d');
+$today = getOperatingDay();
 $todayStats = getDailySalesReport($today);
 $activeSessions  = getActiveSessions();
 $activeCount     = count($activeSessions);
@@ -860,15 +860,18 @@ $pendingUserReschedules = $purStmt ? $purStmt->fetch_all(MYSQLI_ASSOC) : [];
 
 
 // Financial stats
-$finStmt = $conn->query(
+[$opStart, $opEnd] = getOperatingDayBounds($today);
+$finStmt = $conn->prepare(
     "SELECT
         SUM(CASE WHEN MONTH(transaction_date)=MONTH(NOW()) AND YEAR(transaction_date)=YEAR(NOW()) AND payment_status='completed' THEN amount ELSE 0 END) AS monthly_revenue,
-        SUM(CASE WHEN DATE(transaction_date)=CURDATE() AND payment_status='completed' THEN amount ELSE 0 END) AS today_revenue,
+        SUM(CASE WHEN (transaction_date BETWEEN ? AND ?) AND payment_status='completed' THEN amount ELSE 0 END) AS today_revenue,
         SUM(CASE WHEN payment_status='completed' THEN amount ELSE 0 END) AS total_revenue,
         COUNT(CASE WHEN payment_status='completed' THEN 1 END) AS total_transactions
      FROM transactions"
 );
-$finStats = $finStmt ? $finStmt->fetch_assoc() : [];
+$finStmt->bind_param("ss", $opStart, $opEnd);
+$finStmt->execute();
+$finStats = $finStmt->get_result()->fetch_assoc();
 
 // Transaction history (last 30)
 // NOTE: LEFT JOINs used because session_id can be NULL for reservation refunds.
@@ -972,15 +975,18 @@ $cancelByConsole = $conn->query(
 )->fetch_all(MYSQLI_ASSOC);
 
 // Cancellations over last 30 days (line chart)
+$nowTs = time();
 $cancelTrend = [];
 $cancelTrendLabels = [];
 for ($i = 29; $i >= 0; $i--) {
-    $d = date('Y-m-d', strtotime("-{$i} days"));
-    $cancelTrendLabels[] = date('M d', strtotime($d));
+    $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
+    [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
+    
+    $cancelTrendLabels[] = date('M d', strtotime($targetOpDay));
     $cs = $conn->prepare(
-        "SELECT COUNT(*) AS cnt FROM reservation_cancellations WHERE DATE(cancelled_at) = ?"
+        "SELECT COUNT(*) AS cnt FROM reservation_cancellations WHERE (cancelled_at BETWEEN ? AND ?)"
     );
-    $cs->bind_param('s', $d);
+    $cs->bind_param('ss', $sBound, $eBound);
     $cs->execute();
     $cancelTrend[] = (int)$cs->get_result()->fetch_assoc()['cnt'];
 }
@@ -1001,16 +1007,16 @@ foreach ($settingsKeys as $k) {
 
 // Chart data: revenue last 7 days
 $revChartData = [];
-for ($i = 6; $i >= 0; $i--) {
-    $d = date('Y-m-d', strtotime("-{$i} days"));
-    $s = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS rev FROM transactions WHERE DATE(transaction_date)=? AND payment_status='completed'");
-    $s->bind_param("s", $d);
-    $s->execute();
-    $revChartData[] = (float)$s->get_result()->fetch_assoc()['rev'];
-}
 $revLabels = [];
 for ($i = 6; $i >= 0; $i--) {
-    $revLabels[] = date('M d', strtotime("-{$i} days"));
+    $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
+    [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
+    
+    $revLabels[] = date('M d', strtotime($targetOpDay));
+    $s = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS rev FROM transactions WHERE (transaction_date BETWEEN ? AND ?) AND payment_status='completed'");
+    $s->bind_param("ss", $sBound, $eBound);
+    $s->execute();
+    $revChartData[] = (float)$s->get_result()->fetch_assoc()['rev'];
 }
 
 // Chart data: console type usage
@@ -3497,6 +3503,117 @@ function _addNotifItems(newItems) {
         poll();
         setInterval(poll, POLL_MS);
     }, 3000);
+})();
+
+// ── Unlimited Session Auto-Termination at 12:00 AM ────────────────────────
+// Monitors the clock every 30 s. When midnight (00:00 - 00:10) is detected,
+// calls ajax/auto_end_unlimited.php once to close all active Unlimited sessions.
+// Strictly Unlimited only — Hourly and Open Time sessions are unaffected.
+(function () {
+    var _midnightJobFired = false;   // prevent double-firing within the same midnight window
+    var POLL_MS = 30000;             // check every 30 seconds
+
+    function _checkMidnight() {
+        var now = new Date();
+        var h   = now.getHours();
+        var m   = now.getMinutes();
+
+        // Trigger window: 00:00 – 00:10 (covers late tab wake-ups)
+        if (h !== 0 || m > 10) {
+            // Outside the midnight window — reset the flag so next midnight fires again
+            if (_midnightJobFired && (h !== 0 || m > 10)) {
+                _midnightJobFired = false;
+            }
+            return;
+        }
+
+        // Already fired this midnight window — skip
+        if (_midnightJobFired) return;
+        _midnightJobFired = true;
+
+        console.log('[GSpot] Midnight detected — triggering auto-end for Unlimited sessions…');
+
+        fetch('ajax/auto_end_unlimited.php', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data || !data.success && data.ended === undefined) return;
+
+                var count = data.ended || 0;
+                if (count === 0) {
+                    console.log('[GSpot] Midnight auto-end: No active Unlimited sessions found.');
+                    return;
+                }
+
+                // ── Build a rich notification toast ──────────────────────────
+                var sessionLines = (data.sessions || []).map(function(s) {
+                    var h = Math.floor(s.duration_minutes / 60);
+                    var m = s.duration_minutes % 60;
+                    var dur = (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
+                    return '• ' + s.customer + ' (' + s.unit + ') — ' + dur + ' — ₱' + parseFloat(s.total_cost).toFixed(2);
+                }).join('\n');
+
+                var toastMsg = count + ' Unlimited session' + (count > 1 ? 's' : '') +
+                    ' automatically ended at 12:00 AM (shop closing).\n' + sessionLines;
+
+                console.log('[GSpot] Midnight auto-end complete:', data);
+
+                // Show toast if available, otherwise use a non-blocking banner
+                if (window.showToast) {
+                    window.showToast(
+                        count + ' Unlimited session' + (count > 1 ? 's' : '') +
+                        ' auto-ended at 12:00 AM — ₱400.00 flat rate applied.',
+                        'success'
+                    );
+                } else {
+                    // Fallback: inline status banner at top of admin panel
+                    var banner = document.createElement('div');
+                    banner.style.cssText =
+                        'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+                        'z-index:999999;background:linear-gradient(135deg,#0d2e22,#102e1a);' +
+                        'border:1px solid rgba(32,200,161,.5);border-radius:14px;' +
+                        'padding:16px 24px;max-width:480px;width:92%;' +
+                        'box-shadow:0 8px 32px rgba(0,0,0,.6);color:#eee;font-size:13px;' +
+                        'animation:gspotSirenFadeIn .3s ease;';
+                    banner.innerHTML =
+                        '<div style="display:flex;align-items:center;gap:12px;">' +
+                        '<div style="width:36px;height:36px;border-radius:10px;flex-shrink:0;' +
+                        'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);' +
+                        'display:flex;align-items:center;justify-content:center;font-size:16px;">' +
+                        '<i class="fas fa-moon" style="color:#20c8a1;"></i></div>' +
+                        '<div>' +
+                        '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
+                        'Shop Closing — Unlimited Sessions Ended</div>' +
+                        '<div style="color:#aaa;font-size:12px;">' +
+                        count + ' session' + (count > 1 ? 's' : '') +
+                        ' ended at 12:00 AM · ₱400.00 flat rate applied each</div>' +
+                        '</div>' +
+                        '<button onclick="this.parentElement.parentElement.remove()" ' +
+                        'style="background:none;border:none;color:#555;font-size:16px;' +
+                        'cursor:pointer;margin-left:auto;flex-shrink:0;">×</button>' +
+                        '</div>';
+                    document.body.appendChild(banner);
+                    setTimeout(function() {
+                        if (banner.parentNode) banner.parentNode.removeChild(banner);
+                    }, 12000);
+                }
+
+                // Refresh the dashboard view so ended sessions disappear from Live Sessions
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+            })
+            .catch(function(err) {
+                console.warn('[GSpot] Midnight auto-end fetch error:', err);
+                // Reset flag so it retries on the next poll if something went wrong
+                _midnightJobFired = false;
+            });
+    }
+
+    // First check at 5 s after page load (catches admin pages open past midnight)
+    setTimeout(function() {
+        _checkMidnight();
+        setInterval(_checkMidnight, POLL_MS);
+    }, 5000);
 })();
 </script>
 </body>

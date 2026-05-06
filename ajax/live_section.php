@@ -77,7 +77,8 @@ $allConsoles      = getConsoles();
 $availableCount   = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
 $inUseCount       = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount = count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
-$todayStats       = getDailySalesReport(date('Y-m-d'));
+$today            = getOperatingDay();
+$todayStats       = getDailySalesReport($today);
 $todayBookings    = $todayStats['total_sessions'] ?? 0;
 $unlimitedRateVal = (float)(getSetting('unlimited_rate') ?? 300);
 
@@ -218,12 +219,16 @@ foreach ($completedSessions as $s) {
 }
 
 // Dashboard stats (needed for dashboard section)
+[$opStart, $opEnd] = getOperatingDayBounds($today);
 $todayRevenue  = 0;
-$trQ = $conn->query(
+$trQ = $conn->prepare(
     "SELECT COALESCE(SUM(amount),0) AS rev FROM transactions
-      WHERE type='payment' AND DATE(created_at)=CURDATE()"
+      WHERE type='payment' AND (transaction_date BETWEEN ? AND ?)"
 );
-if ($trQ) $todayRevenue = (float)$trQ->fetch_assoc()['rev'];
+$trQ->bind_param("ss", $opStart, $opEnd);
+$trQ->execute();
+$trRes = $trQ->get_result()->fetch_assoc();
+$todayRevenue = (float)$trRes['rev'];
 
 $totalRevenue = 0;
 $trQ2 = $conn->query("SELECT COALESCE(SUM(amount),0) AS rev FROM transactions WHERE type='payment'");

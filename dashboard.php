@@ -103,16 +103,18 @@ if ($activeSession) {
 }
 
 // Total spending (sum of transactions)
+$opDay = getOperatingDay();
+[$opStart, $opEnd] = getOperatingDayBounds($opDay);
 $spendStmt = $conn->prepare(
     "SELECT
-        COALESCE(SUM(CASE WHEN DATE(transaction_date) = CURDATE() THEN amount ELSE 0 END),0) AS today,
+        COALESCE(SUM(CASE WHEN transaction_date BETWEEN ? AND ? THEN amount ELSE 0 END),0) AS today,
         COALESCE(SUM(CASE WHEN MONTH(transaction_date)=MONTH(NOW()) AND YEAR(transaction_date)=YEAR(NOW()) THEN amount ELSE 0 END),0) AS this_month,
         COALESCE(SUM(amount),0) AS total,
         COUNT(*) AS tx_count
      FROM transactions
      WHERE user_id = ? AND payment_status = 'completed'"
 );
-$spendStmt->bind_param('i', $user_id);
+$spendStmt->bind_param('ssi', $opStart, $opEnd, $user_id);
 $spendStmt->execute();
 $spending = $spendStmt->get_result()->fetch_assoc();
 
@@ -161,31 +163,36 @@ $upcomingRes = array_filter($myReservations, fn($r) => in_array($r['status'], ['
 // Sessions by day (last 14 days) — for activity chart
 $activityData = [];
 $activityLabels = [];
+$nowTs = time();
 for ($i = 13; $i >= 0; $i--) {
-    $d = date('Y-m-d', strtotime("-{$i} days"));
-    $activityLabels[] = date('M d', strtotime($d));
+    // We want the operating day that was $i days before the current operating day
+    $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
+    [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
+    
+    $activityLabels[] = date('M d', strtotime($targetOpDay));
     $s = $conn->prepare(
         "SELECT COALESCE(SUM(duration_minutes),0) AS mins
            FROM gaming_sessions
-          WHERE user_id=? AND DATE(start_time)=? AND status='completed'"
+          WHERE user_id=? AND (start_time BETWEEN ? AND ?) AND status='completed'"
     );
-    $s->bind_param('is', $user_id, $d);
+    $s->bind_param('iss', $user_id, $sBound, $eBound);
     $s->execute();
     $activityData[] = (int) $s->get_result()->fetch_assoc()['mins'];
 }
 
 // Spending by day (last 14 days) — for spend chart
-// Use LEFT JOIN so reservation downpayments (session_id IS NULL) are also counted.
 $spendData  = [];
 for ($i = 13; $i >= 0; $i--) {
-    $d = date('Y-m-d', strtotime("-{$i} days"));
+    $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
+    [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
+    
     $s = $conn->prepare(
         "SELECT COALESCE(SUM(t.amount),0) AS rev
            FROM transactions t
-          WHERE t.user_id=? AND DATE(t.transaction_date)=? AND t.payment_status='completed'
+          WHERE t.user_id=? AND (t.transaction_date BETWEEN ? AND ?) AND t.payment_status='completed'
             AND t.amount > 0"
     );
-    $s->bind_param('is', $user_id, $d);
+    $s->bind_param('iss', $user_id, $sBound, $eBound);
     $s->execute();
     $spendData[] = (float) $s->get_result()->fetch_assoc()['rev'];
 }

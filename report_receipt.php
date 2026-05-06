@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/includes/session_helper.php';
 require_once __DIR__ . '/includes/db_config.php';
+require_once __DIR__ . '/includes/db_functions.php';
 
 requireRole(['owner', 'shopkeeper']);
 
@@ -14,10 +15,10 @@ $txWhere = ""; $resWhere = "";
 $dateLabel = "";
 
 if ($type === 'daily') {
-    $safeDate = $conn->real_escape_string($dateVal);
-    $txWhere = "DATE(transaction_date) = '$safeDate'";
-    $resWhere = "DATE(created_at) = '$safeDate'";
-    $dateLabel = date('F j, Y', strtotime($safeDate));
+    [$start, $end] = getOperatingDayBounds($dateVal);
+    $txWhere = "transaction_date BETWEEN '$start' AND '$end'";
+    $resWhere = "created_at BETWEEN '$start' AND '$end'";
+    $dateLabel = date('F j, Y', strtotime($dateVal));
 } elseif ($type === 'monthly') {
     $safeDate = $conn->real_escape_string($dateVal);
     $txWhere = "DATE_FORMAT(transaction_date, '%Y-%m') = '$safeDate'";
