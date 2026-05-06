@@ -24,7 +24,7 @@
                 </div>
                 <div class="form-group" style="margin:0; flex:1; min-width:200px;">
                     <label id="reportDateLabel" style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Select Date</label>
-                    <input type="date" name="date" id="reportDateInput" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" required value="<?= date('Y-m-d') ?>">
+                    <input type="date" name="date" id="reportDateInput" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" required value="<?= getOperatingDay() ?>">
                 </div>
                 <button type="submit" style="height:41px;background:linear-gradient(135deg,#20c8a1,#5f85da);color:#fff;border:none;border-radius:8px;padding:0 24px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(32,200,161,.2);">
                     <i class="fas fa-print"></i> Generate & Print
@@ -40,7 +40,7 @@
         if (t === 'daily') {
             i.type = 'date';
             l.textContent = 'Select Date';
-            i.value = '<?= date('Y-m-d') ?>';
+            i.value = '<?= getOperatingDay() ?>';
         } else if (t === 'monthly') {
             i.type = 'month';
             l.textContent = 'Select Month';

@@ -973,6 +973,7 @@ function submitGameRequest($user_id, $game_name, $console_type, $message = null)
  */
 function getDailySalesReport($date) {
     global $conn;
+    [$start, $end] = getOperatingDayBounds($date);
     $stmt = $conn->prepare(
         "SELECT COUNT(*) AS total_sessions,
                 SUM(total_cost) AS total_revenue,
@@ -981,9 +982,9 @@ function getDailySalesReport($date) {
                 SUM(CASE WHEN rental_mode = 'open_time' THEN 1 ELSE 0 END) AS open_time_sessions,
                 SUM(CASE WHEN rental_mode = 'unlimited' THEN 1 ELSE 0 END) AS unlimited_sessions
          FROM gaming_sessions
-         WHERE DATE(start_time) = ? AND status = 'completed'"
+         WHERE start_time BETWEEN ? AND ? AND status = 'completed'"
     );
-    $stmt->bind_param("s", $date);
+    $stmt->bind_param("ss", $start, $end);
     $stmt->execute();
     return $stmt->get_result()->fetch_assoc();
 }
@@ -1395,6 +1396,35 @@ function getCancelledReservations() {
     );
     $stmt->execute();
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Returns the current "operating day" date string (Y-m-d).
+ * The operating day runs from 06:00:00 to 05:59:59 the next calendar day.
+ */
+function getOperatingDay($datetime = 'now') {
+    $tz = new DateTimeZone('Asia/Manila');
+    $dt = new DateTime($datetime, $tz);
+    $hour = (int)$dt->format('G'); // 0-23
+    
+    if ($hour < 6) {
+        // If before 6 AM, it belongs to the previous calendar day's operating day
+        $dt->modify('-1 day');
+    }
+    
+    return $dt->format('Y-m-d');
+}
+
+/**
+ * Given an operating day date string (Y-m-d), returns the exact start and end timestamps.
+ * e.g. "2026-05-07" returns ['2026-05-07 06:00:00', '2026-05-08 05:59:59']
+ */
+function getOperatingDayBounds($operating_date) {
+    $start = $operating_date . ' 06:00:00';
+    $end_dt = new DateTime($operating_date);
+    $end_dt->modify('+1 day');
+    $end = $end_dt->format('Y-m-d') . ' 05:59:59';
+    return [$start, $end];
 }
 ?>
 
