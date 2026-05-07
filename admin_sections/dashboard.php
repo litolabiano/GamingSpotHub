@@ -54,9 +54,10 @@
                 <i class="fas fa-circle" style="color:#20c8a1;font-size:9px;margin-right:8px;animation:livePulse 2s ease infinite;"></i>
                 Live Sessions
             </h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('startSession')">
+            <button class="btn-prim btn-sm" onclick="openModal('startSession')">
                 <i class="fas fa-plus"></i> Start Session
             </button>
+
         </div>
         <?php if (empty($activeSessions)): ?>
             <div class="empty-state">
@@ -103,7 +104,7 @@
                     data-customer="<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>"
                     data-unit="<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>">—</span></td>
                 <td>
-                    <button class="btn btn-danger btn-sm" title="End & Collect Payment"
+                    <button class="btn-dang btn-sm" title="End & Collect Payment"
                         onclick="openEndSessionModal(
                         <?= $sess['session_id'] ?>,
                         '<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>',
@@ -117,6 +118,7 @@
                         <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay
                     </button>
+
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -142,9 +144,10 @@
                 </span>
                 <?php endif; ?>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']'))">
+            <button class="btn-sec btn-sm" onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']'))">
                 <i class="fas fa-list"></i> View All
             </button>
+
         </div>
 
         <?php if (empty($todayRes)): ?>
@@ -173,16 +176,18 @@
                                 <input type="hidden" name="action" value="confirm_reservation">
                                 <?= csrfField() ?>
                                 <input type="hidden" name="reservation_id" value="<?= $r['reservation_id'] ?>">
-                                <button type="button" class="btn btn-primary btn-sm" title="Confirm"
+                                <button type="button" class="btn-prim btn-sm" title="Confirm"
                                         onclick="gspotConfirm('Confirm this reservation?', function(){ document.getElementById('dashFormConfirm<?= $r['reservation_id'] ?>').submit(); }, {yesLabel:'Yes, Confirm'})">
                                     <i class="fas fa-check"></i> Confirm
                                 </button>
+
                             </form>
                             <?php endif; ?>
                             <?php if ($r['status'] === 'reserved'): ?>
-                            <button class="btn btn-success btn-sm" onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Convert to Session">
+                            <button class="btn-prim btn-sm" onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Convert to Session">
                                 <i class="fas fa-play"></i> Start
                             </button>
+
                             <?php endif; ?>
                         </div>
                     </td>
@@ -204,9 +209,10 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Recent Sessions</h3>
-            <button class="btn btn-secondary btn-sm" onclick="showPage('sessions', document.querySelector('.nav-item[onclick*=\'sessions\']'))">
+            <button class="btn-sec btn-sm" onclick="showPage('sessions', document.querySelector('.nav-item[onclick*=\'sessions\']'))">
                 <i class="fas fa-list"></i> All Sessions
             </button>
+
         </div>
         <table class="data-table">
             <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Duration</th><th>Cost</th><th>Status</th></tr></thead>

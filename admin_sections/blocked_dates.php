@@ -27,9 +27,10 @@
                         <label>Reason / Note (Optional)</label>
                         <input type="text" name="reason" class="form-control" placeholder="e.g. Shop Holiday, Maintenance">
                     </div>
-                    <button type="submit" class="btn btn-danger btn-full" style="margin-top:10px;">
+                    <button type="submit" class="btn-dang btn-full" style="margin-top:10px;">
                         <i class="fas fa-lock"></i> Block This Date
                     </button>
+
                 </form>
             </div>
         </div>
@@ -74,9 +75,10 @@
                                             <input type="hidden" name="action" value="unblock_date">
                                             <?= csrfField() ?>
                                             <input type="hidden" name="blocked_date" value="<?= $bd['blocked_date'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-secondary" style="background:rgba(255,255,255,.05);color:#aaa;">
+                                            <button type="submit" class="btn-sec btn-sm">
                                                 <i class="fas fa-unlock"></i> Unblock
                                             </button>
+
                                         </form>
                                     </td>
                                 </tr>

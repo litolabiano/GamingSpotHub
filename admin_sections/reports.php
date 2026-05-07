@@ -26,9 +26,10 @@
                     <label id="reportDateLabel" style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Select Date</label>
                     <input type="date" name="date" id="reportDateInput" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" required value="<?= getOperatingDay() ?>">
                 </div>
-                <button type="submit" style="height:41px;background:linear-gradient(135deg,#20c8a1,#5f85da);color:#fff;border:none;border-radius:8px;padding:0 24px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(32,200,161,.2);">
+                <button type="submit" class="btn-prim" style="height:41px; padding:0 24px;">
                     <i class="fas fa-print"></i> Generate & Print
                 </button>
+
             </form>
         </div>
     </div>

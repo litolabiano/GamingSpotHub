@@ -127,7 +127,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
     .end-time-edit-wrap .btn-confirm:hover {
         background: #17a887;
+        filter: brightness(1.1);
     }
+
 
     .end-time-edit-wrap .btn-cancel-edit {
         background: transparent;
@@ -141,8 +143,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     }
 
     .end-time-edit-wrap .btn-cancel-edit:hover {
-        background: rgba(251, 86, 107, .1);
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
     }
+
 
     .saving-indicator {
         font-size: 11px;
@@ -172,9 +176,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             <h2 class="page-title"><i class="fas fa-play-circle" style="color:#5f85da;margin-right:10px;"></i>Session Management</h2>
             <p class="page-subtitle">View, manage, and control all gaming sessions</p>
         </div>
-        <button class="btn btn-primary" onclick="openModal('startSession')">
+        <button class="btn-prim" onclick="openModal('startSession')">
             <i class="fas fa-plus"></i> New Session
         </button>
+
     </div>
 
 
@@ -274,8 +279,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             </td>
                             <td>
                                 <?php if ($psOwed > 0): ?>
-                                    <button class="btn btn-sm" title="Collect Payment"
-                                        style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                                    <button class="btn-prim btn-sm" title="Collect Payment"
                                         onclick="openPayModal(
                             <?= $ps['session_id'] ?>,
                             '<?= sessionCustomerLabel($ps, true) ?>',
@@ -288,6 +292,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         )">
                                         <i class="fas fa-peso-sign"></i> Pay
                                     </button>
+
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -311,10 +316,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                 </select>
-                <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
-                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#888;font-size:12px;">
+                <button class="btn-sec btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first">
                     <i class="fas fa-sort-amount-down"></i>
                 </button>
+
                 <span class="asb-count" id="sessionsCount"></span>
             </div>
         </div>
@@ -421,7 +426,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <td>
                             <?php if ($sess['status'] === 'active'): ?>
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;min-width:170px;">
-                                    <button class="btn btn-danger btn-sm" title="End Session"
+                                    <button class="btn-dang btn-sm" title="End Session"
                                         style="justify-content:center;flex:1 1 70px;"
                                         onclick="openEndSessionModal(
                             <?= $sess['session_id'] ?>,
@@ -437,9 +442,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
+
                                     <?php if ($sess['rental_mode'] !== 'unlimited'): ?>
-                                    <button class="btn btn-sm" title="Extend Session"
-                                        style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
+                                    <button class="btn-sec btn-sm" title="Extend Session"
+                                        style="justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(
                                 <?= $sess['session_id'] ?>,
                                 '<?= sessionCustomerLabel($sess, true) ?>',
@@ -449,6 +455,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             )">
                                         <i class="fas fa-clock"></i> Extend
                                     </button>
+
                                     <?php endif; ?>
                                 </div>
 

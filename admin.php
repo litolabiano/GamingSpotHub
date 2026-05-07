@@ -99,9 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
         $pr           = getPricingRules();
-        $upfront_cost = ($planned_minutes <= 30)
-                        ? $pr['session_min_charge']
-                        : (float)($planned_minutes / 60 * $pr['hourly_rate']);
+        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
         // Add controller rental fee to upfront total if checked
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee     = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
@@ -1499,15 +1497,12 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
                 <!-- Footer -->
                 <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);text-align:center;">
-                    <button onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();"
-                            style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.35);color:#20c8a1;
-                                   border-radius:8px;padding:6px 18px;font-size:12px;font-weight:700;cursor:pointer;
-                                   font-family:inherit;width:100%;transition:background .2s;"
-                            onmouseover="this.style.background='rgba(32,200,161,.25)'"
-                            onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                    <button class="btn-prim" style="width:100%;font-size:12px;padding:8px 18px;"
+                            onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();">
                         <i class="fas fa-list" style="margin-right:5px;"></i> View All Reservations
                     </button>
                 </div>
+
             </div>
         </div>
 
@@ -2118,13 +2113,13 @@ function _showStartShortError(msg) {
         banner.id = 'startShortErrorBanner';
         banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(251,86,107,.13);border:1.5px solid rgba(251,86,107,.45);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:13px;font-weight:600;color:#fb566b;animation:shakeX .35s;';
         // inject before the submit button
-        const btn = document.querySelector('#startSessionForm .btn-primary');
+        const btn = document.querySelector('#startSessionForm .btn-prim');
         if (btn) btn.parentNode.insertBefore(banner, btn);
     }
     banner.innerHTML = '<i class="fas fa-circle-exclamation"></i><span>' + msg + '</span>';
     banner.style.display = 'flex';
     // Disable submit button briefly
-    const btn = document.querySelector('#startSessionForm .btn-primary');
+    const btn = document.querySelector('#startSessionForm .btn-prim');
     if (btn) {
         btn.disabled = true;
         btn.style.opacity = '0.5';
@@ -2136,7 +2131,7 @@ function _showStartShortError(msg) {
 function _clearStartShortError() {
     const banner = document.getElementById('startShortErrorBanner');
     if (banner) banner.style.display = 'none';
-    const btn = document.querySelector('#startSessionForm .btn-primary');
+    const btn = document.querySelector('#startSessionForm .btn-prim');
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
 }
 
@@ -2147,7 +2142,7 @@ function _clearStartShortError() {
 function _syncStartBtn() {
     const mode = document.getElementById('rentalModeSelect') ?
                  document.getElementById('rentalModeSelect').value : '';
-    const btn  = document.querySelector('#startSessionForm .btn-primary');
+    const btn  = document.querySelector('#startSessionForm .btn-prim');
     if (!btn) return;
 
     let isShort  = false;

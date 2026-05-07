@@ -64,9 +64,11 @@ if (!$res) {
     exit;
 }
 
-$old_date = $res['reserved_date'];
-$old_time = $res['reserved_time'];
-$user_id  = (int)$res['user_id'];
+$old_date         = $res['reserved_date'];
+$old_time         = $res['reserved_time'];
+$old_console_type = $res['console_type'];
+$old_console_id   = $res['console_id'];
+$user_id          = (int)$res['user_id'];
 
 // If console type not passed, keep current
 if (!$new_console_type) {
@@ -83,9 +85,9 @@ if ($new_date === $old_date &&
 
 $conn->begin_transaction();
 try {
-    // Update the reservation date/time/console and set status to pending
+    // Update the reservation date/time/console and keep/set status to reserved
     $upd = $conn->prepare(
-        "UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type = ?, console_id = ?, status = 'pending', updated_at = NOW()
+        "UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type = ?, console_id = ?, status = 'reserved', updated_at = NOW()
           WHERE reservation_id = ?"
     );
     $upd->bind_param('sssii', $new_date, $new_time, $new_console_type, $new_console_id, $reservation_id);
@@ -94,18 +96,18 @@ try {
     // Log the reschedule (also acts as user notification)
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
-            (reservation_id, user_id, old_date, old_time, new_date, new_time, console_id, console_type,
+            (reservation_id, user_id, 
+             old_date, old_time, old_console_id, old_console_type,
+             new_date, new_time, console_id, console_type,
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'approved', 0)"
     );
     $staff_id = (int)$user['user_id'];
     $log->bind_param(
-        'iissssisssi',
+        'iississsisssi',
         $reservation_id, $user_id,
-        $old_date, $old_time,
-        $new_date, $new_time,
-        $new_console_id,
-        $new_console_type,
+        $old_date, $old_time, $old_console_id, $old_console_type,
+        $new_date, $new_time, $new_console_id, $new_console_type,
         $reason, $reason_detail,
         $staff_id
     );

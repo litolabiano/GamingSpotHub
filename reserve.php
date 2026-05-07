@@ -828,13 +828,9 @@ if (!empty($_GET['console'])) {
 
     /* ── Submit button ──────────────────────────────────── */
     .res-submit-btn {
-        width: 100%; padding: 16px;
-        background: linear-gradient(135deg, #20c8a1, #17a887);
-        border: none; border-radius: 12px;
-        color: #0a0f1c; font-weight: 800; font-size: 16px;
-        cursor: pointer; transition: all .2s;
-        display: flex; align-items: center; justify-content: center; gap: 10px;
+        width: 100%; margin-top: 10px;
     }
+
     .res-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(32,200,161,.35); }
     .res-submit-btn:active { transform: translateY(0); }
 
@@ -1107,13 +1103,8 @@ if (!empty($_GET['console'])) {
     .ur-alert { background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.3); color:#fb566b; padding:12px; border-radius:8px; font-size:12px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start; }
     .ur-alert i { margin-top:2px; }
     .ur-btn-row { display: flex; justify-content: flex-end; gap: 10px; }
-    .ur-btn { padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; transition: all .2s; }
-    .ur-btn.sec { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #ddd; }
-    .ur-btn.sec:hover { background: rgba(255,255,255,.1); }
-    .ur-btn.dang { background: #fb566b; color: #fff; }
-    .ur-btn.dang:hover { filter: brightness(1.1); }
-    .ur-btn.prim { background: #20c8a1; color: #000; }
-    .ur-btn.prim:hover { filter: brightness(1.1); }
+    </style>
+
     </style>
 
 </head>
@@ -1671,11 +1662,12 @@ if (!empty($_GET['console'])) {
                     </div>
 
                     <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
-                    <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
+                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn" disabled>
                         <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
                         <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
                         <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
                     </button>
+
                     <div style="text-align:center;margin-top:10px;font-size:11px;color:#555;">
                         <i class="fas fa-lock" style="margin-right:4px;"></i>
                         You will be redirected to GCash to complete payment. Your reservation is saved only after payment succeeds.
@@ -1743,8 +1735,8 @@ if (!empty($_GET['console'])) {
                         No reservations yet
                     </div>
                     <?php else: ?>
-                    <div class="my-res-table-wrap">
-                        <table class="my-res-table" style="min-width:520px;">
+                    <div class="my-res-table-wrap" id="myReservationsTableWrap">
+                        <table class="my-res-table" id="myReservationsTable" style="min-width:520px;">
                             <thead>
                                 <tr>
                                     <th>Date &amp; Time</th>
@@ -2696,8 +2688,14 @@ function submitUserCancel(e) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            window.location.reload();
+            closeUserCancelModal();
+            fetch(location.href).then(r => r.text()).then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTable = doc.getElementById('myReservationsTableWrap');
+                const oldTable = document.getElementById('myReservationsTableWrap');
+                if (newTable && oldTable) oldTable.innerHTML = newTable.innerHTML;
+                alert(data.message);
+            });
         } else {
             err.textContent = data.message;
             err.style.display = 'block';
@@ -2811,7 +2809,6 @@ function submitUserReschedule(e) {
     const type = document.getElementById('reschedConsoleType').value;
     const unit = document.getElementById('reschedUnit').value;
 
-
     if (!rid || !date || !time) {
         err.textContent = 'Please fill out all required fields.';
         err.style.display = 'block';
@@ -2829,13 +2826,18 @@ function submitUserReschedule(e) {
     fd.append('console_type', type);
     fd.append('console_id', unit);
 
-
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            window.location.reload();
+            closeUserRescheduleModal();
+            fetch(location.href).then(r => r.text()).then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTable = doc.getElementById('myReservationsTableWrap');
+                const oldTable = document.getElementById('myReservationsTableWrap');
+                if (newTable && oldTable) oldTable.innerHTML = newTable.innerHTML;
+                alert(data.message);
+            });
         } else {
             err.textContent = data.message;
             err.style.display = 'block';
@@ -2885,9 +2887,10 @@ function submitUserReschedule(e) {
                 <div id="cancelError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
 
                 <div style="margin-top:20px;" class="ur-btn-row">
-                    <button type="button" class="ur-btn sec" onclick="closeUserCancelModal()">Keep Reservation</button>
-                    <button type="submit" class="ur-btn dang" id="cancelSubmitBtn">Yes, Cancel It</button>
+                    <button type="button" class="btn-sec" onclick="closeUserCancelModal()">Keep Reservation</button>
+                    <button type="submit" class="btn-dang" id="cancelSubmitBtn">Yes, Cancel It</button>
                 </div>
+
             </form>
         </div>
     </div>
@@ -2946,9 +2949,10 @@ function submitUserReschedule(e) {
                 <div id="reschedError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
 
                 <div class="ur-btn-row">
-                    <button type="button" class="ur-btn sec" onclick="closeUserRescheduleModal()">Cancel</button>
-                    <button type="submit" class="ur-btn prim" id="reschedSubmitBtn">Confirm Reschedule</button>
+                    <button type="button" class="btn-sec" onclick="closeUserRescheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-prim" id="reschedSubmitBtn">Confirm Reschedule</button>
                 </div>
+
             </form>
         </div>
     </div>

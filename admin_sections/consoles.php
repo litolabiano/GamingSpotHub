@@ -11,16 +11,17 @@
             </div>
             
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="openModal('addConsole')">
+                <button class="btn-prim" onclick="openModal('addConsole')">
                     <i class="fas fa-plus"></i> Add Console
                 </button>
-                <button class="btn btn-secondary" onclick="openModal('manageConsoleTypes')">
+                <button class="btn-sec" onclick="openModal('manageConsoleTypes')">
                     <i class="fas fa-tags"></i> Manage Types
                 </button>
-                <button class="btn btn-secondary" onclick="toggleArchiveSection(true)">
+                <button class="btn-sec" onclick="toggleArchiveSection(true)">
                     <i class="fas fa-archive"></i> Archived Consoles (<?= count($archivedConsoles) ?>)
                 </button>
             </div>
+
             
             <div style="width:100%;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:5px;">
                 <span style="font-size:13px;display:flex;align-items:center;gap:6px;">
@@ -111,10 +112,10 @@
                     <div class="console-edit-row">
                         <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>, <?= (int)$con['controller_count'] ?>)"
 
-                                class="btn btn-sm"
-                                style="background:rgba(95,133,218,.15);color:#8aa4e8;border:1px solid rgba(95,133,218,.3);">
+                                class="btn-sec btn-sm">
                             <i class="fas fa-edit"></i> Edit Console
                         </button>
+
                     </div>
 
                     <!-- Row 2: Status toggle buttons (2-col grid, only shows if NOT that status) -->
@@ -125,9 +126,10 @@
                             <?= csrfField() ?>
                             <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                             <input type="hidden" name="status" value="available">
-                            <button type="submit" class="btn btn-success btn-sm" title="Set as Available">
+                            <button type="submit" class="btn-prim btn-sm" title="Set as Available">
                                 <i class="fas fa-check"></i> Available
                             </button>
+
                         </form>
                         <?php endif; ?>
 
@@ -137,10 +139,10 @@
                             <?= csrfField() ?>
                             <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                             <input type="hidden" name="status" value="maintenance">
-                            <button type="submit" class="btn btn-sm" title="Set to Maintenance"
-                                    style="background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.3);color:#fb566b;">
+                            <button type="submit" class="btn-dang btn-sm" title="Set to Maintenance">
                                 <i class="fas fa-wrench"></i> Maintenance
                             </button>
+
                         </form>
                         <?php endif; ?>
                     </div>
@@ -153,10 +155,10 @@
                             <?= csrfField() ?>
                             <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                             <input type="hidden" name="status" value="archived">
-                            <button type="submit" class="btn btn-sm" title="Archive Console"
-                                    style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#aaa;">
+                            <button type="submit" class="btn-sec btn-sm" title="Archive Console" style="opacity:0.7;">
                                 <i class="fas fa-archive"></i> Archive
                             </button>
+
                         </form>
                     </div>
 
@@ -179,9 +181,10 @@
                 <p class="page-subtitle">These consoles are hidden from normal operations.</p>
             </div>
             
-            <button class="btn btn-secondary" onclick="toggleArchiveSection(false)">
+            <button class="btn-sec" onclick="toggleArchiveSection(false)">
                 <i class="fas fa-arrow-left"></i> Back to Active
             </button>
+
         </div>
         
         <div class="console-grid">
@@ -207,18 +210,20 @@
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
                         <input type="hidden" name="status" value="available">
-                        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;" title="Restore Console">
+                        <button type="submit" class="btn-prim btn-sm" style="width:100%;" title="Restore Console">
                             <i class="fas fa-undo"></i> Restore
                         </button>
+
                     </form>
                     
                     <form method="POST" action="admin.php#consoles" style="flex:1;" onsubmit="return confirm('WARNING: Permanently delete this console? This cannot be undone.')">
                         <input type="hidden" name="action" value="delete_console">
                         <?= csrfField() ?>
                         <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <button type="submit" class="btn btn-danger btn-sm" style="width:100%;" title="Permanently Delete">
+                        <button type="submit" class="btn-dang btn-sm" style="width:100%;" title="Permanently Delete">
                             <i class="fas fa-trash"></i> Delete
                         </button>
+
                     </form>
                 </div>
             </div>
@@ -251,9 +256,10 @@
                 </h2>
                 <p class="page-subtitle">Manage physical controllers available for rental</p>
             </div>
-            <button class="btn btn-primary" onclick="openModal('addController')">
+            <button class="btn-prim" onclick="openModal('addController')">
                 <i class="fas fa-plus"></i> Add Controller
             </button>
+
         </div>
 
         <!-- Stats row -->
@@ -337,12 +343,10 @@
                                     <input type="hidden" name="status" value="archived">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
-                                    <button type="submit"
-                                            style="background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.3);
-                                                   color:#fb566b;padding:5px 12px;border-radius:7px;font-size:12px;
-                                                   cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
+                                    <button type="submit" class="btn-dang btn-sm" style="padding:5px 12px; font-size:12px;">
                                         <i class="fas fa-archive"></i> Archive
                                     </button>
+
                                 </form>
                                 <?php endif; ?>
                             </div>
@@ -393,11 +397,10 @@
                                         <input type="hidden" name="action" value="update_controller_status">
                                         <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
                                         <input type="hidden" name="status" value="available">
-                                        <button type="submit"
-                                                style="background:rgba(32,200,161,.15);color:#20c8a1;border:1px solid rgba(32,200,161,.3);
-                                                       padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;">
+                                        <button type="submit" class="btn-prim btn-sm" style="padding:5px 12px; font-size:12px;">
                                             <i class="fas fa-undo"></i> Restore
                                         </button>
+
                                     </form>
                                     <?php if ($user['role'] === 'owner'): ?>
                                     <form method="POST" action="admin.php#consoles" style="display:inline;"
@@ -405,11 +408,10 @@
                                         <?= csrfField() ?>
                                         <input type="hidden" name="action" value="delete_controller">
                                         <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
-                                        <button type="submit"
-                                                style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
-                                                       padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;">
+                                        <button type="submit" class="btn-dang btn-sm" style="padding:5px 10px; font-size:12px;">
                                             <i class="fas fa-trash"></i> Delete
                                         </button>
+
                                     </form>
                                     <?php endif; ?>
                                 </div>
@@ -466,9 +468,10 @@
 
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addConsole')">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Console</button>
+                <button type="button" class="btn-sec" onclick="closeModal('addConsole')">Cancel</button>
+                <button type="submit" class="btn-prim"><i class="fas fa-save"></i> Add Console</button>
             </div>
+
         </form>
     </div>
 </div>
@@ -516,11 +519,12 @@
 
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('editConsole')">Cancel</button>
-                <button type="submit" class="btn btn-primary">
+                <button type="button" class="btn-sec" onclick="closeModal('editConsole')">Cancel</button>
+                <button type="submit" class="btn-prim">
                     <i class="fas fa-save"></i> Save Changes
                 </button>
             </div>
+
         </form>
     </div>
 </div>
@@ -602,8 +606,9 @@ function toggleArchiveSection(showArchive) {
                 <label style="font-size:12px; font-weight:700; color:#888; text-transform:uppercase; display:block; margin-bottom:8px;">Add New Type</label>
                 <div style="display:flex; gap:10px;">
                     <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:1;">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+                    <button type="submit" class="btn-prim"><i class="fas fa-plus"></i> Add</button>
                 </div>
+
             </form>
 
             <!-- Existing Types List -->
@@ -672,7 +677,8 @@ function toggleArchiveSection(showArchive) {
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-secondary btn-full" onclick="closeModal('manageConsoleTypes')">Close</button>
+            <button type="button" class="btn-sec btn-full" onclick="closeModal('manageConsoleTypes')">Close</button>
         </div>
+
     </div>
 </div>

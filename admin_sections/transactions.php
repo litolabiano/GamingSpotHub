@@ -93,12 +93,7 @@
                     };
                 } else {
                     if ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) {
-                        $pr = getPricingRules();
-                        // computeTimedCost walks the bonus cycle so free minutes
-                        // are not billed. e.g. 300 min (4hr paid+1hr free) → ₱320.
-                        $psExpected = $ps['planned_minutes'] <= 30
-                            ? $pr['session_min_charge']
-                            : (float)computeTimedCost((int)$ps['planned_minutes']);
+                        $psExpected = (float)computeHourlySessionBaseCost((int)$ps['planned_minutes']);
                         $psModeLabel = 'Hourly';
                     } else {
                         $psExpected  = $unlimitedRateVal;
@@ -133,8 +128,7 @@
                 </td>
                 <td>
                     <?php if ($psOwed > 0): ?>
-                    <button class="btn btn-sm" title="Collect Payment"
-                        style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                    <button class="btn-prim btn-sm" title="Collect Payment"
                         onclick="openPayModal(
                             <?= $ps['session_id'] ?>,
                             '<?= htmlspecialchars(addslashes($ps['customer_name'])) ?>',
@@ -147,6 +141,7 @@
                         )">
                         <i class="fas fa-peso-sign"></i> Collect
                     </button>
+
                     <?php endif; ?>
                 </td>
             </tr>

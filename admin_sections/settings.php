@@ -164,9 +164,10 @@
         </div>
 
         <div style="margin-top:16px;display:flex;align-items:center;gap:12px;">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn-prim">
                 <i class="fas fa-save"></i> Save All Settings
             </button>
+
             <span style="font-size:12px;color:#888;">
                 <i class="fas fa-info-circle"></i>
                 Saving rates will immediately update all console dropdowns and duration options across the system.

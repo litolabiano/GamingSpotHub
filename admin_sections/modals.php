@@ -33,23 +33,14 @@
         "></p>
         <!-- Buttons -->
         <div style="display:flex;gap:10px;">
-            <button id="gspotConfirmNo" style="
-                flex:1;padding:11px;border-radius:10px;
-                background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
-                color:#aaa;font-size:14px;font-weight:600;cursor:pointer;
-                transition:.18s;font-family:inherit;
-            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">
+            <button id="gspotConfirmNo" class="btn-sec" style="flex:1;">
                 <i class="fas fa-times" style="margin-right:6px"></i>Cancel
             </button>
-            <button id="gspotConfirmYes" style="
-                flex:1;padding:11px;border-radius:10px;
-                background:linear-gradient(135deg,#20c8a1,#5f85da);
-                border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
-                box-shadow:0 4px 16px rgba(32,200,161,0.3);transition:.18s;font-family:inherit;
-            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+            <button id="gspotConfirmYes" class="btn-prim" style="flex:1;">
                 <i class="fas fa-check" style="margin-right:6px"></i>Confirm
             </button>
         </div>
+
     </div>
 </div>
 <style>
@@ -201,12 +192,13 @@
     80%     { transform:translateX(5px); }
 }
 /* Start Session button disabled state */
-#startSessionForm .btn-primary:disabled {
+#startSessionForm .btn-prim:disabled {
     background:rgba(100,100,120,.3)!important;
     box-shadow:none!important;
     cursor:not-allowed!important;
     opacity:.55!important;
 }
+
 </style>
 
 <!-- ════ CUSTOMER SEARCH WIDGET — shared CSS ═══════════════════════════ -->
@@ -559,9 +551,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-clock"></i> <strong>Open Time</strong> — no upfront payment needed. Cost is calculated and collected when the session ends.
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-play"></i> Start Session
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -656,18 +649,11 @@ $ctrlTotal = $conn->query(
             </div>
 
             <!-- Refund & End action -->
-            <button type="button" id="endEarlyRefundBtn"
-                    style="width:100%;padding:12px;border-radius:10px;
-                           background:linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15));
-                           border:1px solid rgba(241,168,60,.5);color:#f1e1aa;
-                           font-size:14px;font-weight:700;cursor:pointer;
-                           display:flex;align-items:center;justify-content:center;gap:8px;
-                           transition:.2s;"
-                    onmouseover="this.style.background='linear-gradient(135deg,rgba(241,168,60,.35),rgba(251,86,107,.25))'"
-                    onmouseout="this.style.background='linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15))'">
+            <button type="button" id="endEarlyRefundBtn" class="btn-dang btn-full" style="padding:12px;">
                 <i class="fas fa-undo-alt"></i>
                 <span>Refund <span id="endEarlyRefundBtnAmt">—</span> &amp; End Session Early</span>
             </button>
+
         </div>
 
 
@@ -752,9 +738,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-check-circle"></i> <strong>Payment already collected at session start.</strong> No additional charge at end.
             </div>
 
-            <button type="submit" class="btn btn-danger btn-full" id="endSessionConfirmBtn" style="margin-top:4px;">
+            <button type="submit" class="btn-dang btn-full" id="endSessionConfirmBtn" style="margin-top:4px;">
                 <i class="fas fa-check-circle"></i> <span id="endSessionConfirmLabel">Confirm End &amp; Record Payment</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -833,9 +820,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>
                 <strong>Short payment</strong> — the remaining shortfall will be recorded.
             </div>
-            <button type="submit" id="payConfirmBtn" class="btn btn-primary btn-full">
+            <button type="submit" id="payConfirmBtn" class="btn-prim btn-full">
                 <i class="fas fa-check-circle"></i> <span id="payConfirmLabel">Record Payment</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -898,10 +886,11 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
                 <span id="refundErrorText"></span>
             </div>
-            <button type="button" id="refundConfirmBtn" class="btn btn-danger btn-full"
+            <button type="button" id="refundConfirmBtn" class="btn-dang btn-full"
                     onclick="_submitRefundAjax()">
                 <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -970,9 +959,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
                 <span id="extendErrorText"></span>
             </div>
-            <button type="submit" id="extendConfirmBtn" class="btn btn-primary" style="width:100%;justify-content:center;background:rgba(95,133,218,.25);border:1px solid #5f85da;color:#8aa4e8;">
+            <button type="submit" id="extendConfirmBtn" class="btn-prim btn-full">
                 <i class="fas fa-clock"></i> <span id="extendConfirmLabel">Extend Session</span>
             </button>
+
         </form>
         
     </div>
@@ -1379,9 +1369,10 @@ function denyExt(extId) {
                 <label>Notes</label>
                 <textarea name="notes" rows="2" placeholder="Any notes…"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-calendar-check"></i> Save Reservation
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -1417,9 +1408,10 @@ function denyExt(extId) {
                 <span>Double-check the console unit matches the customer's reservation type. This action starts the timer immediately.</span>
             </div>
             <hr class="modal-divider">
-            <button type="submit" class="btn btn-success btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-play"></i> Start Session Now
             </button>
+
         </form>
     </div>
 </div>
@@ -1791,13 +1783,14 @@ function openConvertModal(res) {
             </div>
 
             <div class="modal-footer">
-                <button type="button" onclick="closeModal('addController')" class="btn btn-secondary">
+                <button type="button" onclick="closeModal('addController')" class="btn-sec">
                     Cancel
                 </button>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn-prim">
                     <i class="fas fa-plus"></i> Add Controller
                 </button>
             </div>
+
         </form>
     </div>
 </div>

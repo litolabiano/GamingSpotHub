@@ -10,9 +10,10 @@
         <h2 class="page-title"><i class="fas fa-trophy" style="color:#f1a83c;margin-right:10px;"></i>Tournaments</h2>
         <p class="page-subtitle">Create tournaments and manage participant registrations</p>
     </div>
-    <button class="btn btn-primary" onclick="openModal('createTournament')">
+    <button class="btn-prim" onclick="openModal('createTournament')">
         <i class="fas fa-plus"></i> New Tournament
     </button>
+
 </div>
 
 <?php
@@ -169,11 +170,12 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
             <td>
                 <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
                     <!-- View Registrants -->
-                    <button class="btn btn-sm btn-secondary"
+                    <button class="btn-sec btn-sm"
                         onclick="viewParticipants(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>')"
                         title="View Registrants">
                         <i class="fas fa-users"></i>
                     </button>
+
 
                     <!-- Status switch buttons -->
                     <?php if ($t['status'] === 'upcoming'): ?>
@@ -182,11 +184,10 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="scheduled">
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(32,200,161,.15);color:#20c8a1;border:1px solid rgba(32,200,161,.3);"
-                            title="Open Registration">
+                        <button type="submit" class="btn-prim btn-sm" title="Open Registration">
                             <i class="fas fa-door-open"></i> Open Reg.
                         </button>
+
                     </form>
 
                     <?php elseif ($t['status'] === 'scheduled'): ?>
@@ -195,22 +196,20 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="upcoming">
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(241,168,60,.12);color:#f1a83c;border:1px solid rgba(241,168,60,.3);"
-                            title="Close Registration">
+                        <button type="submit" class="btn-sec btn-sm" title="Close Registration">
                             <i class="fas fa-lock"></i> Close Reg.
                         </button>
+
                     </form>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="ongoing">
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(95,133,218,.15);color:#5f85da;border:1px solid rgba(95,133,218,.3);"
-                            title="Start Tournament">
+                        <button type="submit" class="btn-prim btn-sm" title="Start Tournament">
                             <i class="fas fa-play"></i> Start
                         </button>
+
                     </form>
 
                     <?php elseif ($t['status'] === 'ongoing'): ?>
@@ -219,31 +218,31 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="completed">
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(32,200,161,.12);color:#20c8a1;border:1px solid rgba(32,200,161,.3);">
+                        <button type="submit" class="btn-prim btn-sm">
                             <i class="fas fa-flag-checkered"></i> Complete
                         </button>
+
                     </form>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
                         <?= csrfField() ?>
                         <input type="hidden" name="tournament_id" value="<?= $t['tournament_id'] ?>">
                         <input type="hidden" name="new_status" value="cancelled">
-                        <button type="submit" class="btn btn-sm"
-                            style="background:rgba(251,86,107,.12);color:#fb566b;border:1px solid rgba(251,86,107,.3);">
+                        <button type="submit" class="btn-dang btn-sm">
                             <i class="fas fa-times"></i> Cancel
                         </button>
+
                     </form>
                     <?php endif; ?>
 
                     <!-- Add Participant -->
                     <?php if (in_array($t['status'], ['scheduled','ongoing']) && !$isFull): ?>
-                    <button class="btn btn-sm"
-                        style="background:rgba(179,123,236,.12);color:#b37bec;border:1px solid rgba(179,123,236,.3);"
+                    <button class="btn-sec btn-sm"
                         onclick="openAddParticipant(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>')"
                         title="Add Participant">
                         <i class="fas fa-user-plus"></i>
                     </button>
+
                     <?php endif; ?>
                 </div>
             </td>
@@ -265,9 +264,10 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 <i class="fas fa-users"></i> Registrants:
                 <span id="drawerTournamentName" style="color:#f1a83c;">—</span>
             </h3>
-            <button class="btn btn-sm btn-secondary" onclick="closeDrawer()">
+            <button class="btn-sec btn-sm" onclick="closeDrawer()">
                 <i class="fas fa-times"></i> Close
             </button>
+
         </div>
         <div id="drawerContent">
             <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>
@@ -404,9 +404,10 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 Switch to <strong style="color:#20c8a1;">Scheduled</strong> to open public registration.
             </div>
             <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('createTournament')">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create Tournament</button>
+                <button type="button" class="btn-sec" onclick="closeModal('createTournament')">Cancel</button>
+                <button type="submit" class="btn-prim"><i class="fas fa-plus"></i> Create Tournament</button>
             </div>
+
         </form>
     </div>
 </div>
@@ -488,9 +489,10 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
             </div>
 
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addParticipant')">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Register</button>
+                <button type="button" class="btn-sec" onclick="closeModal('addParticipant')">Cancel</button>
+                <button type="submit" class="btn-prim"><i class="fas fa-user-plus"></i> Register</button>
             </div>
+
         </form>
     </div>
 </div>

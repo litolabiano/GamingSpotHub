@@ -138,7 +138,10 @@ function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null):
     // paidToTotalMinutes(p) === total_minutes.
     for ($p = $total_minutes; $p >= 0; $p--) {
         if ($p + (int)floor($p / $bp) * $bf === $total_minutes) {
-            return (float)round($p / 60 * $rules['hourly_rate'], 2);
+            // Apply the new pricing structure: ₱50 for first 30m, ₱80/hr for the rest
+            if ($p <= 0) return 0.0;
+            if ($p <= 30) return (float)$rules['session_min_charge'];
+            return (float)($rules['session_min_charge'] + round(($p - 30) / 60 * $rules['hourly_rate'], 2));
         }
     }
     // Fallback: no bonus found — treat all minutes as paid (shouldn't happen)
@@ -160,7 +163,8 @@ function getHourlyDurationOptions(?array $rules = null): array {
     for ($paid = 30; $paid <= $max; $paid += 30) {
         $bonus = calcBonusMinutes($paid, $rules);
         $total = $paid + $bonus;
-        $cost  = ($paid <= 30) ? $minChg : round($paid / 60 * $rate, 2);
+        // Pricing: ₱50 for first 30 mins, ₱40 for every 30 mins thereafter (derived from hourly_rate)
+        $cost  = ($paid <= 30) ? $minChg : ($minChg + round(($paid - 30) / 60 * $rate, 2));
 
         // Human-readable label helpers
         $fmtMin = function(int $m): string {
@@ -742,6 +746,19 @@ function computeTimedCost(int $minutes): float {
 }
 
 /**
+ * Compute the cost for an INITIAL session start (incorporates the ₱50 min charge).
+ * Applies the ₱10 surcharge over the standard ₱80/hr (₱40/30m) rate for the first 30m.
+ */
+function computeInitialSessionCost(int $total_minutes): float {
+    if ($total_minutes <= 0) return 0.0;
+    $rules = getPricingRules();
+    $standardCost = computeTimedCost($total_minutes);
+    // Standard cost for 30m is ₱40. We want ₱50. So we add ₱10.
+    // We also ensure it's at least the session_min_charge (₱50).
+    return (float) max($rules['session_min_charge'], $standardCost + 10);
+}
+
+/**
  * Compute rental fee based on mode.
  *
  * Hourly  – pre-booked duration; charge base cost + overtime brackets if over.
@@ -765,13 +782,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
 
                 // computeTimedCost handles bonus-free cycles; raw multiplication
                 // incorrectly bills free bonus minutes at full rate.
-                $base_cost = ($planned_minutes <= 30)
-                    ? $rules['session_min_charge']
-                    : (float) computeTimedCost((int)$planned_minutes);
+                $base_cost = computeInitialSessionCost((int)$planned_minutes);
                 return $base_cost + computeTimedCost($overtime);
             }
-            // No pre-booking data: fall back to open-time bracket pricing
-            return computeTimedCost($duration_minutes);
+            // No pre-booking data: fall back to open-time (initial session) pricing
+            return computeInitialSessionCost($duration_minutes);
 
 
         case 'open_time':
