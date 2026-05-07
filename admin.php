@@ -444,12 +444,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare(
                 "UPDATE reservations
                     SET status               = 'cancelled',
-                        cancelled_by         = 'admin',
-                        cancel_reason_type   = ?,
-                        cancel_reason_detail = ?
+                        cancelled_by         = 'admin'
                   WHERE reservation_id = ?"
             );
-            $stmt->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
+            $stmt->bind_param('i', $res_id);
             $stmt->execute();
 
             // ── Log to reservation_cancellations audit table ──────────────
@@ -465,12 +463,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
                      VALUES (?, ?, 'admin', ?, ?, NOW())"
                 );
-                $logStmt->execute([
+                $logStmt->bind_param('iiss',
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
-                    $reasonDetail,
-                ]);
+                    $reasonDetail
+                );
+                $logStmt->execute();
             }
 
             $message     = 'Reservation #' . $res_id . ' cancelled.';

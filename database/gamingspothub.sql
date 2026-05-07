@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 05, 2026 at 02:57 PM
+-- Generation Time: May 05, 2026 at 04:43 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -58,10 +58,11 @@ INSERT INTO `additional_requests` (`request_id`, `session_id`, `request_type`, `
 CREATE TABLE `consoles` (
   `console_id` int(11) NOT NULL,
   `console_name` varchar(50) NOT NULL,
-  `console_type` enum('PS5','PS4','Xbox Series X','Xbox Controller') NOT NULL,
+  `console_type` enum('PS5','PS4','Xbox Series X') NOT NULL,
   `unit_number` varchar(20) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `compatible_controller_type` varchar(50) DEFAULT NULL COMMENT 'Controller type compatible with this console unit',
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -69,15 +70,15 @@ CREATE TABLE `consoles` (
 -- Dumping data for table `consoles`
 --
 
-INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `created_at`) VALUES
-(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, '2026-02-21 19:55:41'),
-(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, '2026-02-21 19:55:41'),
-(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, '2026-02-21 19:55:41'),
-(6, 'PS4 Unit 6', 'PS4', 'PS4-06', 'maintenance', 80.00, '2026-02-21 19:55:41'),
-(7, 'Xbox Unit 2', 'Xbox Series X', 'XBX-02', 'available', 80.00, '2026-02-21 19:55:41'),
-(8, 'Xbox Unit 3', 'Xbox Series X', 'XBX-03', 'available', 80.00, '2026-02-21 19:55:41');
+INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `status`, `hourly_rate`, `compatible_controller_type`, `created_at`) VALUES
+(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 'in_use', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 'available', 80.00, 'DualSense', '2026-02-21 19:55:41'),
+(6, 'PS4 Unit 6', 'PS4', 'PS4-06', 'maintenance', 80.00, 'DualShock 4', '2026-02-21 19:55:41'),
+(7, 'Xbox Unit 2', 'Xbox Series X', 'XBX-02', 'available', 80.00, 'Xbox Controller', '2026-02-21 19:55:41'),
+(8, 'Xbox Unit 3', 'Xbox Series X', 'XBX-03', 'available', 80.00, 'Xbox Controller', '2026-02-21 19:55:41');
 
 -- --------------------------------------------------------
 
@@ -157,7 +158,10 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (21, 0, 7, 'hourly', 60, '2026-05-05 17:15:19', '2026-05-05 18:35:40', 80, 80.00, 160.00, 'completed', NULL, 12, '2026-05-05 17:15:19', 0, NULL),
 (22, 27, 5, 'hourly', 300, '2026-05-05 18:35:21', '2026-05-05 19:11:10', 36, 80.00, 60.00, 'completed', NULL, 12, '2026-05-05 18:35:21', 0, NULL),
 (23, 0, 8, 'hourly', 300, '2026-05-05 18:38:55', '2026-05-05 19:11:21', 32, 80.00, 80.00, 'completed', NULL, 12, '2026-05-05 18:38:55', 0, NULL),
-(24, 0, 8, 'hourly', 330, '2026-05-05 19:20:38', '2026-05-05 19:53:45', 33, 80.00, 80.00, 'completed', NULL, 12, '2026-05-05 19:20:38', 150, NULL);
+(24, 0, 8, 'hourly', 330, '2026-05-05 19:20:38', '2026-05-05 19:53:45', 33, 80.00, 80.00, 'completed', NULL, 12, '2026-05-05 19:20:38', 150, NULL),
+(25, 0, 1, 'hourly', 30, '2026-05-05 20:37:59', '2026-05-05 21:08:02', 30, 80.00, 40.00, 'completed', NULL, 12, '2026-05-05 21:05:42', 0, NULL),
+(26, 0, 1, 'unlimited', NULL, '2026-05-05 22:25:56', '2026-05-05 22:33:56', 8, 80.00, 400.00, 'completed', NULL, 12, '2026-05-05 22:25:56', 0, NULL),
+(27, 0, 1, 'unlimited', NULL, '2026-05-05 22:34:16', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-05-05 22:34:16', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -205,40 +209,38 @@ CREATE TABLE `reservations` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `cancelled_by` enum('user','admin') DEFAULT NULL,
   `cancellation_reason` varchar(300) DEFAULT NULL,
-  `refund_issued` tinyint(1) NOT NULL DEFAULT 0,
-  `cancel_reason_type` enum('schedule_change','found_alternative','budget_issue','technical_issue','emergency','other','admin_decision') DEFAULT NULL,
-  `cancel_reason_detail` text DEFAULT NULL
+  `refund_issued` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `reservations`
 --
 
-INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `payment_proof`, `payment_proof_status`, `paymongo_source_id`, `paymongo_payment_id`, `paymongo_status`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`, `cancel_reason_type`, `cancel_reason_detail`) VALUES
-(1, 27, 2, 'PS5', 'hourly', 180, '2026-05-01', '21:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'src_1vDGQX8cNyVFSX9nhPTz6AjN', 'pay_G6MHwN8GKN4Dzx5yVVga8DCL', 'paid', 'cancelled', 27, '2026-05-01 19:56:50', '2026-05-01 19:57:31', 'user', NULL, 0, 'schedule_change', NULL),
-(2, 27, 1, 'PS5', 'hourly', 60, '2026-05-01', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'src_zBnQc83ZGDNc3FYmLcMMa4Xw', 'pay_pZACwQPXNStvFBB2uM9jYss6', 'paid', 'cancelled', 27, '2026-05-01 20:48:35', '2026-05-01 20:49:16', 'admin', NULL, 0, 'admin_decision', 'event that day nigga'),
-(3, 27, 2, 'PS5', 'hourly', 30, '2026-05-02', '12:30:00', NULL, 23.00, 'gcash', 1, NULL, NULL, 'src_4keDrbFouD9ap4MLQg2PRAho', 'pay_ww8WyKP28SU2H3pazuCo1XhF', 'paid', 'converted', 27, '2026-05-02 00:02:46', '2026-05-02 00:03:59', NULL, NULL, 0, NULL, NULL),
-(4, 27, 1, 'PS5', 'hourly', 90, '2026-05-03', '22:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'src_MfhyN3EDUNjuD6i35gxsfhMT', 'pay_3aeHb5pm7RwHwdBGuToffWkx', 'paid', 'cancelled', 27, '2026-05-03 19:43:07', '2026-05-03 19:43:41', 'user', NULL, 0, 'budget_issue', NULL),
-(5, 27, 1, 'PS5', 'hourly', 60, '2026-05-03', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_e268b1c8bda2bfd037c0526e', 'pay_pKVPRS3NSkCDRbjPNuffkRLo', 'paid', 'cancelled', 27, '2026-05-03 20:48:38', '2026-05-03 20:49:26', 'user', NULL, 0, 'other', 'no'),
-(6, 27, 1, 'PS5', 'hourly', 60, '2026-05-03', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_e5a46a718ca4836d1fe4fc7d', 'pay_cPLucGDC6uLtH9zyGL6B4kqg', 'paid', 'cancelled', 27, '2026-05-03 20:49:58', '2026-05-03 21:12:23', 'user', NULL, 0, 'budget_issue', NULL),
-(7, 27, 1, 'PS5', 'hourly', 90, '2026-05-03', '23:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_c8d96e4918a03316c59fd881', 'pay_H3z7AXcMmAGfcRiA9jdKfCjY', 'paid', 'converted', 27, '2026-05-03 21:13:25', '2026-05-03 21:14:25', NULL, NULL, 0, NULL, NULL),
-(8, 27, 1, 'PS5', 'hourly', 210, '2026-05-03', '23:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_0d94b6d85f9f1ae405789275', 'pay_qRUSNbjR3bKrhRToNPR91apK', 'paid', 'cancelled', 27, '2026-05-03 21:20:53', '2026-05-03 21:23:35', 'admin', NULL, 0, 'found_alternative', NULL),
-(9, 27, 1, 'PS5', 'hourly', 210, '2026-05-03', '23:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_f843554097d90778b5f7033b', 'pay_xcbGmV7xAn59b5gWwkJPXg95', 'paid', 'converted', 27, '2026-05-03 21:24:47', '2026-05-03 21:25:08', NULL, NULL, 0, NULL, NULL),
-(10, 27, 2, 'PS5', 'hourly', 60, '2026-05-03', '23:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_cd82316260eb1d9948a482f8', 'pay_5beLD8PfnZC4sDeL47eKgS7v', 'paid', 'converted', 27, '2026-05-03 21:33:03', '2026-05-03 21:37:14', NULL, NULL, 0, NULL, NULL),
-(11, 27, 1, 'PS5', 'hourly', 30, '2026-05-14', '15:30:00', NULL, 23.00, 'gcash', 1, NULL, NULL, 'cs_867f35e47c8efa0dde09d059', 'pay_pzX1L3727mqG3KVkoNpuT5wy', 'paid', 'converted', 27, '2026-05-03 21:55:58', '2026-05-03 22:11:20', NULL, NULL, 0, NULL, NULL),
-(12, 27, 3, 'PS5', 'hourly', 60, '2026-05-04', '13:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_dc30e2e144bb052cec611757', 'pay_tuyuY32Ey4aECyqn3f3nJhLf', 'paid', 'converted', 27, '2026-05-03 22:12:13', '2026-05-03 22:13:39', NULL, NULL, 0, NULL, NULL),
-(13, 27, 2, 'PS5', 'hourly', 180, '2026-05-05', '19:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'cs_0fe0514425d874f724ff76a7', 'pay_amVEDoZphF9FSQFvKmYzLFDG', 'paid', 'converted', 27, '2026-05-03 22:15:16', '2026-05-03 22:15:30', NULL, NULL, 0, NULL, NULL),
-(14, 27, 1, 'PS5', 'hourly', 180, '2026-05-04', '17:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'cs_ac046727b57767b94272bd30', 'pay_KXUX2wxhPA348gFyVG4ZBK6r', 'paid', 'converted', 27, '2026-05-03 22:25:46', '2026-05-03 22:25:57', NULL, NULL, 0, NULL, NULL),
-(15, 27, 2, 'PS5', 'hourly', 90, '2026-05-04', '14:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_3d4c7589f7561c89a5d3b910', 'pay_65kuF9MG31YkmWFAEBGbMXAs', 'paid', 'converted', 27, '2026-05-03 23:17:48', '2026-05-03 23:18:12', NULL, NULL, 0, NULL, NULL),
-(16, 27, 3, 'PS5', 'hourly', 90, '2026-05-04', '14:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_6749205be6bf853f265a6e0d', 'pay_ZEzz1kFLLiDh8mBkgacu2DYH', 'paid', 'converted', 27, '2026-05-03 23:47:59', '2026-05-03 23:48:46', NULL, NULL, 0, NULL, NULL),
-(17, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '20:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_1c19b40fe31000856dfe0a4a', 'pay_vjuMy7GyQLKZKMvVyMQeNDo9', 'paid', 'converted', 27, '2026-05-03 23:58:29', '2026-05-04 00:00:39', NULL, NULL, 0, NULL, NULL),
-(18, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '16:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_6a402e098b0a6daaa6bd53a4', 'pay_g59YUP1QhjwSSrJCC6PTL86Y', 'paid', 'converted', 27, '2026-05-04 00:05:24', '2026-05-04 00:06:31', NULL, NULL, 0, NULL, NULL),
-(19, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '17:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_c54236ebb6a4a7bd7d172ea5', 'pay_sMDHBZden2yDv2FDdhNh4bEw', 'paid', 'cancelled', 27, '2026-05-04 12:35:27', '2026-05-04 12:36:49', 'user', NULL, 0, 'found_alternative', NULL),
-(20, 27, 1, 'PS5', 'hourly', 60, '2026-05-04', '18:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_921f735bfe2e40ff309d2f78', 'pay_NfEpfdgWf73dXVLTnEak1MNZ', 'paid', 'reserved', 27, '2026-05-04 16:11:04', '2026-05-05 20:03:55', NULL, NULL, 0, NULL, NULL),
-(21, 32, 1, 'PS5', 'hourly', 240, '2026-05-08', '17:00:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_9fd9ae326013d0cf76678a55', 'pay_tTs2i2NxW8EsV91yKdjHE4ds', 'paid', 'cancelled', 32, '2026-05-05 14:36:37', '2026-05-05 18:37:37', 'user', NULL, 0, 'budget_issue', NULL),
-(22, 32, 8, 'Xbox Series X', 'hourly', 240, '2026-05-07', '18:30:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_f1f67869569f5d6670b6778b', 'pay_Z8rGgnC43oKaKiP3bog1ZvqB', 'paid', 'cancelled', 32, '2026-05-05 18:38:14', '2026-05-05 20:11:33', 'user', NULL, 0, 'emergency', NULL),
-(23, 32, 7, 'Xbox Series X', 'hourly', 210, '2026-05-08', '21:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_e20ab275de50b5b8a35d68d2', 'pay_8dDR3ZSrbzBgdP7CEVxsvi5R', 'paid', 'reserved', 32, '2026-05-05 20:12:33', '2026-05-05 20:22:33', NULL, NULL, 0, NULL, NULL),
-(24, 33, 1, 'PS5', 'hourly', 240, '2026-05-08', '17:00:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_787cfe52c0f3ea21b238d560', 'pay_5mg9617i6MxZYomvBSiDm3R8', 'paid', 'reserved', 33, '2026-05-05 20:27:52', '2026-05-05 20:49:17', NULL, NULL, 0, NULL, NULL);
+INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `payment_proof`, `payment_proof_status`, `paymongo_source_id`, `paymongo_payment_id`, `paymongo_status`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`) VALUES
+(1, 27, 2, 'PS5', 'hourly', 180, '2026-05-01', '21:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'src_1vDGQX8cNyVFSX9nhPTz6AjN', 'pay_G6MHwN8GKN4Dzx5yVVga8DCL', 'paid', 'cancelled', 27, '2026-05-01 19:56:50', '2026-05-01 19:57:31', 'user', NULL, 0),
+(2, 27, 1, 'PS5', 'hourly', 60, '2026-05-01', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'src_zBnQc83ZGDNc3FYmLcMMa4Xw', 'pay_pZACwQPXNStvFBB2uM9jYss6', 'paid', 'cancelled', 27, '2026-05-01 20:48:35', '2026-05-01 20:49:16', 'admin', NULL, 0),
+(3, 27, 2, 'PS5', 'hourly', 30, '2026-05-02', '12:30:00', NULL, 23.00, 'gcash', 1, NULL, NULL, 'src_4keDrbFouD9ap4MLQg2PRAho', 'pay_ww8WyKP28SU2H3pazuCo1XhF', 'paid', 'converted', 27, '2026-05-02 00:02:46', '2026-05-02 00:03:59', NULL, NULL, 0),
+(4, 27, 1, 'PS5', 'hourly', 90, '2026-05-03', '22:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'src_MfhyN3EDUNjuD6i35gxsfhMT', 'pay_3aeHb5pm7RwHwdBGuToffWkx', 'paid', 'cancelled', 27, '2026-05-03 19:43:07', '2026-05-03 19:43:41', 'user', NULL, 0),
+(5, 27, 1, 'PS5', 'hourly', 60, '2026-05-03', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_e268b1c8bda2bfd037c0526e', 'pay_pKVPRS3NSkCDRbjPNuffkRLo', 'paid', 'cancelled', 27, '2026-05-03 20:48:38', '2026-05-03 20:49:26', 'user', NULL, 0),
+(6, 27, 1, 'PS5', 'hourly', 60, '2026-05-03', '22:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_e5a46a718ca4836d1fe4fc7d', 'pay_cPLucGDC6uLtH9zyGL6B4kqg', 'paid', 'cancelled', 27, '2026-05-03 20:49:58', '2026-05-03 21:12:23', 'user', NULL, 0),
+(7, 27, 1, 'PS5', 'hourly', 90, '2026-05-03', '23:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_c8d96e4918a03316c59fd881', 'pay_H3z7AXcMmAGfcRiA9jdKfCjY', 'paid', 'converted', 27, '2026-05-03 21:13:25', '2026-05-03 21:14:25', NULL, NULL, 0),
+(8, 27, 1, 'PS5', 'hourly', 210, '2026-05-03', '23:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_0d94b6d85f9f1ae405789275', 'pay_qRUSNbjR3bKrhRToNPR91apK', 'paid', 'cancelled', 27, '2026-05-03 21:20:53', '2026-05-03 21:23:35', 'admin', NULL, 0),
+(9, 27, 1, 'PS5', 'hourly', 210, '2026-05-03', '23:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_f843554097d90778b5f7033b', 'pay_xcbGmV7xAn59b5gWwkJPXg95', 'paid', 'converted', 27, '2026-05-03 21:24:47', '2026-05-03 21:25:08', NULL, NULL, 0),
+(10, 27, 2, 'PS5', 'hourly', 60, '2026-05-03', '23:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_cd82316260eb1d9948a482f8', 'pay_5beLD8PfnZC4sDeL47eKgS7v', 'paid', 'converted', 27, '2026-05-03 21:33:03', '2026-05-03 21:37:14', NULL, NULL, 0),
+(11, 27, 1, 'PS5', 'hourly', 30, '2026-05-14', '15:30:00', NULL, 23.00, 'gcash', 1, NULL, NULL, 'cs_867f35e47c8efa0dde09d059', 'pay_pzX1L3727mqG3KVkoNpuT5wy', 'paid', 'converted', 27, '2026-05-03 21:55:58', '2026-05-03 22:11:20', NULL, NULL, 0),
+(12, 27, 3, 'PS5', 'hourly', 60, '2026-05-04', '13:30:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_dc30e2e144bb052cec611757', 'pay_tuyuY32Ey4aECyqn3f3nJhLf', 'paid', 'converted', 27, '2026-05-03 22:12:13', '2026-05-03 22:13:39', NULL, NULL, 0),
+(13, 27, 2, 'PS5', 'hourly', 180, '2026-05-05', '19:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'cs_0fe0514425d874f724ff76a7', 'pay_amVEDoZphF9FSQFvKmYzLFDG', 'paid', 'converted', 27, '2026-05-03 22:15:16', '2026-05-03 22:15:30', NULL, NULL, 0),
+(14, 27, 1, 'PS5', 'hourly', 180, '2026-05-04', '17:30:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'cs_ac046727b57767b94272bd30', 'pay_KXUX2wxhPA348gFyVG4ZBK6r', 'paid', 'converted', 27, '2026-05-03 22:25:46', '2026-05-03 22:25:57', NULL, NULL, 0),
+(15, 27, 2, 'PS5', 'hourly', 90, '2026-05-04', '14:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_3d4c7589f7561c89a5d3b910', 'pay_65kuF9MG31YkmWFAEBGbMXAs', 'paid', 'converted', 27, '2026-05-03 23:17:48', '2026-05-03 23:18:12', NULL, NULL, 0),
+(16, 27, 3, 'PS5', 'hourly', 90, '2026-05-04', '14:00:00', NULL, 26.00, 'gcash', 1, NULL, NULL, 'cs_6749205be6bf853f265a6e0d', 'pay_ZEzz1kFLLiDh8mBkgacu2DYH', 'paid', 'converted', 27, '2026-05-03 23:47:59', '2026-05-03 23:48:46', NULL, NULL, 0),
+(17, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '20:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_1c19b40fe31000856dfe0a4a', 'pay_vjuMy7GyQLKZKMvVyMQeNDo9', 'paid', 'converted', 27, '2026-05-03 23:58:29', '2026-05-04 00:00:39', NULL, NULL, 0),
+(18, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '16:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_6a402e098b0a6daaa6bd53a4', 'pay_g59YUP1QhjwSSrJCC6PTL86Y', 'paid', 'converted', 27, '2026-05-04 00:05:24', '2026-05-04 00:06:31', NULL, NULL, 0),
+(19, 27, 2, 'PS5', 'hourly', 60, '2026-05-04', '17:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_c54236ebb6a4a7bd7d172ea5', 'pay_sMDHBZden2yDv2FDdhNh4bEw', 'paid', 'cancelled', 27, '2026-05-04 12:35:27', '2026-05-04 12:36:49', 'user', NULL, 0),
+(20, 27, 1, 'PS5', 'hourly', 60, '2026-05-04', '18:00:00', NULL, 24.00, 'gcash', 1, NULL, NULL, 'cs_921f735bfe2e40ff309d2f78', 'pay_NfEpfdgWf73dXVLTnEak1MNZ', 'paid', 'reserved', 27, '2026-05-04 16:11:04', '2026-05-05 20:03:55', NULL, NULL, 0),
+(21, 32, 1, 'PS5', 'hourly', 240, '2026-05-08', '17:00:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_9fd9ae326013d0cf76678a55', 'pay_tTs2i2NxW8EsV91yKdjHE4ds', 'paid', 'cancelled', 32, '2026-05-05 14:36:37', '2026-05-05 18:37:37', 'user', NULL, 0),
+(22, 32, 8, 'Xbox Series X', 'hourly', 240, '2026-05-07', '18:30:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_f1f67869569f5d6670b6778b', 'pay_Z8rGgnC43oKaKiP3bog1ZvqB', 'paid', 'cancelled', 32, '2026-05-05 18:38:14', '2026-05-05 20:11:33', 'user', NULL, 0),
+(23, 32, 7, 'Xbox Series X', 'hourly', 210, '2026-05-08', '21:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_e20ab275de50b5b8a35d68d2', 'pay_8dDR3ZSrbzBgdP7CEVxsvi5R', 'paid', 'reserved', 32, '2026-05-05 20:12:33', '2026-05-05 20:22:33', NULL, NULL, 0),
+(24, 33, 1, 'PS5', 'hourly', 240, '2026-05-08', '17:00:00', NULL, 36.00, 'gcash', 1, NULL, NULL, 'cs_787cfe52c0f3ea21b238d560', 'pay_5mg9617i6MxZYomvBSiDm3R8', 'paid', 'reserved', 33, '2026-05-05 20:27:52', '2026-05-05 20:49:17', NULL, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -435,8 +437,6 @@ INSERT INTO `tournament_participants` (`participant_id`, `tournament_id`, `user_
 
 -- --------------------------------------------------------
 
--- --------------------------------------------------------
-
 --
 -- Table structure for table `transactions`
 --
@@ -529,7 +529,10 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (66, 24, 0, 0.00, 0.00, 80.00, 'Extension +60 min via staff (Extension #4)', 'cash', 'completed', '2026-05-05 19:53:08', 12, '2026-05-05 19:53:08'),
 (67, 24, 0, -40.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 32m (₱80.00), refunding unused time (₱40.00)', '', 'completed', '2026-05-05 19:53:45', 12, '2026-05-05 19:53:45'),
 (68, NULL, 32, 34.00, 34.00, NULL, 'Downpayment for reservation #23', 'gcash', 'completed', '2026-05-05 20:12:33', 32, '2026-05-05 20:12:33'),
-(69, NULL, 33, 36.00, 36.00, NULL, 'Downpayment for reservation #24', 'gcash', 'completed', '2026-05-05 20:27:52', 33, '2026-05-05 20:27:52');
+(69, NULL, 33, 36.00, 36.00, NULL, 'Downpayment for reservation #24', 'gcash', 'completed', '2026-05-05 20:27:52', 33, '2026-05-05 20:27:52'),
+(70, 25, 0, 50.00, 50.00, NULL, NULL, 'cash', 'completed', '2026-05-05 21:05:42', 12, '2026-05-05 21:05:42'),
+(71, 26, 0, 400.00, 400.00, 0.00, NULL, 'cash', 'completed', '2026-05-05 22:25:56', 12, '2026-05-05 22:25:56'),
+(72, 27, 0, 400.00, 400.00, 0.00, NULL, 'cash', 'completed', '2026-05-05 22:34:16', 12, '2026-05-05 22:34:16');
 
 -- --------------------------------------------------------
 
@@ -563,7 +566,7 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 (0, 'walkin@system.local', '', 'Walk-in Customer', NULL, 'walkin', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 00:33:18', 0, NULL),
 (12, 'ljlabianao@gmail.com', '$2y$10$nEuBy0VoWqtbRETOnAD99eurxRHdLaGpxROWA//NGpziKgIG1CmmS', 'lito', '09916310227', 'owner', 'active', 1, NULL, NULL, NULL, NULL, '2026-02-21 20:45:06', 0, NULL),
 (17, 'llabianojr@kld.edu.ph', '$2y$10$N97t4MFGjElD3iM.nlpn3uZ/hy1zNC/Lfqi/YozlBB6BG1VWkL.Oe', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-12 19:54:25', 0, NULL),
-(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29', 0, '2026-05-04 23:10:54'),
+(21, 'hello@gmail.com', '$2y$10$vjAu848ZbS1DpfexUIsM1.x31O/VNLXNwp/sw65NckgmZTHTKLzAO', 'Lito LARGUEZA LABIANO', '09916310227', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-17 11:59:29', 0, '2026-05-04 23:10:54'),
 (22, 'admin@gmail.com', '$2y$10$kZCF21cxNKIxXE99XNGyF.nGfT94FZeDaGtbH4YTBOxrpumQLDvIK', 'Admin User', '', 'customer', 'active', 0, '9ad4e0d4b2004d75a763bd2e6e9af695cdb053e39c7cadd65db419783c75b54f', '2026-04-20 16:02:24', NULL, NULL, '2026-04-19 16:02:24', 0, NULL),
 (23, 'customer@example.com', '$2y$10$8mmAlQ1UknZorTRMn6NVneRRA5JrVSOO8oMAuDEVll.pICMikYieO', 'Test Customer', '', 'customer', 'active', 0, '5337f25a858a79327c9001f982e6629f2f64be6579986d9da00c816159a6a75c', '2026-04-20 20:49:05', NULL, NULL, '2026-04-19 20:49:05', 0, NULL),
 (24, 'lito@example.com', '$2y$10$b1z6jAajQr5NjOyHWkU5kOJ7kx/BdeM6HbUg/qLWdElsilx20bLta', 'Lito Test', '', 'customer', 'active', 0, '10512cc414ac02ff1b961698a17863ad87e3e55d976dc1e14d92a2af161ee3bd', '2026-04-20 20:52:01', NULL, NULL, '2026-04-19 20:52:01', 0, NULL),
@@ -650,7 +653,7 @@ ALTER TABLE `reservation_cancellations`
   ADD KEY `idx_rc_cancelled_by` (`cancelled_by`),
   ADD KEY `idx_rc_reason_type` (`cancel_reason_type`),
   ADD KEY `idx_rc_date` (`cancelled_at`),
-  ADD KEY `idx_rc_console` (`console_type`);
+  ADD KEY `idx_rc_res` (`reservation_id`);
 
 --
 -- Indexes for table `reservation_reschedules`
@@ -743,7 +746,7 @@ ALTER TABLE `controllers`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `reports`
@@ -797,7 +800,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT for table `users`
