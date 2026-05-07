@@ -215,3 +215,52 @@ function sendRescheduleNotificationEmail($email, $fullName, $newDate, $newTime) 
     }
 }
 ?>
+
+/**
+ * Notify user that admin has proposed a reschedule (pending their confirmation).
+ * The user can pick a date on or after the admin's proposed date.
+ */
+function sendRescheduleProposalEmail($email, $fullName, $oldDate, $oldTime, $proposedDate, $proposedTime) {
+    try {
+        $mail = createMailer();
+        $mail->addAddress($email, $fullName);
+        $mail->Subject = 'Action Required: Your Reservation Needs Rescheduling';
+
+        $dashUrl     = SITE_URL . '/dashboard.php';
+        $proposedFmt = date('M d, Y', strtotime($proposedDate)) . ' at ' . date('g:i A', strtotime($proposedTime));
+        $oldFmt      = date('M d, Y', strtotime($oldDate)) . ' at ' . date('g:i A', strtotime($oldTime));
+
+        $mail->Body = '<!DOCTYPE html><html><head><style>
+            body{margin:0;padding:0;font-family:"Inter","Segoe UI",sans-serif;background:#0d1117;}
+            .container{max-width:600px;margin:0 auto;background:#1a1a2e;border-radius:16px;overflow:hidden;}
+            .header{background:linear-gradient(135deg,#20c8a1,#0a0f1c);padding:40px 30px;text-align:center;}
+            .header h1{color:#fff;font-size:24px;margin:0;}
+            .body{padding:30px;color:#e0e0e0;}.body p{line-height:1.6;margin-bottom:16px;}
+            .btn{display:inline-block;background:linear-gradient(135deg,#20c8a1,#5f85da);color:white!important;padding:14px 32px;border-radius:50px;text-decoration:none;font-weight:600;font-size:16px;}
+            .btn-wrap{text-align:center;margin:30px 0;}
+            .reschedbox{background:rgba(32,200,161,.08);border:1px solid rgba(32,200,161,.25);padding:12px 16px;border-radius:10px;margin-bottom:14px;}
+            .footer{padding:20px 30px;text-align:center;color:#666;font-size:12px;border-top:1px solid rgba(255,255,255,0.05);}
+        </style></head><body><div style="padding:20px;background:#0d1117;">
+            <div class="container">
+                <div class="header"><h1>Reschedule Proposed</h1><p>Your confirmation is needed</p></div>
+                <div class="body">
+                    <p>Hi <strong>' . htmlspecialchars($fullName) . '</strong>,</p>
+                    <p>Our admin has proposed a new schedule for your reservation. Your original booking was:</p>
+                    <div class="reschedbox" style="color:#aaa;"><strong style="color:#fff;">' . $oldFmt . '</strong></div>
+                    <p>The earliest proposed date is:</p>
+                    <div class="reschedbox"><strong style="color:#20c8a1;">' . $proposedFmt . ' (or any date after this)</strong></div>
+                    <p>Please log in to your dashboard to choose your preferred date and confirm the reschedule.</p>
+                    <div class="btn-wrap"><a href="' . $dashUrl . '" class="btn">Choose My Date</a></div>
+                    <p style="font-size:13px;color:#888;">Your reservation remains unchanged until you confirm a new date.</p>
+                </div>
+                <div class="footer"><p>Good Spot Gaming Hub</p></div>
+            </div>
+        </div></body></html>';
+
+        $mail->AltBody = "Hi $fullName, admin proposed rescheduling your reservation from $oldFmt to $proposedFmt or later. Please log in to choose your preferred date: $dashUrl";
+        $mail->send();
+        return ['success' => true];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => isset($mail) ? $mail->ErrorInfo : $e->getMessage()];
+    }
+}

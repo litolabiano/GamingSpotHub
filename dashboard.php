@@ -779,8 +779,11 @@ function fmtMins(int $m): string {
         /* ── Chart container ──────────────────────────────────────────── */
         .cd-chart-wrap { position: relative; height: 180px; }
 
-        /* ── Charts grid ──────────────────────�        /* ── Responsive ─────────────────────────────────────────────── */
-        @media (max-width: 900px) {
+        /* ── Charts grid ──────────────────────────────────────────────── */
+        .cd-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .cd-2col-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+        /* ── Responsive ──────────────────────────────────────────────── */        @media (max-width: 900px) {
             /* Hard-clip the viewport — nothing bleeds horizontally */
             html, body { overflow-x: hidden; max-width: 100vw; }
 
@@ -862,92 +865,7 @@ function fmtMins(int $m): string {
             .cd-mobile-nav  { display: none; }
             .cd-bottom-nav  { display: none !important; }
         }
-der: none;
-                cursor: pointer;
-                color: rgba(255,255,255,0.45);
-                font-family: inherit;
-                font-size: 10px;
-                font-weight: 600;
-                letter-spacing: .3px;
-                padding: 8px 4px;
-                transition: color .2s;
-                position: relative;
-                -webkit-tap-highlight-color: transparent;
-            }
-            .cd-bnav-btn i {
-                font-size: 18px;
-                transition: color .2s, transform .2s;
-            }
-            .cd-bnav-btn.active {
-                color: var(--mint);
-            }
-            .cd-bnav-btn.active i {
-                transform: translateY(-2px);
-            }
-            .cd-bnav-btn.active::after {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 32px;
-                height: 3px;
-                background: var(--mint);
-                border-radius: 0 0 4px 4px;
-            }
-            /* Badge on bottom nav */
-            .cd-bnav-badge {
-                position: absolute;
-                top: 6px;
-                right: calc(50% - 14px);
-                background: var(--mint);
-                color: #000;
-                font-size: 9px;
-                font-weight: 800;
-                min-width: 16px;
-                height: 16px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0 4px;
-                pointer-events: none;
-            }
-            .cd-bnav-badge.coral {
-                background: var(--coral);
-                color: #fff;
-            }
 
-            /* Content grids on mobile */
-            .cd-stats {
-                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-                gap: 12px;
-            }
-            .cd-charts-grid,
-            .cd-2col-grid {
-                grid-template-columns: 1fr;
-            }
-            .cd-live-meta {
-                grid-template-columns: 1fr 1fr;
-            }
-            /* Welcome title smaller on mobile */
-            .cd-section-title {
-                font-size: 18px;
-                margin-bottom: 16px;
-            }
-            .cd-card {
-                padding: 16px;
-            }
-        }
-        @media (max-width: 480px) {
-            .cd-stats    { grid-template-columns: 1fr 1fr; gap: 10px; }
-            .cd-live-meta { grid-template-columns: 1fr; }
-            .cd-stat-value { font-size: 22px; }
-        }
-        @media (min-width: 901px) {
-            .cd-mobile-nav  { display: none; }
-            .cd-bottom-nav  { display: none !important; }
-        }
 
         /* ── Profile Edit Form ─────────────────────────────────────────── */
         .pf-field-group { display: flex; flex-direction: column; gap: 6px; }
@@ -1222,8 +1140,13 @@ der: none;
                         <i class="fas fa-calendar-alt"></i>
                     </div>
                     <div style="flex:1;min-width:0;">
-                        <div style="font-weight:800;color:#20c8a1;font-size:14px;margin-bottom:4px;">
-                            📅 Your Reservation Has Been Rescheduled
+                        <div style="font-weight:800;font-size:14px;margin-bottom:4px;
+                            color:<?= ($rs['status']==='pending' && $rs['initiated_by']==='admin') ? '#f1a83c' : '#20c8a1' ?>;">
+                            <?php if ($rs['status']==='pending' && $rs['initiated_by']==='admin'): ?>
+                                ⏳ Action Required: Confirm Your New Schedule
+                            <?php else: ?>
+                                📅 Your Reservation Has Been Rescheduled
+                            <?php endif; ?>
                         </div>
                         <div style="font-size:13px;color:#ccc;line-height:1.7;">
                             <strong style="color:#fff;">Reservation #<?= $rs['reservation_id'] ?></strong>
@@ -1238,22 +1161,18 @@ der: none;
                             — <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
                             <?php endif; ?>
                             <?php if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin'): ?>
-                                <div style="margin-top:12px; display:flex; gap:10px;">
-                                    <button onclick="respondReschedule(<?= $rs['reschedule_id'] ?>, 'confirm')"
-                                        style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;"
-                                        onmouseover="this.style.background='rgba(32,200,161,.25)'"
-                                        onmouseout="this.style.background='rgba(32,200,161,.15)'">
-                                        <i class="fas fa-check"></i> Confirm
+                                <div style="display:flex;gap:10px;margin-top:12px;">
+                                    <button onclick="openRescheduleConfirmModal(<?= $rs['reschedule_id'] ?>, '<?= $rs['new_date'] ?>', '<?= substr($rs['new_time'],0,5) ?>')"
+                                        style="flex:1;background:linear-gradient(135deg,rgba(32,200,161,.2),rgba(32,200,161,.1));border:1px solid rgba(32,200,161,.45);color:#20c8a1;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;transition:all .2s;">
+                                        <i class="fas fa-calendar-check"></i> Choose My Date
                                     </button>
                                     <button onclick="respondReschedule(<?= $rs['reschedule_id'] ?>, 'cancel')"
-                                        style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;"
-                                        onmouseover="this.style.background='rgba(251,86,107,.25)'"
-                                        onmouseout="this.style.background='rgba(251,86,107,.15)'">
-                                        <i class="fas fa-times"></i> Cancel
+                                        style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;transition:all .2s;">
+                                        <i class="fas fa-times"></i> Decline
                                     </button>
                                 </div>
                             <?php endif; ?>
-                        </div>
+                    </div>
                     </div>
                     <?php if ($rs['status'] !== 'pending'): ?>
                     <button onclick="dismissReschedule(<?= $rs['reschedule_id'] ?>)"
@@ -1280,8 +1199,46 @@ der: none;
                     if (el) { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }
                 });
             }
+            function openRescheduleConfirmModal(id, minDate, preTime) {
+                document.getElementById('rcmRescheduleId').value = id;
+                const dateInput  = document.getElementById('rcmDate');
+                const timeSelect = document.getElementById('rcmTime');
+                dateInput.min    = minDate;
+                dateInput.value  = minDate;
+                if (timeSelect && preTime) timeSelect.value = preTime;
+                const d = new Date(minDate + 'T00:00:00');
+                document.getElementById('rcmProposedDate').textContent =
+                    d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+                document.getElementById('rescheduleConfirmModal').style.display = 'flex';
+            }
+            function closeRescheduleConfirmModal() {
+                document.getElementById('rescheduleConfirmModal').style.display = 'none';
+            }
+            function submitRescheduleConfirm() {
+                const id   = document.getElementById('rcmRescheduleId').value;
+                const date = document.getElementById('rcmDate').value;
+                const time = document.getElementById('rcmTime').value;
+                if (!date) { alert('Please select a date.'); return; }
+                const btn = document.getElementById('rcmSubmitBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
+                fetch('ajax/respond_reschedule.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time)
+                }).then(r => r.json()).then(d => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
+                    if (d.success) { closeRescheduleConfirmModal(); location.reload(); }
+                    else alert(d.message);
+                }).catch(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
+                    alert('Network error. Please try again.');
+                });
+            }
             function respondReschedule(id, action) {
-                if (action === 'cancel' && !confirm('Are you sure you want to cancel? Your reservation will be forfeited and the fee is non-refundable.')) return;
+                if (action === 'cancel' && !confirm('Are you sure you want to decline this reschedule? Your reservation will remain on its original date.')) return;
                 fetch('ajax/respond_reschedule.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -1728,33 +1685,13 @@ der: none;
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                 <?php if ($pendingAdminResched): ?>
-                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'confirm')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;" onmouseover="this.style.background='rgba(32,200,161,.25)'" onmouseout="this.style.background='rgba(32,200,161,.15)'">
-                                        <i class="fas fa-check"></i> Confirm
+                                    <button onclick="openRescheduleConfirmModal(<?= $pendingAdminResched['reschedule_id'] ?>, '<?= $pendingAdminResched['new_date'] ?>', '<?= substr($pendingAdminResched['new_time'],0,5) ?>')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;">
+                                        <i class="fas fa-calendar-check"></i> Confirm
                                     </button>
-                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;" onmouseover="this.style.background='rgba(251,86,107,.25)'" onmouseout="this.style.background='rgba(251,86,107,.15)'">
-                                        <i class="fas fa-times"></i> Cancel
+                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
+                                        <i class="fas fa-times"></i> Decline
                                     </button>
-                                <?php else: ?>
-                                    <?php if ($alreadyResched): ?>
-                                        <button class="cd-btn" disabled
-                                            title="You have already used your one-time reschedule for this reservation."
-                                            style="opacity:.45;cursor:not-allowed;padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;">
-                                            <i class="fas fa-calendar-alt"></i> Rescheduled
-                                        </button>
-                                    <?php else: ?>
-                                        <button class="cd-btn cd-btn-ghost cd-btn-sm" onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')" title="Change your reservation date &amp; time (one-time only)">
-                                            <i class="fas fa-calendar-alt"></i> Reschedule
-                                        </button>
-                                    <?php endif; ?>
-                                    <button class="cd-cancel-btn"
-                                            data-id="<?= $r['reservation_id'] ?>"
-                                            data-amount="<?= number_format((float)$r['downpayment_amount'], 2) ?>"
-                                            data-paid="<?= $r['downpayment_amount'] > 0 ? '1' : '0' ?>"
-                                            onclick="openCancelModal(this)"
-                                            title="Cancel this reservation">
-                                        <i class="fas fa-times"></i> Cancel
-                                    </button>
-                                <?php endif; ?>
+                            <?php endif; ?>
                             </div>
                             <?php endif; ?>
                         </td>
@@ -3612,4 +3549,97 @@ function togglePwVisibility(inputId, btnId) {
     }
 }
 </script>
+
+<!-- ── Reschedule Confirm Modal ── -->
+<div id="rescheduleConfirmModal" style="display:none;position:fixed;inset:0;z-index:99999;
+     background:rgba(0,0,0,.82);backdrop-filter:blur(10px);
+     align-items:center;justify-content:center;padding:20px;">
+    <div style="background:linear-gradient(145deg,#0e1d36,#0a1628);
+                border:1px solid rgba(32,200,161,.35);border-radius:22px;
+                padding:32px 28px 26px;max-width:440px;width:100%;
+                box-shadow:0 28px 72px rgba(0,0,0,.75);position:relative;
+                animation:rcmFadeIn .25s ease;">
+        <style>@keyframes rcmFadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}</style>
+
+        <button onclick="closeRescheduleConfirmModal()"
+            style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.07);
+                   border:1px solid rgba(255,255,255,.1);color:#aaa;border-radius:8px;
+                   width:32px;height:32px;cursor:pointer;font-size:14px;
+                   display:flex;align-items:center;justify-content:center;transition:all .2s;"
+            onmouseover="this.style.background='rgba(251,86,107,.15)';this.style.color='#fb566b'"
+            onmouseout="this.style.background='rgba(255,255,255,.07)';this.style.color='#aaa'">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+            <div style="width:48px;height:48px;border-radius:14px;background:rgba(32,200,161,.12);
+                        border:1px solid rgba(32,200,161,.25);flex-shrink:0;
+                        display:flex;align-items:center;justify-content:center;
+                        box-shadow:0 0 20px rgba(32,200,161,.15);">
+                <i class="fas fa-calendar-check" style="color:#20c8a1;font-size:19px;"></i>
+            </div>
+            <div>
+                <div style="font-weight:800;color:#fff;font-size:16px;margin-bottom:3px;">Confirm Reschedule</div>
+                <div style="font-size:12px;color:#888;">Earliest date: <span id="rcmProposedDate" style="color:#f1a83c;font-weight:600;"></span></div>
+            </div>
+        </div>
+
+        <input type="hidden" id="rcmRescheduleId">
+
+        <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.18);
+                    border-radius:10px;padding:10px 14px;font-size:12px;color:#f1a83c;
+                    margin-bottom:18px;display:flex;gap:8px;align-items:flex-start;">
+            <i class="fas fa-info-circle" style="margin-top:2px;flex-shrink:0;"></i>
+            <span>Choose any date <strong>on or after</strong> the proposed date. Your reservation is only updated after you confirm.</span>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
+                          text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
+            <input type="date" id="rcmDate"
+                style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
+                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
+                       font-family:inherit;outline:none;box-sizing:border-box;">
+        </div>
+
+        <div style="margin-bottom:24px;">
+            <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
+                          text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
+            <select id="rcmTime"
+                style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
+                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
+                       font-family:inherit;outline:none;">
+                <?php for($h=12;$h<=23;$h++) foreach(['00','30'] as $m){
+                    $v=sprintf('%02d:%s',$h,$m);
+                    echo '<option value="'.$v.'">'.date('g:i A',strtotime('2000-01-01 '.$v)).'</option>'.PHP_EOL;
+                } ?>
+            </select>
+        </div>
+
+        <div style="display:flex;gap:10px;">
+            <button id="rcmSubmitBtn" onclick="submitRescheduleConfirm()"
+                style="flex:1;background:linear-gradient(135deg,#20c8a1,#5f85da);color:#fff;
+                       border:none;border-radius:10px;padding:13px 18px;cursor:pointer;
+                       font-size:14px;font-weight:700;font-family:inherit;
+                       display:flex;align-items:center;justify-content:center;gap:8px;
+                       box-shadow:0 4px 18px rgba(32,200,161,.3);transition:opacity .2s;">
+                <i class="fas fa-calendar-check"></i> Confirm Date
+            </button>
+            <button onclick="closeRescheduleConfirmModal()"
+                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+                       color:#aaa;border-radius:10px;padding:13px 22px;cursor:pointer;
+                       font-size:14px;font-weight:600;font-family:inherit;transition:all .2s;"
+                onmouseover="this.style.background='rgba(255,255,255,.12)'"
+                onmouseout="this.style.background='rgba(255,255,255,.07)'">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('rescheduleConfirmModal').addEventListener('click', function(e) {
+    if (e.target === this) closeRescheduleConfirmModal();
+});
+</script>
+
 </html>
