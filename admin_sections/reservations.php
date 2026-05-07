@@ -379,9 +379,6 @@
             </div>
         </div>
     <?php endif; ?>
-</div>
-
-
 
 <!-- ── Reschedule Reservation Modal ── -->
 <div id="rescheduleResModal" style="display:none;position:fixed;inset:0;z-index:9999;
