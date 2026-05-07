@@ -380,7 +380,10 @@
         </div>
     <?php endif; ?>
 
-<!-- ── Reschedule Reservation Modal ── -->
+    </div> <!-- end #reservationsContent -->
+</div><!-- /.page#reservations -->
+
+<!-- ── Reschedule Reservation Modal (outside .page to avoid transform stacking context) ── -->
 <div id="rescheduleResModal" style="display:none;position:fixed;inset:0;z-index:9999;
      background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
      align-items:center;justify-content:center;">
@@ -477,7 +480,6 @@
         </div>
 
         <!-- New Unit (Dynamic) -->
-
         <div style="margin-bottom:20px;">
             <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Unit (Optional)</label>
             <select id="rescheduleUnit" style="
@@ -491,7 +493,6 @@
         </div>
 
         <!-- Buttons -->
-
         <div style="display:flex;gap:10px;">
             <button type="button" class="btn-prim" id="rescheduleSubmitBtn" onclick="submitReschedule()" style="flex:1;">
                 <i class="fas fa-calendar-check"></i> Confirm Reschedule
@@ -515,11 +516,9 @@ function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType)
     document.getElementById('rescheduleTime').dataset.oldTime = oldTime.substring(0,5);
     document.getElementById('rescheduleDate').dataset.consoleType = consoleType;
     document.getElementById('rescheduleConsoleType').value = consoleType;
-    document.getElementById('rescheduleDate').value    = oldDate;  // pre-fill with current date
-
+    document.getElementById('rescheduleDate').value    = oldDate;
     document.getElementById('rescheduleTime').value    = oldTime.substring(0,5);
     document.getElementById('rescheduleResModal').style.display = 'flex';
-    
     refreshRescheduleUnits();
 }
 
@@ -542,22 +541,15 @@ function refreshRescheduleUnits() {
     const time = document.getElementById('rescheduleTime').value;
     const type = document.getElementById('rescheduleConsoleType').value;
     const sel  = document.getElementById('rescheduleUnit');
-
     const stat = document.getElementById('rescheduleUnitStatus');
-
     if (!date || !time || !type) return;
-
     stat.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking units...';
     sel.disabled = true;
-
     fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(type)}`)
     .then(r => r.json())
     .then(data => {
         sel.disabled = false;
-        if (!data.success) {
-            stat.textContent = 'Error checking units';
-            return;
-        }
+        if (!data.success) { stat.textContent = 'Error checking units'; return; }
         let html = '<option value="">-- Assign any available --</option>';
         data.units.forEach(u => {
             const ok = u.status === 'available';
@@ -566,10 +558,7 @@ function refreshRescheduleUnits() {
         sel.innerHTML = html;
         stat.textContent = data.units.filter(u => u.status === 'available').length + ' units available for this slot';
     })
-    .catch(() => {
-        sel.disabled = false;
-        stat.textContent = 'Network error';
-    });
+    .catch(() => { sel.disabled = false; stat.textContent = 'Network error'; });
 }
 
 function submitReschedule() {
@@ -580,49 +569,30 @@ function submitReschedule() {
     const time   = document.getElementById('rescheduleTime').value;
     const type   = document.getElementById('rescheduleConsoleType').value;
     const unitId = document.getElementById('rescheduleUnit').value;
-
     if (!reason) { alert('Please select a reason.'); return; }
     if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
     if (!date)   { alert('Please select a new date.'); return; }
     if (!time)   { alert('Please select a new time.'); return; }
     if (!type)   { alert('Please select a console type.'); return; }
-
     const oldDate = document.getElementById('rescheduleDate').dataset.oldDate;
     const oldTime = document.getElementById('rescheduleTime').dataset.oldTime;
-    // Check if anything changed
     if (date === oldDate && time === oldTime && !unitId && type === document.getElementById('rescheduleDate').dataset.consoleType) {
         alert('Please change the date, time, console type, or assign a specific unit.');
         return;
     }
-
     const btn = document.getElementById('rescheduleSubmitBtn');
     btn.disabled = true;
     btn.textContent = 'Rescheduling...';
-
     fetch('ajax/reschedule_reservation.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: new URLSearchParams({ 
-            reservation_id: resId, 
-            reason, 
-            reason_detail: detail, 
-            new_date: date, 
-            new_time: time, 
-            console_type: type,
-            console_id: unitId 
-        })
+        body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time, console_type: type, console_id: unitId })
     })
-
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             closeRescheduleModal();
-            // Show success toast if available, else alert
-            if (typeof showAdminToast === 'function') {
-                showAdminToast(data.message, 'success');
-            } else {
-                alert('✓ ' + data.message);
-            }
+            if (typeof showAdminToast === 'function') { showAdminToast(data.message, 'success'); } else { alert('✓ ' + data.message); }
             refreshReservationsUI();
         } else {
             alert('✕ ' + (data.message || 'Failed to reschedule.'));
@@ -637,9 +607,6 @@ function submitReschedule() {
     });
 }
 </script>
-
-    </div> <!-- end #reservationsContent -->
-</div>
 
 <script>
 let resPag, cancelPag;
