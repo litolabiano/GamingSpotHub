@@ -5,7 +5,7 @@ $allConsoles = getConsoles();
 $isLoggedIn  = isLoggedIn();
 ?>
 <!-- ══ UNITS ════════════════════════════════════════════════════════════════ -->
-<section id="units" style="background:linear-gradient(180deg,#07101f 0%,#0d1b2a 100%);padding:90px 0 100px;">
+<section id="units" class="gsh-units">
 <div class="container">
 
     <!-- Header -->
@@ -19,10 +19,10 @@ $isLoggedIn  = isLoggedIn();
 
     <!-- Filter tabs -->
     <div class="text-center mb-4" data-aos="fade-up">
-        <div id="unitFilter" style="display:inline-flex;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:6px;">
+        <div id="unitFilter" class="gsh-filter-wrap">
             <button class="uf-btn active" data-filter="all">All Units</button>
-            <button class="uf-btn" data-filter="available"><span style="color:#20c8a1">●</span> Available</button>
-            <button class="uf-btn" data-filter="in_use"><span style="color:#fb566b">●</span> In Use</button>
+            <button class="uf-btn" data-filter="available"><span class="dot available">●</span> Available</button>
+            <button class="uf-btn" data-filter="in_use"><span class="dot in-use">●</span> In Use</button>
         </div>
     </div>
 
@@ -44,27 +44,27 @@ $isLoggedIn  = isLoggedIn();
              style="--accent:<?= $accentColor ?>;">
 
             <!-- Top row: type badge + status -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+            <div class="gsh-unit-header">
                 <span class="gsh-type-badge">
-                    <i class="<?= $icon ?>" style="color:<?= $accentColor ?>;margin-right:6px;"></i>
+                    <i class="<?= $icon ?>" style="color:<?= $accentColor ?>;"></i>
                     <?= htmlspecialchars($type) ?>
                 </span>
-                <span class="gsh-status-dot" style="color:<?= $statusColor ?>;">
-                    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:<?= $statusColor ?>;margin-right:5px;
+                <span class="gsh-status-pill" style="color:<?= $statusColor ?>;">
+                    <span class="gsh-status-indicator" style="background:<?= $statusColor ?>;
                     <?= $status==='available' ? 'box-shadow:0 0 0 3px rgba(32,200,161,.25);animation:pulse 2s infinite;' : '' ?>"></span>
                     <?= $statusLabel ?>
                 </span>
             </div>
 
             <!-- Icon -->
-            <div class="gsh-unit-icon" style="background:linear-gradient(135deg,rgba(<?= $accentColor==='#5f85da'?'95,133,218':($accentColor==='#f1a83c'?'241,168,60':'32,200,161') ?>,.12),transparent);">
-                <i class="<?= $icon ?>" style="font-size:3rem;color:<?= $accentColor ?>;"></i>
+            <div class="gsh-unit-icon-wrap" style="background:linear-gradient(135deg,rgba(<?= $accentColor==='#5f85da'?'95,133,218':($accentColor==='#f1a83c'?'241,168,60':'32,200,161') ?>,.12),transparent);">
+                <i class="<?= $icon ?>" style="color:<?= $accentColor ?>;"></i>
             </div>
 
             <!-- Name + unit -->
-            <div style="text-align:center;margin-bottom:16px;">
-                <div style="font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:4px;"><?= htmlspecialchars($con['console_name']) ?></div>
-                <div style="font-size:12px;color:rgba(255,255,255,.35);font-weight:600;letter-spacing:.5px;"><?= htmlspecialchars($con['unit_number']) ?></div>
+            <div class="gsh-unit-info">
+                <div class="gsh-unit-name"><?= htmlspecialchars($con['console_name']) ?></div>
+                <div class="gsh-unit-sub"><?= htmlspecialchars($con['unit_number']) ?></div>
             </div>
 
             <!-- Rate -->
@@ -97,15 +97,15 @@ $isLoggedIn  = isLoggedIn();
     </div>
 
     <!-- Legend -->
-    <div style="display:flex;justify-content:center;gap:24px;margin-top:40px;flex-wrap:wrap;" data-aos="fade-up">
-        <span style="font-size:13px;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:7px;">
-            <span style="width:9px;height:9px;border-radius:50%;background:#20c8a1;box-shadow:0 0 0 3px rgba(32,200,161,.2);"></span> Available
+    <div class="gsh-legend" data-aos="fade-up">
+        <span class="gsh-legend-item">
+            <span class="gsh-legend-dot available"></span> Available
         </span>
-        <span style="font-size:13px;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:7px;">
-            <span style="width:9px;height:9px;border-radius:50%;background:#fb566b;"></span> In Use
+        <span class="gsh-legend-item">
+            <span class="gsh-legend-dot in-use"></span> In Use
         </span>
-        <span style="font-size:13px;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:7px;">
-            <span style="width:9px;height:9px;border-radius:50%;background:#f1a83c;"></span> Maintenance
+        <span class="gsh-legend-item">
+            <span class="gsh-legend-dot maintenance"></span> Maintenance
         </span>
     </div>
 
@@ -113,6 +113,87 @@ $isLoggedIn  = isLoggedIn();
 </section>
 
 <style>
+.gsh-units {
+    background: linear-gradient(180deg, #07101f 0%, #0d1b2a 100%);
+    padding: 100px 0;
+}
+.gsh-filter-wrap {
+    display: inline-flex;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 6px;
+}
+.uf-btn .dot.available { color: #20c8a1; }
+.uf-btn .dot.in-use { color: #fb566b; }
+
+.gsh-unit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+.gsh-status-pill {
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.gsh-status-indicator {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+}
+.gsh-unit-icon-wrap {
+    width: 90px; height: 90px;
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.gsh-unit-icon-wrap i {
+    font-size: 3rem;
+}
+.gsh-unit-info {
+    text-align: center;
+    margin-bottom: 16px;
+}
+.gsh-unit-name {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+}
+.gsh-unit-sub {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+.gsh-legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+.gsh-legend-item {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.gsh-legend-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+}
+.gsh-legend-dot.available { background: #20c8a1; box-shadow: 0 0 0 3px rgba(32, 200, 161, 0.2); }
+.gsh-legend-dot.in-use { background: #fb566b; }
+.gsh-legend-dot.maintenance { background: #f1a83c; }
+
 .gsh-unit-card {
     background: rgba(10,20,40,.7);
     border: 1px solid rgba(255,255,255,.07);

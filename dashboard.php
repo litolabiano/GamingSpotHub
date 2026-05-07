@@ -338,40 +338,76 @@ function fmtMins(int $m): string {
             font-family: 'Inter', sans-serif;
             font-size: 14px;
             min-height: 100vh;
-            padding-top: 70px; /* for the site navbar */
             overflow-x: hidden;
         }
 
-        /* ── Page wrapper ─────────────────────────────────────────────── */
+        /* ── Page wrapper (not a grid — sidebar is fixed) ────────────────── */
         .cd-wrapper {
-            display: grid;
-            grid-template-columns: 260px 1fr;
-            min-height: calc(100vh - 70px);
+            display: block;
+            min-height: 100vh;
         }
 
-        /* ── Sidebar ──────────────────────────────────────────────────── */
+        /* ── Sidebar (fixed, like admin) ────────────────────────────── */
         .cd-sidebar {
-            background: linear-gradient(180deg, rgba(10,33,81,0.97) 0%, rgba(8,14,26,0.98) 100%);
-            border-right: 1px solid var(--border);
-            padding: 30px 16px;
-            position: sticky;
-            top: 70px;
-            height: calc(100vh - 70px);
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 240px;
+            height: 100vh;
+            background: #07101f;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.35);
+            padding: 0;
+            overflow-x: hidden;
             overflow-y: auto;
+            z-index: 1000;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 0;
         }
+        .cd-sidebar::-webkit-scrollbar { width: 3px; }
+        .cd-sidebar::-webkit-scrollbar-track { background: transparent; }
+        .cd-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+
+        /* ── Sidebar header (logo area — mirrors admin sidebar-header) ────── */
+        .cd-sidebar-header {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 64px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .cd-sidebar-header .logo-container {
+            display: flex;
+            align-items: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 900;
+            font-size: 1.5rem;
+            white-space: nowrap;
+        }
+        .cd-sidebar-header .logo-text {
+            font-size: 0.52rem;
+            letter-spacing: 2px;
+            color: var(--gold);
+            margin-left: 7px;
+            white-space: nowrap;
+        }
+
+        /* ── Sidebar user section (below logo) ────────────────────────── */
 
         .cd-sidebar-avatar {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 16px;
-            margin-bottom: 20px;
-            background: var(--panel);
-            border: 1px solid var(--border);
+            padding: 12px 16px;
+            margin: 8px 8px 4px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
             border-radius: var(--radius);
+            flex-shrink: 0;
         }
         .cd-avatar-circle {
             width: 48px; height: 48px;
@@ -389,7 +425,7 @@ function fmtMins(int $m): string {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 10px;
             cursor: pointer;
             color: var(--muted);
@@ -399,7 +435,7 @@ function fmtMins(int $m): string {
             background: none;
             width: 100%;
             text-align: left;
-            font-size: 14px;
+            font-size: 13.5px;
             font-family: inherit;
         }
         .cd-nav-btn i { width: 18px; text-align: center; font-size: 15px; }
@@ -421,10 +457,141 @@ function fmtMins(int $m): string {
         }
         .cd-sidebar-bottom { margin-top: auto; }
 
-        /* ── Main area ────────────────────────────────────────────────── */
+        /* ── Topbar (fixed, right of sidebar — mirrors admin topbar) ──────── */
+        .cd-topbar {
+            position: fixed;
+            left: 240px;
+            top: 0;
+            right: 0;
+            height: 60px;
+            background: #0a0f1c;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 999;
+        }
+        .cd-topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .cd-topbar-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cd-topbar-title .cd-live-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--mint);
+            box-shadow: 0 0 0 3px rgba(32,200,161,.25);
+            animation: cdPulse 1.5s infinite;
+            display: inline-block;
+        }
+        .cd-topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        /* user pill in topbar */
+        .cd-topbar-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 50px;
+            padding: 5px 14px 5px 6px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            position: relative;
+        }
+        .cd-topbar-user:hover {
+            background: rgba(255,255,255,0.09);
+            border-color: rgba(255,255,255,0.14);
+        }
+        .cd-topbar-user .cd-avatar-sm {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--mint), var(--blue));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 12px; color: #fff;
+            flex-shrink: 0;
+        }
+        .cd-topbar-user .cd-tu-name {
+            font-size: 13px; font-weight: 600; color: var(--text);
+            line-height: 1.2;
+        }
+        .cd-topbar-user .cd-tu-role {
+            font-size: 10px; color: var(--mint); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.4px;
+        }
+        .cd-topbar-user .fa-chevron-down {
+            font-size: 9px; color: rgba(255,255,255,0.35); margin-left: 2px;
+            transition: transform 0.2s;
+        }
+        .cd-topbar-user.open .fa-chevron-down { transform: rotate(180deg); }
+        /* topbar dropdown */
+        .cd-tu-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 220px;
+            background: rgba(10,15,30,0.97);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 6px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+            opacity: 0; visibility: hidden;
+            transform: translateY(-8px) scale(0.96);
+            transition: all 0.22s cubic-bezier(0.4,0,0.2,1);
+            z-index: 9999;
+        }
+        .cd-topbar-user.open .cd-tu-menu {
+            opacity: 1; visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+        .cd-tu-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 10px;
+            color: rgba(255,255,255,0.65);
+            text-decoration: none; font-size: 13px; font-weight: 500;
+            transition: background 0.18s, color 0.18s;
+        }
+        .cd-tu-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+        .cd-tu-item.danger { color: rgba(251,86,107,0.8); }
+        .cd-tu-item.danger:hover { background: rgba(251,86,107,0.1); color: #fb566b; }
+        .cd-tu-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 4px 0; }
+
+        /* Nav items: inside padded area */
+        .cd-sidebar-nav { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+        /* ── Main area (margin-based, like admin .main-content) ──────────── */
         .cd-main {
-            padding: 30px;
-            overflow-y: auto;
+            margin-left: 240px;
+            margin-top: 60px;
+            padding: 28px;
+            min-height: calc(100vh - 60px);
+            min-width: 0;
+        }
+
+        /* ── Account page: two-column layout ─────────────────────────── */
+        .cd-account-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        @media (max-width: 1100px) {
+            .cd-account-grid { grid-template-columns: 1fr; }
         }
 
         /* ── Page switching ───────────────────────────────────────────── */
@@ -612,80 +779,19 @@ function fmtMins(int $m): string {
         /* ── Chart container ──────────────────────────────────────────── */
         .cd-chart-wrap { position: relative; height: 180px; }
 
-        /* ── Charts grid ──────────────────────────────────────────────── */
-        .cd-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-
-        /* ── Two-column responsive grid (stats page personality row etc.) */
-        .cd-2col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-
-        /* ── Progress bar ─────────────────────────────────────────────── */
-        .cd-progress-bar {
-            height: 6px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 8px;
-        }
-        .cd-progress-fill {
-            height: 100%;
-            border-radius: 10px;
-            background: linear-gradient(90deg, var(--mint), var(--blue));
-            transition: width 1s ease;
-        }
-
-        /* ── Btn ──────────────────────────────────────────────────────── */
-        .cd-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            padding: 9px 18px;
-            border-radius: 9px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: var(--trans);
-            text-decoration: none;
-        }
-        .cd-btn-primary {
-            background: linear-gradient(135deg, var(--mint), var(--blue));
-            color: #fff;
-            box-shadow: 0 4px 14px rgba(32,200,161,0.3);
-        }
-        .cd-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(32,200,161,0.4); color:#fff; }
-        .cd-btn-ghost {
-            background: rgba(95,133,218,0.12);
-            color: var(--blue);
-            border: 1px solid rgba(95,133,218,0.25);
-        }
-        .cd-btn-ghost:hover { background: rgba(95,133,218,0.22); transform: translateY(-2px); color:var(--blue); }
-
-        /* ══════════════════════════════════════════════════════════════════
-           MOBILE BOTTOM NAV BAR
-        ══════════════════════════════════════════════════════════════════ */
-        .cd-bottom-nav {
-            display: none; /* hidden on desktop */
-        }
-
-        /* ── Responsive ───────────────────────────────────────────────── */
+        /* ── Charts grid ──────────────────────�        /* ── Responsive ─────────────────────────────────────────────── */
         @media (max-width: 900px) {
             /* Hard-clip the viewport — nothing bleeds horizontally */
-            html, body {
-                overflow-x: hidden;
-                max-width: 100vw;
-            }
-            body {
-                padding-top: 70px; /* keep space for fixed site navbar */
-            }
+            html, body { overflow-x: hidden; max-width: 100vw; }
 
-            .cd-wrapper {
-                grid-template-columns: 1fr;
-                min-height: 100vh;
-            }
+            /* Topbar & sidebar stack on mobile */
+            .cd-topbar { left: 0; }
             .cd-sidebar { display: none; }
 
-            /* Main content area: full width, pad bottom for bottom nav */
+            /* Main content area: no left margin on mobile, pad bottom for bottom nav */
             .cd-main {
+                margin-left: 0;
+                margin-top: 60px;
                 padding: 20px 16px 90px;
                 overflow-x: hidden;
                 max-width: 100%;
@@ -695,15 +801,15 @@ function fmtMins(int $m): string {
             /* Old horizontal scroll nav — completely hidden on mobile now */
             .cd-mobile-nav { display: none !important; }
 
-            /* ── Bottom navigation bar ─────────────────────────────────── */
+            /* Topbar welcome text: shorter on small screens */
+            .cd-topbar-title { font-size: 14px; }
+            .cd-topbar-title .cd-live-dot { display: none; }
+
+            /* ── Bottom navigation bar ───────────────────────────────── */
             .cd-bottom-nav {
                 display: flex;
                 position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                width: 100%;
-                height: 64px;
+                bottom: 0; left: 0; right: 0; width: 100%; height: 64px;
                 background: rgba(10, 20, 45, 0.97);
                 border-top: 1px solid rgba(95,133,218,0.2);
                 backdrop-filter: blur(20px);
@@ -713,14 +819,50 @@ function fmtMins(int $m): string {
                 box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
             }
             .cd-bnav-btn {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 3px;
-                background: none;
-                border: none;
+                flex: 1; display: flex; flex-direction: column;
+                align-items: center; justify-content: center;
+                gap: 3px; background: none; border: none; cursor: pointer;
+                color: rgba(255,255,255,0.45); font-family: inherit;
+                font-size: 10px; font-weight: 600; letter-spacing: .3px;
+                padding: 8px 4px; transition: color .2s; position: relative;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .cd-bnav-btn i { font-size: 18px; transition: color .2s, transform .2s; }
+            .cd-bnav-btn.active { color: var(--mint); }
+            .cd-bnav-btn.active i { transform: translateY(-2px); }
+            .cd-bnav-btn.active::after {
+                content: ''; position: absolute; top: 0; left: 50%;
+                transform: translateX(-50%); width: 32px; height: 3px;
+                background: var(--mint); border-radius: 0 0 4px 4px;
+            }
+            .cd-bnav-badge {
+                position: absolute; top: 6px; right: calc(50% - 14px);
+                background: var(--mint); color: #000;
+                font-size: 9px; font-weight: 800;
+                min-width: 16px; height: 16px; border-radius: 8px;
+                display: flex; align-items: center; justify-content: center;
+                padding: 0 4px; pointer-events: none;
+            }
+            .cd-bnav-badge.coral { background: var(--coral); color: #fff; }
+
+            /* Content grids on mobile */
+            .cd-stats { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+            .cd-charts-grid, .cd-2col-grid { grid-template-columns: 1fr; }
+            .cd-live-meta { grid-template-columns: 1fr 1fr; }
+            .cd-section-title { font-size: 18px; margin-bottom: 16px; }
+            .cd-card { padding: 16px; }
+            .cd-account-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .cd-stats    { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .cd-live-meta { grid-template-columns: 1fr; }
+            .cd-stat-value { font-size: 22px; }
+        }
+        @media (min-width: 901px) {
+            .cd-mobile-nav  { display: none; }
+            .cd-bottom-nav  { display: none !important; }
+        }
+der: none;
                 cursor: pointer;
                 color: rgba(255,255,255,0.45);
                 font-family: inherit;
@@ -834,9 +976,9 @@ function fmtMins(int $m): string {
         }
         .pf-input::placeholder { color: rgba(255,255,255,0.25); }
 
-        /* Flash */
+        /* Flash — sit below the new topbar */
         .cd-flash {
-            position: fixed; top: 80px; right: 20px; z-index: 9999;
+            position: fixed; top: 72px; right: 20px; z-index: 9999;
             padding: 13px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
             display: flex; align-items: center; gap: 10px;
             animation: slideInRight .3s ease; max-width: 360px;
@@ -851,34 +993,104 @@ function fmtMins(int $m): string {
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(95,133,218,0.3); border-radius: 3px; }
+
+        /* ══════════════════════════════════════════════════════════════════
+           LOGO & NAVBAR ALIGNMENT — dashboard-specific
+           Shifts the Bootstrap .container left-padding so the navbar brand
+           (GSpot logo) visually aligns with the sidebar/content boundary
+           rather than the raw viewport edge.
+        ══════════════════════════════════════════════════════════════════ */
+        @media (min-width: 901px) {
+            #mainNav .container {
+                padding-left: calc(240px + 16px);
+            }
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           UI CONSISTENCY — align user dashboard sidebar with admin panel
+        ══════════════════════════════════════════════════════════════════ */
+
+        /* Sidebar background: match admin's #07101f deep dark */
+        .cd-sidebar {
+            background: linear-gradient(180deg, #07101f 0%, #080e1a 100%) !important;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.35);
+        }
+
+        /* Avatar block: tighter, matches admin's compact header feel */
+        .cd-sidebar-avatar {
+            background: rgba(255,255,255,0.03) !important;
+            border-color: rgba(255,255,255,0.06) !important;
+        }
+        .cd-avatar-name { font-size: 13px; }
+        .cd-avatar-sub  { font-size: 10.5px; letter-spacing: 0.3px; }
+
+        /* Nav buttons: match admin .nav-item height of 44px */
+        .cd-nav-btn {
+            height: 40px;
+            padding: 0 14px !important;
+            border-radius: 10px;
+            color: rgba(255,255,255,0.55) !important;
+        }
+        .cd-nav-btn:hover {
+            background: rgba(255,255,255,0.06) !important;
+            color: rgba(255,255,255,0.9) !important;
+            transform: none !important;
+        }
+        .cd-nav-btn:hover i { color: var(--mint); }
+        .cd-nav-btn.active {
+            background: rgba(32,200,161,0.12) !important;
+            color: #fff !important;
+            border: 1px solid rgba(32,200,161,0.2) !important;
+            transform: none !important;
+        }
+        .cd-nav-btn.active i { color: var(--mint); }
+
+        /* Nav spacer: match admin divider */
+        .cd-nav-spacer {
+            background: rgba(255,255,255,0.06) !important;
+            margin: 6px 0 !important;
+        }
+
+        /* Cards: align border opacity with admin */
+        .cd-card {
+            border-color: rgba(95,133,218,0.1) !important;
+        }
+        .cd-card:hover { border-color: rgba(95,133,218,0.18) !important; }
+
+        /* Main content: match admin .main-content padding */
+        @media (min-width: 901px) {
+            .cd-main { padding: 28px !important; }
+        }
     </style>
 </head>
-<body data-navbar-fixed="true">
-<?php include __DIR__ . '/includes/navbar.php'; ?>
+<?php
+    $base_url  = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/GamingSpotHub';
+    $firstName = htmlspecialchars(explode(' ', $user['full_name'])[0]);
+?>
+<body>
 
-<script>
-    /* Dashboard: keep navbar in its "scrolled" state at all times,
-       matching the home page scroll-triggered background */
-    (function () {
-        var nav = document.getElementById('mainNav');
-        if (nav) {
-            nav.classList.add('scrolled');
-        }
-    })();
-</script>
+<!-- ══ SIDEBAR ════════════════════════════════════════════════════════════════ -->
+<aside class="cd-sidebar">
 
-<div class="cd-wrapper">
-
-    <!-- ══ SIDEBAR ══════════════════════════════════════════════════════════ -->
-    <aside class="cd-sidebar">
-        <div class="cd-sidebar-avatar">
-            <div class="cd-avatar-circle"><?= getUserInitials() ?></div>
-            <div>
-                <div class="cd-avatar-name"><?= htmlspecialchars($user['full_name']) ?></div>
-                <div class="cd-avatar-sub"><i class="fas fa-gamepad" style="margin-right:4px"></i>Gamer</div>
-            </div>
+    <!-- Logo header (mirrors admin sidebar-header) -->
+    <a class="cd-sidebar-header" href="<?= $base_url ?>/#home">
+        <div class="logo-container">
+            <span class="logo-g">G</span><span class="logo-s">s</span><span class="logo-p">p</span><span class="logo-o">o</span><span class="logo-t">t</span>
+            <span class="logo-text">GAMING HUB</span>
         </div>
+    </a>
 
+    <!-- User avatar / identity block (below logo) -->
+    <div class="cd-sidebar-avatar">
+        <div class="cd-avatar-circle"><?= getUserInitials() ?></div>
+        <div>
+            <div class="cd-avatar-name"><?= htmlspecialchars($user['full_name']) ?></div>
+            <div class="cd-avatar-sub"><i class="fas fa-gamepad" style="margin-right:4px"></i>Gamer</div>
+        </div>
+    </div>
+
+    <!-- Nav items -->
+    <div class="cd-sidebar-nav">
         <button class="cd-nav-btn active" onclick="cdShowPage('overview',this)" id="navOverview">
             <i class="fas fa-chart-line"></i> Overview
         </button>
@@ -925,19 +1137,65 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </button>
 
+        <div class="cd-nav-spacer"></div>
+
         <button class="cd-nav-btn" onclick="cdShowPage('account',this)" id="navAccount">
             <i class="fas fa-user-cog"></i> My Account
         </button>
+    </div>
 
-        <div class="cd-nav-spacer"></div>
+</aside>
 
-    </aside>
+<!-- ══ TOPBAR ═════════════════════════════════════════════════════════════════ -->
+<div class="cd-topbar" id="cdTopbar">
+    <!-- Left: Welcome message (dynamic, from session) -->
+    <div class="cd-topbar-left">
+        <h3 class="cd-topbar-title">
+            Welcome back, <strong style="color:var(--mint);margin-left:5px;"><?= $firstName ?>!</strong>
+            <span class="cd-live-dot" style="margin-left:6px;"></span>
+        </h3>
+    </div>
 
-    <!-- ══ MAIN ═════════════════════════════════════════════════════════════ -->
-    <main class="cd-main">
+    <!-- Right: User dropdown pill -->
+    <div class="cd-topbar-right">
+        <div class="cd-topbar-user" id="cdTopbarUserBtn">
+            <div class="cd-avatar-sm"><?= getUserInitials() ?></div>
+            <div>
+                <div class="cd-tu-name"><?= htmlspecialchars($user['full_name']) ?></div>
+                <div class="cd-tu-role">Gamer</div>
+            </div>
+            <i class="fas fa-chevron-down"></i>
 
-        <!-- Mobile nav (horizontal scroll) — hidden on mobile, kept for structure -->
-        <div class="cd-mobile-nav"></div>
+            <!-- Dropdown menu -->
+            <div class="cd-tu-menu" id="cdTopbarMenu">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:2px;">
+                    <div class="cd-avatar-sm" style="width:38px;height:38px;font-size:14px;flex-shrink:0;"><?= getUserInitials() ?></div>
+                    <div>
+                        <div style="font-weight:700;font-size:13px;color:#e8eaed;"><?= htmlspecialchars($user['full_name']) ?></div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;"><?= htmlspecialchars($user['email']) ?></div>
+                    </div>
+                </div>
+                <div class="cd-tu-divider"></div>
+                <a href="<?= $base_url ?>/index.php" class="cd-tu-item">
+                    <i class="fas fa-home" style="width:16px;text-align:center;"></i> Go to Homepage
+                </a>
+                <a href="<?= $base_url ?>/reserve.php" class="cd-tu-item">
+                    <i class="fas fa-calendar-plus" style="width:16px;text-align:center;"></i> Reserve a Console
+                </a>
+                <div class="cd-tu-divider"></div>
+                <a href="<?= $base_url ?>/auth/logout.php" class="cd-tu-item danger">
+                    <i class="fas fa-sign-out-alt" style="width:16px;text-align:center;"></i> Sign Out
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MAIN CONTENT ═══════════════════════════════════════════════════════════ -->
+<main class="cd-main">
+
+    <!-- Mobile nav placeholder (hidden on desktop) -->
+    <div class="cd-mobile-nav"></div>
 
 
         <!-- ══ PAGE: OVERVIEW ═════════════════════════════════════════════ -->
@@ -1083,11 +1341,7 @@ function fmtMins(int $m): string {
                         Extension request for <strong>+<?= $pendingExtension['extra_minutes'] ?> min</strong> is <strong>pending staff approval</strong>
                     </div>
                     <?php else: ?>
-                    <button class="cd-btn" id="reqExtBtn"
-                            style="background:rgba(95,133,218,0.18);border:1px solid rgba(95,133,218,0.4);color:#8aa4e8;"
-                            onclick="openReqExtModal()"
-                            onmouseover="this.style.background='rgba(95,133,218,.3)'"
-                            onmouseout="this.style.background='rgba(95,133,218,.18)'">
+                    <button class="cd-btn cd-btn-blue" id="reqExtBtn" onclick="openReqExtModal()">
                         <i class="fas fa-clock"></i> Request More Time
                     </button>
                     <span style="font-size:12px;color:var(--muted);">Ask staff to approve extra gaming time</span>
@@ -1488,12 +1742,7 @@ function fmtMins(int $m): string {
                                             <i class="fas fa-calendar-alt"></i> Rescheduled
                                         </button>
                                     <?php else: ?>
-                                        <button class="cd-btn"
-                                            onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')"
-                                            title="Change your reservation date &amp; time (one-time only)"
-                                            style="padding:4px 10px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#ddd;"
-                                            onmouseover="this.style.background='rgba(32,200,161,.15)';this.style.color='#20c8a1';this.style.borderColor='#20c8a1'"
-                                            onmouseout="this.style.background='rgba(255,255,255,.05)';this.style.color='#ddd';this.style.borderColor='rgba(255,255,255,.1)'">
+                                        <button class="cd-btn cd-btn-ghost cd-btn-sm" onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')" title="Change your reservation date &amp; time (one-time only)">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
                                     <?php endif; ?>
@@ -2312,7 +2561,10 @@ function fmtMins(int $m): string {
         <div class="cd-page" id="page-account">
             <h2 class="cd-section-title"><i class="fas fa-user-cog"></i> My Account</h2>
 
-            <div class="cd-card" style="max-width:560px;">
+            <div class="cd-account-grid">
+
+            <!-- Profile Information Card -->
+            <div class="cd-card">
                 <div class="cd-card-header">
                     <div class="cd-card-title"><i class="fas fa-id-card"></i> Profile Information</div>
                 </div>
@@ -2396,11 +2648,74 @@ function fmtMins(int $m): string {
                         </div>
                     </div>
                 </form>
-            </div>
+            </div><!-- /profile card -->
+
+            <!-- Change Password Card -->
+            <div class="cd-card">
+                <div class="cd-card-header">
+                    <div class="cd-card-title"><i class="fas fa-key"></i> Security & Password</div>
+                </div>
+
+                <form id="passwordChangeForm" onsubmit="submitPasswordChange(event)">
+                    <div style="display:grid;gap:20px;">
+                        <div class="pf-field-group">
+                            <label class="pf-label" for="pw_current" style="color:rgba(255,255,255,0.7); font-size:12px; margin-bottom:8px;">
+                                <i class="fas fa-lock" style="color:var(--muted);width:14px;"></i> CURRENT PASSWORD
+                            </label>
+                            <div style="position:relative;">
+                                <input class="pf-input" type="password" id="pw_current" name="current_password" required placeholder="Verify your identity"
+                                    style="padding-right:44px; background:rgba(10,33,81,0.4); border-color:rgba(95,133,218,0.25); font-size:15px;">
+                                <button type="button" onclick="togglePwVisibility('pw_current', 'pw_curr_toggle')" id="pw_curr_toggle"
+                                    style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; padding:4px;">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+                            <div class="pf-field-group">
+                                <label class="pf-label" for="pw_new" style="color:rgba(255,255,255,0.7); font-size:12px; margin-bottom:8px;">
+                                    <i class="fas fa-plus-circle" style="color:var(--mint);width:14px;"></i> NEW PASSWORD
+                                </label>
+                                <div style="position:relative;">
+                                    <input class="pf-input" type="password" id="pw_new" name="new_password" required minlength="8" placeholder="At least 8 chars"
+                                        style="padding-right:44px; background:rgba(10,33,81,0.4); border-color:rgba(95,133,218,0.25); font-size:15px;">
+                                    <button type="button" onclick="togglePwVisibility('pw_new', 'pw_new_toggle')" id="pw_new_toggle"
+                                        style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; padding:4px;">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="pf-field-group">
+                                <label class="pf-label" for="pw_confirm" style="color:rgba(255,255,255,0.7); font-size:12px; margin-bottom:8px;">
+                                    <i class="fas fa-check-circle" style="color:var(--mint);width:14px;"></i> CONFIRM
+                                </label>
+                                <div style="position:relative;">
+                                    <input class="pf-input" type="password" id="pw_confirm" name="confirm_password" required placeholder="Match new password"
+                                        style="padding-right:44px; background:rgba(10,33,81,0.4); border-color:rgba(95,133,218,0.25); font-size:15px;">
+                                    <button type="button" onclick="togglePwVisibility('pw_confirm', 'pw_conf_toggle')" id="pw_conf_toggle"
+                                        style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; padding:4px;">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="pw_alert" style="display:none;border-radius:9px;padding:12px 16px;font-size:13.5px;font-weight:500;align-items:center;gap:10px;"></div>
+
+                        <div style="margin-top:4px;">
+                            <button type="submit" class="cd-btn cd-btn-primary" id="pwSaveBtn" style="padding:14px 24px; font-size:15px; font-weight:800;">
+                                <i class="fas fa-shield-halved"></i> Update Password
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div><!-- /password card -->
+
+            </div><!-- /cd-account-grid -->
         </div><!-- /page-account -->
 
     </main>
-</div>
 
 <!-- ══ MOBILE BOTTOM NAVIGATION BAR ══════════════════════════════════════ -->
 <nav class="cd-bottom-nav" id="cdBottomNav">
@@ -3214,9 +3529,10 @@ function submitProfileEdit(e) {
                 // Update display values
                 document.getElementById('dispName').textContent  = res.full_name;
                 document.getElementById('dispPhone').textContent = res.phone || '—';
-                // Update sidebar avatar name
-                const avatarName = document.querySelector('.cd-avatar-name');
-                if (avatarName) avatarName.textContent = res.full_name;
+                
+                // Also update the sidebar header
+                const sidebarName = document.querySelector('.cd-avatar-name');
+                if (sidebarName) sidebarName.textContent = res.full_name;
 
                 pfShowAlert(true, true, res.message);
                 // Auto-close form after short delay
@@ -3230,6 +3546,70 @@ function submitProfileEdit(e) {
             btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
             pfShowAlert(true, false, 'Network error. Please try again.');
         });
+}
+
+function submitPasswordChange(e) {
+    e.preventDefault();
+    const btn = document.getElementById('pwSaveBtn');
+    const alertEl = document.getElementById('pw_alert');
+    
+    function showPwAlert(show, success, msg) {
+        if (!show) { alertEl.style.display = 'none'; return; }
+        alertEl.style.display = 'flex';
+        alertEl.style.background = success ? 'rgba(32,200,161,0.12)' : 'rgba(251,86,107,0.12)';
+        alertEl.style.border = success ? '1px solid rgba(32,200,161,0.35)' : '1px solid rgba(251,86,107,0.35)';
+        alertEl.style.color  = success ? '#20c8a1' : '#fb566b';
+        alertEl.innerHTML = (success ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-circle"></i>') + ' <span>' + msg + '</span>';
+    }
+
+    const newPw = document.getElementById('pw_new').value;
+    const confPw = document.getElementById('pw_confirm').value;
+
+    if (newPw.length < 8) {
+        showPwAlert(true, false, 'New password must be at least 8 characters.');
+        return;
+    }
+    if (newPw !== confPw) {
+        showPwAlert(true, false, 'New passwords do not match.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating…';
+    showPwAlert(false);
+
+    const fd = new FormData(document.getElementById('passwordChangeForm'));
+    fetch('ajax/change_password.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-shield-halved"></i> Update Password';
+        if (res.success) {
+            showPwAlert(true, true, res.message);
+            document.getElementById('passwordChangeForm').reset();
+        } else {
+            showPwAlert(true, false, res.message);
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-shield-halved"></i> Update Password';
+        showPwAlert(true, false, 'Network error. Please try again.');
+    });
+}
+function togglePwVisibility(inputId, btnId) {
+    const inp = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    const icon = btn.querySelector('i');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+        btn.style.color = 'var(--mint)';
+    } else {
+        inp.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+        btn.style.color = 'rgba(255,255,255,0.4)';
+    }
 }
 </script>
 </html>

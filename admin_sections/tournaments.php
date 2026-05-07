@@ -302,8 +302,9 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     <label>Console *</label>
                     <select name="console_type" required>
                         <option value="" disabled selected>Select Console</option>
-                        <option value="PS5">PlayStation 5</option>
-                        <option value="Xbox Series X">Xbox Series X</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>

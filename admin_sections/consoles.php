@@ -14,6 +14,9 @@
                 <button class="btn btn-primary" onclick="openModal('addConsole')">
                     <i class="fas fa-plus"></i> Add Console
                 </button>
+                <button class="btn btn-secondary" onclick="openModal('manageConsoleTypes')">
+                    <i class="fas fa-tags"></i> Manage Types
+                </button>
                 <button class="btn btn-secondary" onclick="toggleArchiveSection(true)">
                     <i class="fas fa-archive"></i> Archived Consoles (<?= count($archivedConsoles) ?>)
                 </button>
@@ -54,8 +57,9 @@
             <div class="console-card <?= $con['status'] ?>">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <?php
-                        $badgeClass = match($con['console_type']) { 'PS5' => 'ps5', 'PS4' => 'ps4', default => 'xbox' };
-                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', 'Xbox Controller' => 'gamepad', default => 'xbox' };
+                        $typeLower = strtolower($con['console_type']);
+                        $badgeClass = (str_contains($typeLower, 'ps5')) ? 'ps5' : ((str_contains($typeLower, 'ps4')) ? 'ps4' : 'xbox');
+                        $icon = (str_contains($typeLower, 'playstation') || str_contains($typeLower, 'ps')) ? 'playstation' : (str_contains($typeLower, 'controller') ? 'gamepad' : 'xbox');
                     ?>
                     <span class="console-type-badge <?= $badgeClass ?>">
                         <i class="fa-solid fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
@@ -65,6 +69,9 @@
                 <div class="console-unit"><?= htmlspecialchars($con['unit_number']) ?></div>
                 <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:2px;">
+                    <i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> <?= (int)($con['controller_count'] ?? 0) ?> Controller<?= (int)($con['controller_count'] ?? 0) != 1 ? 's' : '' ?>
+                </div>
 
                 <?php
                     $rental = $ctrlRentalByConsole[$con['console_id']] ?? null;
@@ -102,7 +109,8 @@
                 <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
-                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>)"
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>, <?= (int)$con['controller_count'] ?>)"
+
                                 class="btn btn-sm"
                                 style="background:rgba(95,133,218,.15);color:#8aa4e8;border:1px solid rgba(95,133,218,.3);">
                             <i class="fas fa-edit"></i> Edit Console
@@ -438,9 +446,9 @@
                     <label>Console Type</label>
                     <select name="console_type" class="form-control" required>
                         <option value="" disabled selected>Select Type</option>
-                        <option value="PS5">PlayStation 5</option>
-                        <option value="PS4">PlayStation 4</option>
-                        <option value="Xbox Series X">Xbox Series X</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
@@ -451,6 +459,11 @@
                     <label>Hourly Rate (₱)</label>
                     <input type="number" name="hourly_rate" class="form-control" required min="0" step="0.01" value="100.00">
                 </div>
+                <div class="form-group">
+                    <label>Available Controllers</label>
+                    <input type="number" name="controller_count" class="form-control" required min="0" value="2">
+                </div>
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addConsole')">Cancel</button>
@@ -480,9 +493,9 @@
                 <div class="form-group">
                     <label>Console Type</label>
                     <select name="console_type" id="editConsoleType" class="form-control" required>
-                        <option value="PS5">PlayStation 5</option>
-                        <option value="PS4">PlayStation 4</option>
-                        <option value="Xbox Series X">Xbox Series X</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
@@ -495,6 +508,12 @@
                     <input type="number" name="hourly_rate" id="editConsoleRate"
                            class="form-control" required min="0" step="0.01">
                 </div>
+                <div class="form-group">
+                    <label>Available Controllers</label>
+                    <input type="number" name="controller_count" id="editConsoleControllerCount"
+                           class="form-control" required min="0">
+                </div>
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('editConsole')">Cancel</button>
@@ -507,14 +526,16 @@
 </div>
 
 <script>
-function openEditConsoleModal(id, name, type, unit, rate) {
+function openEditConsoleModal(id, name, type, unit, rate, ctrlCount) {
     document.getElementById('editConsoleId').value   = id;
     document.getElementById('editConsoleName').value = name;
     document.getElementById('editConsoleType').value = type;
     document.getElementById('editConsoleUnit').value = unit;
     document.getElementById('editConsoleRate').value = parseFloat(rate).toFixed(2);
+    document.getElementById('editConsoleControllerCount').value = ctrlCount;
     openModal('editConsole');
 }
+
 </script>
 
 <script>
@@ -565,3 +586,93 @@ function toggleArchiveSection(showArchive) {
     pag.apply();
 })();
 </script>
+
+<!-- Manage Console Types Modal -->
+<div class="modal" id="manageConsoleTypesModal">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-tags" style="color:#20c8a1;"></i> Manage Console Types</h3>
+            <span class="modal-close" onclick="closeModal('manageConsoleTypes')"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="modal-body">
+            <!-- Add New Type Form -->
+            <form method="POST" action="admin.php#consoles" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,.1);">
+                <input type="hidden" name="action" value="add_console_type">
+                <?= csrfField() ?>
+                <label style="font-size:12px; font-weight:700; color:#888; text-transform:uppercase; display:block; margin-bottom:8px;">Add New Type</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:1;">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </form>
+
+            <!-- Existing Types List -->
+            <label style="font-size:12px; font-weight:700; color:#888; text-transform:uppercase; display:block; margin-bottom:12px;">Active Types</label>
+            <div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; padding-right:5px; margin-bottom:20px;">
+                <?php if (empty($consoleTypes)): ?>
+                    <div style="text-align:center; padding:20px; color:#555; font-style:italic;">No active types.</div>
+                <?php else: ?>
+                    <?php foreach ($consoleTypes as $ct): ?>
+                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(32,200,161,.05); padding:10px 14px; border-radius:8px; border:1px solid rgba(32,200,161,.1);">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <i class="fas fa-tag" style="color:#20c8a1; font-size:12px;"></i>
+                                <span style="font-weight:600; font-size:14px; color:#f0f0f0;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                            </div>
+                            <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this type? All associated consoles will be moved to the ARCHIVE section.');">
+                                <input type="hidden" name="action" value="archive_console_type">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                <button type="submit" title="Archive Type" style="background:none; border:none; color:#f1a83c; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                    <i class="fas fa-archive"></i>
+                                </button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- Archived Types List -->
+            <?php if (!empty($archivedConsoleTypes)): ?>
+            <label style="font-size:12px; font-weight:700; color:#fb566b; text-transform:uppercase; display:block; margin-bottom:12px; border-top:1px solid rgba(255,255,255,.05); padding-top:15px;">Archived Types</label>
+            <div style="display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto; padding-right:5px; margin-bottom:15px;">
+                <?php foreach ($archivedConsoleTypes as $ct): ?>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.03); padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,.03); opacity:0.8;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-tag" style="color:#888; font-size:12px;"></i>
+                            <span style="font-weight:500; font-size:13px; color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <form method="POST" action="admin.php#consoles">
+                                <input type="hidden" name="action" value="restore_console_type">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                <button type="submit" title="Restore Type" style="background:none; border:none; color:#20c8a1; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            </form>
+                            <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this console type? This action is irreversible and will completely remove the record from the database.');">
+                                <input type="hidden" name="action" value="delete_console_type">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                <button type="submit" title="Delete Permanently" style="background:none; border:none; color:#fb566b; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            
+            <div style="margin-top:10px; padding:12px; background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); border-radius:8px; display:flex; gap:10px;">
+                <i class="fas fa-info-circle" style="color:#5f85da; margin-top:2px;"></i>
+                <div style="font-size:12px; color:rgba(140,160,210,.9); line-height:1.4;">
+                    <strong>Note:</strong> Archiving a console type prevents it from being selected for new units, but keeps it for historical data. Associated units are moved to the <strong>Archive</strong>.
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-full" onclick="closeModal('manageConsoleTypes')">Close</button>
+        </div>
+    </div>
+</div>

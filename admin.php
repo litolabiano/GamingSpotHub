@@ -13,6 +13,10 @@ header("Pragma: no-cache");
 header("Expires: 0"); 
 
 $user = getCurrentUser();
+$consoleTypes = getConsoleTypes(true); // only active
+$archivedConsoleTypes = getConsoleTypes(false); // only archived if we want, but let's filter in the view or fetch separately.
+// Actually, let's fetch all and filter in PHP or fetch separately.
+$archivedConsoleTypes = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1);
 $message = '';
 $messageType = '';
 
@@ -235,9 +239,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type = $_POST['console_type'] ?? '';
         $unit_number = trim($_POST['unit_number'] ?? '');
         $rate = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
         $compat_ctrl = $_POST['compatible_controller_type'] ?? null;
         
-        if ($name && in_array($type, ['PS5', 'PS4', 'Xbox Series X', 'Xbox Controller']) && $unit_number && $rate >= 0) {
+        if ($name && $type && $unit_number && $rate >= 0) {
             // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
             $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
             $checkStmt->bind_param("s", $unit_number);
@@ -246,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
             } else {
-                if (addConsole($name, $type, $unit_number, $rate, $compat_ctrl)) {
+                if (addConsole($name, $type, $unit_number, $rate, $ctrl_count, $compat_ctrl)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                 } else {
@@ -265,8 +270,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type       = $_POST['console_type'] ?? '';
         $unit       = trim($_POST['unit_number'] ?? '');
         $rate       = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
     
-        if ($console_id && $name && in_array($type, ['PS5', 'PS4', 'Xbox Series X']) && $unit && $rate >= 0) {
+        if ($console_id && $name && $type && $unit && $rate >= 0) {
             // Check for duplicate unit number (exclude current console)
             $dupCheck = $conn->prepare(
                 "SELECT console_id FROM consoles WHERE unit_number = ? AND console_id != ?"
@@ -278,10 +284,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?
+                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?, controller_count = ?
                       WHERE console_id = ?"
                 );
-                $stmt->bind_param('sssdi', $name, $type, $unit, $rate, $console_id);
+                $stmt->bind_param('sssdi i', $name, $type, $unit, $rate, $ctrl_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
@@ -295,6 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         }
     }
+
     elseif ($action === 'delete_console') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         if ($console_id) {
@@ -304,6 +311,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'success';
             } else {
                 $message = 'Cannot delete console. It likely has existing sessions/reservations associated with it. Keep it archived instead.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // ADD CONSOLE TYPE
+    elseif ($action === 'add_console_type') {
+        $typeName = trim($_POST['type_name'] ?? '');
+        if ($typeName) {
+            if (addConsoleType($typeName)) {
+                $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to add console type. It might already exist.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // ARCHIVE CONSOLE TYPE
+    elseif ($action === 'archive_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId) {
+            if (archiveConsoleType($typeId)) {
+                $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to archive console type.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // RESTORE CONSOLE TYPE
+    elseif ($action === 'restore_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId) {
+            if (restoreConsoleType($typeId)) {
+                $message = 'Console type restored successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to restore console type.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // PERMANENTLY DELETE CONSOLE TYPE
+    elseif ($action === 'delete_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId) {
+            if (deleteConsoleType($typeId)) {
+                $message = 'Console type permanently removed from the system.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to permanently delete console type.';
                 $messageType = 'error';
             }
         }
@@ -385,8 +448,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
         $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
-                 'business_hours_open','business_hours_close','shop_phone',
-                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
+                 'business_hours_open','business_hours_close','shop_phone','contact_email',
+                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge',
+                 'brevo_api_key','sender_email'];
         foreach ($keys as $key) {
             if (isset($_POST[$key])) {
                 updateSetting($key, trim($_POST[$key]));
@@ -530,7 +594,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // BLOCK DATE
+    elseif ($action === 'block_date') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can block dates.';
+            $messageType = 'error';
+        } else {
+            $date   = $_POST['blocked_date'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            if ($date) {
+                if (blockDate($date, $reason)) {
+                    $message     = 'Date blocked: ' . date('M d, Y', strtotime($date));
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Failed to block date or date already blocked.';
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
+    // UNBLOCK DATE
+    elseif ($action === 'unblock_date') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can unblock dates.';
+            $messageType = 'error';
+        } else {
+            $date = $_POST['blocked_date'] ?? '';
+            if ($date) {
+                if (unblockDate($date)) {
+                    $message     = 'Date unblocked: ' . date('M d, Y', strtotime($date));
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Failed to unblock date.';
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
+
     // COLLECT PAYMENT (mid-session, does NOT end the session)
+
     elseif ($action === 'collect_payment') {
         $session_id     = (int)($_POST['session_id'] ?? 0);
         $payment_method = $_POST['payment_method'] ?? 'cash';
@@ -1329,10 +1432,14 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
+    <div class="nav-item" data-tooltip="Blocked Dates" onclick="showPage('blocked_dates', this)">
+        <i class="fas fa-calendar-times"></i><span>Blocked Dates</span>
+    </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
     <?php endif; ?>
+
 </div>
 
 <!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
@@ -1442,7 +1549,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
 
+<?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/blocked_dates.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
+
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
@@ -1502,8 +1611,10 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings', tournaments: 'Tournaments'
+        settings: 'Settings', tournaments: 'Tournaments',
+        blocked_dates: 'Blocked Dates'
     };
+
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
     // Persist active page in URL hash so reloads stay on the same section
@@ -1525,7 +1636,8 @@ var _currentSection = 'dashboard';
 (function () {
     var REFRESH_MS = 12000;
     // Sections we can safely auto-refresh (exclude settings to avoid mid-edit disruption)
-    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments'];
+    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments','blocked_dates'];
+
     // CSS flash keyframe for subtle update feedback
     var styleEl = document.createElement('style');
     styleEl.textContent = '@keyframes liveFlash{0%{opacity:.6}50%{opacity:.9}100%{opacity:1}} .live-refreshing{animation:liveFlash .4s ease;}';

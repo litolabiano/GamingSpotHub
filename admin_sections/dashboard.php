@@ -72,7 +72,11 @@
                 <td><span style="color:#555;font-size:12px">#</span><?= $sess['session_id'] ?></td>
                 <td style="font-weight:600"><?= htmlspecialchars($sess['customer_name']) ?></td>
                 <td>
-                    <span class="console-type-badge <?= $sess['console_type'] === 'PS5' ? 'ps5' : ($sess['console_type'] === 'PS4' ? 'ps4' : 'xbox') ?>">
+                    <?php
+                        $tL = strtolower($sess['console_type']);
+                        $bC = (str_contains($tL, 'ps5')) ? 'ps5' : ((str_contains($tL, 'ps4')) ? 'ps4' : 'xbox');
+                    ?>
+                    <span class="console-type-badge <?= $bC ?>">
                         <?= $sess['console_type'] ?>
                     </span>
                     <span style="color:#aaa;font-size:12px;margin-left:4px"><?= htmlspecialchars($sess['unit_number']) ?></span>

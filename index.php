@@ -3,11 +3,22 @@ require_once __DIR__ . '/includes/session_helper.php';
 if (isLoggedIn() && in_array($_SESSION['role'] ?? '', ['owner', 'shopkeeper'])) {
     header('Location: ' . getBaseUrl() . '/admin.php'); exit;
 }
-require_once __DIR__ . '/includes/db_config.php';
-$r = $conn->query("SELECT COUNT(*) AS cnt FROM consoles"); $stat_consoles = (int)$r->fetch_assoc()['cnt'];
+require_once __DIR__ . '/includes/db_functions.php';
+$r = $conn->query("SELECT COUNT(*) AS cnt FROM consoles WHERE status != 'archived'"); $stat_consoles = (int)$r->fetch_assoc()['cnt'];
 $r = $conn->query("SELECT COUNT(*) AS cnt FROM users WHERE role='customer' AND status='active'"); $stat_members = (int)$r->fetch_assoc()['cnt'];
 $r = $conn->query("SELECT COUNT(*) AS cnt FROM gaming_sessions WHERE status='completed'"); $stat_sessions = (int)$r->fetch_assoc()['cnt'];
-$r = $conn->query("SELECT DISTINCT console_type FROM consoles ORDER BY console_type");
+
+$openTime = getSetting('business_hours_open') ?: '12:00';
+$closeTime = getSetting('business_hours_close') ?: '00:00';
+$nowTime = (int)date('Gi');
+$oTime = (int)str_replace(':', '', $openTime);
+$cTime = (int)str_replace(':', '', $closeTime);
+$isOpen = ($oTime < $cTime) ? ($nowTime >= $oTime && $nowTime < $cTime) : ($nowTime >= $oTime || $nowTime < $cTime);
+
+$statusText = $isOpen ? 'Now Open' : 'Currently Closed';
+$displayHours = date('gA', strtotime($openTime)) . ' – ' . date('gA', strtotime($closeTime));
+
+$r = $conn->query("SELECT DISTINCT console_type FROM consoles WHERE status != 'archived' ORDER BY console_type");
 $consoleTypes = []; while ($row = $r->fetch_assoc()) $consoleTypes[] = $row['console_type'];
 if (count($consoleTypes) > 1) { $last = array_pop($consoleTypes); $consoleList = implode(', ', $consoleTypes).' & '.$last; }
 else $consoleList = $consoleTypes[0] ?? 'console';
@@ -352,8 +363,8 @@ else $consoleList = $consoleTypes[0] ?? 'console';
             <!-- Left: copy -->
             <div class="col-lg-6" data-aos="fade-right" data-aos-duration="800">
                 <div class="gsh-badge">
-                    <span class="gsh-badge-dot"></span>
-                    Now Open · 12PM – 12AM
+                    <span class="gsh-badge-dot" style="background: <?= $isOpen ? '#20c8a1' : '#fb566b' ?>"></span>
+                    <?= $statusText ?> · <?= $displayHours ?>
                 </div>
                 <h1 class="gsh-title">
                     YOUR ULTIMATE<br>

@@ -237,17 +237,28 @@ function updateConsoleStatus($console_id, $status) {
 /**
  * Add a new console to the database.
  */
-function addConsole($name, $type, $unit_number, $rate, $compat_ctrl_type = null) {
+function addConsole($name, $type, $unit_number, $rate, $controller_count = 2, $compat_ctrl_type = null) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, status, compatible_controller_type) VALUES (?, ?, ?, ?, 'available', ?)");
-        $stmt->bind_param("sssds", $name, $type, $unit_number, $rate, $compat_ctrl_type);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, controller_count, status, compatible_controller_type) VALUES (?, ?, ?, ?, ?, 'available', ?)");
+        $stmt->bind_param("sssdis", $name, $type, $unit_number, $rate, $controller_count, $compat_ctrl_type);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         // Return false if duplicate entry or other SQL error
         return false;
     }
 }
+
+/**
+ * Update console controller count.
+ */
+function updateConsoleControllerCount($console_id, $count) {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE consoles SET controller_count = ? WHERE console_id = ?");
+    $stmt->bind_param("ii", $count, $console_id);
+    return $stmt->execute();
+}
+
 
 /**
  * Permanently delete a console. 
@@ -1103,6 +1114,11 @@ function createReservation(
         return ['success' => false, 'message' => 'Cannot reserve a past date.'];
     }
 
+    if (isDateBlocked($reserved_date)) {
+        return ['success' => false, 'message' => 'The selected date is currently blocked for reservations. Please choose another date.'];
+    }
+
+
     // Payment proof is required — payment_proof_status starts as 'pending' (awaiting admin verify)
     $downpayment_paid  = 0;  // NOT marked paid until admin verifies the GCash proof
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
@@ -1426,5 +1442,165 @@ function getOperatingDayBounds($operating_date) {
     $end = $end_dt->format('Y-m-d') . ' 05:59:59';
     return [$start, $end];
 }
-?>
 
+// ============================================================================
+// CONSOLE TYPES (DYNAMIC LIST)
+// ============================================================================
+
+/**
+ * Get all available console types from the database.
+ */
+function getConsoleTypes(bool $onlyActive = true): array {
+    global $conn;
+    
+    // Check if table exists
+    $check = $conn->query("SHOW TABLES LIKE 'console_types'");
+    if ($check->num_rows === 0) {
+        // Table missing, create it and populate defaults
+        $conn->query("CREATE TABLE IF NOT EXISTS console_types (
+            type_id INT AUTO_INCREMENT PRIMARY KEY,
+            type_name VARCHAR(50) NOT NULL UNIQUE,
+            is_archived TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        
+        $conn->query("INSERT IGNORE INTO console_types (type_name) VALUES ('PS5'), ('PS4'), ('Xbox Series X'), ('Xbox Controller');");
+        
+        // Also ensure other tables are updated from ENUM to VARCHAR
+        $conn->query("ALTER TABLE consoles MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
+        $conn->query("ALTER TABLE reservations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
+        $conn->query("ALTER TABLE tournaments MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
+        $conn->query("ALTER TABLE reservation_cancellations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
+    } else {
+        // Ensure is_archived column exists (for existing systems)
+        $conn->query("ALTER TABLE console_types ADD COLUMN IF NOT EXISTS is_archived TINYINT(1) DEFAULT 0 AFTER type_name;");
+    }
+
+    $types = [];
+    $where = $onlyActive ? " WHERE is_archived = 0 " : "";
+    $res = $conn->query("SELECT * FROM console_types $where ORDER BY type_name ASC");
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            $types[] = $row;
+        }
+    }
+    return $types;
+}
+
+/**
+ * Add a new console type.
+ * Returns true on success, false on failure (e.g. duplicate name).
+ */
+function addConsoleType(string $typeName): bool {
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO console_types (type_name) VALUES (?)");
+    $stmt->bind_param("s", $typeName);
+    try {
+        return $stmt->execute();
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * Archive a console type and archive all consoles of that type.
+ */
+function archiveConsoleType(int $typeId): bool {
+    global $conn;
+    
+    // Start transaction
+    $conn->begin_transaction();
+    
+    try {
+        // Get the type name first
+        $stmtName = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+        $stmtName->bind_param("i", $typeId);
+        $stmtName->execute();
+        $resName = $stmtName->get_result();
+        if (!$resName || $resName->num_rows === 0) {
+            $conn->rollback();
+            return false;
+        }
+        $typeName = $resName->fetch_assoc()['type_name'];
+        
+        // 1. Archive all consoles of this type
+        $stmtArchive = $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type = ?");
+        $stmtArchive->bind_param("s", $typeName);
+        $stmtArchive->execute();
+        
+        // 2. Archive the type
+        $stmtType = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
+        $stmtType->bind_param("i", $typeId);
+        $stmtType->execute();
+        
+        $conn->commit();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        return false;
+    }
+}
+
+/**
+ * Restore an archived console type.
+ */
+function restoreConsoleType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/**
+ * Permanently delete a console type (if needed, but we use archiving now).
+ */
+function deleteConsoleType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("DELETE FROM console_types WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+// ============================================================================
+// DATE BLOCKING FUNCTIONS
+// ============================================================================
+
+/**
+ * Get all blocked dates.
+ */
+function getBlockedDates() {
+    global $conn;
+    $res = $conn->query("SELECT * FROM blocked_dates ORDER BY blocked_date ASC");
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Block a specific date.
+ */
+function blockDate($date, $reason = '') {
+    global $conn;
+    $stmt = $conn->prepare("INSERT IGNORE INTO blocked_dates (blocked_date, reason) VALUES (?, ?)");
+    $stmt->bind_param("ss", $date, $reason);
+    return $stmt->execute();
+}
+
+/**
+ * Unblock a specific date.
+ */
+function unblockDate($date) {
+    global $conn;
+    $stmt = $conn->prepare("DELETE FROM blocked_dates WHERE blocked_date = ?");
+    $stmt->bind_param("s", $date);
+    return $stmt->execute();
+}
+
+/**
+ * Check if a date is blocked.
+ */
+function isDateBlocked($date) {
+    global $conn;
+    $stmt = $conn->prepare("SELECT id FROM blocked_dates WHERE blocked_date = ? LIMIT 1");
+    $stmt->bind_param("s", $date);
+    $stmt->execute();
+    return $stmt->get_result()->num_rows > 0;
+}
+?>

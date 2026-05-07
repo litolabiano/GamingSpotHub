@@ -125,6 +125,40 @@
                     <label>Shop Phone</label>
                     <input type="text" name="shop_phone" value="<?= htmlspecialchars($settings['shop_phone'] ?? '') ?>">
                 </div>
+                <div class="form-group">
+                    <label>Contact Inquiry Email</label>
+                    <input type="email" name="contact_email" value="<?= htmlspecialchars($settings['contact_email'] ?? 'goodspotgaminghub@gmail.com') ?>">
+                    <div style="font-size:11px;color:#888;margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> This is where all contact form submissions will be sent.
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Email Configuration (Brevo API) ── -->
+            <div class="card">
+                <div class="card-header"><h3 class="card-title"><i class="fas fa-paper-plane" style="color:#20c8a1;margin-right:6px;"></i>Hassle-Free Email (Brevo API)</h3></div>
+                
+                <div style="background:rgba(32,200,161,.08);border:1px solid rgba(32,200,161,.25);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#20c8a1;">
+                    <i class="fas fa-bolt" style="color:#f1a83c;margin-right:6px;"></i> 
+                    <strong>No SMTP setup required!</strong> Just enter your Brevo API Key to enable instant email notifications for all form submissions.
+                </div>
+
+                <div class="form-group">
+                    <label>Brevo API Key (v3) — <span style="color:#fb566b">Must start with 'xkeysib-'</span></label>
+                    <input type="password" name="brevo_api_key" placeholder="xkeysib-..." value="<?= htmlspecialchars($settings['brevo_api_key'] ?? '') ?>">
+                    <div style="font-size:11px;color:#888;margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> Go to <strong>SMTP & API</strong> > <strong>API Keys</strong> tab. <br>
+                        <strong style="color:#f1a83c">Note:</strong> Do NOT use the 'SMTP Key' (xsmtpsib-), use the 'API Key'.
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Sender Email (Verified in Brevo)</label>
+                    <input type="email" name="sender_email" placeholder="notifications@yourdomain.com" value="<?= htmlspecialchars($settings['sender_email'] ?? 'goodspotgaminghub@gmail.com') ?>">
+                    <div style="font-size:11px;color:#888;margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> This must be a <strong>verified sender</strong> in your Brevo account.
+                    </div>
+                </div>
             </div>
 
         </div>

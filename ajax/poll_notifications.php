@@ -46,11 +46,12 @@ $resResched = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
 // 3. Cancellations (cancelled by user)
 $stmt3 = $conn->prepare("
     SELECT c.cancel_id AS id, 'cancellation' AS event_type,
-           u.full_name AS customer_name, c.console_type, c.rental_mode,
-           c.reserved_date, '00:00:00' AS reserved_time,
+           u.full_name AS customer_name, r.console_type, r.rental_mode,
+           r.reserved_date, r.reserved_time,
            c.cancelled_at AS event_time
     FROM reservation_cancellations c
     JOIN users u ON c.user_id = u.user_id
+    JOIN reservations r ON c.reservation_id = r.reservation_id
     WHERE c.cancelled_at > ? AND c.cancelled_by = 'user'
 ");
 $stmt3->bind_param('s', $lastDate);

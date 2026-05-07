@@ -28,9 +28,13 @@ $user   = getCurrentUser();
 $uid    = (int)$user['user_id'];
 
 // ── Input ─────────────────────────────────────────────────────────────────────
-$res_id   = (int)trim($_POST['reservation_id'] ?? 0);
-$new_date = trim($_POST['new_date'] ?? '');
-$new_time = trim($_POST['new_time'] ?? '');
+$res_id           = (int)trim($_POST['reservation_id'] ?? 0);
+$new_date         = trim($_POST['new_date'] ?? '');
+$new_time         = trim($_POST['new_time'] ?? '');
+$new_console_type = trim($_POST['console_type'] ?? '');
+$new_console_id   = (int)($_POST['console_id'] ?? 0) ?: null;
+
+
 
 // Basic presence check
 if (!$res_id || !$new_date || !$new_time) {
@@ -158,19 +162,23 @@ try {
     $reason_detail = 'Customer self-reschedule request.';
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
-            (reservation_id, user_id, old_date, old_time, new_date, new_time,
+            (reservation_id, user_id, old_date, old_time, new_date, new_time, console_id, console_type,
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-        'iissssssi',
+        'iissssisssi',
         $res_id, $uid,
         $old_date, $old_time,
         $new_date, $new_time,
+        $new_console_id,
+        $new_console_type,
         $reason, $reason_detail,
         $uid   // rescheduled_by = the customer
     );
     $log->execute();
+
+
 
     $conn->commit();
 

@@ -338,7 +338,6 @@
                 <label>Customer <span style="color:#888;font-size:11px;font-weight:400;">(optional — leave blank for walk-in)</span></label>
                 <div class="cs-wrap" id="ssWrap">
                     <div class="cs-input-row">
-                        <i class="fas fa-search cs-icon"></i>
                         <input type="text" id="ssQuery" class="cs-input"
                                placeholder="Search customer by name or email…"
                                autocomplete="off"
@@ -399,9 +398,9 @@
                     <?php endforeach; ?>
                 </select>
                 <?php $pr = getPricingRules(); ?>
-                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:center;gap:5px;">
-                    <i class="fas fa-info-circle"></i>
-                    Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly. For longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).
+                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:flex-start;gap:6px;">
+                    <i class="fas fa-info-circle" style="margin-top:2px;"></i>
+                    <span>Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly; for longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).</span>
                 </div>
             </div>
 
@@ -1315,9 +1314,9 @@ function denyExt(extId) {
                     <label>Console Type <span class="req">*</span></label>
                     <select name="console_type" required>
                         <option value="" disabled selected>— Select —</option>
-                        <option value="PS4">PS4</option>
-                        <option value="PS5">PS5</option>
-                        <option value="Xbox Series X">Xbox Series X</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
