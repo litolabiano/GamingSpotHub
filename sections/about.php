@@ -63,6 +63,16 @@
                         </div>
                     </div>
 
+                    <div class="gsh-about-feat">
+                        <div class="gsh-af-icon" style="background:linear-gradient(135deg,rgba(251,86,107,.2),rgba(251,86,107,.05));">
+                            <i class="fas fa-layer-group" style="color:#fb566b;"></i>
+                        </div>
+                        <div>
+                            <div class="gsh-af-title">Massive Game Library</div>
+                            <div class="gsh-af-desc">Choose from 957+ titles across PS5, PS4, and Xbox platforms</div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

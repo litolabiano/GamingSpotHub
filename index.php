@@ -398,6 +398,11 @@ else $consoleList = $consoleTypes[0] ?? 'console';
                         <div class="gsh-stat-val"><?= $stat_sessions ?>+</div>
                         <div class="gsh-stat-lbl">Sessions Played</div>
                     </div>
+                    <div class="gsh-stat-div"></div>
+                    <div class="gsh-stat">
+                        <div class="gsh-stat-val">957+</div>
+                        <div class="gsh-stat-lbl">Total Games</div>
+                    </div>
                 </div>
             </div>
 
