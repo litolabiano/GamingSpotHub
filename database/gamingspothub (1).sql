@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 08, 2026 at 08:42 AM
+-- Generation Time: May 08, 2026 at 09:47 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -36,6 +36,13 @@ CREATE TABLE `additional_requests` (
   `status` enum('pending','approved','denied') NOT NULL DEFAULT 'pending',
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `additional_requests`
+--
+
+INSERT INTO `additional_requests` (`request_id`, `session_id`, `request_type`, `description`, `extra_cost`, `status`, `created_at`) VALUES
+(13, 1, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 15:46:36');
 
 -- --------------------------------------------------------
 
@@ -80,12 +87,12 @@ CREATE TABLE `consoles` (
 --
 
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `controller_count`, `status`, `hourly_rate`, `created_at`) VALUES
-(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(6, 'PS4 Unit 6', 'PS4', 'PS4-06', 2, 'maintenance', 80.00, '2026-02-21 19:55:41'),
+(1, 'PS5 Unit 1', 'PS5', 'PS5-01', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 2, 'in_use', 90.00, '2026-02-21 19:55:41'),
+(3, 'PS5 Unit 3', 'PS5', 'PS5-03', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+(4, 'PS5 Unit 4', 'PS5', 'PS5-04', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+(6, 'PS4 Unit 6', 'PS4', 'PS4-06', 2, 'maintenance', 90.00, '2026-02-21 19:55:41'),
 (7, 'Xbox Unit 7', 'Xbox Series X', 'XBX-07', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (8, 'Xbox Unit 8', 'Xbox Series X', 'XBX-08', 2, 'available', 80.00, '2026-02-21 19:55:41');
 
@@ -191,6 +198,13 @@ CREATE TABLE `gaming_sessions` (
   `extended_minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes added via approved extensions',
   `source_reservation_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `gaming_sessions`
+--
+
+INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mode`, `planned_minutes`, `start_time`, `end_time`, `duration_minutes`, `hourly_rate`, `total_cost`, `status`, `payment_status`, `created_by`, `created_at`, `extended_minutes`, `source_reservation_id`) VALUES
+(1, 0, 2, 'hourly', 60, '2026-05-08 15:46:36', NULL, NULL, 90.00, NULL, 'active', NULL, 12, '2026-05-08 15:46:36', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -427,7 +441,7 @@ CREATE TABLE `system_settings` (
 --
 
 INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `description`, `updated_at`) VALUES
-(1, 'ps5_hourly_rate', '80', 'Default hourly rate for PS5 units in ₱', '2026-05-08 10:49:51'),
+(1, 'ps5_hourly_rate', '90', 'Default hourly rate for PS5 units in ₱', '2026-05-08 15:46:02'),
 (2, 'xbox_hourly_rate', '80.00', 'Default hourly rate for Xbox Series X units in ₱', '2026-04-26 23:09:54'),
 (3, 'unlimited_rate', '400.00', 'Rate for unlimited play (whole day) in ₱', '2026-04-14 09:56:44'),
 (4, 'controller_rental_fee', '20.00', 'Additional controller rental fee in ₱', '2026-02-21 19:55:41'),
@@ -440,7 +454,7 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (21, 'bonus_paid_minutes', '120', NULL, '2026-04-26 16:47:16'),
 (22, 'bonus_free_minutes', '30', NULL, '2026-05-07 10:23:13'),
 (23, 'max_hourly_minutes', '240', NULL, '2026-04-26 16:47:16'),
-(24, 'session_min_charge', '60', NULL, '2026-05-08 10:57:43'),
+(24, 'session_min_charge', '50', NULL, '2026-05-08 15:46:20'),
 (152, 'gcash_number', '09XX-XXX-XXXX', 'Shop GCash number displayed on reservation payment screen', '2026-04-28 19:21:02'),
 (164, 'shop_override_enabled', '0', NULL, '2026-05-06 19:55:24'),
 (165, 'shop_override_closing_time', '', NULL, '2026-05-06 19:55:24'),
@@ -544,7 +558,8 @@ CREATE TABLE `transactions` (
 --
 
 INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`, `tendered_amount`, `shortfall_amount`, `payment_note`, `payment_method`, `payment_status`, `transaction_date`, `processed_by`, `created_at`) VALUES
-(123, NULL, 12, 23.00, 23.00, NULL, 'Downpayment for reservation #34', 'gcash', 'completed', '2026-05-08 14:07:12', 12, '2026-05-08 14:07:12');
+(123, NULL, 12, 23.00, 23.00, NULL, 'Downpayment for reservation #34', 'gcash', 'completed', '2026-05-08 14:07:12', 12, '2026-05-08 14:07:12'),
+(124, 1, 0, 110.00, 110.00, NULL, NULL, 'cash', 'completed', '2026-05-08 15:46:36', 12, '2026-05-08 15:46:36');
 
 -- --------------------------------------------------------
 
@@ -779,7 +794,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `additional_requests`
 --
 ALTER TABLE `additional_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `blocked_dates`
@@ -815,7 +830,7 @@ ALTER TABLE `controller_types`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `pricing_tiers`
@@ -863,7 +878,7 @@ ALTER TABLE `shop_hours_overrides`
 -- AUTO_INCREMENT for table `system_settings`
 --
 ALTER TABLE `system_settings`
-  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=366;
+  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=394;
 
 --
 -- AUTO_INCREMENT for table `tournaments`
@@ -881,7 +896,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=124;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=125;
 
 --
 -- AUTO_INCREMENT for table `users`
