@@ -53,6 +53,11 @@ try {
     }
 
     // 4. Perform Restore
+    // Delete any transactions recorded for this session at or after the end_time (voiding the "end session" payment)
+    $stmtT = $conn->prepare("DELETE FROM transactions WHERE session_id = ? AND transaction_date >= ?");
+    $stmtT->bind_param("is", $session_id, $sess['end_time']);
+    $stmtT->execute();
+
     // Update session: status='active', end_time=NULL, total_cost=NULL, duration_minutes=NULL
     $upd = $conn->prepare("UPDATE gaming_sessions SET status = 'active', end_time = NULL, total_cost = NULL, duration_minutes = NULL WHERE session_id = ?");
     $upd->bind_param("i", $session_id);
@@ -68,7 +73,7 @@ try {
     $details = "Restored session #{$session_id} for " . ($sess['is_walkin'] ? 'Walk-in' : "User #{$sess['user_id']}") . ". "
              . "Time elapsed since end: " . floor($elapsedSec / 60) . "m " . ($elapsedSec % 60) . "s. "
              . "Console: {$console['unit_number']}. "
-             . "Original End Time: {$sess['end_time']}.";
+             . "Original End Time: {$sess['end_time']}. Payments made at end were voided.";
     
     $log = $conn->prepare("INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)");
     $log->bind_param("iss", $staff_id, $action, $details);
