@@ -57,12 +57,8 @@ $rescheduleStmt = $conn->prepare(
             ct.type_name AS console_type, c.unit_number
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
-<<<<<<< Updated upstream
-       LEFT JOIN consoles c ON r.console_id = c.console_id
-=======
        LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
        LEFT JOIN consoles c ON rs.console_id = c.console_id
->>>>>>> Stashed changes
       WHERE rs.user_id = ? AND rs.seen_by_user = 0
       ORDER BY rs.created_at DESC"
 );
@@ -1160,7 +1156,7 @@ function fmtMins(int $m): string {
                             <span style="color:#888;">From:</span>
                             <strong style="color:#fff;"><?= date('M d, Y', strtotime($rs['old_date'])) ?> at <?= date('g:i A', strtotime($rs['old_time'])) ?></strong><br>
                             <span style="color:#888;">To:</span>
-                            <strong style="color:#20c8a1;"><?= date('M d, Y', strtotime($rs['new_date'])) ?> at <?= date('g:i A', strtotime($rs['new_time'])) ?></strong><br>
+                            <strong style="color:#20c8a1;"><?= (!empty($rs['new_date']) && $rs['new_date'] !== '0000-00-00') ? date('M d, Y', strtotime($rs['new_date'])) : 'TBD' ?> at <?= (!empty($rs['new_time']) && $rs['new_time'] !== '00:00:00') ? date('g:i A', strtotime($rs['new_time'])) : 'TBD' ?></strong><br>
                             <span style="color:#888;">Reason:</span>
                             <span style="color:#f1a83c;"><?= $rescheduleReasonLabels[$rs['reason']] ?? ucfirst($rs['reason']) ?></span>
                             <?php if ($rs['reason_detail']): ?>
@@ -1210,9 +1206,9 @@ function fmtMins(int $m): string {
                 const dateInput  = document.getElementById('rcmDate');
                 const timeSelect = document.getElementById('rcmTime');
                 dateInput.min    = minDate;
-                dateInput.value  = minDate;
+                dateInput.value  = minDate || '';
                 // Store original proposed values
-                dateInput.dataset.original = minDate;
+                dateInput.dataset.original = minDate || '';
                 if (timeSelect && preTime) {
                     // Check if the preTime exists in the select options
                     let optionExists = false;
@@ -1234,8 +1230,8 @@ function fmtMins(int $m): string {
                         newOpt.text = h + ':' + m + ' ' + ampm;
                         timeSelect.appendChild(newOpt);
                     }
-                    timeSelect.value = preTime;
-                    timeSelect.dataset.original = preTime;
+                    timeSelect.value = preTime || '';
+                    timeSelect.dataset.original = preTime || '';
                 }
                 const d = new Date(minDate + 'T00:00:00');
                 document.getElementById('rcmProposedDate').textContent =

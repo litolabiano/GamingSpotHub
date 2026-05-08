@@ -1125,13 +1125,8 @@ $purStmt = $conn->query(
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
-<<<<<<< Updated upstream
-     LEFT JOIN consoles c ON r.console_id = c.console_id
-     LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
-=======
      LEFT JOIN consoles c ON rs.console_id = c.console_id
      LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
->>>>>>> Stashed changes
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );

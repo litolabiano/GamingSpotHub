@@ -175,7 +175,7 @@ try {
                 updated_at        = NOW()
           WHERE reservation_id = ?"
     );
-    $upd->bind_param('ssiiii', $new_date, $new_time, $new_type_id, $new_console_id, $res_id);
+    $upd->bind_param('ssiii', $new_date, $new_time, $new_type_id, $new_console_id, $res_id);
     $upd->execute();
 
     // 2. Log the reschedule request — initiated_by = 'user', status = 'pending'
@@ -184,18 +184,13 @@ try {
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
             (reservation_id, user_id, 
-<<<<<<< Updated upstream
-             old_date, old_time, old_console_id, old_console_type,
-             new_date, new_time, console_id, console_type,
-=======
              old_date, old_time, old_console_id, old_console_type_id,
              new_date, new_time, console_id, new_console_type_id,
->>>>>>> Stashed changes
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-        'iississsisssi',
+        'iissiissiissi',
         $res_id, $uid,
         $old_date, $old_time, $old_console_id, $old_type_id,
         $new_date, $new_time, $new_console_id, $new_type_id,
@@ -205,6 +200,7 @@ try {
     $log->execute();
 
     $conn->commit();
+    logActivity($uid, "Reschedule Request", "Customer requested to reschedule Reservation #{$res_id} to {$new_date} {$new_time}");
 
     // ── Format for response ───────────────────────────────────────────────────
     $newDateDisplay = date('M d, Y', strtotime($new_date));
