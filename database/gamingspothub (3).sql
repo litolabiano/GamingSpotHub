@@ -3,7 +3,11 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
+<<<<<<< Updated upstream
 -- Generation Time: May 08, 2026 at 01:27 PM
+=======
+-- Generation Time: May 08, 2026 at 12:48 PM
+>>>>>>> Stashed changes
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -24,6 +28,7 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+<<<<<<< Updated upstream
 -- Table structure for table `activity_logs`
 --
 
@@ -53,6 +58,8 @@ INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `created_
 -- --------------------------------------------------------
 
 --
+=======
+>>>>>>> Stashed changes
 -- Table structure for table `additional_requests`
 --
 
@@ -66,6 +73,7 @@ CREATE TABLE `additional_requests` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+<<<<<<< Updated upstream
 --
 -- Dumping data for table `additional_requests`
 --
@@ -73,6 +81,8 @@ CREATE TABLE `additional_requests` (
 INSERT INTO `additional_requests` (`request_id`, `session_id`, `request_type`, `description`, `extra_cost`, `status`, `created_at`) VALUES
 (13, 9, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 18:51:18');
 
+=======
+>>>>>>> Stashed changes
 -- --------------------------------------------------------
 
 --
@@ -119,13 +129,21 @@ INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_numb
 (2, 'PS5 Unit 2', 'PS5', 'PS5-02', 2, 'available', 90.00, '2026-02-21 19:55:41'),
 (3, 'PS5 Unit 3', 'PS5', 'PS5-03', 2, 'available', 90.00, '2026-02-21 19:55:41'),
 (4, 'PS5 Unit 4', 'PS5', 'PS5-04', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+<<<<<<< Updated upstream
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'in_use', 90.00, '2026-02-21 19:55:41'),
+=======
+(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'available', 90.00, '2026-02-21 19:55:41'),
+>>>>>>> Stashed changes
 (6, 'PS4 Unit 6', 'PS4', 'PS4-06', 2, 'maintenance', 90.00, '2026-02-21 19:55:41'),
 (7, 'Xbox Unit 7', 'Xbox Series X', 'XBX-07', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (8, 'Xbox Unit 8', 'Xbox Series X', 'XBX-08', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (3225, 'PS5', 'PS5', 'PS5-9', 2, 'available', 100.00, '2026-05-08 17:32:01'),
 (3226, 'ps 6', 'PS6', 'NINTENDO-01', 2, 'available', 90.00, '2026-05-08 17:34:13'),
+<<<<<<< Updated upstream
 (3227, 'PS5', 'hello', '1', 2, 'in_use', 100.00, '2026-05-08 17:39:52');
+=======
+(3227, 'PS5', 'hello', '1', 2, 'available', 100.00, '2026-05-08 17:39:52');
+>>>>>>> Stashed changes
 
 -- --------------------------------------------------------
 
@@ -246,11 +264,15 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (4, 33, 2, 'hourly', 300, '2026-05-08 14:30:08', '2026-05-08 18:19:32', 229, 80.00, 260.00, 'completed', NULL, 12, '2026-05-08 14:30:08', 0, 36),
 (5, 27, 1, 'open_time', NULL, '2026-05-08 17:06:57', '2026-05-08 17:46:45', 39, 90.00, 60.00, 'completed', NULL, 12, '2026-05-08 17:06:57', 0, 38),
 (6, 27, 1, 'hourly', 30, '2026-05-08 17:49:27', '2026-05-08 18:19:17', 29, 90.00, 40.00, 'completed', NULL, 12, '2026-05-08 17:49:27', 0, 40),
+<<<<<<< Updated upstream
 (7, 0, 3227, 'hourly', 90, '2026-05-08 18:40:30', NULL, NULL, 100.00, NULL, 'active', NULL, 12, '2026-05-08 18:40:30', 0, NULL),
 (8, 0, 2, 'hourly', 30, '2026-05-08 18:49:11', '2026-05-08 19:23:31', 34, 90.00, 60.00, 'completed', NULL, 12, '2026-05-08 18:49:11', 0, NULL),
 (9, 0, 3, 'hourly', 30, '2026-05-08 18:51:18', '2026-05-08 19:23:34', 32, 90.00, 80.00, 'completed', NULL, 12, '2026-05-08 18:51:18', 0, NULL),
 (10, 0, 1, 'hourly', 30, '2026-05-08 18:53:05', '2026-05-08 19:22:53', 29, 90.00, 40.00, 'completed', NULL, 12, '2026-05-08 18:53:05', 0, NULL),
 (11, 0, 5, 'hourly', 30, '2026-05-08 19:13:28', NULL, NULL, 90.00, NULL, 'active', NULL, 12, '2026-05-08 19:13:28', 0, NULL);
+=======
+(7, 0, 3227, 'hourly', 90, '2026-05-08 18:40:30', '2026-05-08 18:40:47', 0, 100.00, 0.00, 'completed', NULL, 12, '2026-05-08 18:40:30', 0, NULL);
+>>>>>>> Stashed changes
 
 -- --------------------------------------------------------
 
@@ -648,6 +670,7 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (138, 3, 0, 40.00, 240.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 18:19:35', 12, '2026-05-08 18:19:35'),
 (139, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #43', 'gcash', 'completed', '2026-05-08 18:24:56', 27, '2026-05-08 18:24:56'),
 (140, 7, 0, 120.00, 120.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:40:30', 12, '2026-05-08 18:40:30'),
+<<<<<<< Updated upstream
 (141, 7, 0, -120.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱120.00)', '', 'completed', '2026-05-08 18:40:47', 12, '2026-05-08 18:40:47'),
 (142, 8, 0, 60.00, 60.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:49:11', 12, '2026-05-08 18:49:11'),
 (143, 8, 0, -60.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱60.00)', '', 'completed', '2026-05-08 18:49:16', 12, '2026-05-08 18:49:16'),
@@ -660,6 +683,9 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (150, 8, 0, 60.00, NULL, NULL, NULL, 'cash', 'completed', '2026-05-08 19:23:31', 12, '2026-05-08 19:23:31'),
 (151, 9, 0, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:23:34', 12, '2026-05-08 19:23:34'),
 (152, 11, 0, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:23:38', 12, '2026-05-08 19:23:38');
+=======
+(141, 7, 0, -120.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱120.00)', '', 'completed', '2026-05-08 18:40:47', 12, '2026-05-08 18:40:47');
+>>>>>>> Stashed changes
 
 -- --------------------------------------------------------
 
@@ -714,12 +740,15 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 --
 
 --
+<<<<<<< Updated upstream
 -- Indexes for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
   ADD PRIMARY KEY (`log_id`);
 
 --
+=======
+>>>>>>> Stashed changes
 -- Indexes for table `additional_requests`
 --
 ALTER TABLE `additional_requests`
@@ -896,6 +925,7 @@ ALTER TABLE `users`
 --
 
 --
+<<<<<<< Updated upstream
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
@@ -906,6 +936,12 @@ ALTER TABLE `activity_logs`
 --
 ALTER TABLE `additional_requests`
   MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+=======
+-- AUTO_INCREMENT for table `additional_requests`
+--
+ALTER TABLE `additional_requests`
+  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+>>>>>>> Stashed changes
 
 --
 -- AUTO_INCREMENT for table `blocked_dates`
@@ -941,7 +977,11 @@ ALTER TABLE `controller_types`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
+<<<<<<< Updated upstream
   MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+=======
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+>>>>>>> Stashed changes
 
 --
 -- AUTO_INCREMENT for table `pricing_tiers`
@@ -1007,7 +1047,11 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
+<<<<<<< Updated upstream
   MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=153;
+=======
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=142;
+>>>>>>> Stashed changes
 
 --
 -- AUTO_INCREMENT for table `users`
