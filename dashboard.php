@@ -1205,11 +1205,36 @@ function fmtMins(int $m): string {
                 const timeSelect = document.getElementById('rcmTime');
                 dateInput.min    = minDate;
                 dateInput.value  = minDate;
-                if (timeSelect && preTime) timeSelect.value = preTime;
+                // Store original proposed values
+                dateInput.dataset.original = minDate;
+                if (timeSelect && preTime) {
+                    timeSelect.value = preTime;
+                    timeSelect.dataset.original = preTime;
+                }
                 const d = new Date(minDate + 'T00:00:00');
                 document.getElementById('rcmProposedDate').textContent =
                     d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+                
+                // Reset reason field
+                document.getElementById('rcmReasonGroup').style.display = 'none';
+                document.getElementById('rcmReason').value = '';
+                
                 document.getElementById('rescheduleConfirmModal').style.display = 'flex';
+            }
+
+            function checkRcmChanges() {
+                const dateInput = document.getElementById('rcmDate');
+                const timeInput = document.getElementById('rcmTime');
+                const reasonGroup = document.getElementById('rcmReasonGroup');
+                
+                const propDate = dateInput.dataset.original;
+                const propTime = (timeInput.dataset.original || '').substring(0, 5);
+                
+                if (dateInput.value !== propDate || timeInput.value !== propTime) {
+                    reasonGroup.style.display = 'block';
+                } else {
+                    reasonGroup.style.display = 'none';
+                }
             }
             function closeRescheduleConfirmModal() {
                 document.getElementById('rescheduleConfirmModal').style.display = 'none';
@@ -1218,18 +1243,36 @@ function fmtMins(int $m): string {
                 const id   = document.getElementById('rcmRescheduleId').value;
                 const date = document.getElementById('rcmDate').value;
                 const time = document.getElementById('rcmTime').value;
+                const reasonGroup = document.getElementById('rcmReasonGroup');
+                const reason = document.getElementById('rcmReason').value.trim();
+
                 if (!date) { alert('Please select a date.'); return; }
+                if (!time) { alert('Please select a time.'); return; }
+
+                // If date or time changed, reason is mandatory
+                if (reasonGroup.style.display !== 'none' && !reason) {
+                    alert('Please provide a reason for changing the proposed schedule.');
+                    return;
+                }
+
                 const btn = document.getElementById('rcmSubmitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                
                 fetch('ajax/respond_reschedule.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time)
+                    body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time) + '&reason=' + encodeURIComponent(reason)
                 }).then(r => r.json()).then(d => {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
-                    if (d.success) { closeRescheduleConfirmModal(); location.reload(); }
+                    if (d.success) { 
+                        if (d.counter_proposal) {
+                            alert('Your counter-proposal has been sent back to the admin for review.');
+                        }
+                        closeRescheduleConfirmModal(); 
+                        location.reload(); 
+                    }
                     else alert(d.message);
                 }).catch(() => {
                     btn.disabled = false;
@@ -3639,16 +3682,16 @@ function togglePwVisibility(inputId, btnId) {
         <div style="margin-bottom:14px;">
             <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                           text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
-            <input type="date" id="rcmDate"
+            <input type="date" id="rcmDate" onchange="checkRcmChanges()"
                 style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                        color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                        font-family:inherit;outline:none;box-sizing:border-box;">
         </div>
 
-        <div style="margin-bottom:24px;">
+        <div style="margin-bottom:18px;">
             <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                           text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
-            <select id="rcmTime"
+            <select id="rcmTime" onchange="checkRcmChanges()"
                 style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                        color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                        font-family:inherit;outline:none;">
@@ -3657,6 +3700,16 @@ function togglePwVisibility(inputId, btnId) {
                     echo '<option value="'.$v.'">'.date('g:i A',strtotime('2000-01-01 '.$v)).'</option>'.PHP_EOL;
                 } ?>
             </select>
+        </div>
+
+        <!-- Reason for change (Hidden by default, shown if date/time differs from proposal) -->
+        <div id="rcmReasonGroup" style="display:none;margin-bottom:24px;">
+            <label style="font-size:11px;font-weight:700;color:#fb566b;display:block;margin-bottom:6px;
+                          text-transform:uppercase;letter-spacing:.6px;">Reason for change *</label>
+            <textarea id="rcmReason" rows="2" placeholder="Please explain why you need a different schedule..."
+                style="width:100%;background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.25);
+                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:13px;
+                       font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
         </div>
 
         <div style="display:flex;gap:10px;">
