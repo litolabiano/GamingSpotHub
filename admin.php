@@ -1981,6 +1981,39 @@ function onConsoleChange() {
             if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
         }
     }
+
+    // Refresh duration option labels to reflect this console's per-type rate
+    _refreshDurationLabels();
+}
+
+/* Recompute cost labels in the duration dropdown using the currently selected
+   console's hourly rate. Called on console change. */
+function _refreshDurationLabels() {
+    const rate    = getConsoleRate();
+    const minChg  = PRICING.session_min_charge;
+    const bp      = PRICING.bonus_paid_minutes;
+    const bf      = PRICING.bonus_free_minutes;
+    const sel     = document.getElementById('durationSelect');
+    if (!sel) return;
+    Array.from(sel.options).forEach(function(opt) {
+        const paid = parseInt(opt.value);
+        if (!paid) return;
+        const bonus = Math.floor(paid / bp) * bf;
+        const cost  = paid <= 30 ? minChg : paid / 60 * rate;
+        opt.dataset.cost = cost.toFixed(2);
+        // Update visible label text: "Xh Ym — ₱NNN"
+        const paidH = Math.floor(paid / 60);
+        const paidM = paid % 60;
+        let label = (paidH ? paidH + 'h ' : '') + (paidM ? paidM + 'm' : '');
+        let bonusLabel = '';
+        if (bonus > 0) {
+            const bH = Math.floor(bonus / 60), bM = bonus % 60;
+            bonusLabel = ' (+' + (bH ? bH + 'h ' : '') + (bM ? bM + 'm' : '') + ')';
+        }
+        opt.textContent = label + ' — ₱' + Math.round(cost) + bonusLabel;
+    });
+    // Refresh the preview if a duration is already selected
+    if (sel.value) updateSessionPreview();
 }
 
 /* Show/hide payment method when the optional checkbox is toggled */
@@ -2324,23 +2357,39 @@ const PRICING = <?= json_encode(getPricingRules()) ?>;
 // Available controllers for the rental dropdown — populated from DB on page load
 const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
+/**
+ * Return the hourly rate for the currently selected console in the
+ * Start Session modal, falling back to the global PRICING default.
+ */
+function getConsoleRate() {
+    const sel = document.getElementById('consoleSelect');
+    const opt = sel && sel.options[sel.selectedIndex];
+    const rate = opt ? parseFloat(opt.dataset.rate || 0) : 0;
+    if (rate > 0) return rate;
+    // Fallback: look up by type name in PRICING.console_rates_by_name
+    const type = opt ? (opt.dataset.type || '') : '';
+    return (PRICING.console_rates_by_name && PRICING.console_rates_by_name[type])
+        || PRICING.hourly_rate;
+}
+
 function _bracketCost(partialMin) {
     if (partialMin <= 0) return 0;
+    const rate  = getConsoleRate();
     const tiers = PRICING.pricing_tiers || [];
     for (let i = 0; i < tiers.length; i++) {
         if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
             return tiers[i].charge;
         }
     }
-    return PRICING.hourly_rate;
+    return rate;
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const bp       = PRICING.bonus_paid_minutes;         // e.g. 120
-    const bf       = PRICING.bonus_free_minutes;         // e.g. 30
-    const rate     = PRICING.hourly_rate;                // e.g. 80
-    const cyclePay = bp / 60 * rate;                    // e.g. 160
-    const cycleLen = bp + bf;                           // e.g. 150
+    const bp       = PRICING.bonus_paid_minutes;  // e.g. 120
+    const bf       = PRICING.bonus_free_minutes;  // e.g. 30
+    const rate     = getConsoleRate();            // per-type rate from console_types
+    const cyclePay = bp / 60 * rate;
+    const cycleLen = bp + bf;
     const full     = Math.floor(totalMin / cycleLen);
     const rem      = totalMin % cycleLen;
     let cost       = full * cyclePay;

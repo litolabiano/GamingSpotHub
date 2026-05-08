@@ -875,9 +875,10 @@ function getActiveSessions() {
 function getUserSessionHistory($user_id, $limit = 20) {
     global $conn;
     $stmt = $conn->prepare(
-        "SELECT gs.*, c.console_name, c.console_type
+        "SELECT gs.*, c.console_name, ct.type_name AS console_type
          FROM gaming_sessions gs
-         JOIN consoles c ON gs.console_id = c.console_id
+         JOIN consoles c      ON gs.console_id    = c.console_id
+         LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
          WHERE gs.user_id = ?
          ORDER BY gs.start_time DESC
          LIMIT ?"

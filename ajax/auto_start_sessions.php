@@ -46,10 +46,12 @@ $cutoffBack = (clone $now)->modify('-2 hours')->format('Y-m-d H:i:s');
 // ── Find all due 'reserved' reservations ─────────────────────────────────────
 // "due" = reserved_date + reserved_time is in the past (up to 2 hours ago)
 $stmt = $conn->prepare(
-    "SELECT r.reservation_id, r.user_id, r.console_id, r.console_type,
+    "SELECT r.reservation_id, r.user_id, r.console_id, r.console_type_id,
+            ct.type_name AS console_type,
             r.rental_mode, r.planned_minutes, r.reserved_date, r.reserved_time,
             r.downpayment_amount
        FROM reservations r
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.status = 'reserved'
         AND CONCAT(r.reserved_date, ' ', r.reserved_time) <= ?
         AND CONCAT(r.reserved_date, ' ', r.reserved_time) >= ?
@@ -86,10 +88,10 @@ foreach ($dueReservations as $res) {
     if (!$consoleId) {
         $avail = $conn->prepare(
             "SELECT console_id FROM consoles
-              WHERE console_type = ? AND status = 'available'
+              WHERE console_type_id = ? AND status = 'available'
               ORDER BY console_id ASC LIMIT 1"
         );
-        $avail->bind_param('s', $res['console_type']);
+        $avail->bind_param('i', $res['console_type_id']);
         $avail->execute();
         $row = $avail->get_result()->fetch_assoc();
         if ($row) {
@@ -105,11 +107,11 @@ foreach ($dueReservations as $res) {
             // Pre-assigned console not available — try to find another of the same type
             $fallback = $conn->prepare(
                 "SELECT console_id FROM consoles
-                  WHERE console_type = ? AND status = 'available'
+                  WHERE console_type_id = ? AND status = 'available'
                     AND console_id != ?
                   ORDER BY console_id ASC LIMIT 1"
             );
-            $fallback->bind_param('si', $res['console_type'], $consoleId);
+            $fallback->bind_param('ii', $res['console_type_id'], $consoleId);
             $fallback->execute();
             $fbRow = $fallback->get_result()->fetch_assoc();
             $consoleId = $fbRow ? (int)$fbRow['console_id'] : 0;

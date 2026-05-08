@@ -38,7 +38,7 @@ $requestedDT = $date . ' ' . $time . ':00';
 
 $sql = "
     SELECT
-        c.console_type,
+        ct.type_name AS console_type,
         c.console_id,
         c.unit_number,
         c.status,
@@ -61,8 +61,9 @@ $sql = "
                           INTERVAL COALESCE(NULLIF(r.planned_minutes,0), 60) MINUTE) > ?
         ) AS confirmed_reservation
     FROM consoles c
+    LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
     WHERE c.status != 'maintenance'
-    ORDER BY c.console_type, c.unit_number
+    ORDER BY ct.type_name, c.unit_number
 ";
 
 $stmt = $conn->prepare($sql);
