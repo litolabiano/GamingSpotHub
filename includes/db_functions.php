@@ -1464,35 +1464,65 @@ function getOperatingDayBounds($operating_date) {
 /**
  * Get all available console types from the database.
  */
-function getConsoleTypes(bool $onlyActive = true): array {
+function getConsoleTypes(bool $onlyActive = true, ?string $category = null): array {
     global $conn;
-    
+
     // Check if table exists
     $check = $conn->query("SHOW TABLES LIKE 'console_types'");
     if ($check->num_rows === 0) {
-        // Table missing, create it and populate defaults
+        // Table missing — create it fresh with the category column
         $conn->query("CREATE TABLE IF NOT EXISTS console_types (
-            type_id INT AUTO_INCREMENT PRIMARY KEY,
-            type_name VARCHAR(50) NOT NULL UNIQUE,
+            type_id    INT AUTO_INCREMENT PRIMARY KEY,
+            type_name  VARCHAR(50) NOT NULL UNIQUE,
+            category   ENUM('console','controller') NOT NULL DEFAULT 'console',
             is_archived TINYINT(1) DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-        
-        $conn->query("INSERT IGNORE INTO console_types (type_name) VALUES ('PS5'), ('PS4'), ('Xbox Series X'), ('Xbox Controller');");
-        
-        // Also ensure other tables are updated from ENUM to VARCHAR
+
+        // Seed defaults: console types + controller types separated
+        $conn->query("INSERT IGNORE INTO console_types (type_name, category) VALUES
+            ('PS5',        'console'),
+            ('PS4',        'console'),
+            ('Xbox Series X','console'),
+            ('DualSense',     'controller'),
+            ('DualShock 4',   'controller'),
+            ('Xbox Controller','controller');");
+
+        // Ensure other tables use VARCHAR (not ENUM)
         $conn->query("ALTER TABLE consoles MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
         $conn->query("ALTER TABLE reservations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
         $conn->query("ALTER TABLE tournaments MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
         $conn->query("ALTER TABLE reservation_cancellations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
     } else {
-        // Ensure is_archived column exists (for existing systems)
+        // Ensure columns exist on pre-existing installs
         $conn->query("ALTER TABLE console_types ADD COLUMN IF NOT EXISTS is_archived TINYINT(1) DEFAULT 0 AFTER type_name;");
+        $conn->query("ALTER TABLE console_types ADD COLUMN IF NOT EXISTS category ENUM('console','controller') NOT NULL DEFAULT 'console' AFTER is_archived;");
+
+        // Back-fill category for known controller-type names that may exist without category
+        $conn->query("UPDATE console_types SET category = 'controller'
+                      WHERE type_name IN ('DualSense','DualShock 4','Xbox Controller','Other')
+                        AND category = 'console';");
+
+        // Ensure the default controller types exist
+        $conn->query("INSERT IGNORE INTO console_types (type_name, category) VALUES
+            ('DualSense',       'controller'),
+            ('DualShock 4',     'controller'),
+            ('Xbox Controller', 'controller');");
     }
 
+    $conditions = [];
+    if ($onlyActive)        $conditions[] = "c.is_archived = 0";
+    if ($category !== null) $conditions[] = "c.category = '" . $conn->real_escape_string($category) . "'";
+    $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
     $types = [];
-    $where = $onlyActive ? " WHERE is_archived = 0 " : "";
-    $res = $conn->query("SELECT * FROM console_types $where ORDER BY type_name ASC");
+    $res = $conn->query(
+        "SELECT c.*, p.type_name AS parent_console_name
+         FROM console_types c
+         LEFT JOIN console_types p ON p.type_id = c.console_type_id
+         $where
+         ORDER BY c.type_name ASC"
+    );
     if ($res) {
         while ($row = $res->fetch_assoc()) {
             $types[] = $row;
@@ -1502,13 +1532,30 @@ function getConsoleTypes(bool $onlyActive = true): array {
 }
 
 /**
- * Add a new console type.
+ * Convenience wrapper — returns active controller types only.
+ * Optionally filtered to controllers for a specific console_type_id.
+ */
+function getControllerTypes(bool $onlyActive = true, ?int $consoleTypeId = null): array {
+    global $conn;
+    $types = getConsoleTypes($onlyActive, 'controller');
+    if ($consoleTypeId !== null) {
+        $types = array_filter($types, fn($t) => (int)($t['console_type_id'] ?? 0) === $consoleTypeId);
+    }
+    return array_values($types);
+}
+
+/**
+ * Add a new console or controller type.
+ * For controller types, pass the parent $consoleTypeId to link via FK.
  * Returns true on success, false on failure (e.g. duplicate name).
  */
-function addConsoleType(string $typeName): bool {
+function addConsoleType(string $typeName, string $category = 'console', ?int $consoleTypeId = null): bool {
     global $conn;
-    $stmt = $conn->prepare("INSERT INTO console_types (type_name) VALUES (?)");
-    $stmt->bind_param("s", $typeName);
+    $category = in_array($category, ['console', 'controller']) ? $category : 'console';
+    // Only controller types can have a console_type_id
+    if ($category !== 'controller') $consoleTypeId = null;
+    $stmt = $conn->prepare("INSERT INTO console_types (type_name, category, console_type_id) VALUES (?, ?, ?)");
+    $stmt->bind_param("ssi", $typeName, $category, $consoleTypeId);
     try {
         return $stmt->execute();
     } catch (Exception $e) {

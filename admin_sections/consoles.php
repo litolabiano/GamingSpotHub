@@ -593,92 +593,202 @@ function toggleArchiveSection(showArchive) {
 
 <!-- Manage Console Types Modal -->
 <div class="modal" id="manageConsoleTypesModal">
-    <div class="modal-content" style="max-width:500px;">
+    <div class="modal-content" style="max-width:560px;">
         <div class="modal-header">
-            <h3><i class="fas fa-tags" style="color:#20c8a1;"></i> Manage Console Types</h3>
+            <h3><i class="fas fa-tags" style="color:#20c8a1;"></i> Manage Types</h3>
             <span class="modal-close" onclick="closeModal('manageConsoleTypes')"><i class="fas fa-times"></i></span>
         </div>
         <div class="modal-body">
-            <!-- Add New Type Form -->
-            <form method="POST" action="admin.php#consoles" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,.1);">
-                <input type="hidden" name="action" value="add_console_type">
-                <?= csrfField() ?>
-                <label style="font-size:12px; font-weight:700; color:#888; text-transform:uppercase; display:block; margin-bottom:8px;">Add New Type</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:1;">
-                    <button type="submit" class="btn-prim"><i class="fas fa-plus"></i> Add</button>
+
+            <!-- ── Tab switcher ── -->
+            <div style="display:flex;gap:0;border:1px solid rgba(95,133,218,.25);border-radius:10px;overflow:hidden;margin-bottom:20px;" id="typeCategoryTabs">
+                <button onclick="switchTypeTab('console')" id="tabConsole"
+                        style="flex:1;padding:10px 16px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:.15s;background:rgba(32,200,161,.15);color:#20c8a1;">
+                    <i class="fas fa-desktop" style="margin-right:5px;"></i> Console Types
+                </button>
+                <button onclick="switchTypeTab('controller')" id="tabController"
+                        style="flex:1;padding:10px 16px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:.15s;background:rgba(255,255,255,.04);color:#888;border-left:1px solid rgba(95,133,218,.2);">
+                    <i class="fas fa-gamepad" style="margin-right:5px;"></i> Controller Types
+                </button>
+            </div>
+
+            <!-- ══ CONSOLE TYPES PANEL ══ -->
+            <div id="panelConsole">
+                <!-- Add New Console Type -->
+                <form method="POST" action="admin.php#consoles" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1);">
+                    <input type="hidden" name="action" value="add_console_type">
+                    <input type="hidden" name="category" value="console">
+                    <?= csrfField() ?>
+                    <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:8px;">Add New Console Type</label>
+                    <div style="display:flex;gap:10px;">
+                        <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:1;">
+                        <button type="submit" class="btn-prim"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                </form>
+
+                <!-- Active Console Types -->
+                <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:12px;">Active Console Types</label>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;padding-right:5px;margin-bottom:20px;">
+                    <?php $consoleOnlyTypes = array_filter($consoleTypes, fn($ct) => ($ct['category'] ?? 'console') === 'console'); ?>
+                    <?php if (empty($consoleOnlyTypes)): ?>
+                        <div style="text-align:center;padding:20px;color:#555;font-style:italic;">No active console types.</div>
+                    <?php else: ?>
+                        <?php foreach ($consoleOnlyTypes as $ct): ?>
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(32,200,161,.05);padding:10px 14px;border-radius:8px;border:1px solid rgba(32,200,161,.1);">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <i class="fas fa-desktop" style="color:#20c8a1;font-size:12px;"></i>
+                                    <span style="font-weight:600;font-size:14px;color:#f0f0f0;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                                </div>
+                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this console type? All associated consoles will be moved to ARCHIVE.');">
+                                    <input type="hidden" name="action" value="archive_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                        <i class="fas fa-archive"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
 
-            </form>
-
-            <!-- Existing Types List -->
-            <label style="font-size:12px; font-weight:700; color:#888; text-transform:uppercase; display:block; margin-bottom:12px;">Active Types</label>
-            <div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; padding-right:5px; margin-bottom:20px;">
-                <?php if (empty($consoleTypes)): ?>
-                    <div style="text-align:center; padding:20px; color:#555; font-style:italic;">No active types.</div>
-                <?php else: ?>
-                    <?php foreach ($consoleTypes as $ct): ?>
-                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(32,200,161,.05); padding:10px 14px; border-radius:8px; border:1px solid rgba(32,200,161,.1);">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <i class="fas fa-tag" style="color:#20c8a1; font-size:12px;"></i>
-                                <span style="font-weight:600; font-size:14px; color:#f0f0f0;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                <!-- Archived Console Types -->
+                <?php if (!empty($archivedConsoleTypes)): ?>
+                <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;display:block;margin-bottom:12px;border-top:1px solid rgba(255,255,255,.05);padding-top:15px;">Archived Console Types</label>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
+                    <?php foreach ($archivedConsoleTypes as $ct): ?>
+                        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <i class="fas fa-desktop" style="color:#888;font-size:12px;"></i>
+                                <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
                             </div>
-                            <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this type? All associated consoles will be moved to the ARCHIVE section.');">
-                                <input type="hidden" name="action" value="archive_console_type">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
-                                <button type="submit" title="Archive Type" style="background:none; border:none; color:#f1a83c; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
-                                    <i class="fas fa-archive"></i>
-                                </button>
-                            </form>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <form method="POST" action="admin.php#consoles">
+                                    <input type="hidden" name="action" value="restore_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
+                                </form>
+                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
+                                    <input type="hidden" name="action" value="delete_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
+                                </form>
+                            </div>
                         </div>
                     <?php endforeach; ?>
+                </div>
                 <?php endif; ?>
-            </div>
+            </div><!-- /#panelConsole -->
 
-            <!-- Archived Types List -->
-            <?php if (!empty($archivedConsoleTypes)): ?>
-            <label style="font-size:12px; font-weight:700; color:#fb566b; text-transform:uppercase; display:block; margin-bottom:12px; border-top:1px solid rgba(255,255,255,.05); padding-top:15px;">Archived Types</label>
-            <div style="display:flex; flex-direction:column; gap:8px; max-height:150px; overflow-y:auto; padding-right:5px; margin-bottom:15px;">
-                <?php foreach ($archivedConsoleTypes as $ct): ?>
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.03); padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,.03); opacity:0.8;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <i class="fas fa-tag" style="color:#888; font-size:12px;"></i>
-                            <span style="font-weight:500; font-size:13px; color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+            <!-- ══ CONTROLLER TYPES PANEL ══ -->
+            <div id="panelController" style="display:none;">
+                <!-- Add New Controller Type -->
+                <form method="POST" action="admin.php#consoles" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1);">
+                    <input type="hidden" name="action" value="add_console_type">
+                    <input type="hidden" name="category" value="controller">
+                    <?= csrfField() ?>
+                    <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:8px;">Add New Controller Type</label>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <input type="text" name="type_name" class="form-control" required placeholder="e.g. Joy-Con">
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size:11px;color:#888;margin-bottom:4px;display:block;">Compatible Console <span style="color:#5f85da;">(FK link)</span></label>
+                            <select name="console_type_id" class="form-control">
+                                <option value="">— Not linked / Generic —</option>
+                                <?php foreach ($consoleTypes as $cType): ?>
+                                    <option value="<?= $cType['type_id'] ?>"><?= htmlspecialchars($cType['type_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <form method="POST" action="admin.php#consoles">
-                                <input type="hidden" name="action" value="restore_console_type">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
-                                <button type="submit" title="Restore Type" style="background:none; border:none; color:#20c8a1; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
-                                    <i class="fas fa-undo"></i>
-                                </button>
-                            </form>
-                            <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this console type? This action is irreversible and will completely remove the record from the database.');">
-                                <input type="hidden" name="action" value="delete_console_type">
-                                <?= csrfField() ?>
-                                <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
-                                <button type="submit" title="Delete Permanently" style="background:none; border:none; color:#fb566b; cursor:pointer; font-size:14px; transition:opacity .2s;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </form>
-                        </div>
+                        <button type="submit" class="btn-prim" style="align-self:flex-start;"><i class="fas fa-plus"></i> Add Controller Type</button>
                     </div>
-                <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
-            
-            <div style="margin-top:10px; padding:12px; background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); border-radius:8px; display:flex; gap:10px;">
-                <i class="fas fa-info-circle" style="color:#5f85da; margin-top:2px;"></i>
-                <div style="font-size:12px; color:rgba(140,160,210,.9); line-height:1.4;">
-                    <strong>Note:</strong> Archiving a console type prevents it from being selected for new units, but keeps it for historical data. Associated units are moved to the <strong>Archive</strong>.
+                </form>
+
+                <!-- Active Controller Types -->
+                <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:12px;">Active Controller Types</label>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;padding-right:5px;margin-bottom:20px;">
+                    <?php if (empty($controllerTypes)): ?>
+                        <div style="text-align:center;padding:20px;color:#555;font-style:italic;">No active controller types.</div>
+                    <?php else: ?>
+                        <?php foreach ($controllerTypes as $ct): ?>
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(95,133,218,.07);padding:10px 14px;border-radius:8px;border:1px solid rgba(95,133,218,.15);">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <i class="fas fa-gamepad" style="color:#8aa4e8;font-size:12px;"></i>
+                                    <div>
+                                        <span style="font-weight:600;font-size:14px;color:#f0f0f0;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                                        <?php if (!empty($ct['parent_console_name'])): ?>
+                                            <div style="font-size:11px;color:#5f85da;margin-top:2px;">
+                                                <i class="fas fa-link" style="font-size:9px;margin-right:3px;"></i><?= htmlspecialchars($ct['parent_console_name']) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div style="font-size:11px;color:#555;margin-top:2px;">Generic / not linked</div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this controller type?');">
+                                    <input type="hidden" name="action" value="archive_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                        <i class="fas fa-archive"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Archived Controller Types -->
+                <?php if (!empty($archivedCtrlTypes)): ?>
+                <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;display:block;margin-bottom:12px;border-top:1px solid rgba(255,255,255,.05);padding-top:15px;">Archived Controller Types</label>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
+                    <?php foreach ($archivedCtrlTypes as $ct): ?>
+                        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <i class="fas fa-gamepad" style="color:#888;font-size:12px;"></i>
+                                <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <form method="POST" action="admin.php#consoles">
+                                    <input type="hidden" name="action" value="restore_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
+                                </form>
+                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
+                                    <input type="hidden" name="action" value="delete_console_type">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                    <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div><!-- /#panelController -->
+
+            <div style="margin-top:10px;padding:12px;background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.2);border-radius:8px;display:flex;gap:10px;">
+                <i class="fas fa-info-circle" style="color:#5f85da;margin-top:2px;"></i>
+                <div style="font-size:12px;color:rgba(140,160,210,.9);line-height:1.4;">
+                    <strong>Console types</strong> appear in the Add Console form. <strong>Controller types</strong> appear in the Add Controller form. Archiving a console type also archives all consoles of that type.
                 </div>
             </div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn-sec btn-full" onclick="closeModal('manageConsoleTypes')">Close</button>
         </div>
-
     </div>
 </div>
+
+<script>
+function switchTypeTab(tab) {
+    document.getElementById('panelConsole').style.display    = tab === 'console'    ? 'block' : 'none';
+    document.getElementById('panelController').style.display = tab === 'controller' ? 'block' : 'none';
+    document.getElementById('tabConsole').style.background    = tab === 'console'    ? 'rgba(32,200,161,.15)' : 'rgba(255,255,255,.04)';
+    document.getElementById('tabConsole').style.color         = tab === 'console'    ? '#20c8a1' : '#888';
+    document.getElementById('tabController').style.background = tab === 'controller' ? 'rgba(95,133,218,.2)'   : 'rgba(255,255,255,.04)';
+    document.getElementById('tabController').style.color      = tab === 'controller' ? '#8aa4e8' : '#888';
+}
+</script>
