@@ -25,9 +25,8 @@ if ($evTournament) {
     $evSlotRes->execute();
     $evSlotsTaken = (int)$evSlotRes->get_result()->fetch_assoc()['cnt'];
 }
-$evSlotsLeft = $evSlotsMax - $evSlotsTaken;
-$evIsFull    = $evTournament && $evSlotsLeft <= 0;
-$evIsOpen    = $evTournament && $evTournament['status'] === 'scheduled' && !$evIsFull;
+$evIsFull    = false; // Unlimited participants
+$evIsOpen    = $evTournament && $evTournament['status'] === 'scheduled';
 
 $evStatusLabel = [
     'upcoming'  => 'Upcoming',
@@ -110,7 +109,7 @@ $evSColor = $evTournament ? ($evStatusColor[$evTournament['status']] ?? '#f1a83c
                                 <?php endif; ?>
                                 <span class="gsh-ev-chip">
                                     <i class="fas fa-users" style="color:#b37bec;"></i>
-                                    <?= $evSlotsTaken ?> / <?= $evSlotsMax ?> Slots
+                                    <?= $evSlotsTaken ?> Participants
                                 </span>
                                 <span class="gsh-ev-chip">
                                     <i class="fas fa-map-marker-alt" style="color:#fb566b;"></i>

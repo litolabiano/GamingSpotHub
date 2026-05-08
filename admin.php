@@ -765,8 +765,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $start_date   = $_POST['start_date']           ?? '';
         $end_date     = $_POST['end_date']             ?? '';
         $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
-        $prize_pool   = (float)($_POST['prize_pool']        ?? 0);
-        $max_part     = (int)  ($_POST['max_participants']  ?? 16);
+        $prize_pool   = 0; // Fixed prize removed, now dependent on registration count
+        $max_part     = 0; // Participant limit removed, now unlimited by default
         $announcement = trim($_POST['announcement']    ?? '');
 
         if (!$name || !$game || !$console_type || !$start_date || !$end_date) {
@@ -3173,64 +3173,56 @@ function _getAudioCtx() {
     }, { passive: true });
 });
 
-/* Descending 3-tone alarm - fires when a session crosses into overtime.
-   Square wave = more urgent/harsh than the sine-wave session-end chime. */
+/* Gentle triple-ding - fires when a session crosses into overtime.
+   Uses sine wave for a clean, non-disruptive tone. */
 function playOvertimeBeep() {
     var ctx = _getAudioCtx();
     if (!ctx) return;
     ctx.resume().then(function() {
-        [880, 660, 440].forEach(function(freq, i) {
-            var delay = i * 0.22;
+        var now = ctx.currentTime;
+        // Three ascending soft notes (E5, A5, C6)
+        [659.25, 880.00, 1046.50].forEach(function(freq, i) {
+            var delay = i * 0.12;
             var osc   = ctx.createOscillator();
             var gain  = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
-            gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.20);
-            osc.start(ctx.currentTime + delay);
-            osc.stop(ctx.currentTime + delay + 0.20);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + delay);
+            gain.gain.setValueAtTime(0.15, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.4);
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.5);
         });
     });
 }
 
-/* ── SIREN ALARM - plays for 15 seconds ─────────────────────────────────────
-   Simulates an emergency-siren sweep: oscillator frequency glides up and
-   down between 800 Hz (low) and 1400 Hz (high) repeatedly, like a real
-   ambulance / police siren. Uses sawtooth wave for maximum urgency.
-   All notes are scheduled up-front so the sound plays even if the tab loses focus. */
+/* ── SOFT CHIME - plays for session-end warnings ──────────────────────────
+   Replaces the emergency siren with a gentle, professional double-chime.
+   Uses a pure sine wave with exponential decay for a 'bell-like' feel. */
 function playWarningBeep() {
     var ctx = _getAudioCtx();
     if (!ctx) return;
     ctx.resume().then(function() {
-        var now       = ctx.currentTime;
-        var DURATION  = 15;      // total seconds of siren
-        var CYCLE     = 0.80;    // one up-down sweep = 0.80 s
-        var LOW_FREQ  = 800;
-        var HIGH_FREQ = 1400;
-        var VOLUME    = 0.50;
-
-        for (var i = 0; i < DURATION; i += CYCLE) {
-            var t   = now + i;
-            var osc = ctx.createOscillator();
-            var g   = ctx.createGain();
-            osc.connect(g);
-            g.connect(ctx.destination);
-            osc.type = 'sawtooth';
-
-            // Sweep up for first half, sweep down for second half
-            osc.frequency.setValueAtTime(LOW_FREQ,  t);
-            osc.frequency.linearRampToValueAtTime(HIGH_FREQ, t + CYCLE * 0.5);
-            osc.frequency.linearRampToValueAtTime(LOW_FREQ,  t + CYCLE);
-
-            g.gain.setValueAtTime(VOLUME, t);
-            g.gain.setValueAtTime(VOLUME, t + CYCLE - 0.04);
-            g.gain.linearRampToValueAtTime(0, t + CYCLE); // click-free crossfade
-
-            osc.start(t);
-            osc.stop(t + CYCLE);
-        }
+        var now = ctx.currentTime;
+        // Two-tone "Ding-Dong" chime (B5 -> G5)
+        var notes = [987.77, 783.99]; 
+        notes.forEach(function(freq, i) {
+            var delay = i * 0.35;
+            var osc   = ctx.createOscillator();
+            var gain  = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + delay);
+            
+            // Soft volume with smooth decay
+            gain.gain.setValueAtTime(0.2, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 1.2);
+            
+            osc.start(now + delay);
+            osc.stop(now + delay + 1.5);
+        });
     });
 }
 
