@@ -36,8 +36,8 @@ try {
     $nowTs = time();
     $elapsedSec = $nowTs - $endTs;
 
-    if ($elapsedSec > 300) {
-        throw new Exception('Restore window (5 minutes) has expired.');
+    if ($elapsedSec > 3600) {
+        throw new Exception('Restore window (1 hour) has expired.');
     }
 
     // 3. Check if console is available
