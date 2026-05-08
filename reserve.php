@@ -25,15 +25,44 @@ $error   = '';
 
 // ── Fetch consoles ────────────────────────────────────────────────────────────
 $allConsoles = getConsoles();
-$ps5Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'));
-$ps4Count    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'));
-$xboxCount   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X'));
-$ps5Maint    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS5'           && $c['status'] === 'maintenance'));
-$ps4Maint    = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'PS4'           && $c['status'] === 'maintenance'));
-$xboxMaint   = count(array_filter($allConsoles, fn($c) => $c['console_type'] === 'Xbox Series X' && $c['status'] === 'maintenance'));
-$ps5AllMaint  = $ps5Count  > 0 && $ps5Maint  === $ps5Count;
-$ps4AllMaint  = $ps4Count  > 0 && $ps4Maint  === $ps4Count;
-$xboxAllMaint = $xboxCount > 0 && $xboxMaint === $xboxCount;
+$consoleTypesRes = $conn->query("SELECT * FROM console_types WHERE is_archived = 0 ORDER BY type_id");
+$consoleTypesDB = [];
+if ($consoleTypesRes) {
+    while ($row = $consoleTypesRes->fetch_assoc()) {
+        $consoleTypesDB[] = $row;
+    }
+}
+
+$ctCards = [];
+$colors = ['#5f85da', '#f1a83c', '#20c8a1', '#e60012', '#b37bec'];
+
+foreach ($consoleTypesDB as $idx => $ct) {
+    $typeName = $ct['type_name'];
+    $count = count(array_filter($allConsoles, fn($c) => $c['console_type'] === $typeName));
+    if ($count === 0) continue; // Only show console types that actually have units
+
+    $maintCount = count(array_filter($allConsoles, fn($c) => $c['console_type'] === $typeName && $c['status'] === 'maintenance'));
+    $allMaint = ($count > 0 && $maintCount === $count);
+    
+    // Choose color and icon
+    $color = $colors[$idx % count($colors)];
+    $icon = 'fas fa-gamepad';
+    if (strpos(strtolower($typeName), 'xbox') !== false) $icon = 'fab fa-xbox';
+    if (strpos(strtolower($typeName), 'ps') !== false || strpos(strtolower($typeName), 'playstation') !== false) $icon = 'fab fa-playstation';
+    
+    $ctCards[] = [
+        'type' => $typeName,
+        'id' => 'ct-' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $typeName)),
+        'icon' => $icon,
+        'color' => $color,
+        'label' => $typeName,
+        'count' => $count,
+        'allMaint' => $allMaint,
+        'maintCount' => $maintCount
+    ];
+}
+
+$consoleListStr = implode(', ', array_map(fn($c) => $c['label'], $ctCards));
 
 $consolesByType = [];
 foreach ($allConsoles as $c) {
@@ -283,7 +312,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notes             = trim($_POST['notes']    ?? '');
     $preferred_unit_id = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
     $dp_amount         = (float)($_POST['downpayment_amount']  ?? 0);
-    $pay_via           = $_POST['pay_via'] ?? 'paymongo';   // 'paymongo' or 'screenshot'
+    // pay_via removed; we only use paymongo now.
     // Controller add-on
     $with_ctrl         = !empty($_POST['with_controller']) && $_POST['with_controller'] === '1';
     $ctrl_id           = $with_ctrl ? ((int)($_POST['selected_controller_id'] ?? 0) ?: null) : null;
@@ -350,113 +379,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$error) {
 
-        // ── PATH A1: Pay via PayMongo Checkout Session ────────────────────
-        if ($pay_via === 'paymongo') {
+        // ── Pay via PayMongo Checkout Session ────────────────────
+        // Build redirect URLs that PayMongo will use after checkout
+        $base        = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
+        $script_dir  = rtrim(dirname($_SERVER['PHP_SELF']),'/');
+        $success_url = $base . $script_dir . '/reserve.php?paymongo=success';
+        $cancel_url  = $base . $script_dir . '/reserve.php?paymongo=failed';
 
-            // Build redirect URLs that PayMongo will use after checkout
-            $base        = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
-            $script_dir  = rtrim(dirname($_SERVER['PHP_SELF']),'/');
-            $success_url = $base . $script_dir . '/reserve.php?paymongo=success';
-            $cancel_url  = $base . $script_dir . '/reserve.php?paymongo=failed';
+        // Amount must be at least ₱1 (100 centavos)
+        $centavos = PayMongoService::pesosToCentavos($dp_amount > 0 ? $dp_amount : 20.0);
 
-            // Amount must be at least ₱1 (100 centavos)
-            $centavos = PayMongoService::pesosToCentavos($dp_amount > 0 ? $dp_amount : 20.0);
+        $modeLabel = ($rental_mode === 'unlimited') ? 'Unlimited session' :
+                     ($planned_minutes ? round($planned_minutes / 60, 1) . 'hr session' : 'session');
+        $desc = 'Reservation fee for ' . $modeLabel . ' on ' . $reserved_date . ' at ' . $reserved_time;
 
-            $modeLabel = ($rental_mode === 'unlimited') ? 'Unlimited session' :
-                         ($planned_minutes ? round($planned_minutes / 60, 1) . 'hr session' : 'session');
-            $desc = 'Reservation fee for ' . $modeLabel . ' on ' . $reserved_date . ' at ' . $reserved_time;
+        $pm = PayMongoService::createCheckoutSession(
+            $centavos,
+            $desc,
+            $success_url,
+            $cancel_url,
+            $user['email']     ?? '',
+            $user['full_name'] ?? 'Customer'
+        );
 
-            $pm = PayMongoService::createCheckoutSession(
-                $centavos,
-                $desc,
-                $success_url,
-                $cancel_url,
-                $user['email']     ?? '',
-                $user['full_name'] ?? 'Customer'
-            );
+        if ($pm['success'] && !empty($pm['checkout_url'])) {
+            // Stash reservation data in session so PATH B can pick it up
+            $_SESSION['pending_reservation'] = [
+                'console_type'      => $console_type,
+                'rental_mode'       => $rental_mode,
+                'planned_minutes'   => $planned_minutes,
+                'reserved_date'     => $reserved_date,
+                'reserved_time'     => $reserved_time,
+                'notes'             => $notes,
+                'dp_amount'         => $dp_amount,
+                'preferred_unit_id' => $preferred_unit_id,
+                'session_id'        => $pm['session_id'],
+                'created_at'        => time(),
+                // Controller add-on
+                'controller_id'     => $ctrl_id,
+                'controller_fee'    => $ctrl_fee,
+            ];
 
-            if ($pm['success'] && !empty($pm['checkout_url'])) {
-                // Stash reservation data in session so PATH B can pick it up
-                $_SESSION['pending_reservation'] = [
-                    'console_type'      => $console_type,
-                    'rental_mode'       => $rental_mode,
-                    'planned_minutes'   => $planned_minutes,
-                    'reserved_date'     => $reserved_date,
-                    'reserved_time'     => $reserved_time,
-                    'notes'             => $notes,
-                    'dp_amount'         => $dp_amount,
-                    'preferred_unit_id' => $preferred_unit_id,
-                    'session_id'        => $pm['session_id'],
-                    'created_at'        => time(),
-                    // Controller add-on
-                    'controller_id'     => $ctrl_id,
-                    'controller_fee'    => $ctrl_fee,
-                ];
+            // Redirect to PayMongo hosted checkout page
+            header('Location: ' . $pm['checkout_url']);
+            exit;
 
-                // Redirect to PayMongo hosted checkout page
-                header('Location: ' . $pm['checkout_url']);
-                exit;
-
-            } else {
-                // PayMongo API error — show the error, do not fall into screenshot check
-                $error = 'Could not connect to GCash payment gateway: ' .
-                         htmlspecialchars($pm['message'] ?? 'Unknown error') .
-                         '. Please try again, or use the "pay manually" link to upload a screenshot instead.';
-            }
-        }
-
-        // ── PATH A2: Screenshot fallback (only when customer explicitly chose it) ──
-        if (!$error && $pay_via === 'screenshot') {
-            $payment_proof_file = null;
-            $upload_error       = '';
-            if (!empty($_FILES['payment_proof']['name'])) {
-                $file        = $_FILES['payment_proof'];
-                $allowed     = ['image/jpeg','image/png','image/gif','image/webp'];
-                $allowed_ext = ['jpg','jpeg','png','gif','webp'];
-                $maxSize     = 5 * 1024 * 1024;
-                $ext         = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                if ($file['error'] !== UPLOAD_ERR_OK) {
-                    $upload_error = 'Upload failed. Please try again.';
-                } elseif (!in_array($file['type'], $allowed) || !in_array($ext, $allowed_ext)) {
-                    $upload_error = 'Invalid file type. Please upload a JPG, PNG, GIF, or WebP image.';
-                } elseif ($file['size'] > $maxSize) {
-                    $upload_error = 'File too large. Maximum 5 MB.';
-                } else {
-                    $destDir  = __DIR__ . '/uploads/payment_proofs/';
-                    $filename = 'proof_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-                    if (move_uploaded_file($file['tmp_name'], $destDir . $filename)) {
-                        $payment_proof_file = $filename;
-                    } else {
-                        $upload_error = 'Could not save file. Please contact support.';
-                    }
-                }
-            }
-
-            if ($upload_error) {
-                $error = $upload_error;
-            } elseif (empty($payment_proof_file)) {
-                $error = 'Please upload your GCash proof of payment screenshot, or use the GCash button above.';
-            } else {
-                $result = createReservation(
-                    $user['user_id'], $console_type, $rental_mode, $planned_minutes,
-                    $reserved_date, $reserved_time,
-                    $notes ?: null,
-                    $dp_amount, 'gcash',
-                    $preferred_unit_id,
-                    $payment_proof_file,
-                    $ctrl_id,
-                    $ctrl_fee
-                );
-
-                if ($result['success']) {
-                    $_SESSION['reserve_success'] = 'Your reservation #' . $result['reservation_id'] .
-                        ' has been successfully completed and your slot is reserved. A staff member will verify your GCash screenshot shortly.';
-                    header('Location: reserve.php');
-                    exit;
-                } else {
-                    $error = 'Could not save reservation: ' . htmlspecialchars($result['message']);
-                }
-            }
+        } else {
+            // PayMongo API error — show the error
+            $error = 'Could not connect to GCash payment gateway: ' .
+                     htmlspecialchars($pm['message'] ?? 'Unknown error') .
+                     '. Please try again.';
         }
     }
 }
@@ -1182,26 +1154,18 @@ if (!empty($_GET['console'])) {
                     <span style="background:linear-gradient(135deg,#20c8a1,#5f85da);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Gaming Session</span>
                 </h1>
                 <p style="font-size:1.05rem;max-width:480px;line-height:1.8;">
-                    Secure your <?= htmlspecialchars($consoleList ?? 'PS5, PS4 &amp; Xbox Series X') ?> slot in advance.
+                    Secure your <?= htmlspecialchars($consoleListStr ?? 'your favorite console') ?> slot in advance.
                     Pick your date, time, and rental mode — and optionally pay a downpayment to lock it in.
                 </p>
 
                 <!-- Stat pill strip -->
                 <div class="reserve-hero-stats">
+                    <?php foreach ($ctCards as $idx => $ct): if ($idx >= 3) break; // show max 3 in hero stats ?>
                     <div class="reserve-hero-stat">
-                        <div class="rhs-val" style="color:#5f85da;"><?= $ps5Count ?></div>
-                        <div class="rhs-lbl">PS5 Units</div>
+                        <div class="rhs-val" style="color:<?= $ct['color'] ?>;"><?= $ct['count'] ?></div>
+                        <div class="rhs-lbl"><?= htmlspecialchars($ct['label']) ?> Units</div>
                     </div>
-                    <?php if ($ps4Count > 0): ?>
-                    <div class="reserve-hero-stat">
-                        <div class="rhs-val" style="color:#f1a83c;"><?= $ps4Count ?></div>
-                        <div class="rhs-lbl">PS4 Units</div>
-                    </div>
-                    <?php endif; ?>
-                    <div class="reserve-hero-stat">
-                        <div class="rhs-val" style="color:#20c8a1;"><?= $xboxCount ?></div>
-                        <div class="rhs-lbl">Xbox Units</div>
-                    </div>
+                    <?php endforeach; ?>
                     <div class="reserve-hero-stat">
                         <div class="rhs-val" style="color:#b37bec;">∞</div>
                         <div class="rhs-lbl">Future Dates</div>
@@ -1212,26 +1176,14 @@ if (!empty($_GET['console'])) {
             <!-- Right: floating console cards -->
             <div class="col-lg-6 d-none d-lg-block" data-aos="fade-left" data-aos-delay="150" data-aos-duration="800">
                 <div class="rhero-console-wrap">
-                    <div class="rhero-con-card ps5">
-                        <i class="fab fa-playstation" style="font-size:2.8rem;color:#5f85da;"></i>
-                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">PS5</div>
+                    <?php foreach ($ctCards as $idx => $ct): if ($idx >= 3) break; // show max 3 floating cards ?>
+                    <div class="rhero-con-card <?= htmlspecialchars($ct['id']) ?>">
+                        <i class="<?= $ct['icon'] ?>" style="font-size:2.8rem;color:<?= $ct['color'] ?>;"></i>
+                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;"><?= htmlspecialchars($ct['label']) ?></div>
                         <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
-                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#5f85da;background:rgba(95,133,218,.12);border-radius:8px;padding:3px 8px;"><?= $ps5Count ?> units</div>
+                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:<?= $ct['color'] ?>;background:<?= $ct['color'] ?>1e;border-radius:8px;padding:3px 8px;"><?= $ct['count'] ?> unit<?= $ct['count']>1?'s':'' ?></div>
                     </div>
-                    <?php if ($ps4Count > 0): ?>
-                    <div class="rhero-con-card ps4">
-                        <i class="fab fa-playstation" style="font-size:2.8rem;color:#f1a83c;"></i>
-                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">PS4</div>
-                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
-                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#f1a83c;background:rgba(241,168,60,.12);border-radius:8px;padding:3px 8px;"><?= $ps4Count ?> unit<?= $ps4Count>1?'s':'' ?></div>
-                    </div>
-                    <?php endif; ?>
-                    <div class="rhero-con-card xbox">
-                        <i class="fab fa-xbox" style="font-size:2.8rem;color:#20c8a1;"></i>
-                        <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;">Xbox</div>
-                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
-                        <div style="margin-top:10px;font-size:10px;font-weight:700;color:#20c8a1;background:rgba(32,200,161,.12);border-radius:8px;padding:3px 8px;"><?= $xboxCount ?> units</div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -1325,11 +1277,6 @@ if (!empty($_GET['console'])) {
                         <h2><i class="fas fa-desktop"></i> Step 1 — Choose Console Type</h2>
                         <div class="console-type-grid">
                             <?php
-                            $ctCards = [
-                                ['type'=>'PS5',         'id'=>'ct-ps5',  'icon'=>'fab fa-playstation', 'color'=>'#5f85da', 'label'=>'PlayStation 5', 'count'=>$ps5Count,  'allMaint'=>$ps5AllMaint,  'maintCount'=>$ps5Maint],
-                                ['type'=>'PS4',         'id'=>'ct-ps4',  'icon'=>'fab fa-playstation', 'color'=>'#f1a83c', 'label'=>'PlayStation 4', 'count'=>$ps4Count,  'allMaint'=>$ps4AllMaint,  'maintCount'=>$ps4Maint],
-                                ['type'=>'Xbox Series X','id'=>'ct-xbox','icon'=>'fab fa-xbox',         'color'=>'#20c8a1', 'label'=>'Xbox Series X', 'count'=>$xboxCount, 'allMaint'=>$xboxAllMaint, 'maintCount'=>$xboxMaint],
-                            ];
                             foreach ($ctCards as $ct):
                                 if ($ct['count'] === 0) continue; // hide types with no units at all
                                 $isMaint = $ct['allMaint'];
@@ -1606,69 +1553,11 @@ if (!empty($_GET['console'])) {
                                     <i class="fas fa-check-circle" style="color:#00c96b;font-size:1.1rem;flex-shrink:0;"></i>
                                     <span>Fee calculated. Click <strong style="color:#20c8a1;">Confirm &amp; Pay via GCash</strong> below to complete your booking.</span>
                                 </div>
-                                <div style="text-align:center;margin-top:10px;">
-                                    <button type="button" onclick="toggleScreenshotFallback()"
-                                        style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;">
-                                        Pay manually instead (upload screenshot)
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- ── Fallback: Screenshot Upload ─────────────────────── -->
-                            <div id="screenshotFallback" style="display:none;">
-                                <div class="dp-box">
-                                    <div class="dp-title">
-                                        <span><i class="fas fa-image"></i> Upload GCash Receipt *</span>
-                                        <span style="font-size:11px;color:#888;font-weight:400;margin-left:8px;">— manual verification by staff</span>
-                                    </div>
-
-                                    <!-- Shop number reference -->
-                                    <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                                        <div>
-                                            <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Send to GCash Number</div>
-                                            <div style="font-size:1.1rem;font-weight:900;color:#fff;letter-spacing:1.5px;"><?= htmlspecialchars($gcashNumber) ?></div>
-                                        </div>
-                                        <div style="text-align:right;">
-                                            <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Amount</div>
-                                            <div id="gcashAmountDisplay" style="font-size:1.3rem;font-weight:900;color:#20c8a1;">₱0</div>
-                                        </div>
-                                    </div>
-
-                                    <label for="payment_proof" id="proofUploadLabel" style="
-                                        display:block;border:2px dashed rgba(32,200,161,.35);
-                                        border-radius:12px;padding:22px;text-align:center;
-                                        cursor:pointer;background:rgba(32,200,161,.03);
-                                        transition:border-color .2s,background .2s;"
-                                        onmouseover="this.style.borderColor='rgba(32,200,161,.7)';this.style.background='rgba(32,200,161,.07)'"
-                                        onmouseout="this.style.borderColor='rgba(32,200,161,.35)';this.style.background='rgba(32,200,161,.03)'">
-                                        <i class="fas fa-cloud-upload-alt" id="proofUploadIcon" style="font-size:2rem;color:#20c8a1;display:block;margin-bottom:8px;"></i>
-                                        <div id="proofFileName" style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Click to select screenshot</div>
-                                        <div style="font-size:11px;color:#666;">JPG, PNG, GIF or WebP &mdash; max 5 MB</div>
-                                    </label>
-                                    <input type="file" id="payment_proof" name="payment_proof"
-                                           accept="image/jpeg,image/png,image/gif,image/webp"
-                                           style="display:none;"
-                                           onchange="onProofSelected(this)">
-                                    <div id="proofPreview" style="display:none;margin-top:14px;text-align:center;">
-                                        <img id="proofImg" src="" alt="Receipt Preview"
-                                             style="max-width:100%;max-height:220px;border-radius:10px;border:2px solid rgba(32,200,161,.4);">
-                                        <div style="font-size:12px;color:#20c8a1;margin-top:8px;font-weight:700;">
-                                            <i class="fas fa-check-circle"></i> Screenshot ready to submit
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="text-align:center;margin-top:-6px;margin-bottom:10px;">
-                                    <button type="button" onclick="toggleScreenshotFallback()"
-                                        style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;text-decoration:underline;">
-                                        ← Back to GCash auto-pay
-                                    </button>
-                                </div>
                             </div>
 
                             <!-- Hidden inputs -->
                             <input type="hidden" name="downpayment_amount" id="dpAmount" value="0">
                             <input type="hidden" name="downpayment_method" value="gcash">
-                            <input type="hidden" name="pay_via" id="payViaInput" value="paymongo">
                         </div>
                     </div>
 
@@ -2009,7 +1898,7 @@ function onTimeSelect(sel) {
 
 
 /* ── Console type ───────────────────────────────────── */
-const CONSOLE_TYPE_IDS = { 'PS5': 'ct-ps5', 'PS4': 'ct-ps4', 'Xbox Series X': 'ct-xbox' };
+const CONSOLE_TYPE_IDS = <?= json_encode(array_combine(array_column($ctCards, 'type'), array_column($ctCards, 'id'))) ?>;
 function selectConsoleType(type) {
     selectedConsoleType = type;
     document.getElementById('hiddenConsoleType').value = type;
@@ -2266,54 +2155,6 @@ function hideGcashPanel() {
     document.getElementById('gcashWaiting').style.display = 'block';
 }
 
-/* ── Proof of payment file preview ──────────────────── */
-function onProofSelected(input) {
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    document.getElementById('proofFileName').textContent = file.name;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('proofImg').src = e.target.result;
-        document.getElementById('proofPreview').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-}
-
-/* ── Update submit button label when switching pay method ── */
-function updateSubmitBtn() {
-    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
-    const icon   = document.getElementById('submitBtnIcon');
-    const label  = document.getElementById('submitBtnLabel');
-    if (!icon || !label) return;
-    if (payVia === 'screenshot') {
-        icon.className  = 'fas fa-cloud-upload-alt';
-        label.innerHTML = 'Submit Reservation';
-    } else {
-        icon.className  = 'fas fa-mobile-alt';
-        label.innerHTML = 'Confirm &amp; Pay via GCash';
-    }
-}
-
-/* ── Screenshot fallback toggle ──────────────────────── */
-function toggleScreenshotFallback() {
-    const pmBlock  = document.getElementById('pmGcashBlock');
-    const fallback = document.getElementById('screenshotFallback');
-    const payVia   = document.getElementById('payViaInput');
-    const isShowing = fallback.style.display !== 'none';
-
-    if (isShowing) {
-        // Switch back to PayMongo
-        fallback.style.display = 'none';
-        pmBlock.style.display  = 'block';
-        payVia.value           = 'paymongo';
-    } else {
-        // Show screenshot upload
-        pmBlock.style.display  = 'none';
-        fallback.style.display = 'block';
-        payVia.value           = 'screenshot';
-    }
-    updateSubmitBtn();
-}
 
 /* ── Duration ───────────────────────────────────────── */
 function selectDuration(mins) {
@@ -2515,17 +2356,11 @@ function checkAvailability() {
     const date = document.getElementById('reservedDate').value;
     const time = document.getElementById('reservedTime').value;
     const el   = document.getElementById('availabilityResult');
-    const miniEls = {
-        'PS5':         document.getElementById('avail-ps5'),
-        'PS4':         document.getElementById('avail-ps4'),
-        'Xbox Series X': document.getElementById('avail-xbox')
-    };
-    // Map console type → ct-avail badge inside the type card
-    const ctAvailEls = {
-        'PS5':         document.querySelector('#ct-ps5 .ct-avail'),
-        'PS4':         document.querySelector('#ct-ps4 .ct-avail'),
-        'Xbox Series X': document.querySelector('#ct-xbox .ct-avail'),
-    };
+    const ctAvailEls = {};
+    Object.keys(CONSOLE_TYPE_IDS).forEach(type => {
+        const cardId = CONSOLE_TYPE_IDS[type];
+        ctAvailEls[type] = document.querySelector('#' + cardId + ' .ct-avail');
+    });
 
     if (!date || !time) {
         el.style.display = 'none';
@@ -2536,7 +2371,7 @@ function checkAvailability() {
 
     el.style.display = 'block';
     el.innerHTML = '<span style="color:#888;font-size:12px;"><i class="fas fa-spinner fa-spin"></i> Checking availability…</span>';
-    Object.values(miniEls).forEach(e => { if (e) e.innerHTML = ''; });
+    Object.values(ctAvailEls).forEach(e => { if (e) e.innerHTML = ''; });
 
     fetch(`ajax/check_availability.php?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`)
         .then(r => r.json())
@@ -2549,16 +2384,12 @@ function checkAvailability() {
             const av = data.availability;
             let html = '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
 
-            ['PS5','PS4','Xbox Series X'].forEach(type => {
+            Object.keys(CONSOLE_TYPE_IDS).forEach(type => {
                 const info = av[type];
                 if (!info) return;
                 const ok  = info.available > 0;
                 const cls = ok ? 'ok' : 'none';
                 html += `<span class="avail-badge ${cls}"><i class="fas fa-${ok ? 'check' : 'xmark'}"></i> ${type}: ${info.available}/${info.total} free at this slot</span>`;
-
-                // Update mini badge in the availability result area
-                const miniEl = miniEls[type];
-                if (miniEl) miniEl.innerHTML = `<span class="avail-badge ${cls}" style="font-size:10px;">${ok ? info.available + ' free' : 'Full'}</span>`;
 
                 // ── Update the "X free" badge INSIDE the console type card ──
                 const ctEl = ctAvailEls[type];
@@ -2680,8 +2511,6 @@ function updateSummary() {
 
 /* ── Form validation ────────────────────────────────── */
 document.getElementById('reserveForm').addEventListener('submit', function(e) {
-    const payVia = document.getElementById('payViaInput')?.value || 'paymongo';
-
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
@@ -2731,25 +2560,13 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         return;
     }
 
-    // Screenshot path only: require proof file
-    if (payVia === 'screenshot') {
-        const proofFile = document.getElementById('payment_proof');
-        if (!proofFile || !proofFile.files || proofFile.files.length === 0) {
-            e.preventDefault();
-            alert('\u26a0\ufe0f Please upload your GCash payment screenshot before submitting.');
-            return;
-        }
-    }
-
     // PayMongo path: show loading state on button
-    if (payVia === 'paymongo') {
-        const btn   = document.getElementById('submitBtn');
-        const label = document.getElementById('submitBtnLabel');
-        const icon  = document.getElementById('submitBtnIcon');
-        if (btn)   { btn.disabled = true; btn.style.opacity = '.75'; }
-        if (icon)  icon.className = 'fas fa-spinner fa-spin';
-        if (label) label.textContent = 'Redirecting to GCash…';
-    }
+    const btn   = document.getElementById('submitBtn');
+    const label = document.getElementById('submitBtnLabel');
+    const icon  = document.getElementById('submitBtnIcon');
+    if (btn)   { btn.disabled = true; btn.style.opacity = '.75'; }
+    if (icon)  icon.className = 'fas fa-spinner fa-spin';
+    if (label) label.textContent = 'Redirecting to GCash…';
 });
 
 // ── Cancel Modal Logic ──

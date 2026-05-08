@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * GamingSpotHub - Customer Dashboard
  * Lets logged-in customers track reservations, session history, spending, and more.
@@ -17,7 +17,7 @@ require_once __DIR__ . '/includes/db_functions.php';
 $user    = getCurrentUser();
 $user_id = $user['user_id'];
 
-// â”€â”€ Data fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Data fetching 
 
 // Session history (all, ordered newest-first)
 $sessionHistory = getUserSessionHistory($user_id, 50);
@@ -43,7 +43,6 @@ if (!empty($myReservations)) {
     }
 }
 
-// â”€â”€ Cancellation ban / streak status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $banStmt = $conn->prepare("SELECT consecutive_cancellations, reservation_banned_until FROM users WHERE user_id = ?");
 $banStmt->bind_param('i', $user_id);
 $banStmt->execute();
@@ -52,7 +51,6 @@ $isBanned  = !empty($banData['reservation_banned_until']) && strtotime($banData[
 $banExpiry = $isBanned ? date('F j, Y \a\t g:i A', strtotime($banData['reservation_banned_until'])) : '';
 $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 
-// â”€â”€ Reschedule notifications (unseen reschedules for this user) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
             rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
@@ -197,7 +195,7 @@ for ($i = 13; $i >= 0; $i--) {
     $spendData[] = (float) $s->get_result()->fetch_assoc()['rev'];
 }
 
-// â”€â”€ My Payments (all transactions for this user) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  My Payments (all transactions for this user) 
 $myPaymentsStmt = $conn->prepare(
     "SELECT t.*,
             CASE
@@ -224,7 +222,7 @@ $myPaymentsStmt->execute();
 $myPayments = $myPaymentsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $myPaymentsCount = count($myPayments);
 
-// â”€â”€ My Cancellations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  My Cancellations 
 $myCancels = [];
 $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
@@ -244,7 +242,7 @@ $myCancels = $cancelLog->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $myCancelCount = count($myCancels);
 
-// â”€â”€ My Tournament Registrations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  My Tournament Registrations 
 $myTournaments = [];
 $tStmt = $conn->prepare(
     "SELECT tp.participant_id, tp.tournament_id, tp.registration_date,
@@ -341,13 +339,13 @@ function fmtMins(int $m): string {
             overflow-x: hidden;
         }
 
-        /* â”€â”€ Page wrapper (not a grid â€” sidebar is fixed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Page wrapper (not a grid â€” sidebar is fixed)  */
         .cd-wrapper {
             display: block;
             min-height: 100vh;
         }
 
-        /* â”€â”€ Sidebar (fixed, like admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Sidebar (fixed, like admin)  */
         .cd-sidebar {
             position: fixed;
             left: 0;
@@ -369,7 +367,7 @@ function fmtMins(int $m): string {
         .cd-sidebar::-webkit-scrollbar-track { background: transparent; }
         .cd-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
 
-        /* â”€â”€ Sidebar header (logo area â€” mirrors admin sidebar-header) â”€â”€â”€â”€â”€â”€ */
+        /*  Sidebar header (logo area â€” mirrors admin sidebar-header)  */
         .cd-sidebar-header {
             display: flex;
             align-items: center;
@@ -396,7 +394,7 @@ function fmtMins(int $m): string {
             white-space: nowrap;
         }
 
-        /* â”€â”€ Sidebar user section (below logo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Sidebar user section (below logo)  */
 
         .cd-sidebar-avatar {
             display: flex;
@@ -457,7 +455,7 @@ function fmtMins(int $m): string {
         }
         .cd-sidebar-bottom { margin-top: auto; }
 
-        /* â”€â”€ Topbar (fixed, right of sidebar â€” mirrors admin topbar) â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Topbar (fixed, right of sidebar â€” mirrors admin topbar)  */
         .cd-topbar {
             position: fixed;
             left: 240px;
@@ -574,7 +572,7 @@ function fmtMins(int $m): string {
         /* Nav items: inside padded area */
         .cd-sidebar-nav { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
-        /* â”€â”€ Main area (margin-based, like admin .main-content) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Main area (margin-based, like admin .main-content)  */
         .cd-main {
             margin-left: 240px;
             margin-top: 60px;
@@ -583,7 +581,7 @@ function fmtMins(int $m): string {
             min-width: 0;
         }
 
-        /* â”€â”€ Account page: two-column layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Account page: two-column layout  */
         .cd-account-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -594,7 +592,7 @@ function fmtMins(int $m): string {
             .cd-account-grid { grid-template-columns: 1fr; }
         }
 
-        /* â”€â”€ Page switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Page switching  */
         .cd-page { display: none; animation: cdFade .35s ease; }
         .cd-page.active { display: block; }
         @keyframes cdFade {
@@ -602,7 +600,7 @@ function fmtMins(int $m): string {
             to   { opacity:1; transform:translateY(0); }
         }
 
-        /* â”€â”€ Section title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Section title  */
         .cd-section-title {
             font-family: 'Outfit', sans-serif;
             font-size: 22px;
@@ -615,7 +613,7 @@ function fmtMins(int $m): string {
         }
         .cd-section-title i { color: var(--mint); font-size: 20px; }
 
-        /* â”€â”€ Stats grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Stats grid  */
         .cd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 16px; margin-bottom: 24px; }
         .cd-stat-card {
             background: var(--panel);
@@ -649,7 +647,7 @@ function fmtMins(int $m): string {
         .cd-stat-value { font-size: 28px; font-weight: 800; font-family: 'Outfit', sans-serif; color: #fff; }
         .cd-stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-        /* â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Card  */
         .cd-card {
             background: var(--panel);
             border: 1px solid var(--border);
@@ -674,7 +672,7 @@ function fmtMins(int $m): string {
         }
         .cd-card-title i { color: var(--mint); }
 
-        /* â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Table  */
         .cd-table { width: 100%; border-collapse: collapse; }
         .cd-table th {
             background: rgba(10,33,81,0.5);
@@ -696,7 +694,7 @@ function fmtMins(int $m): string {
         .cd-table tr:hover td { background: rgba(32,200,161,0.04); }
         .cd-table tr:last-child td { border-bottom: none; }
 
-        /* â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Badge  */
         .cd-badge {
             display: inline-block;
             padding: 3px 10px;
@@ -711,7 +709,7 @@ function fmtMins(int $m): string {
         .cd-badge.gold    { background: rgba(241,168,60,0.15); color: var(--gold); }
         .cd-badge.gray    { background: rgba(150,150,150,0.15); color: #aaa; }
 
-        /* â”€â”€ Cancel reservation button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Cancel reservation button  */
         .cd-cancel-btn {
             display: inline-flex; align-items: center; gap: 6px;
             padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(251,86,107,.35);
@@ -724,7 +722,7 @@ function fmtMins(int $m): string {
             background: rgba(251,86,107,.15); border-color: rgba(251,86,107,.6);
         }
 
-        /* â”€â”€ Active session live card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Active session live card  */
         .cd-live-card {
             background: linear-gradient(135deg, rgba(32,200,161,0.14), rgba(95,133,218,0.07));
             border: 1px solid rgba(32,200,161,0.35);
@@ -764,7 +762,7 @@ function fmtMins(int $m): string {
         .cd-live-val   { font-size: 15px; font-weight: 700; color: #fff; }
         .cd-live-timer { font-family: monospace; font-size: 22px; font-weight: 800; color: var(--mint); }
 
-        /* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Empty state  */
         .cd-empty {
             text-align: center;
             padding: 40px 20px;
@@ -773,17 +771,17 @@ function fmtMins(int $m): string {
         .cd-empty i { font-size: 36px; margin-bottom: 12px; display: block; opacity: .5; }
         .cd-empty p { font-size: 13px; }
 
-        /* â”€â”€ Reservation row glow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Reservation row glow  */
         tr.res-today td { background: rgba(32,200,161,0.04) !important; }
 
-        /* â”€â”€ Chart container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Chart container  */
         .cd-chart-wrap { position: relative; height: 180px; }
 
-        /* â”€â”€ Charts grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Charts grid  */
         .cd-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .cd-2col-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
-        /* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */        @media (max-width: 900px) {
+        /*  Responsive  */        @media (max-width: 900px) {
             /* Hard-clip the viewport â€” nothing bleeds horizontally */
             html, body { overflow-x: hidden; max-width: 100vw; }
 
@@ -808,7 +806,7 @@ function fmtMins(int $m): string {
             .cd-topbar-title { font-size: 14px; }
             .cd-topbar-title .cd-live-dot { display: none; }
 
-            /* â”€â”€ Bottom navigation bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+            /*  Bottom navigation bar  */
             .cd-bottom-nav {
                 display: flex;
                 position: fixed;
@@ -867,7 +865,7 @@ function fmtMins(int $m): string {
         }
 
 
-        /* â”€â”€ Profile Edit Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        /*  Profile Edit Form  */
         .pf-field-group { display: flex; flex-direction: column; gap: 6px; }
         .pf-label {
             font-size: 12px; font-weight: 600;
@@ -1121,7 +1119,7 @@ function fmtMins(int $m): string {
             <h2 class="cd-section-title"><i class="fas fa-chart-line"></i> Welcome back, <?= htmlspecialchars(explode(' ', $user['full_name'])[0]) ?>!</h2>
 
             <?php if (!empty($unseenReschedules)): ?>
-            <!-- â”€â”€ Reschedule notification banners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <!--  Reschedule notification banners  -->
             <div id="reschedule-notifications">
                 <?php foreach ($unseenReschedules as $rs): ?>
                 <div id="rn-<?= $rs['reschedule_id'] ?>" style="
@@ -1602,7 +1600,7 @@ function fmtMins(int $m): string {
             </div>
 
             <?php if ($isBanned): ?>
-            <!-- â”€â”€ Reservation Ban Alert â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <!--  Reservation Ban Alert  -->
             <div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.4);border-radius:16px;
                         padding:18px 22px;margin-bottom:24px;display:flex;align-items:flex-start;gap:16px;">
                 <div style="width:44px;height:44px;border-radius:12px;background:rgba(251,86,107,.2);
@@ -1621,7 +1619,7 @@ function fmtMins(int $m): string {
                 </div>
             </div>
             <?php elseif ($cancelStreak === 2): ?>
-            <!-- â”€â”€ 2nd-Strike Warning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+            <!--  2nd-Strike Warning  -->
             <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.35);border-radius:16px;
                         padding:16px 20px;margin-bottom:24px;display:flex;align-items:flex-start;gap:14px;">
                 <div style="width:40px;height:40px;border-radius:12px;background:rgba(241,168,60,.18);
@@ -1826,7 +1824,7 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </div>
 
-        <!-- â”€â”€ Cancel Reservation Modal (two-step: Reason â†’ Confirm) â”€â”€ -->
+        <!--  Cancel Reservation Modal (two-step: Reason â†’ Confirm)  -->
         <div id="cancelResModal" style="display:none;position:fixed;inset:0;z-index:9999;
              background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
              align-items:center;justify-content:center;">
@@ -1943,81 +1941,7 @@ function fmtMins(int $m): string {
         </div>
 
 
-        <!-- ── User-Initiated Reschedule Modal ── -->
-        <div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
-             background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
-             align-items:center;justify-content:center;">
-            <div style="background:#0e1d36;border:1px solid rgba(95,133,218,.35);border-radius:18px;
-                        padding:28px 28px 24px;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
-                
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-                    <div style="width:40px;height:40px;border-radius:12px;background:rgba(95,133,218,.15);
-                                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fas fa-calendar-alt" style="color:#5f85da;"></i>
-                    </div>
-                    <div>
-                        <div style="font-weight:800;color:#fff;font-size:15px;">Reschedule Reservation</div>
-                        <div style="font-size:12px;color:#888;" id="urmSubtitle">Reservation #...</div>
-                    </div>
-                </div>
 
-                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;margin-bottom:18px;">
-                    <div style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Current Schedule</div>
-                    <div style="font-size:13px;color:#fff;font-weight:600;" id="urmCurrentSched">...</div>
-                </div>
-
-                <div style="margin-bottom:16px;">
-                    <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Date</label>
-                    <input type="date" id="urmDate" style="
-                        width:100%;background:rgba(10,33,81,.7);
-                        border:1px solid rgba(95,133,218,.3);
-                        color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                        font-size:14px;font-family:inherit;outline:none;"
-                        min="<?= date('Y-m-d') ?>"
-                        max="<?= date('Y-m-d', strtotime('+1 month')) ?>">
-                </div>
-
-                <div style="margin-bottom:20px;">
-                    <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Time</label>
-                    <select id="urmTime" style="
-                        width:100%;background:rgba(10,33,81,.7);
-                        border:1px solid rgba(95,133,218,.3);
-                        color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                        font-size:14px;font-family:inherit;outline:none;">
-                        <?php for($h=12;$h<=23;$h++): ?>
-                            <?php 
-                                $val = sprintf("%02d:00", $h);
-                                $lbl = date("g:i A", strtotime($val));
-                            ?>
-                            <option value="<?= $val ?>"><?= $lbl ?></option>
-                            <?php if($h<23): ?>
-                                <?php 
-                                    $val2 = sprintf("%02d:30", $h);
-                                    $lbl2 = date("g:i A", strtotime($val2));
-                                ?>
-                                <option value="<?= $val2 ?>"><?= $lbl2 ?></option>
-                            <?php endif; ?>
-                        <?php endfor; ?>
-                    </select>
-                </div>
-
-                <div style="display:flex;gap:10px;">
-                    <button id="urmSubmitBtn"
-                        onclick="submitUserReschedule()"
-                        style="flex:1;padding:11px;border-radius:10px;border:none;
-                               background:linear-gradient(135deg,#5f85da,#2b59c3);color:#fff;
-                               font-weight:700;font-size:13px;cursor:pointer;transition:.2s;">
-                        <i class="fas fa-calendar-check"></i> Request Reschedule
-                    </button>
-                    <button onclick="closeUserRescheduleModal()"
-                        style="flex:1;padding:11px;border-radius:10px;
-                               border:1px solid rgba(255,255,255,.15);background:transparent;
-                               color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
 
         <!-- Toast notification -->
         <div id="dashToast" style="display:none;position:fixed;bottom:24px;right:24px;z-index:10000;
@@ -3116,7 +3040,7 @@ function showDashToast(msg, type, duration) {
     t._timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 320); }, ms);
 }
 
-// â”€â”€ Re-display toast saved before page reload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Re-display toast saved before page reload 
 document.addEventListener('DOMContentLoaded', function () {
     const msg  = sessionStorage.getItem('dashToastMsg');
     const type = sessionStorage.getItem('dashToastType');
@@ -3139,83 +3063,6 @@ document.getElementById('cancelResModal')?.addEventListener('click', function(e)
 let _urmResId = null;
 let _urmConsole = null;
 
-function openUserRescheduleModal(rid, curDate, curTime, consoleType) {
-    _urmResId = rid;
-    _urmConsole = consoleType;
-    
-    document.getElementById('urmSubtitle').textContent = 'Reservation #' + rid;
-    
-    // Format current schedule display
-    const d = new Date(curDate + 'T00:00:00');
-    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeDisplay = formatTime(curTime);
-    
-    document.getElementById('urmCurrentSched').textContent = dateStr + ' at ' + timeDisplay;
-    
-    // Reset inputs
-    const dateInput = document.getElementById('urmDate');
-    dateInput.value = curDate;
-    document.getElementById('urmTime').value = curTime.substring(0, 5);
-    
-    document.getElementById('userRescheduleModal').style.display = 'flex';
-}
-
-function formatTime(t) {
-    let [h, m] = t.split(':');
-    h = parseInt(h);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return h + ':' + m + ' ' + ampm;
-}
-
-function closeUserRescheduleModal() {
-    document.getElementById('userRescheduleModal').style.display = 'none';
-    _urmResId = null;
-    _urmConsole = null;
-}
-
-function submitUserReschedule() {
-    if (!_urmResId) return;
-    
-    const newDate = document.getElementById('urmDate').value;
-    const newTime = document.getElementById('urmTime').value;
-    
-    if (!newDate || !newTime) {
-        showDashToast('Please select both date and time.', 'error');
-        return;
-    }
-    
-    const btn = document.getElementById('urmSubmitBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Requesting...';
-    
-    const fd = new FormData();
-    fd.append('reservation_id', _urmResId);
-    fd.append('new_date', newDate);
-    fd.append('new_time', newTime);
-    fd.append('console_type', _urmConsole);
-    
-    fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                closeUserRescheduleModal();
-                showDashToast(data.message, 'success');
-                sessionStorage.setItem('dashToastMsg', data.message);
-                sessionStorage.setItem('dashToastType', 'success');
-                setTimeout(() => { location.reload(); }, 1500);
-            } else {
-                showDashToast(data.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-calendar-check"></i> Request Reschedule';
-            }
-        })
-        .catch(() => {
-            showDashToast('Network error. Please try again.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-calendar-check"></i> Request Reschedule';
-        });
-}
 
 // Close user reschedule modal on backdrop click
 document.getElementById('userRescheduleModal')?.addEventListener('click', function(e) {
@@ -3227,7 +3074,7 @@ document.getElementById('userRescheduleModal')?.addEventListener('click', functi
 <script src="assets/libs/aos/aos.js"></script>
 
 <script>
-// â”€â”€ Navbar scroll effect (same as index.php) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Navbar scroll effect (same as index.php) 
 AOS.init({ duration: 800, once: true, offset: 80 });
 
 const mainNav = document.getElementById('mainNav');
@@ -3449,7 +3296,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </script>
 <?php endif; ?>
 
-<!-- â”€â”€ Reschedule Modal â”€â”€ -->
+<!--  Reschedule Modal  -->
 <div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
      background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
      align-items:center;justify-content:center;">
@@ -3809,7 +3656,7 @@ function togglePwVisibility(inputId, btnId) {
 }
 </script>
 
-<!-- â”€â”€ Reschedule Confirm Modal â”€â”€ -->
+<!--  Reschedule Confirm Modal  -->
 <div id="rescheduleConfirmModal" style="display:none;position:fixed;inset:0;z-index:99999;
      background:rgba(0,0,0,.82);backdrop-filter:blur(10px);
      align-items:center;justify-content:center;padding:20px;">
@@ -3911,7 +3758,7 @@ document.getElementById('rescheduleConfirmModal').addEventListener('click', func
 });
 </script>
 
-<!-- ── Auto-Start Sessions Poller ─────────────────────────────────────────── -->
+<!--  Auto-Start Sessions Poller  -->
 <script>
 (function() {
     var POLL_MS   = 60000; // every 60 seconds
