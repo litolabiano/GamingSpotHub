@@ -1701,18 +1701,6 @@ function fmtMins(int $m): string {
                                         <i class="fas fa-times"></i> Cancel
                                     </button>
                                 <?php endif; ?>
-                                <?php else: ?>
-                                    <?php if (!$alreadyResched): ?>
-                                <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-calendar-alt"></i> Reschedule
-                                </button>
-                                <?php else: ?>
-                                <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
-                                <?php endif; ?>
-                                <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
-                            <?php endif; ?>
                             </div>
                             <?php endif; ?>
                         </td>
