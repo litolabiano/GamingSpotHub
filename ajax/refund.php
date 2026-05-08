@@ -120,6 +120,8 @@ if ($action_type === 'reservation') {
     $upd->bind_param('i', $reservation_id);
     $upd->execute();
 
+    logActivity($staff_id, "Refund", "Issued ₱" . number_format($refund_amount, 2) . " refund for Reservation #{$reservation_id}. Reason: {$refund_reason}");
+
     echo json_encode([
         'success'        => true,
         'message'        => 'Reservation refund of ₱' . number_format($refund_amount, 2) . ' issued successfully.',
@@ -137,8 +139,8 @@ if (!$session_id) {
     exit;
 }
 
-// Fetch session
-$stmt = $conn->prepare("SELECT user_id, status FROM gaming_sessions WHERE session_id = ?");
+// Fetch session and console unit
+$stmt = $conn->prepare("SELECT gs.user_id, gs.status, c.unit_number FROM gaming_sessions gs JOIN consoles c ON gs.console_id = c.console_id WHERE gs.session_id = ?");
 $stmt->bind_param('i', $session_id);
 $stmt->execute();
 $session = $stmt->get_result()->fetch_assoc();
@@ -231,6 +233,10 @@ if ($refund_amount > 0) {
         null,
         $note
     );
+
+    $logAct = $action_type === 'early_end' ? "Early End Refund" : "Refund";
+    $logDet = "Issued ₱" . number_format($refund_amount, 2) . " refund for Session #{$session_id} on " . ($session['unit_number'] ?? 'Unknown Console') . ". Reason: {$refund_reason}";
+    logActivity($staff_id, $logAct, $logDet);
 }
 
 // Build the response message

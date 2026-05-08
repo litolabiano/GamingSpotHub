@@ -1321,11 +1321,17 @@ function fmtMins(int $m): string {
                     </div>
                     <?php endif; ?>
                     <div class="cd-live-item">
-                        <div class="cd-live-label">Elapsed</div>
-                        <div class="cd-live-timer" id="liveTimer"
-                             data-start="<?= $activeSession['start_time'] ?>"
-                             data-planned="<?= $activeSession['planned_minutes'] ?? 0 ?>">
-                            â€“:â€“â€“
+                        <div class="cd-live-label">End Time</div>
+                        <div class="cd-live-val" style="color:var(--mint); font-weight:700;">
+                            <?php 
+                                if ($activeSession['rental_mode'] === 'unlimited') {
+                                    echo '12:00 AM';
+                                } elseif ($activeSession['planned_minutes']) {
+                                    echo date('h:i A', strtotime($activeSession['start_time'] . ' + ' . (int)$activeSession['planned_minutes'] . ' minutes'));
+                                } else {
+                                    echo 'Until Logout';
+                                }
+                            ?>
                         </div>
                     </div>
                 </div>
@@ -2815,28 +2821,7 @@ function cdShowPage(page, el) {
 })();
 
 /* â•â• Live session timer â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-(function () {
-    const el = document.getElementById('liveTimer');
-    if (!el) return;
-    const startUtc = new Date(el.dataset.start.replace(' ', 'T') + '+08:00').getTime();
-    const planned  = parseInt(el.dataset.planned, 10) || 0;
 
-    function tick() {
-        const elapsed = Math.floor((Date.now() - startUtc) / 1000);
-        const h = Math.floor(elapsed / 3600);
-        const m = Math.floor((elapsed % 3600) / 60);
-        const s = elapsed % 60;
-        const pad = n => String(n).padStart(2, '0');
-        el.textContent = (h ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
-
-        if (planned > 0) {
-            const remaining = planned * 60 - elapsed;
-            if (remaining < 0) el.style.color = '#fb566b';  // overtime
-        }
-    }
-    tick();
-    setInterval(tick, 1000);
-})();
 
 /* â•â• Charts â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const activityLabels = <?= json_encode($activityLabels) ?>;

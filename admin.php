@@ -132,6 +132,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
     }
+
+    // Activity Log
+    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
+    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
+    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
+    logActivity($user['user_id'], "Start Session", $logDet);
+
     if (!$messageType) $messageType = 'success';
 }
 
@@ -165,8 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $remaining = round($result['total_cost'] - $alreadyPaid, 2);
 
-                // Fetch user_id
-                $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
+                // Fetch user_id and console unit
+                $stmt = $conn->prepare("SELECT gs.user_id, c.unit_number FROM gaming_sessions gs JOIN consoles c ON gs.console_id = c.console_id WHERE gs.session_id = ?");
                 $stmt->bind_param('i', $session_id);
                 $stmt->execute();
                 $sess_row = $stmt->get_result()->fetch_assoc();
@@ -212,6 +219,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront - no extra charge.";
                     $messageType = 'success';
                 }
+
+                // Activity Log
+                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: ₱{$total}.";
+                logActivity($user['user_id'], "End Session", $logDet);
             } else {
                 $message     = 'Could not end session: ' . $result['message'];
                 $messageType = 'error';
@@ -230,6 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateConsoleStatus($console_id, $status);
             $message = 'Console status updated.';
             $messageType = 'success';
+            
+            // Activity Log
+            logActivity($user['user_id'], "Console Status", "Updated Console ID #{$console_id} status to " . ucfirst($status));
         }
     }
     elseif ($action === 'add_console') {
@@ -252,6 +266,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (addConsole($name, $type, $unit_number, $rate, $ctrl_count, $compat_ctrl)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
+                    
+                    // Activity Log
+                    logActivity($user['user_id'], "Add Console", "Added new console: {$name} ({$type}), Unit: {$unit_number}, Rate: ₱{$rate}/hr");
                 } else {
                     $message = 'Failed to add console. An unexpected database error occurred.';
                     $messageType = 'error';
@@ -289,6 +306,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
+
+                    // Activity Log
+                    logActivity($user['user_id'], "Edit Console", "Updated Console ID #{$console_id}: {$name}, Unit: {$unit}, Rate: ₱{$rate}/hr");
                 } else {
                     $message     = 'Failed to update console: ' . $conn->error;
                     $messageType = 'error';
@@ -307,6 +327,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($res['success']) {
                 $message = 'Console deleted permanently.';
                 $messageType = 'success';
+                
+                // Activity Log
+                logActivity($user['user_id'], "Delete Console", "Permanently deleted Console ID #{$console_id}");
             } else {
                 $message = 'Cannot delete console. It likely has existing sessions/reservations associated with it. Keep it archived instead.';
                 $messageType = 'error';
@@ -322,6 +345,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (addConsoleType($typeName)) {
                 $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
                 $messageType = 'success';
+                logActivity($user['user_id'], "Console Type", "Added new console type: {$typeName}");
             } else {
                 $message = 'Failed to add console type. It might already exist.';
                 $messageType = 'error';
@@ -335,6 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && archiveConsoleType($typeId)) {
             $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Console Type", "Archived Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to archive console type.';
             $messageType = 'error';
@@ -347,6 +372,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && restoreConsoleType($typeId)) {
             $message = 'Console type restored successfully.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Console Type", "Restored Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to restore console type.';
             $messageType = 'error';
@@ -359,6 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && deleteConsoleType($typeId)) {
             $message = 'Console type permanently removed.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Console Type", "Permanently deleted Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to permanently delete console type.';
             $messageType = 'error';
@@ -381,6 +408,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $message = 'Controller type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added.';
                 $messageType = 'success';
+                logActivity($user['user_id'], "Controller Type", "Added new controller type: {$typeName}{$parentNote}");
             } else {
                 $message = 'Failed to add controller type. It might already exist.';
                 $messageType = 'error';
@@ -394,6 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && archiveControllerType($typeId)) {
             $message = 'Controller type archived successfully.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Controller Type", "Archived Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to archive controller type.';
             $messageType = 'error';
@@ -406,6 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && restoreControllerType($typeId)) {
             $message = 'Controller type restored successfully.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Controller Type", "Restored Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to restore controller type.';
             $messageType = 'error';
@@ -418,6 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && deleteControllerType($typeId)) {
             $message = 'Controller type permanently removed.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Controller Type", "Permanently deleted Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to permanently delete controller type.';
             $messageType = 'error';
@@ -452,6 +483,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
+                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_name} ({$ctrl_type}), Unit: {$ctrl_unit}");
                 } else {
                     $message = 'Failed to add controller: ' . $conn->error;
                     $messageType = 'error';
@@ -479,6 +511,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             $message = 'Controller status updated.';
             $messageType = 'success';
+            logActivity($user['user_id'], "Controller Status", "Updated Controller ID #{$ctrl_id} status to " . ucfirst($status));
         }
     }
     elseif ($action === 'delete_controller') {
@@ -494,6 +527,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
                 $message = 'Controller deleted permanently.';
                 $messageType = 'success';
+                logActivity($user['user_id'], "Controller Unit", "Permanently deleted Controller ID #{$ctrl_id}");
             }
         }
     }
@@ -530,6 +564,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $message = 'Settings saved and console rates updated.';
         $messageType = 'success';
+        
+        // Activity Log
+        logActivity($user['user_id'], "System Settings", "Updated system settings and synced console rates.");
         } // end owner check
     }
 
@@ -541,6 +578,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateReservationStatus($res_id, 'reserved', $console_id ?: null);
             $message = 'Reservation confirmed.';
             $messageType = 'success';
+            
+            // Activity Log
+            logActivity($user['user_id'], "Confirm Reservation", "Confirmed Reservation #{$res_id}" . ($console_id ? " and assigned Console Unit #{$console_id}" : ""));
         }
     }
 
@@ -595,6 +635,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $message     = 'Reservation #' . $res_id . ' cancelled.';
             $messageType = 'success';
+
+            // Activity Log
+            logActivity($user['user_id'], "Cancel Reservation", "Cancelled Reservation #{$res_id}. Reason: " . ucfirst($reasonType) . ($reasonDetail ? " ({$reasonDetail})" : ""));
         }
     }
 
@@ -606,6 +649,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateReservationStatus($res_id, 'no_show');
             $message = 'Marked as no-show.';
             $messageType = 'warning';
+
+            // Activity Log
+            logActivity($user['user_id'], "No-Show", "Marked Reservation #{$res_id} as No-Show.");
         }
     }
 
@@ -618,6 +664,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($result['success']) {
                 $message = 'Reservation converted to active session!';
                 $messageType = 'success';
+
+                // Activity Log
+                $conQ = $conn->query("SELECT unit_number FROM consoles WHERE console_id = $console_id");
+                $unit = ($conQ && $conQ->num_rows) ? $conQ->fetch_assoc()['unit_number'] : "ID #$console_id";
+                logActivity($user['user_id'], "Convert Reservation", "Converted Reservation #{$res_id} to Session #{$result['session_id']} on Console: {$unit}");
             } else {
                 $message = 'Conversion failed: ' . $result['message'];
                 $messageType = 'error';
@@ -644,6 +695,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         $notes ?: null, $dp_amount, $dp_method);
             $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
             $messageType = $result['success'] ? 'success' : 'error';
+
+            if ($result['success']) {
+                logActivity($user['user_id'], "Add Reservation", "Created new Reservation #{$result['reservation_id']} for User #{$uid} on {$rdate} {$rtime}. Console Type: {$ctype}");
+            }
         } else {
             $message = 'Please fill in all required fields.';
             $messageType = 'error';
@@ -662,6 +717,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (blockDate($date, $reason)) {
                     $message     = 'Date blocked: ' . date('M d, Y', strtotime($date));
                     $messageType = 'success';
+
+                    logActivity($user['user_id'], "Block Date", "Blocked system for date: {$date}. Reason: {$reason}");
                 } else {
                     $message     = 'Failed to block date or date already blocked.';
                     $messageType = 'error';
@@ -680,6 +737,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (unblockDate($date)) {
                     $message     = 'Date unblocked: ' . date('M d, Y', strtotime($date));
                     $messageType = 'success';
+
+                    logActivity($user['user_id'], "Unblock Date", "Unblocked system for date: {$date}");
                 } else {
                     $message     = 'Failed to unblock date.';
                     $messageType = 'error';
@@ -729,6 +788,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
                     $messageType = 'success';
                 }
+
+                // Activity Log
+                $payNote = "Recorded payment of ₱" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
+                if ($shortfall) $payNote .= ". Short by ₱" . number_format($shortfall, 2);
+                logActivity($user['user_id'], "Record Payment", $payNote);
             } else {
                 $message = 'Session not found or already ended.';
                 $messageType = 'error';
@@ -787,10 +851,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $entry_fee, $prize_pool, $max_part, $announcement, $user['user_id']
             );
             if ($stmt->execute()) {
+                $newTid = $conn->insert_id;
                 $message = 'Tournament "' . htmlspecialchars($name) . '" created.';
                 $messageType = 'success';
+
+                logActivity($user['user_id'], "Create Tournament", "Created Tournament #{$newTid}: {$name} ({$game}) on {$console_type}");
             } else {
                 $message = 'Failed to create tournament: ' . $conn->error;
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // EDIT TOURNAMENT
+    elseif ($action === 'edit_tournament') {
+        $tid          = (int)($_POST['tournament_id'] ?? 0);
+        $name         = trim($_POST['tournament_name'] ?? '');
+        $game         = trim($_POST['game_name']       ?? '');
+        $console_type = $_POST['console_type']         ?? '';
+        $start_date   = $_POST['start_date']           ?? '';
+        $end_date     = $_POST['end_date']             ?? '';
+        $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
+        $announcement = trim($_POST['announcement']    ?? '');
+
+        if (!$tid || !$name || !$game || !$console_type || !$start_date || !$end_date) {
+            $message = 'Please fill in all required tournament fields.';
+            $messageType = 'error';
+        } else {
+            $start_dt = (new DateTime($start_date))->format('Y-m-d H:i:s');
+            $end_dt   = (new DateTime($end_date  ))->format('Y-m-d H:i:s');
+            $stmt = $conn->prepare(
+                "UPDATE tournaments SET
+                    tournament_name = ?, game_name = ?, console_type = ?,
+                    start_date = ?, end_date = ?, entry_fee = ?,
+                    announcement = ?
+                 WHERE tournament_id = ?"
+            );
+            $stmt->bind_param('sssssdsi',
+                $name, $game, $console_type, $start_dt, $end_dt,
+                $entry_fee, $announcement, $tid
+            );
+            if ($stmt->execute()) {
+                $message = 'Tournament "' . htmlspecialchars($name) . '" updated.';
+                $messageType = 'success';
+
+                logActivity($user['user_id'], "Edit Tournament", "Updated Tournament #{$tid}: {$name}");
+            } else {
+                $message = 'Failed to update tournament: ' . $conn->error;
                 $messageType = 'error';
             }
         }
@@ -807,6 +914,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $message = 'Tournament status updated to ' . ucfirst($new_status) . '.';
             $messageType = 'success';
+
+            logActivity($user['user_id'], "Tournament Status", "Updated Tournament #{$tid} status to " . ucfirst($new_status));
         } else {
             $message = 'Invalid tournament or status.';
             $messageType = 'error';
@@ -838,6 +947,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt->execute()) {
                     $message     = 'Walk-in participant registered.';
                     $messageType = 'success';
+
+                    logActivity($user['user_id'], "Tournament Join", "Registered walk-in participant '{$walkin_name}' for Tournament #{$tid}");
                 } else {
                     $message     = 'Could not register walk-in: ' . $conn->error;
                     $messageType = 'error';
@@ -867,6 +978,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($stmt->execute()) {
                         $message     = 'Participant registered.';
                         $messageType = 'success';
+
+                        logActivity($user['user_id'], "Tournament Join", "Registered User #{$uid} for Tournament #{$tid}");
                     } else {
                         $message     = 'Could not register participant: ' . $conn->error;
                         $messageType = 'error';
@@ -901,6 +1014,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $message = 'Participant removed.';
             $messageType = 'success';
+
+            logActivity($user['user_id'], "Tournament Leave", "Removed Participant #{$pid} from tournament");
         }
     }
 
@@ -1777,6 +1892,8 @@ var _currentSection = 'dashboard';
             setTimeout(refreshSection, 300);
         }
     };
+
+    window.refreshSection = refreshSection;
 })();
 
 
@@ -1913,7 +2030,13 @@ function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
+    const unit   = opt ? (opt.text.split(' \u2014')[0].trim()) : '';
     const group  = document.getElementById('controllerRentalGroup');
+
+    // Sync unit number to hidden field for logging
+    const ssUnit = document.getElementById('ssUnitNumber');
+    if (ssUnit) ssUnit.value = unit;
+
     const toggle = document.getElementById('controllerRentalToggle');
     const label  = document.getElementById('controllerRentalLabel');
     const icon   = document.getElementById('ctrlRentalIcon');
@@ -3173,57 +3296,57 @@ function _getAudioCtx() {
     }, { passive: true });
 });
 
-/* Gentle triple-ding - fires when a session crosses into overtime.
-   Uses sine wave for a clean, non-disruptive tone. */
-function playOvertimeBeep() {
+/** 
+ * ── LEVEL UP CHIME (Session Ending Alert) ──────────────────────────────────
+ * A dedicated, premium ascending arpeggio for session-related alerts.
+ * Isolated from general notification sounds to ensure consistency.
+ */
+function playLevelUpChime() {
     var ctx = _getAudioCtx();
     if (!ctx) return;
     ctx.resume().then(function() {
         var now = ctx.currentTime;
-        // Three ascending soft notes (E5, A5, C6)
-        [659.25, 880.00, 1046.50].forEach(function(freq, i) {
-            var delay = i * 0.12;
+        // Ascending major arpeggio (C5, E5, G5, C6) for a "Level Up" feel
+        var notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach(function(freq, i) {
+            var delay = i * 0.11;
             var osc   = ctx.createOscillator();
             var gain  = ctx.createGain();
+            
             osc.connect(gain);
             gain.connect(ctx.destination);
+            
+            // Use 'triangle' or 'sine' for a soft but clear chime
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, now + delay);
-            gain.gain.setValueAtTime(0.15, now + delay);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.4);
+            
+            // Note velocity
+            var vol = (i === 3) ? 0.22 : 0.15; // Final note slightly louder
+            gain.gain.setValueAtTime(vol, now + delay);
+            
+            // Exponential decay for "bell" effect
+            var decay = (i === 3) ? 1.0 : 0.4; // Final note rings longer
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + decay);
+            
             osc.start(now + delay);
-            osc.stop(now + delay + 0.5);
+            osc.stop(now + delay + decay + 0.1);
         });
     });
+}
+
+/* Gentle triple-ding - fires when a session crosses into overtime.
+   Uses sine wave for a clean, non-disruptive tone. */
+function playOvertimeBeep() {
+    // Dedicated Level Up Chime for session ending alerts
+    playLevelUpChime();
 }
 
 /* ── SOFT CHIME - plays for session-end warnings ──────────────────────────
    Replaces the emergency siren with a gentle, professional double-chime.
    Uses a pure sine wave with exponential decay for a 'bell-like' feel. */
 function playWarningBeep() {
-    var ctx = _getAudioCtx();
-    if (!ctx) return;
-    ctx.resume().then(function() {
-        var now = ctx.currentTime;
-        // Two-tone "Ding-Dong" chime (B5 -> G5)
-        var notes = [987.77, 783.99]; 
-        notes.forEach(function(freq, i) {
-            var delay = i * 0.35;
-            var osc   = ctx.createOscillator();
-            var gain  = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, now + delay);
-            
-            // Soft volume with smooth decay
-            gain.gain.setValueAtTime(0.2, now + delay);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 1.2);
-            
-            osc.start(now + delay);
-            osc.stop(now + delay + 1.5);
-        });
-    });
+    // Dedicated Level Up Chime for session ending alerts
+    playLevelUpChime();
 }
 
 /* ── SESSION ENDING ALARM MODAL ─────────────────────────────────────────────
