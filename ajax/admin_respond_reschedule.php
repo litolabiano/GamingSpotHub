@@ -22,7 +22,7 @@ if (!$reschedule_id || !in_array($action, ['approve', 'reject'])) {
 
 $stmt = $conn->prepare(
     "SELECT rs.reservation_id, rs.status as rs_status, 
-             rs.new_date, rs.new_time, rs.console_id, rs.console_type_id,
+             rs.new_date, rs.new_time, rs.console_id, rs.new_console_type_id,
              rs.old_date, rs.old_time, rs.old_console_id, rs.old_console_type_id,
              r.status as r_status
       FROM reservation_reschedules rs
@@ -54,7 +54,7 @@ try {
         $upd_rs->execute();
 
         $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
-        $upd_r->bind_param('ssiii', $res['new_date'], $res['new_time'], $res['console_type_id'], $res['console_id'], $reservation_id);
+        $upd_r->bind_param('ssiii', $res['new_date'], $res['new_time'], $res['new_console_type_id'], $res['console_id'], $reservation_id);
         $upd_r->execute();
 
         $message = 'Reschedule request approved. The reservation schedule, console type, and unit assignment have been updated.';

@@ -116,6 +116,7 @@ try {
             $mark->close();
 
             $conn->commit();
+            logActivity($user_id, "Reschedule Counter", "User sent counter-proposal for Reservation #{$reservationId} to {$finalDate} {$finalTime}");
             
             ob_clean();
             echo json_encode([
@@ -128,33 +129,15 @@ try {
 
         // ── DIRECT CONFIRMATION ─────────────────────────────────────────────
         // If the user accepted the admin's exact proposal, finalize it.
-        if ($newConsoleId && $newConsoleTypeId) {
-            $upd = $conn->prepare(
-                "UPDATE reservations
-                    SET reserved_date = ?, reserved_time = ?,
-                        console_id    = ?, console_type_id = ?,
-                        status        = 'reserved', updated_at = NOW()
-                  WHERE reservation_id = ?"
-            );
-            $upd->bind_param('ssiiii', $finalDate, $finalTime, $newConsoleId, $newConsoleTypeId, $reservationId);
-        } elseif ($newConsoleId) {
-            $upd = $conn->prepare(
-                "UPDATE reservations
-                    SET reserved_date = ?, reserved_time = ?,
-                        console_id    = ?,
-                        status        = 'reserved', updated_at = NOW()
-                  WHERE reservation_id = ?"
-            );
-            $upd->bind_param('ssii', $finalDate, $finalTime, $newConsoleId, $reservationId);
-        } else {
-            $upd = $conn->prepare(
-                "UPDATE reservations
-                    SET reserved_date = ?, reserved_time = ?,
-                        status        = 'reserved', updated_at = NOW()
-                  WHERE reservation_id = ?"
-            );
-            $upd->bind_param('ssi', $finalDate, $finalTime, $reservationId);
-        }
+        $upd = $conn->prepare(
+            "UPDATE reservations
+                SET reserved_date = ?, reserved_time = ?,
+                    console_type_id = IFNULL(?, console_type_id),
+                    console_id    = ?,
+                    status        = 'reserved', updated_at = NOW()
+              WHERE reservation_id = ?"
+        );
+        $upd->bind_param('ssiii', $finalDate, $finalTime, $newConsoleTypeId, $newConsoleId, $reservationId);
         $upd->execute();
         $upd->close();
 
@@ -172,6 +155,7 @@ try {
         $mark->close();
 
         $conn->commit();
+        logActivity($user_id, "Reschedule Confirm", "User confirmed reschedule for Reservation #{$reservationId} to {$finalDate} {$finalTime}");
 
         jsonOut(true,
             'Your reservation #' . $reservationId . ' has been confirmed for '
@@ -198,6 +182,7 @@ try {
         $upd->close();
 
         $conn->commit();
+        logActivity($user_id, "Reschedule Decline", "User declined reschedule proposal for Reservation #{$reservationId}");
 
         jsonOut(true, 'You have declined the reschedule. Your reservation remains on its original date. Please contact the shop if you have questions.');
     }

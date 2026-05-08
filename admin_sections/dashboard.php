@@ -183,12 +183,7 @@
 
                             </form>
                             <?php endif; ?>
-                            <?php if ($r['status'] === 'reserved'): ?>
-                            <button class="btn-prim btn-sm" onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Convert to Session">
-                                <i class="fas fa-play"></i> Start
-                            </button>
 
-                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>

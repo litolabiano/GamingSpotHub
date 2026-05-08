@@ -153,10 +153,15 @@ $pendingResCount      = count(array_filter($upcomingReservations, fn($r) => $r['
 
 $cancelledReservations = [];
 $crQ = $conn->query(
-    "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone
+    "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone, 
+            ct.type_name AS console_type, c.unit_number,
+            rc.cancel_reason_type, rc.cancel_reason_detail
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
-      WHERE r.status = 'cancelled'
+       LEFT JOIN consoles c ON r.console_id = c.console_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+       LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
+      WHERE r.status IN ('cancelled', 'no_show')
       ORDER BY r.updated_at DESC LIMIT 30"
 );
 if ($crQ) $cancelledReservations = $crQ->fetch_all(MYSQLI_ASSOC);

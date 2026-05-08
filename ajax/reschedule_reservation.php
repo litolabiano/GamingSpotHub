@@ -124,7 +124,7 @@ try {
                 SET new_date              = ?,
                     new_time              = ?,
                     console_id            = ?,
-                    console_type_id       = ?,
+                    new_console_type_id   = ?,
                     reason                = ?,
                     reason_detail         = ?,
                     rescheduled_by        = ?,
@@ -144,12 +144,12 @@ try {
             "INSERT INTO reservation_reschedules
                 (reservation_id, user_id,
                  old_date, old_time, old_console_id, old_console_type_id,
-                 new_date, new_time, console_id, console_type_id,
+                 new_date, new_time, console_id, new_console_type_id,
                  reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
         );
         $log->bind_param(
-            'iississiisssi',
+            'iissiissiissi',
             $reservation_id, $user_id,
             $old_date, $old_time, $old_console_id, $old_type_id,
             $new_date, $new_time, $new_console_id, $new_type_id,
