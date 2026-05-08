@@ -90,7 +90,7 @@ $ctrlRes = $conn->query(
             ct.type_name AS type_name, ct.console_type_id,
             cs.type_name AS console_type_name
        FROM controllers c
-       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
        JOIN console_types cs    ON cs.type_id = ct.console_type_id
       WHERE c.status = 'available'
       ORDER BY cs.type_name, ct.type_name, c.unit_number"
@@ -110,7 +110,7 @@ $ctrlStats = $conn->query(
             COUNT(*) AS total,
             SUM(c.status = 'available') AS available
        FROM controllers c
-       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
        JOIN console_types    cs ON cs.type_id  = ct.console_type_id
       GROUP BY cs.type_name"
 );

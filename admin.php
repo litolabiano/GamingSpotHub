@@ -462,9 +462,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
+                    "INSERT INTO controllers (controller_name, controller_type_id, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('ssiss', $ctrl_name, $ctrl_type, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('siiss', $ctrl_name, $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';

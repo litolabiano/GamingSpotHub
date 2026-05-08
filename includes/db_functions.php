@@ -460,11 +460,17 @@ function endSession($session_id) {
         $checkCtrl->execute();
         $hadCtrl = (int)$checkCtrl->get_result()->fetch_assoc()['n'];
         if ($hadCtrl > 0) {
-            $conn->query(
-                "UPDATE controllers SET status = 'available'
-                 WHERE status = 'in_use' AND controller_type = 'Xbox Controller'
-                 ORDER BY unit_number ASC LIMIT 1"
+            $resCtrl = $conn->query(
+                "SELECT c.controller_id 
+                 FROM controllers c
+                 JOIN controller_types ct ON c.controller_type_id = ct.type_id
+                 WHERE c.status = 'in_use' AND ct.type_name = 'Xbox Controller'
+                 ORDER BY c.unit_number ASC LIMIT 1"
             );
+            if ($resCtrl && $resCtrl->num_rows > 0) {
+                $cid = (int)$resCtrl->fetch_assoc()['controller_id'];
+                $conn->query("UPDATE controllers SET status = 'available' WHERE controller_id = $cid");
+            }
         }
         // ──────────────────────────────────────────────────────────────────
 
@@ -1188,17 +1194,27 @@ function createReservation(
     $controller_id     = $controller_id ? (int)$controller_id : null;
     $controller_fee    = (float)$controller_fee;
 
+    // Lookup console_type_id
+    $ctQ = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0");
+    $ctQ->bind_param('s', $console_type);
+    $ctQ->execute();
+    $ctRow = $ctQ->get_result()->fetch_assoc();
+    if (!$ctRow) {
+        return ['success' => false, 'message' => 'Invalid console type: ' . htmlspecialchars($console_type)];
+    }
+    $console_type_id = (int)$ctRow['type_id'];
+
     $stmt = $conn->prepare(
         "INSERT INTO reservations
-            (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
+            (user_id, console_id, console_type_id, rental_mode, planned_minutes, reserved_date, reserved_time,
              notes, with_controller, controller_id, controller_fee,
              downpayment_amount, downpayment_method, downpayment_paid,
              payment_proof, payment_proof_status, status, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
-        'iississsiidssissi',
-        $user_id, $preferred_unit_id, $console_type, $rental_mode, $planned_minutes,
+        'iiiissssiidssissi',
+        $user_id, $preferred_unit_id, $console_type_id, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
         $with_controller, $controller_id, $controller_fee,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
