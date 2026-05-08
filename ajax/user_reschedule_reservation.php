@@ -75,10 +75,13 @@ if (!$newDT || $newDT->getTimestamp() < ($now->getTimestamp() + 3600)) {
 
 // ── Fetch reservation — must belong to this user ──────────────────────────────
 $stmt = $conn->prepare(
-    "SELECT reservation_id, user_id, console_type, console_id, rental_mode, planned_minutes,
-            reserved_date, reserved_time, status, downpayment_amount
-       FROM reservations
-      WHERE reservation_id = ? AND user_id = ?"
+    "SELECT r.reservation_id, r.user_id, r.console_type_id,
+            ct.type_name AS console_type,
+            r.console_id, r.rental_mode, r.planned_minutes,
+            r.reserved_date, r.reserved_time, r.status, r.downpayment_amount
+       FROM reservations r
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+      WHERE r.reservation_id = ? AND r.user_id = ?"
 );
 $stmt->bind_param('ii', $res_id, $uid);
 $stmt->execute();
@@ -118,21 +121,20 @@ $newSlotStart = $newDT->getTimestamp();
 $newSlotEnd   = $newSlotStart + 7200; // 2h safety window for open/unlimited
 
 $avail = $conn->prepare(
-    "SELECT reservation_id FROM reservations
-      WHERE console_type = ?
-        AND reserved_date = ?
-        AND status IN ('pending','reserved')
-        AND reservation_id != ?
+    "SELECT r.reservation_id FROM reservations r
+       JOIN console_types ct ON r.console_type_id = ct.type_id
+      WHERE ct.type_name = ?
+        AND r.reserved_date = ?
+        AND r.status IN ('pending','reserved')
+        AND r.reservation_id != ?
         AND (
-              -- New slot starts inside an existing reservation window
-              ? BETWEEN UNIX_TIMESTAMP(CONCAT(reserved_date,' ',reserved_time))
-                    AND UNIX_TIMESTAMP(CONCAT(reserved_date,' ',reserved_time))
-                         + GREATEST(IFNULL(planned_minutes,120),120)*60
+              ? BETWEEN UNIX_TIMESTAMP(CONCAT(r.reserved_date,' ',r.reserved_time))
+                    AND UNIX_TIMESTAMP(CONCAT(r.reserved_date,' ',r.reserved_time))
+                         + GREATEST(IFNULL(r.planned_minutes,120),120)*60
               OR
-              -- New slot ends inside an existing reservation window
-              ? BETWEEN UNIX_TIMESTAMP(CONCAT(reserved_date,' ',reserved_time))
-                    AND UNIX_TIMESTAMP(CONCAT(reserved_date,' ',reserved_time))
-                         + GREATEST(IFNULL(planned_minutes,120),120)*60
+              ? BETWEEN UNIX_TIMESTAMP(CONCAT(r.reserved_date,' ',r.reserved_time))
+                    AND UNIX_TIMESTAMP(CONCAT(r.reserved_date,' ',r.reserved_time))
+                         + GREATEST(IFNULL(r.planned_minutes,120),120)*60
             )
       LIMIT 1"
 );
@@ -148,21 +150,32 @@ if ($avail->get_result()->num_rows > 0) {
 $old_date         = $res['reserved_date'];
 $old_time         = $res['reserved_time'];
 $old_console_id   = $res['console_id'];
+$old_type_id      = $res['console_type_id'];
+
+// Resolve new console_type name → ID
+$new_type_id = $old_type_id;
+if ($new_console_type) {
+    $tStmt = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
+    $tStmt->bind_param('s', $new_console_type);
+    $tStmt->execute();
+    $tRow = $tStmt->get_result()->fetch_assoc();
+    if ($tRow) $new_type_id = (int)$tRow['type_id'];
+}
 
 $conn->begin_transaction();
 try {
     // 1. Update the reservation with the new details and set status to pending
     $upd = $conn->prepare(
         "UPDATE reservations 
-            SET reserved_date = ?, 
-                reserved_time = ?, 
-                console_type  = ?, 
-                console_id    = ?, 
-                status        = 'pending', 
-                updated_at    = NOW()
+            SET reserved_date     = ?, 
+                reserved_time     = ?, 
+                console_type_id   = ?, 
+                console_id        = ?, 
+                status            = 'pending', 
+                updated_at        = NOW()
           WHERE reservation_id = ?"
     );
-    $upd->bind_param('sssii', $new_date, $new_time, $new_console_type, $new_console_id, $res_id);
+    $upd->bind_param('ssiiii', $new_date, $new_time, $new_type_id, $new_console_id, $res_id);
     $upd->execute();
 
     // 2. Log the reschedule request — initiated_by = 'user', status = 'pending'
@@ -182,16 +195,12 @@ try {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-<<<<<<< Updated upstream
         'iississsisssi',
-=======
-        'iissiisssissi',
->>>>>>> Stashed changes
         $res_id, $uid,
-        $old_date, $old_time, $old_console_id, $old_console_type,
-        $new_date, $new_time, $new_console_id, $new_console_type,
+        $old_date, $old_time, $old_console_id, $old_type_id,
+        $new_date, $new_time, $new_console_id, $new_type_id,
         $reason, $reason_detail,
-        $uid   // rescheduled_by = the customer
+        $uid
     );
     $log->execute();
 

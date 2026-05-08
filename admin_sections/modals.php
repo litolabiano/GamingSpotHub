@@ -360,6 +360,7 @@
                         <?php foreach ($availableConsoles as $con): ?>
                         <option value="<?= $con['console_id'] ?>"
                                 data-type="<?= htmlspecialchars($con['console_type']) ?>"
+                                data-rate="<?= (float)$con['hourly_rate'] ?>"
                                 data-compat="<?= htmlspecialchars($con['compatible_controller_type'] ?? '') ?>">
                             <?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)
                         </option>
@@ -422,7 +423,7 @@ $ctrlRes = $conn->query(
             COUNT(*) AS total,
             SUM(c.status = 'available') AS available
        FROM controllers c
-       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
        JOIN console_types    cs ON cs.type_id  = ct.console_type_id
       GROUP BY cs.type_name"
 );

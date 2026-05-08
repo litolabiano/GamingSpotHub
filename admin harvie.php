@@ -132,13 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
     }
-
-    // Activity Log
-    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
-    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
-    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
-    logActivity($user['user_id'], "Start Session", $logDet);
-
     if (!$messageType) $messageType = 'success';
 }
 
@@ -172,8 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $remaining = round($result['total_cost'] - $alreadyPaid, 2);
 
-                // Fetch user_id and console unit
-                $stmt = $conn->prepare("SELECT gs.user_id, c.unit_number FROM gaming_sessions gs JOIN consoles c ON gs.console_id = c.console_id WHERE gs.session_id = ?");
+                // Fetch user_id
+                $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ?");
                 $stmt->bind_param('i', $session_id);
                 $stmt->execute();
                 $sess_row = $stmt->get_result()->fetch_assoc();
@@ -219,10 +212,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront - no extra charge.";
                     $messageType = 'success';
                 }
-
-                // Activity Log
-                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: ₱{$total}.";
-                logActivity($user['user_id'], "End Session", $logDet);
             } else {
                 $message     = 'Could not end session: ' . $result['message'];
                 $messageType = 'error';
@@ -241,17 +230,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateConsoleStatus($console_id, $status);
             $message = 'Console status updated.';
             $messageType = 'success';
-            
-            // Activity Log
-            logActivity($user['user_id'], "Console Status", "Updated Console ID #{$console_id} status to " . ucfirst($status));
         }
     }
     elseif ($action === 'add_console') {
         $name = trim($_POST['console_name'] ?? '');
-        $type_id = (int)($_POST['console_type_id'] ?? 0);
+        $type = $_POST['console_type'] ?? '';
         $unit_number = trim($_POST['unit_number'] ?? '');
+        $rate = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
+        $compat_ctrl = $_POST['compatible_controller_type'] ?? null;
         
-        if ($name && $type_id && $unit_number) {
+        if ($name && $type && $unit_number && $rate >= 0) {
             // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
             $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
             $checkStmt->bind_param("s", $unit_number);
@@ -260,12 +249,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
             } else {
-                if (addConsole($name, $type_id, $unit_number)) {
+                if (addConsole($name, $type, $unit_number, $rate, $ctrl_count, $compat_ctrl)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
-                    
-                    // Activity Log
-                    logActivity($user['user_id'], "Add Console", "Added new console: {$name} ({$type}), Unit: {$unit_number}, Rate: ₱{$rate}/hr");
                 } else {
                     $message = 'Failed to add console. An unexpected database error occurred.';
                     $messageType = 'error';
@@ -279,10 +265,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'edit_console') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         $name       = trim($_POST['console_name'] ?? '');
-        $type_id    = (int)($_POST['console_type_id'] ?? 0);
+        $type       = $_POST['console_type'] ?? '';
         $unit       = trim($_POST['unit_number'] ?? '');
+        $rate       = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
     
-        if ($console_id && $name && $type_id && $unit) {
+        if ($console_id && $name && $type && $unit && $rate >= 0) {
             // Check for duplicate unit number (exclude current console)
             $dupCheck = $conn->prepare(
                 "SELECT console_id FROM consoles WHERE unit_number = ? AND console_id != ?"
@@ -294,15 +282,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ? WHERE console_id = ?"
+                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?, controller_count = ?
+                      WHERE console_id = ?"
                 );
-                $stmt->bind_param('sisi', $name, $type_id, $unit, $console_id);
+                $stmt->bind_param('sssdi i', $name, $type, $unit, $rate, $ctrl_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
-
-                    // Activity Log
-                    logActivity($user['user_id'], "Edit Console", "Updated Console ID #{$console_id}: {$name}, Unit: {$unit}, Rate: ₱{$rate}/hr");
                 } else {
                     $message     = 'Failed to update console: ' . $conn->error;
                     $messageType = 'error';
@@ -321,9 +307,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($res['success']) {
                 $message = 'Console deleted permanently.';
                 $messageType = 'success';
-                
-                // Activity Log
-                logActivity($user['user_id'], "Delete Console", "Permanently deleted Console ID #{$console_id}");
             } else {
                 $message = 'Cannot delete console. It likely has existing sessions/reservations associated with it. Keep it archived instead.';
                 $messageType = 'error';
@@ -335,37 +318,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
         $typeName = trim($_POST['type_name'] ?? '');
-        $hourlyRate = (float)($_POST['hourly_rate'] ?? 0);
-        if ($typeName && $hourlyRate >= 0) {
-            if (addConsoleType($typeName, $hourlyRate)) {
+        if ($typeName) {
+            if (addConsoleType($typeName)) {
                 $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
                 $messageType = 'success';
-                logActivity($user['user_id'], "Console Type", "Added new console type: {$typeName}");
             } else {
                 $message = 'Failed to add console type. It might already exist.';
                 $messageType = 'error';
             }
-        }
-    }
-
-    // EDIT CONSOLE TYPE
-    elseif ($action === 'edit_console_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
-        $typeName = trim($_POST['type_name'] ?? '');
-        $hourlyRate = (float)($_POST['hourly_rate'] ?? 0);
-        if ($typeId && $typeName && $hourlyRate >= 0) {
-            $stmt = $conn->prepare("UPDATE console_types SET type_name = ?, hourly_rate = ? WHERE type_id = ?");
-            $stmt->bind_param('sdi', $typeName, $hourlyRate, $typeId);
-            if ($stmt->execute()) {
-                $message = 'Console type updated successfully.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to update console type: ' . $conn->error;
-                $messageType = 'error';
-            }
-        } else {
-            $message = 'Invalid input for console type update.';
-            $messageType = 'error';
         }
     }
 
@@ -375,7 +335,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && archiveConsoleType($typeId)) {
             $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Console Type", "Archived Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to archive console type.';
             $messageType = 'error';
@@ -388,7 +347,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && restoreConsoleType($typeId)) {
             $message = 'Console type restored successfully.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Console Type", "Restored Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to restore console type.';
             $messageType = 'error';
@@ -401,7 +359,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && deleteConsoleType($typeId)) {
             $message = 'Console type permanently removed.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Console Type", "Permanently deleted Console Type ID #{$typeId}");
         } else {
             $message = 'Failed to permanently delete console type.';
             $messageType = 'error';
@@ -424,7 +381,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $message = 'Controller type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added.';
                 $messageType = 'success';
-                logActivity($user['user_id'], "Controller Type", "Added new controller type: {$typeName}{$parentNote}");
             } else {
                 $message = 'Failed to add controller type. It might already exist.';
                 $messageType = 'error';
@@ -438,7 +394,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && archiveControllerType($typeId)) {
             $message = 'Controller type archived successfully.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Controller Type", "Archived Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to archive controller type.';
             $messageType = 'error';
@@ -451,7 +406,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && restoreControllerType($typeId)) {
             $message = 'Controller type restored successfully.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Controller Type", "Restored Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to restore controller type.';
             $messageType = 'error';
@@ -464,7 +418,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($typeId && deleteControllerType($typeId)) {
             $message = 'Controller type permanently removed.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Controller Type", "Permanently deleted Controller Type ID #{$typeId}");
         } else {
             $message = 'Failed to permanently delete controller type.';
             $messageType = 'error';
@@ -493,13 +446,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type_id, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
+                    "INSERT INTO controllers (controller_name, controller_type, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('siiss', $ctrl_name, $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('ssiss', $ctrl_name, $ctrl_type, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
-                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_name} ({$ctrl_type}), Unit: {$ctrl_unit}");
                 } else {
                     $message = 'Failed to add controller: ' . $conn->error;
                     $messageType = 'error';
@@ -527,7 +479,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             $message = 'Controller status updated.';
             $messageType = 'success';
-            logActivity($user['user_id'], "Controller Status", "Updated Controller ID #{$ctrl_id} status to " . ucfirst($status));
         }
     }
     elseif ($action === 'delete_controller') {
@@ -543,7 +494,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
                 $message = 'Controller deleted permanently.';
                 $messageType = 'success';
-                logActivity($user['user_id'], "Controller Unit", "Permanently deleted Controller ID #{$ctrl_id}");
             }
         }
     }
@@ -554,21 +504,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Access denied. Only the owner can change settings.';
             $messageType = 'error';
         } else {
-        $keys = ['unlimited_rate',
+        $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
                  'business_hours_open','business_hours_close','shop_phone','contact_email',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge',
-                 'brevo_api_key','sender_email','base_url'];
+                 'brevo_api_key','sender_email'];
         foreach ($keys as $key) {
             if (isset($_POST[$key])) {
                 updateSetting($key, trim($_POST[$key]));
             }
         }
 
-        $message = 'Settings saved successfully.';
+        // ── Sync consoles.hourly_rate from system_settings ──────────────────
+        // This ensures the "Console" dropdown in Start Session always shows the
+        // live rate from system settings, not a stale per-row value.
+        $rateMap = [
+            'PS5'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80),
+            'PS4'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80), // PS4 shares PS5 rate
+            'Xbox Series X'=> (float)($_POST['xbox_hourly_rate'] ?? getSetting('xbox_hourly_rate') ?? 80),
+        ];
+        foreach ($rateMap as $type => $rate) {
+            $stmt = $conn->prepare("UPDATE consoles SET hourly_rate = ? WHERE console_type = ?");
+            $stmt->bind_param('ds', $rate, $type);
+            $stmt->execute();
+        }
+
+        $message = 'Settings saved and console rates updated.';
         $messageType = 'success';
-        
-        // Activity Log
-        logActivity($user['user_id'], "System Settings", "Updated system settings and synced console rates.");
         } // end owner check
     }
 
@@ -580,9 +541,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateReservationStatus($res_id, 'reserved', $console_id ?: null);
             $message = 'Reservation confirmed.';
             $messageType = 'success';
-            
-            // Activity Log
-            logActivity($user['user_id'], "Confirm Reservation", "Confirmed Reservation #{$res_id}" . ($console_id ? " and assigned Console Unit #{$console_id}" : ""));
         }
     }
 
@@ -637,9 +595,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $message     = 'Reservation #' . $res_id . ' cancelled.';
             $messageType = 'success';
-
-            // Activity Log
-            logActivity($user['user_id'], "Cancel Reservation", "Cancelled Reservation #{$res_id}. Reason: " . ucfirst($reasonType) . ($reasonDetail ? " ({$reasonDetail})" : ""));
         }
     }
 
@@ -651,9 +606,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateReservationStatus($res_id, 'no_show');
             $message = 'Marked as no-show.';
             $messageType = 'warning';
+        }
+    }
 
-            // Activity Log
-            logActivity($user['user_id'], "No-Show", "Marked Reservation #{$res_id} as No-Show.");
+    // CONVERT RESERVATION → SESSION
+    elseif ($action === 'convert_reservation') {
+        $res_id     = (int)($_POST['reservation_id'] ?? 0);
+        $console_id = (int)($_POST['console_id'] ?? 0);
+        if ($res_id && $console_id) {
+            $result = convertReservationToSession($res_id, $console_id, $user['user_id']);
+            if ($result['success']) {
+                $message = 'Reservation converted to active session!';
+                $messageType = 'success';
+            } else {
+                $message = 'Conversion failed: ' . $result['message'];
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Please select a console unit to assign.';
+            $messageType = 'error';
         }
     }
 
@@ -673,10 +644,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         $notes ?: null, $dp_amount, $dp_method);
             $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
             $messageType = $result['success'] ? 'success' : 'error';
-
-            if ($result['success']) {
-                logActivity($user['user_id'], "Add Reservation", "Created new Reservation #{$result['reservation_id']} for User #{$uid} on {$rdate} {$rtime}. Console Type: {$ctype}");
-            }
         } else {
             $message = 'Please fill in all required fields.';
             $messageType = 'error';
@@ -695,8 +662,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (blockDate($date, $reason)) {
                     $message     = 'Date blocked: ' . date('M d, Y', strtotime($date));
                     $messageType = 'success';
-
-                    logActivity($user['user_id'], "Block Date", "Blocked system for date: {$date}. Reason: {$reason}");
                 } else {
                     $message     = 'Failed to block date or date already blocked.';
                     $messageType = 'error';
@@ -715,8 +680,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (unblockDate($date)) {
                     $message     = 'Date unblocked: ' . date('M d, Y', strtotime($date));
                     $messageType = 'success';
-
-                    logActivity($user['user_id'], "Unblock Date", "Unblocked system for date: {$date}");
                 } else {
                     $message     = 'Failed to unblock date.';
                     $messageType = 'error';
@@ -766,11 +729,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
                     $messageType = 'success';
                 }
-
-                // Activity Log
-                $payNote = "Recorded payment of ₱" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
-                if ($shortfall) $payNote .= ". Short by ₱" . number_format($shortfall, 2);
-                logActivity($user['user_id'], "Record Payment", $payNote);
             } else {
                 $message = 'Session not found or already ended.';
                 $messageType = 'error';
@@ -807,8 +765,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $start_date   = $_POST['start_date']           ?? '';
         $end_date     = $_POST['end_date']             ?? '';
         $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
-        $prize_pool   = 0; // Fixed prize removed, now dependent on registration count
-        $max_part     = 0; // Participant limit removed, now unlimited by default
+        $prize_pool   = (float)($_POST['prize_pool']        ?? 0);
+        $max_part     = (int)  ($_POST['max_participants']  ?? 16);
         $announcement = trim($_POST['announcement']    ?? '');
 
         if (!$name || !$game || !$console_type || !$start_date || !$end_date) {
@@ -829,53 +787,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $entry_fee, $prize_pool, $max_part, $announcement, $user['user_id']
             );
             if ($stmt->execute()) {
-                $newTid = $conn->insert_id;
                 $message = 'Tournament "' . htmlspecialchars($name) . '" created.';
                 $messageType = 'success';
-
-                logActivity($user['user_id'], "Create Tournament", "Created Tournament #{$newTid}: {$name} ({$game}) on {$console_type}");
             } else {
                 $message = 'Failed to create tournament: ' . $conn->error;
-                $messageType = 'error';
-            }
-        }
-    }
-
-    // EDIT TOURNAMENT
-    elseif ($action === 'edit_tournament') {
-        $tid          = (int)($_POST['tournament_id'] ?? 0);
-        $name         = trim($_POST['tournament_name'] ?? '');
-        $game         = trim($_POST['game_name']       ?? '');
-        $console_type = $_POST['console_type']         ?? '';
-        $start_date   = $_POST['start_date']           ?? '';
-        $end_date     = $_POST['end_date']             ?? '';
-        $entry_fee    = (float)($_POST['entry_fee']         ?? 0);
-        $announcement = trim($_POST['announcement']    ?? '');
-
-        if (!$tid || !$name || !$game || !$console_type || !$start_date || !$end_date) {
-            $message = 'Please fill in all required tournament fields.';
-            $messageType = 'error';
-        } else {
-            $start_dt = (new DateTime($start_date))->format('Y-m-d H:i:s');
-            $end_dt   = (new DateTime($end_date  ))->format('Y-m-d H:i:s');
-            $stmt = $conn->prepare(
-                "UPDATE tournaments SET
-                    tournament_name = ?, game_name = ?, console_type = ?,
-                    start_date = ?, end_date = ?, entry_fee = ?,
-                    announcement = ?
-                 WHERE tournament_id = ?"
-            );
-            $stmt->bind_param('sssssdsi',
-                $name, $game, $console_type, $start_dt, $end_dt,
-                $entry_fee, $announcement, $tid
-            );
-            if ($stmt->execute()) {
-                $message = 'Tournament "' . htmlspecialchars($name) . '" updated.';
-                $messageType = 'success';
-
-                logActivity($user['user_id'], "Edit Tournament", "Updated Tournament #{$tid}: {$name}");
-            } else {
-                $message = 'Failed to update tournament: ' . $conn->error;
                 $messageType = 'error';
             }
         }
@@ -892,8 +807,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $message = 'Tournament status updated to ' . ucfirst($new_status) . '.';
             $messageType = 'success';
-
-            logActivity($user['user_id'], "Tournament Status", "Updated Tournament #{$tid} status to " . ucfirst($new_status));
         } else {
             $message = 'Invalid tournament or status.';
             $messageType = 'error';
@@ -925,8 +838,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt->execute()) {
                     $message     = 'Walk-in participant registered.';
                     $messageType = 'success';
-
-                    logActivity($user['user_id'], "Tournament Join", "Registered walk-in participant '{$walkin_name}' for Tournament #{$tid}");
                 } else {
                     $message     = 'Could not register walk-in: ' . $conn->error;
                     $messageType = 'error';
@@ -956,8 +867,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($stmt->execute()) {
                         $message     = 'Participant registered.';
                         $messageType = 'success';
-
-                        logActivity($user['user_id'], "Tournament Join", "Registered User #{$uid} for Tournament #{$tid}");
                     } else {
                         $message     = 'Could not register participant: ' . $conn->error;
                         $messageType = 'error';
@@ -992,8 +901,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $message = 'Participant removed.';
             $messageType = 'success';
-
-            logActivity($user['user_id'], "Tournament Leave", "Removed Participant #{$pid} from tournament");
         }
     }
 
@@ -1050,38 +957,19 @@ if ($crQ) {
 // ── Controllers ──────────────────────────────────────────────────────────────
 $allControllers      = [];
 $archivedControllers = [];
-$_res = $conn->query("
-    SELECT c.*, ct.type_name AS controller_type 
-    FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
-    WHERE c.status != 'archived' 
-    ORDER BY c.unit_number
-");
+$_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
-
-$_res = $conn->query("
-    SELECT c.*, ct.type_name AS controller_type 
-    FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
-    WHERE c.status = 'archived' 
-    ORDER BY c.unit_number
-");
+$_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 
 // Available controllers for the Start Session rental dropdown (injected to JS)
-$_avRes = $conn->query("
-    SELECT c.controller_id, c.controller_name, ct.type_name AS controller_type, c.unit_number 
-    FROM controllers c
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
-    WHERE c.status = 'available' 
-    ORDER BY c.unit_number
-");
+$_avRes = $conn->query("SELECT controller_id, controller_name, controller_type, unit_number FROM controllers WHERE status = 'available' ORDER BY unit_number");
 $availableControllers = $_avRes ? $_avRes->fetch_all(MYSQLI_ASSOC) : [];
 unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, ct.type_name AS console_type,
+    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -1090,7 +978,6 @@ $stmt = $conn->prepare(
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
-     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
      LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
      ORDER BY
          CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
@@ -1121,17 +1008,11 @@ $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r[
 
 // Pending User-Initiated Reschedule Requests
 $purStmt = $conn->query(
-    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, c.unit_number
+    "SELECT rs.*, r.console_type, u.full_name AS customer_name, c.unit_number
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
-<<<<<<< Updated upstream
      LEFT JOIN consoles c ON r.console_id = c.console_id
-     LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
-=======
-     LEFT JOIN consoles c ON rs.console_id = c.console_id
-     LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
->>>>>>> Stashed changes
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );
@@ -1246,11 +1127,10 @@ $cancelReasons = $conn->query(
 
 // Cancellations by console type
 $cancelByConsole = $conn->query(
-    "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
+    "SELECT r.console_type, COUNT(*) AS cnt
        FROM reservation_cancellations rc
        JOIN reservations r ON rc.reservation_id = r.reservation_id
-       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
-      GROUP BY ct.type_name
+      GROUP BY r.console_type
       ORDER BY cnt DESC"
 )->fetch_all(MYSQLI_ASSOC);
 
@@ -1277,7 +1157,7 @@ $cancelByWho = $conn->query(
 )->fetch_all(MYSQLI_ASSOC);
 
 // Settings
-$settingsKeys = ['unlimited_rate',
+$settingsKeys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
                  'business_hours_open','business_hours_close','shop_name','shop_address','shop_phone',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
 $settings = [];
@@ -1301,11 +1181,10 @@ for ($i = 6; $i >= 0; $i--) {
 
 // Chart data: console type usage
 $typeUsage = $conn->query(
-    "SELECT ct.type_name AS console_type, COUNT(gs.session_id) AS cnt
+    "SELECT c.console_type, COUNT(gs.session_id) AS cnt
      FROM consoles c
-     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
      LEFT JOIN gaming_sessions gs ON c.console_id = gs.console_id AND gs.status = 'completed'
-     GROUP BY ct.type_name"
+     GROUP BY c.console_type"
 )->fetch_all(MYSQLI_ASSOC);
 $typeLabels = array_column($typeUsage, 'console_type');
 $typeCounts = array_column($typeUsage, 'cnt');
@@ -1609,9 +1488,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
-    <div class="nav-item" data-tooltip="Activity Logs" onclick="showPage('activity_logs', this)">
-        <i class="fas fa-history"></i><span>Activity Logs</span>
-    </div>
     <div class="nav-item" data-tooltip="Blocked Dates" onclick="showPage('blocked_dates', this)">
         <i class="fas fa-calendar-times"></i><span>Blocked Dates</span>
     </div>
@@ -1726,7 +1602,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
 
-<?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/activity_logs.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/blocked_dates.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
 
@@ -1754,7 +1629,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 function showPage(page, el) {
     // ── Role-Based Access Check ──
     const userRole = '<?= $user['role'] ?>';
-    const restricted = ['consoles', 'tournaments', 'activity_logs', 'blocked_dates', 'settings'];
+    const restricted = ['consoles', 'tournaments'];
     if (userRole === 'shopkeeper' && restricted.includes(page)) {
         console.warn('[GSpot Access] Shopkeeper access denied to:', page);
         // Redirect to dashboard if attempting restricted page
@@ -1790,7 +1665,6 @@ function showPage(page, el) {
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
         settings: 'Settings', tournaments: 'Tournaments',
-        activity_logs: 'Activity Logs',
         blocked_dates: 'Blocked Dates'
     };
 
@@ -1898,8 +1772,6 @@ var _currentSection = 'dashboard';
             setTimeout(refreshSection, 300);
         }
     };
-
-    window.refreshSection = refreshSection;
 })();
 
 
@@ -2036,13 +1908,7 @@ function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
-    const unit   = opt ? (opt.text.split(' \u2014')[0].trim()) : '';
     const group  = document.getElementById('controllerRentalGroup');
-
-    // Sync unit number to hidden field for logging
-    const ssUnit = document.getElementById('ssUnitNumber');
-    if (ssUnit) ssUnit.value = unit;
-
     const toggle = document.getElementById('controllerRentalToggle');
     const label  = document.getElementById('controllerRentalLabel');
     const icon   = document.getElementById('ctrlRentalIcon');
@@ -2085,39 +1951,6 @@ function onConsoleChange() {
             if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
         }
     }
-
-    // Refresh duration option labels to reflect this console's per-type rate
-    _refreshDurationLabels();
-}
-
-/* Recompute cost labels in the duration dropdown using the currently selected
-   console's hourly rate. Called on console change. */
-function _refreshDurationLabels() {
-    const rate    = getConsoleRate();
-    const minChg  = PRICING.session_min_charge;
-    const bp      = PRICING.bonus_paid_minutes;
-    const bf      = PRICING.bonus_free_minutes;
-    const sel     = document.getElementById('durationSelect');
-    if (!sel) return;
-    Array.from(sel.options).forEach(function(opt) {
-        const paid = parseInt(opt.value);
-        if (!paid) return;
-        const bonus = Math.floor(paid / bp) * bf;
-        const cost  = paid <= 30 ? minChg : paid / 60 * rate;
-        opt.dataset.cost = cost.toFixed(2);
-        // Update visible label text: "Xh Ym — ₱NNN"
-        const paidH = Math.floor(paid / 60);
-        const paidM = paid % 60;
-        let label = (paidH ? paidH + 'h ' : '') + (paidM ? paidM + 'm' : '');
-        let bonusLabel = '';
-        if (bonus > 0) {
-            const bH = Math.floor(bonus / 60), bM = bonus % 60;
-            bonusLabel = ' (+' + (bH ? bH + 'h ' : '') + (bM ? bM + 'm' : '') + ')';
-        }
-        opt.textContent = label + ' — ₱' + Math.round(cost) + bonusLabel;
-    });
-    // Refresh the preview if a duration is already selected
-    if (sel.value) updateSessionPreview();
 }
 
 /* Show/hide payment method when the optional checkbox is toggled */
@@ -2436,7 +2269,7 @@ function _syncStartBtn() {
 }
 
 
-
+// Ã¢”â‚¬Ã¢”â‚¬ Modals Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
 
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
@@ -2461,39 +2294,23 @@ const PRICING = <?= json_encode(getPricingRules()) ?>;
 // Available controllers for the rental dropdown — populated from DB on page load
 const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
-/**
- * Return the hourly rate for the currently selected console in the
- * Start Session modal, falling back to the global PRICING default.
- */
-function getConsoleRate() {
-    const sel = document.getElementById('consoleSelect');
-    const opt = sel && sel.options[sel.selectedIndex];
-    const rate = opt ? parseFloat(opt.dataset.rate || 0) : 0;
-    if (rate > 0) return rate;
-    // Fallback: look up by type name in PRICING.console_rates_by_name
-    const type = opt ? (opt.dataset.type || '') : '';
-    return (PRICING.console_rates_by_name && PRICING.console_rates_by_name[type])
-        || PRICING.hourly_rate;
-}
-
 function _bracketCost(partialMin) {
     if (partialMin <= 0) return 0;
-    const rate  = getConsoleRate();
     const tiers = PRICING.pricing_tiers || [];
     for (let i = 0; i < tiers.length; i++) {
         if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
             return tiers[i].charge;
         }
     }
-    return rate;
+    return PRICING.hourly_rate;
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const bp       = PRICING.bonus_paid_minutes;  // e.g. 120
-    const bf       = PRICING.bonus_free_minutes;  // e.g. 30
-    const rate     = getConsoleRate();            // per-type rate from console_types
-    const cyclePay = bp / 60 * rate;
-    const cycleLen = bp + bf;
+    const bp       = PRICING.bonus_paid_minutes;         // e.g. 120
+    const bf       = PRICING.bonus_free_minutes;         // e.g. 30
+    const rate     = PRICING.hourly_rate;                // e.g. 80
+    const cyclePay = bp / 60 * rate;                    // e.g. 160
+    const cycleLen = bp + bf;                           // e.g. 150
     const full     = Math.floor(totalMin / cycleLen);
     const rem      = totalMin % cycleLen;
     let cost       = full * cyclePay;
@@ -3351,57 +3168,65 @@ function _getAudioCtx() {
     }, { passive: true });
 });
 
-/** 
- * ── LEVEL UP CHIME (Session Ending Alert) ──────────────────────────────────
- * A dedicated, premium ascending arpeggio for session-related alerts.
- * Isolated from general notification sounds to ensure consistency.
- */
-function playLevelUpChime() {
+/* Descending 3-tone alarm - fires when a session crosses into overtime.
+   Square wave = more urgent/harsh than the sine-wave session-end chime. */
+function playOvertimeBeep() {
     var ctx = _getAudioCtx();
     if (!ctx) return;
     ctx.resume().then(function() {
-        var now = ctx.currentTime;
-        // Ascending major arpeggio (C5, E5, G5, C6) for a "Level Up" feel
-        var notes = [523.25, 659.25, 783.99, 1046.50];
-        notes.forEach(function(freq, i) {
-            var delay = i * 0.11;
+        [880, 660, 440].forEach(function(freq, i) {
+            var delay = i * 0.22;
             var osc   = ctx.createOscillator();
             var gain  = ctx.createGain();
-            
             osc.connect(gain);
             gain.connect(ctx.destination);
-            
-            // Use 'triangle' or 'sine' for a soft but clear chime
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, now + delay);
-            
-            // Note velocity
-            var vol = (i === 3) ? 0.22 : 0.15; // Final note slightly louder
-            gain.gain.setValueAtTime(vol, now + delay);
-            
-            // Exponential decay for "bell" effect
-            var decay = (i === 3) ? 1.0 : 0.4; // Final note rings longer
-            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + decay);
-            
-            osc.start(now + delay);
-            osc.stop(now + delay + decay + 0.1);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.20);
+            osc.start(ctx.currentTime + delay);
+            osc.stop(ctx.currentTime + delay + 0.20);
         });
     });
 }
 
-/* Gentle triple-ding - fires when a session crosses into overtime.
-   Uses sine wave for a clean, non-disruptive tone. */
-function playOvertimeBeep() {
-    // Dedicated Level Up Chime for session ending alerts
-    playLevelUpChime();
-}
-
-/* ── SOFT CHIME - plays for session-end warnings ──────────────────────────
-   Replaces the emergency siren with a gentle, professional double-chime.
-   Uses a pure sine wave with exponential decay for a 'bell-like' feel. */
+/* ── SIREN ALARM - plays for 15 seconds ─────────────────────────────────────
+   Simulates an emergency-siren sweep: oscillator frequency glides up and
+   down between 800 Hz (low) and 1400 Hz (high) repeatedly, like a real
+   ambulance / police siren. Uses sawtooth wave for maximum urgency.
+   All notes are scheduled up-front so the sound plays even if the tab loses focus. */
 function playWarningBeep() {
-    // Dedicated Level Up Chime for session ending alerts
-    playLevelUpChime();
+    var ctx = _getAudioCtx();
+    if (!ctx) return;
+    ctx.resume().then(function() {
+        var now       = ctx.currentTime;
+        var DURATION  = 15;      // total seconds of siren
+        var CYCLE     = 0.80;    // one up-down sweep = 0.80 s
+        var LOW_FREQ  = 800;
+        var HIGH_FREQ = 1400;
+        var VOLUME    = 0.50;
+
+        for (var i = 0; i < DURATION; i += CYCLE) {
+            var t   = now + i;
+            var osc = ctx.createOscillator();
+            var g   = ctx.createGain();
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.type = 'sawtooth';
+
+            // Sweep up for first half, sweep down for second half
+            osc.frequency.setValueAtTime(LOW_FREQ,  t);
+            osc.frequency.linearRampToValueAtTime(HIGH_FREQ, t + CYCLE * 0.5);
+            osc.frequency.linearRampToValueAtTime(LOW_FREQ,  t + CYCLE);
+
+            g.gain.setValueAtTime(VOLUME, t);
+            g.gain.setValueAtTime(VOLUME, t + CYCLE - 0.04);
+            g.gain.linearRampToValueAtTime(0, t + CYCLE); // click-free crossfade
+
+            osc.start(t);
+            osc.stop(t + CYCLE);
+        }
+    });
 }
 
 /* ── SESSION ENDING ALARM MODAL ─────────────────────────────────────────────
@@ -3596,22 +3421,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function updateTimers() {
-    document.querySelectorAll('.no-show-btn[data-start]').forEach(btn => {
-        const start = new Date(btn.dataset.start.replace(' ', 'T') + '+08:00');
-        const now = new Date();
-        if (now >= start) {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.cursor = 'pointer';
-            btn.title = "No Show";
-        } else {
-            btn.disabled = true;
-            btn.style.opacity = '0.4';
-            btn.style.cursor = 'not-allowed';
-            btn.title = "No Show will be available once the session has started";
-        }
-    });
-
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
         const start   = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
         const planned = el.dataset.planned ? parseInt(el.dataset.planned) : null;

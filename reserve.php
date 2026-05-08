@@ -51,14 +51,15 @@ foreach ($consoleTypesDB as $idx => $ct) {
     if (strpos(strtolower($typeName), 'ps') !== false || strpos(strtolower($typeName), 'playstation') !== false) $icon = 'fab fa-playstation';
     
     $ctCards[] = [
-        'type' => $typeName,
-        'id' => 'ct-' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $typeName)),
-        'icon' => $icon,
-        'color' => $color,
-        'label' => $typeName,
-        'count' => $count,
-        'allMaint' => $allMaint,
-        'maintCount' => $maintCount
+        'type'        => $typeName,
+        'id'          => 'ct-' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $typeName)),
+        'icon'        => $icon,
+        'color'       => $color,
+        'label'       => $typeName,
+        'count'       => $count,
+        'allMaint'    => $allMaint,
+        'maintCount'  => $maintCount,
+        'hourly_rate' => (float)($ct['hourly_rate'] ?? 80),
     ];
 }
 
@@ -90,7 +91,7 @@ $ctrlRes = $conn->query(
             ct.type_name AS type_name, ct.console_type_id,
             cs.type_name AS console_type_name
        FROM controllers c
-       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
        JOIN console_types cs    ON cs.type_id = ct.console_type_id
       WHERE c.status = 'available'
       ORDER BY cs.type_name, ct.type_name, c.unit_number"
@@ -110,7 +111,7 @@ $ctrlStats = $conn->query(
             COUNT(*) AS total,
             SUM(c.status = 'available') AS available
        FROM controllers c
-       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
        JOIN console_types    cs ON cs.type_id  = ct.console_type_id
       GROUP BY cs.type_name"
 );
@@ -1159,28 +1160,45 @@ if (!empty($_GET['console'])) {
                 </p>
 
                 <!-- Stat pill strip -->
+                <?php
+                $heroCards = [];
+                $otherCount = 0;
+                foreach ($ctCards as $idx => $ct) {
+                    if ($idx < 3) {
+                        $heroCards[] = $ct;
+                    } else {
+                        $otherCount += $ct['count'];
+                    }
+                }
+                if ($otherCount > 0) {
+                    $heroCards[] = [
+                        'id'          => 'ct-other',
+                        'icon'        => 'fas fa-gamepad',
+                        'color'       => '#b37bec',
+                        'label'       => 'Other',
+                        'count'       => $otherCount,
+                        'hourly_rate' => null,
+                    ];
+                }
+                ?>
                 <div class="reserve-hero-stats">
-                    <?php foreach ($ctCards as $idx => $ct): if ($idx >= 3) break; // show max 3 in hero stats ?>
+                    <?php foreach ($heroCards as $idx => $ct): ?>
                     <div class="reserve-hero-stat">
                         <div class="rhs-val" style="color:<?= $ct['color'] ?>;"><?= $ct['count'] ?></div>
                         <div class="rhs-lbl"><?= htmlspecialchars($ct['label']) ?> Units</div>
                     </div>
                     <?php endforeach; ?>
-                    <div class="reserve-hero-stat">
-                        <div class="rhs-val" style="color:#b37bec;">∞</div>
-                        <div class="rhs-lbl">Future Dates</div>
-                    </div>
                 </div>
             </div>
 
             <!-- Right: floating console cards -->
             <div class="col-lg-6 d-none d-lg-block" data-aos="fade-left" data-aos-delay="150" data-aos-duration="800">
                 <div class="rhero-console-wrap">
-                    <?php foreach ($ctCards as $idx => $ct): if ($idx >= 3) break; // show max 3 floating cards ?>
-                    <div class="rhero-con-card <?= htmlspecialchars($ct['id']) ?>">
+                    <?php foreach ($heroCards as $idx => $ct): ?>
+                    <div class="rhero-con-card <?= htmlspecialchars($ct['id']) ?>" style="border-color: <?= $ct['color'] ?>4d; animation: rcFloat<?= ($idx % 3) + 1 ?> <?= 6 + ($idx % 3) ?>s ease-in-out infinite <?= $idx * 0.5 ?>s;">
                         <i class="<?= $ct['icon'] ?>" style="font-size:2.8rem;color:<?= $ct['color'] ?>;"></i>
                         <div style="font-weight:800;color:#fff;margin-top:10px;font-size:15px;"><?= htmlspecialchars($ct['label']) ?></div>
-                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;">₱80/hr</div>
+                        <div style="color:rgba(255,255,255,.35);font-size:11px;margin-top:3px;"><?= $ct['hourly_rate'] ? '₱'.number_format($ct['hourly_rate'], 0).'/hr' : 'Various Rates' ?></div>
                         <div style="margin-top:10px;font-size:10px;font-weight:700;color:<?= $ct['color'] ?>;background:<?= $ct['color'] ?>1e;border-radius:8px;padding:3px 8px;"><?= $ct['count'] ?> unit<?= $ct['count']>1?'s':'' ?></div>
                     </div>
                     <?php endforeach; ?>
@@ -1277,12 +1295,15 @@ if (!empty($_GET['console'])) {
                         <h2><i class="fas fa-desktop"></i> Step 1 — Choose Console Type</h2>
                         <div class="console-type-grid">
                             <?php
-                            foreach ($ctCards as $ct):
-                                if ($ct['count'] === 0) continue; // hide types with no units at all
+                            $validCards = array_values(array_filter($ctCards, fn($c) => $c['count'] > 0));
+                            foreach ($validCards as $idx => $ct):
                                 $isMaint = $ct['allMaint'];
+                                $pageIdx = floor($idx / 3);
                             ?>
                             <div class="console-type-card<?= $isMaint ? ' ct-maintenance' : '' ?>"
+                                 data-ct-page="<?= $pageIdx ?>"
                                  id="<?= $ct['id'] ?>"
+                                 data-rate="<?= $ct['hourly_rate'] ?>"
                                  <?= !$isMaint ? "onclick=\"selectConsoleType('{$ct['type']}')\"" : '' ?>
                                  <?= $isMaint ? 'title="All units of this type are currently under maintenance."' : '' ?>>
                                 <div class="ct-icon">
@@ -1299,6 +1320,34 @@ if (!empty($_GET['console'])) {
                             </div>
                             <?php endforeach; ?>
                         </div>
+
+                        <?php if (count($validCards) > 3): ?>
+                        <div class="ct-pagination" style="display:flex; justify-content:center; gap:8px; margin-top: 16px;">
+                            <?php $pages = ceil(count($validCards) / 3); for($p=0; $p<$pages; $p++): ?>
+                            <div class="ct-page-dot" 
+                                 onclick="goToCtPage(<?= $p ?>)" 
+                                 style="width:24px;height:6px;border-radius:10px;background:<?= $p===0?'#20c8a1':'rgba(255,255,255,.15)' ?>;cursor:pointer;transition:background .3s;"></div>
+                            <?php endfor; ?>
+                        </div>
+                        <script>
+                        function goToCtPage(pageNum) {
+                            document.querySelectorAll('.console-type-card').forEach(card => {
+                                if (card.hasAttribute('data-ct-page')) {
+                                    if (parseInt(card.getAttribute('data-ct-page')) === pageNum) {
+                                        card.style.display = 'block';
+                                    } else {
+                                        card.style.display = 'none';
+                                    }
+                                }
+                            });
+                            document.querySelectorAll('.ct-page-dot').forEach((dot, idx) => {
+                                dot.style.background = idx === pageNum ? '#20c8a1' : 'rgba(255,255,255,.15)';
+                            });
+                        }
+                        // Initialize pagination immediately to prevent layout shifts
+                        goToCtPage(0);
+                        </script>
+                        <?php endif; ?>
 
                     </div>
 
@@ -1450,24 +1499,8 @@ if (!empty($_GET['console'])) {
                                     Max 4 hrs
                                 </span>
                             </div>
-                            <div class="duration-grid">
-                                <?php
-                                // DB-driven: reads bonus_paid_minutes, bonus_free_minutes, max_hourly_minutes
-                                // from system_settings. Change the DB to change this list.
-                                $durationOptions = getHourlyDurationOptions();
-                                foreach ($durationOptions as $opt):
-                                    $bonus = $opt['bonus_free'] ?? $opt['bonus'];
-                                    $total = $opt['total'];
-                                ?>
-                                <div class="dur-btn" data-mins="<?= $opt['paid'] ?>" data-cost="<?= $opt['cost'] ?>" data-bonus="<?= $opt['bonus'] ?>" data-total="<?= $opt['total'] ?>" onclick="selectDuration(<?= $opt['paid'] ?>)">
-                                    <?= $opt['label_paid'] ?>
-                                    <span class="dur-price">&#8369;<?= number_format($opt['cost'], 0) ?></span>
-                                    <?php if ($opt['bonus'] > 0): ?>
-                                    <span style="display:block;font-size:9px;color:#20c8a1;font-weight:700;margin-top:3px;letter-spacing:.3px;"><?= $opt['label_bonus'] ?></span>
-                                    <span style="display:block;font-size:9px;color:#888;font-weight:600;margin-top:1px;">&rarr; <?= $opt['label_total'] ?> total</span>
-                                    <?php endif; ?>
-                                </div>
-                                <?php endforeach; ?>
+                            <div class="duration-grid" id="durationGridContainer">
+                                <!-- Generated by Javascript to respect dynamic console rates -->
                             </div>
                             <div style="margin-top:10px;font-size:11px;color:#555;background:rgba(32,200,161,.05);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
                                 <i class="fas fa-gift" style="color:#20c8a1;"></i>
@@ -1805,10 +1838,25 @@ let selectedUnitId      = null;
 let selectedUnitLabel   = '';
 
 const unlimitedRate    = <?= (int)$unlimitedRate ?>;
+const controllerRentalFee = <?= (float)$controllerRentalFee ?>;
 const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
+const AVAILABLE_CONTROLLERS = <?= $controllersJson ?>;
 
-function _bracketCost(partialMin) {
+function getConsoleRate() {
+    // Primary: read data-rate from the selected card element (set from console_types.hourly_rate)
+    if (selectedConsoleType) {
+        const cardId = CONSOLE_TYPE_IDS[selectedConsoleType];
+        const card   = cardId ? document.getElementById(cardId) : null;
+        const rate   = card ? parseFloat(card.dataset.rate || 0) : 0;
+        if (rate > 0) return rate;
+    }
+    // Fallback: look up by type name in PRICING map
+    return (PRICING.console_rates_by_name && PRICING.console_rates_by_name[selectedConsoleType])
+        || PRICING.hourly_rate;
+}
+
+function _bracketCost(partialMin, rate) {
     if (partialMin <= 0) return 0;
     const tiers = PRICING.pricing_tiers || [];
     for (let i = 0; i < tiers.length; i++) {
@@ -1816,13 +1864,14 @@ function _bracketCost(partialMin) {
             return tiers[i].charge;
         }
     }
-    return PRICING.hourly_rate;
+    return rate;
 }
+
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
     const bp       = PRICING.bonus_paid_minutes;
     const bf       = PRICING.bonus_free_minutes;
-    const rate     = PRICING.hourly_rate;
+    const rate     = getConsoleRate();
     const cyclePay = bp / 60 * rate;
     const cycleLen = bp + bf;
     const full     = Math.floor(totalMin / cycleLen);
@@ -1831,9 +1880,90 @@ function _timedCost(totalMin) {
     if (rem > bp) {
         cost += cyclePay;
     } else {
-        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60, rate);
     }
     return cost;
+}
+
+function updateDurationLabels() {
+    const container = document.getElementById('durationGridContainer');
+    if (!container) return;
+    
+    const rate = getConsoleRate();
+    const maxMins = PRICING.max_hourly_minutes || 240;
+    const bp = PRICING.bonus_paid_minutes || 120;
+    const bf = PRICING.bonus_free_minutes || 30;
+    
+    let html = '';
+    for (let paid = 30; paid <= maxMins; paid += 30) {
+        let cost = paid <= 30 ? PRICING.session_min_charge : _timedCost(paid);
+        let bonus = Math.floor(paid / bp) * bf;
+        let total = paid + bonus;
+        
+        const fmtMin = (m) => {
+            let h = Math.floor(m / 60); let r = m % 60;
+            if (h && r) return `${h}h ${r}m`;
+            if (h) return `${h}${h === 1 ? ' hr' : ' hrs'}`;
+            return `${r} min`;
+        };
+        
+        let labelPaid = fmtMin(paid);
+        let labelBonus = bonus > 0 ? `+${fmtMin(bonus)} free` : '';
+        let labelTotal = fmtMin(total);
+        
+        html += `<div class="dur-btn ${selectedDuration === paid ? 'selected' : ''}" data-mins="${paid}" data-cost="${cost}" data-bonus="${bonus}" data-total="${total}" onclick="selectDuration(${paid})">
+            ${labelPaid}
+            <span class="dur-price">&#8369;${cost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span>
+            ${bonus > 0 ? `<span style="display:block;font-size:9px;color:#20c8a1;font-weight:700;margin-top:3px;letter-spacing:.3px;">${labelBonus}</span><span style="display:block;font-size:9px;color:#888;font-weight:600;margin-top:1px;">&rarr; ${labelTotal} total</span>` : ''}
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+function onExtraControllerToggle() {
+    const chk = document.getElementById('withControllerCheck');
+    const block = document.getElementById('controllerSelectorBlock');
+    if (chk && chk.checked) {
+        block.style.display = 'block';
+    } else {
+        if (block) block.style.display = 'none';
+        const sel = document.getElementById('selectedControllerId');
+        if (sel) sel.value = '';
+    }
+    if (typeof recalcFee === 'function') recalcFee();
+}
+
+function updateControllerDropdown() {
+    const sel = document.getElementById('selectedControllerId');
+    if (!sel) return;
+    
+    sel.innerHTML = '<option value="">Select a controller...</option>';
+    
+    if (!selectedConsoleType) {
+        const chk = document.getElementById('withControllerCheck');
+        if (chk) { chk.disabled = true; chk.checked = false; }
+        onExtraControllerToggle();
+        return;
+    }
+    
+    if (typeof AVAILABLE_CONTROLLERS === 'undefined') return;
+    const matching = AVAILABLE_CONTROLLERS.filter(c => c.console_type === selectedConsoleType);
+    
+    const chk = document.getElementById('withControllerCheck');
+    if (matching.length === 0) {
+        sel.innerHTML = '<option value="">No controllers available for this type</option>';
+        if (chk) { chk.disabled = true; chk.checked = false; }
+        onExtraControllerToggle();
+    } else {
+        if (chk) chk.disabled = false;
+        matching.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.controller_id;
+            opt.textContent = `${c.unit_number} - ${c.controller_name}`;
+            sel.appendChild(opt);
+        });
+    }
+    if (typeof recalcFee === 'function') recalcFee();
 }
 
 /* ── Time select helpers ────────────────────────── */
@@ -1913,6 +2043,7 @@ function selectConsoleType(type) {
     // Update Add-ons controller dropdown
     updateControllerDropdown();
 
+    updateDurationLabels();
     updateSummary();
     checkAvailability();
 }
@@ -2172,7 +2303,7 @@ function selectDuration(mins) {
 function recalcFee() {
     let baseCost = 0;
     if (selectedMode === 'unlimited') {
-        baseCost = PRICING.unlimited_rate;
+        baseCost = unlimitedRate;
     } else if (selectedMode === 'hourly') {
         if (!selectedDuration) return; // not ready
         baseCost = selectedDuration <= 30 ? PRICING.session_min_charge : _timedCost(selectedDuration);
@@ -2181,7 +2312,7 @@ function recalcFee() {
     }
 
     const withCtrl = document.getElementById('withControllerCheck')?.checked;
-    const ctrlFee = withCtrl ? PRICING.controller_rental_fee : 0;
+    const ctrlFee = withCtrl ? controllerRentalFee : 0;
     
     // Reservation fee = \u20b120 + 5% of session cost + controller fee (if any)
     const pct = Math.round(baseCost * 0.05);

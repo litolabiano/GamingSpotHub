@@ -51,7 +51,7 @@ $reasonDetail = $reasonDetail !== '' ? htmlspecialchars(strip_tags($reasonDetail
 
 // ── Fetch the reservation — must belong to this user ─────────────────────────
 $stmt = $conn->prepare(
-    "SELECT reservation_id, status, console_type, rental_mode,
+    "SELECT reservation_id, status, console_type_id, rental_mode,
             reserved_date, reserved_time, downpayment_amount, created_at
        FROM reservations
       WHERE reservation_id = ? AND user_id = ?"

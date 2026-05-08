@@ -54,7 +54,7 @@ $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
             rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
-            r.console_type, c.unit_number
+            ct.type_name AS console_type, c.unit_number
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
 <<<<<<< Updated upstream
@@ -81,9 +81,10 @@ $rescheduleReasonLabels = [
 // Active session for THIS user (if any)
 $activeSession = null;
 $stmt = $conn->prepare(
-    "SELECT gs.*, c.console_name, c.console_type, c.unit_number
+    "SELECT gs.*, c.console_name, ct.type_name AS console_type, c.unit_number
        FROM gaming_sessions gs
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.user_id = ? AND gs.status = 'active'
       ORDER BY gs.start_time DESC LIMIT 1"
 );
@@ -137,11 +138,12 @@ $timeStats = $timeStmt->get_result()->fetch_assoc();
 
 // Favourite console type
 $favStmt = $conn->prepare(
-    "SELECT c.console_type, COUNT(*) AS cnt
+    "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM gaming_sessions gs
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.user_id = ? AND gs.status = 'completed'
-      GROUP BY c.console_type
+      GROUP BY ct.type_name
       ORDER BY cnt DESC LIMIT 1"
 );
 $favStmt->bind_param('i', $user_id);
@@ -233,10 +235,11 @@ $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
             rc.cancel_reason_type, rc.cancel_reason_detail,
             rc.cancelled_at, rc.refund_issued,
-            r.console_type, r.rental_mode, r.reserved_date,
+            ct.type_name AS console_type, r.rental_mode, r.reserved_date,
             r.downpayment_amount
        FROM reservation_cancellations rc
        JOIN reservations r ON rc.reservation_id = r.reservation_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE rc.user_id = ?
       ORDER BY rc.cancelled_at DESC
       LIMIT 50"

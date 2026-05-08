@@ -56,9 +56,12 @@ if ($new_time < '12:00' || $new_time > '23:00') {
 // Fetch current reservation
 $stmt = $conn->prepare(
     "SELECT r.reservation_id, r.user_id, r.reserved_date, r.reserved_time, r.status,
-            u.email, u.full_name, r.console_id, r.console_type
+            r.console_id, r.console_type_id,
+            ct.type_name AS console_type,
+            u.email, u.full_name
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.reservation_id = ? AND r.status IN ('pending','reserved')"
 );
 $stmt->bind_param('i', $reservation_id);
@@ -74,7 +77,18 @@ $old_date         = $res['reserved_date'];
 $old_time         = $res['reserved_time'];
 $old_console_type = $res['console_type'];
 $old_console_id   = $res['console_id'];
+$old_type_id      = $res['console_type_id'];
 $user_id          = (int)$res['user_id'];
+
+// Resolve new console_type name → ID
+$new_type_id = $old_type_id; // default: keep old type
+if ($new_console_type) {
+    $tStmt = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
+    $tStmt->bind_param('s', $new_console_type);
+    $tStmt->execute();
+    $tRow = $tStmt->get_result()->fetch_assoc();
+    if ($tRow) $new_type_id = (int)$tRow['type_id'];
+}
 
 if (!$new_console_type) {
     $new_console_type = $res['console_type'];
@@ -83,7 +97,7 @@ if (!$new_console_type) {
 if ($new_date === $old_date &&
     substr($new_time, 0, 5) === substr($old_time, 0, 5) &&
     (int)$new_console_id === (int)$res['console_id'] &&
-    $new_console_type === $res['console_type']) {
+    $new_type_id === $old_type_id) {
     echo json_encode(['success' => false, 'message' => 'New schedule/console cannot be the same as the current reservation.']);
     exit;
 }
@@ -134,8 +148,8 @@ try {
 >>>>>>> Stashed changes
         );
         $log->bind_param(
-            'ssisssii',
-            $new_date, $new_time, $new_console_id, $new_console_type,
+            'ssiissii',
+            $new_date, $new_time, $new_console_id, $new_type_id,
             $reason, $reason_detail, $staff_id, $existingId
         );
     } else {
@@ -143,25 +157,16 @@ try {
         $log = $conn->prepare(
             "INSERT INTO reservation_reschedules
                 (reservation_id, user_id,
-<<<<<<< Updated upstream
                  old_date, old_time, old_console_id, old_console_type,
                  new_date, new_time, console_id, console_type,
-=======
-                 old_date, old_time, old_console_id, old_console_type_id,
-                 new_date, new_time, console_id, new_console_type_id,
->>>>>>> Stashed changes
                  reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
         );
         $log->bind_param(
-<<<<<<< Updated upstream
             'iississsisssi',
-=======
-            'iissiisssissi',
->>>>>>> Stashed changes
             $reservation_id, $user_id,
-            $old_date, $old_time, $old_console_id, $old_console_type,
-            $new_date, $new_time, $new_console_id, $new_console_type,
+            $old_date, $old_time, $old_console_id, $old_type_id,
+            $new_date, $new_time, $new_console_id, $new_type_id,
             $reason, $reason_detail,
             $staff_id
         );
