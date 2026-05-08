@@ -1,0 +1,513 @@
+127.0.0.1/gamingspothub/		http://localhost/phpmyadmin/index.php?route=/database/sql&db=gamingspothub
+
+   Showing rows 0 - 499 (786 total, Query took 0.2557 seconds.)
+
+
+SELECT 'mysql' dbms,t.TABLE_SCHEMA,t.TABLE_NAME,c.COLUMN_NAME,c.ORDINAL_POSITION,c.DATA_TYPE,c.CHARACTER_MAXIMUM_LENGTH,n.CONSTRAINT_TYPE,k.REFERENCED_TABLE_SCHEMA,k.REFERENCED_TABLE_NAME,k.REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.TABLES t LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE k ON c.TABLE_SCHEMA=k.TABLE_SCHEMA AND c.TABLE_NAME=k.TABLE_NAME AND c.COLUMN_NAME=k.COLUMN_NAME LEFT JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS n ON k.CONSTRAINT_SCHEMA=n.CONSTRAINT_SCHEMA AND k.CONSTRAINT_NAME=n.CONSTRAINT_NAME AND k.TABLE_SCHEMA=n.TABLE_SCHEMA AND k.TABLE_NAME=n.TABLE_NAME WHERE t.TABLE_TYPE='BASE TABLE' AND t.TABLE_SCHEMA NOT IN('INFORMATION_SCHEMA','mysql','performance_schema');
+
+
+dbms	TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	DATA_TYPE	CHARACTER_MAXIMUM_LENGTH	CONSTRAINT_TYPE	REFERENCED_TABLE_SCHEMA	REFERENCED_TABLE_NAME	REFERENCED_COLUMN_NAME	
+mysql	aperture_db	addons	addID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	aperture_db	addons	packageID	2	int	NULL	FOREIGN KEY	aperture_db	packages	packageID	
+mysql	aperture_db	packages	packageID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	borrowed	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	borrowed	userId	2	int	NULL	FOREIGN KEY	clickledger	users	Account_ID	
+mysql	clickledger	borrowed	productId	3	int	NULL	FOREIGN KEY	clickledger	products	product_id	
+mysql	clickledger	borrowed	approved_by	10	int	NULL	FOREIGN KEY	clickledger	users	Account_ID	
+mysql	clickledger	borrowed	productId	3	int	NULL	FOREIGN KEY	clickledger	products	product_id	
+mysql	clickledger	borrowed	userId	2	int	NULL	FOREIGN KEY	clickledger	users	Account_ID	
+mysql	clickledger	categories	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	categories	name	2	varchar	255	UNIQUE	NULL	NULL	NULL	
+mysql	clickledger	products	product_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	products	categoryId	3	int	NULL	FOREIGN KEY	clickledger	categories	id	
+mysql	clickledger	roles	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	roles	role_name	2	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	clickledger	transactions	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	users	Account_ID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	users	Email	4	varchar	500	PRIMARY KEY	NULL	NULL	NULL	
+mysql	clickledger	users	role_id	6	int	NULL	FOREIGN KEY	clickledger	roles	id	
+mysql	company	attendance	AttendanceID	1	varchar	100	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	attendance	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	deductions	DeductionID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	deductions	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	department	DepartmentID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	department	department_head	4	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	company	department	department_head	4	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	employee	EmployeeID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	employee	QrId	11	varchar	100	UNIQUE	NULL	NULL	NULL	
+mysql	company	employee	DepartmentID	9	int	NULL	FOREIGN KEY	company	department	DepartmentID	
+mysql	company	employee	PositionID	10	int	NULL	FOREIGN KEY	company	position	PositionID	
+mysql	company	employeecontact	ContactID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	employeecontact	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	leave	LeaveID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	leave	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	payroll	PayrollID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	payroll	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	company	position	PositionID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	position	DepartmentID	3	int	NULL	FOREIGN KEY	company	department	DepartmentID	
+mysql	company	workschedule	ScheduleID	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	company	workschedule	EmployeeID	2	int	NULL	FOREIGN KEY	company	employee	EmployeeID	
+mysql	gamingspothub	activity_logs	log_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	request_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	session_id	2	int	NULL	FOREIGN KEY	gamingspothub	gaming_sessions	session_id	
+mysql	gamingspothub	blocked_dates	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	blocked_dates	blocked_date	2	date	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	console_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	aperture_db	addons	Description	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	aperture_db	addons	Price	4	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	addons	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	addons	updated_at	6	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	addons	is_active	7	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	packageName	2	varchar	100	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	Price	3	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	description	4	text	65535	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	coverage_hours	5	int	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	extra_hour_rate	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	created_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	updated_at	8	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	aperture_db	packages	is_active	9	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	quantity	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	dateBorrowed	5	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	dueDate	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	status	7	enum	9	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	requested_at	8	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	borrowed	approved_at	9	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	categories	description	3	text	65535	NULL	NULL	NULL	NULL	
+mysql	clickledger	products	product_name	2	varchar	255	NULL	NULL	NULL	NULL	
+mysql	clickledger	products	stock	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	products	borrowed	5	int	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	products	status	6	varchar	50	NULL	NULL	NULL	NULL	
+mysql	clickledger	roles	description	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	clickledger	transactions	date	2	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	clickledger	transactions	type	3	varchar	50	NULL	NULL	NULL	NULL	
+mysql	clickledger	transactions	product	4	varchar	255	NULL	NULL	NULL	NULL	
+mysql	clickledger	transactions	details	5	text	65535	NULL	NULL	NULL	NULL	
+mysql	clickledger	users	First_Name	2	varchar	500	NULL	NULL	NULL	NULL	
+mysql	clickledger	users	Last_Name	3	varchar	500	NULL	NULL	NULL	NULL	
+mysql	clickledger	users	Password	5	varchar	500	NULL	NULL	NULL	NULL	
+mysql	clickledger	users	status	7	enum	8	NULL	NULL	NULL	NULL	
+mysql	company	attendance	Date	3	date	NULL	NULL	NULL	NULL	NULL	
+mysql	company	attendance	CheckIn	4	time	NULL	NULL	NULL	NULL	NULL	
+mysql	company	attendance	CheckOut	5	time	NULL	NULL	NULL	NULL	NULL	
+mysql	company	attendance	TotalHoursWorked	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	attendance	Status	7	varchar	255	NULL	NULL	NULL	NULL	
+mysql	company	attendance	QrId	8	varchar	100	NULL	NULL	NULL	NULL	
+mysql	company	deductions	DeductionType	3	varchar	50	NULL	NULL	NULL	NULL	
+mysql	company	deductions	DeductionAmount	4	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	deductions	DeductionDate	5	date	NULL	NULL	NULL	NULL	NULL	
+mysql	company	department	Department	2	varchar	255	NULL	NULL	NULL	NULL	
+mysql	company	department	department_description	3	text	65535	NULL	NULL	NULL	NULL	
+mysql	company	department	IsArchived	5	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	company	employee	FirstName	2	varchar	50	NULL	NULL	NULL	NULL	
+mysql	company	employee	MiddleName	3	varchar	50	NULL	NULL	NULL	NULL	
+mysql	company	employee	LastName	4	varchar	50	NULL	NULL	NULL	NULL	
+mysql	company	employee	Gender	5	varchar	10	NULL	NULL	NULL	NULL	
+mysql	company	employee	Birthday	6	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	employee	DateHired	7	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	employee	EmploymentStatus	8	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	employee	Salary	12	int	NULL	NULL	NULL	NULL	NULL	
+mysql	company	employee	Age	13	int	NULL	NULL	NULL	NULL	NULL	
+
+mysql	company	employeecontact	ContactNum	3	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	employeecontact	Email	4	varchar	100	NULL	NULL	NULL	NULL	
+mysql	company	employeecontact	Address	5	text	65535	NULL	NULL	NULL	NULL	
+mysql	company	leave	LeaveType	3	varchar	50	NULL	NULL	NULL	NULL	
+mysql	company	leave	LeaveStart	4	date	NULL	NULL	NULL	NULL	NULL	
+mysql	company	leave	LeaveEnd	5	date	NULL	NULL	NULL	NULL	NULL	
+mysql	company	leave	LeaveStatus	6	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	payroll	BasicSalary	3	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	payroll	OvertimeHours	4	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	payroll	OvertimeRate	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	payroll	Deductions	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	payroll	NetPay	7	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	payroll	PayrollDate	8	date	NULL	NULL	NULL	NULL	NULL	
+mysql	company	position	Position	2	varchar	255	NULL	NULL	NULL	NULL	
+mysql	company	position	Payment_Type	4	varchar	20	NULL	NULL	NULL	NULL	
+mysql	company	position	Default_Rate	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	company	position	IsArchived	6	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	company	workschedule	DayOfWeek	3	varchar	10	NULL	NULL	NULL	NULL	
+mysql	company	workschedule	WorkStart	4	time	NULL	NULL	NULL	NULL	NULL	
+mysql	company	workschedule	WorkEnd	5	time	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	activity_logs	user_id	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	activity_logs	action	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	activity_logs	details	4	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	activity_logs	created_at	5	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	request_type	3	enum	17	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	description	4	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	extra_cost	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	status	6	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	additional_requests	created_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	blocked_dates	reason	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	blocked_dates	created_at	4	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	unit_number	4	varchar	20	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	console_type_id	3	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
+mysql	gamingspothub	console_types	type_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	console_types	type_name	2	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	controller_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	unit_number	4	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	console_type_id	9	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
+mysql	gamingspothub	controllers	controller_type_id	3	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
+mysql	gamingspothub	controller_types	type_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	controller_types	type_name	2	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	session_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	console_id	3	int	NULL	FOREIGN KEY	gamingspothub	consoles	console_id	
+mysql	gamingspothub	gaming_sessions	created_by	13	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	gaming_sessions	user_id	2	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	pricing_tiers	tier_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	reports	report_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	reports	generated_by	3	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	reservations	reservation_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	console_id	3	int	NULL	FOREIGN KEY	gamingspothub	consoles	console_id	
+mysql	gamingspothub	reservations	controller_id	11	int	NULL	FOREIGN KEY	gamingspothub	controllers	controller_id	
+mysql	gamingspothub	reservations	created_by	22	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	reservations	user_id	2	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	reservations	console_type_id	4	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
+mysql	gamingspothub	reservation_cancellations	cancel_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	reservation_id	2	int	NULL	FOREIGN KEY	gamingspothub	reservations	reservation_id	
+mysql	gamingspothub	reservation_cancellations	user_id	3	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	reservation_reschedules	reschedule_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	new_console_type_id	11	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
+mysql	gamingspothub	reservation_reschedules	old_console_type_id	7	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
+mysql	gamingspothub	consoles	console_name	2	varchar	50	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	status	5	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	created_at	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	console_types	is_archived	3	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	console_types	category	4	enum	7	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	console_types	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	console_types	hourly_rate	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	controller_name	2	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	status	5	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	notes	6	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	created_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	updated_at	8	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controller_types	console_type_id	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controller_types	is_archived	4	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controller_types	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	rental_mode	4	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	planned_minutes	5	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	start_time	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	end_time	7	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	duration_minutes	8	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	hourly_rate	9	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	total_cost	10	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	status	11	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	payment_status	12	enum	7	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	created_at	14	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	extended_minutes	15	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	source_reservation_id	16	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	pricing_tiers	min_minutes	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	pricing_tiers	max_minutes	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	pricing_tiers	charge	4	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reports	report_type	2	enum	14	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reports	date_from	4	date	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reports	date_to	5	date	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reports	file_path	6	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reports	created_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	rental_mode	5	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	planned_minutes	6	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	reserved_date	7	date	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	reserved_time	8	time	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	notes	9	text	65535	NULL	NULL	NULL	NULL	
+
+mysql	gamingspothub	reservations	with_controller	10	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	controller_fee	12	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_amount	13	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_method	14	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_paid	15	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	payment_proof	16	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	payment_proof_status	17	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_source_id	18	varchar	60	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_payment_id	19	varchar	60	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_status	20	varchar	30	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	status	21	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	created_at	23	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	updated_at	24	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancelled_by	25	enum	5	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancellation_reason	26	varchar	300	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	refund_issued	27	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancel_reason_type	28	enum	17	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancel_reason_detail	29	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	cancelled_by	4	enum	5	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	cancel_reason_type	5	enum	17	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	cancel_reason_detail	6	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	refund_issued	7	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_cancellations	cancelled_at	8	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	reservation_id	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	user_id	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	old_date	4	date	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	old_time	5	time	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	old_console_id	6	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	new_date	8	date	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	new_time	9	time	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	console_id	10	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	reason	12	enum	12	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	reason_detail	13	varchar	300	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	rescheduled_by	14	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	initiated_by	15	enum	5	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	status	16	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	seen_by_user	17	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	created_at	18	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	extension_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	override_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	system_settings	setting_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	system_settings	setting_key	2	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	tournament_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	participant_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	registered_by	11	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	tournament_participants	tournament_id	2	int	NULL	FOREIGN KEY	gamingspothub	tournaments	tournament_id	
+mysql	gamingspothub	tournament_participants	user_id	3	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	transactions	transaction_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	users	user_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	gamingspothub	users	email	2	varchar	100	UNIQUE	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	guest_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_number	2	varchar	10	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	reviewed_by	19	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	reviewed_at	20	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	session_id	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	requested_by	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	approved_by	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	extra_minutes	5	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	extra_cost	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	payment_method	7	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	status	8	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	note	9	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	requested_at	10	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	session_extensions	resolved_at	11	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	activated_by	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	action	3	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	extended_until	4	varchar	5	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	note	5	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	shop_hours_overrides	created_at	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	system_settings	setting_value	3	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	system_settings	description	4	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	system_settings	updated_at	5	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	tournament_name	2	varchar	150	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	game_id	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	game_name	4	varchar	150	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	console_type	5	varchar	50	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	start_date	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	end_date	7	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	entry_fee	8	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	prize_pool	9	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	max_participants	10	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	status	11	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	announcement	12	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	created_by	13	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournaments	created_at	14	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	registration_date	4	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	payment_status	5	enum	7	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	placement	6	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	prize_amount	7	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	ign	8	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	contact_number	9	varchar	20	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	gcash_proof	10	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	walkin_name	12	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	notes	13	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	paymongo_source_id	14	varchar	80	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	paymongo_payment_id	15	varchar	80	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	paymongo_status	16	varchar	30	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	session_id	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	user_id	3	int	NULL	NULL	NULL	NULL	NULL	
+
+mysql	gamingspothub	transactions	amount	4	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	tendered_amount	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	shortfall_amount	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	payment_note	7	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	payment_method	8	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	payment_status	9	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	transaction_date	10	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	processed_by	11	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	transactions	created_at	12	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	password_hash	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	full_name	4	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	phone	5	varchar	20	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	role	6	enum	10	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	status	7	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	email_verified	8	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	verification_token	9	varchar	64	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	verification_expires	10	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	reset_token	11	varchar	64	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	reset_expires	12	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	created_at	13	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	consecutive_cancellations	14	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	users	reservation_banned_until	15	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	first_name	2	varchar	50	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	last_name	3	varchar	50	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	home_address	4	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	password	5	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	province	6	varchar	50	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	city	7	varchar	50	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	zip_code	8	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	phone_number	9	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	email	10	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	check_in_date	11	varchar	1000	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	check_in_time	12	varchar	1000	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	check_out_date	13	varchar	1000	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	check_out_time	14	varchar	1000	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	room_type	15	enum	8	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	number_of_adults	16	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	number_of_children	17	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	number_of_pets	18	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	number_of_Infants	19	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	registration_date	20	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	admin_status	21	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	activated_status	22	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	room_no	23	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_type	3	enum	8	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	payment_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	guest_id	2	int	NULL	FOREIGN KEY	hotelreservation_db	guest	guest_id	
+mysql	hotelreservation_db	reservation	reservation_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	guest_id	2	int	NULL	FOREIGN KEY	hotelreservation_db	guest	guest_id	
+mysql	hotelreservation_db	reservation	pay_status	16	varchar	20	FOREIGN KEY	hotelreservation_db	payments	pay_status	
+mysql	hotelreservation_db	reservation	room_number	11	varchar	20	FOREIGN KEY	hotelreservation_db	hotel_room	room_number	
+mysql	kld_jobs	activity_log	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	agency_commissions	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	jobs	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	assigned_to	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	jobs	client_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	job_applications	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	job_id	2	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	employee_id	3	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
+mysql	kld_jobs	job_applications	employee_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	job_skills	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	job_skills	job_id	2	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	job_skills	skill_id	3	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	job_skills	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
+mysql	kld_jobs	job_skills	skill_id	3	int	NULL	FOREIGN KEY	kld_jobs	skills	id	
+mysql	kld_jobs	job_views	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
+mysql	kld_jobs	job_views	user_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	hotelreservation_db	hotel_room	bed_count	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	price_per_night	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	is_available	6	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	floor	7	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	created_at	8	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	Reserved_To	9	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	firstname	3	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	amount	4	double	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	payment_time	5	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	pay_status	6	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	payments	reservation_id	7	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	check_in_date	3	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	check_in_time	4	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	check_out_date	5	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	check_out_time	6	varchar	20	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	status	7	varchar	32	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	first_name	8	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	last_name	9	varchar	100	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	email	10	varchar	255	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	number_of_adults	12	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	number_of_children	13	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	number_of_pets	14	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	reservation	number_of_infants	15	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	action	3	varchar	100	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	description	4	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	ip_address	5	varchar	45	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	user_agent	6	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	activity_log	created_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
+
+mysql	kld_jobs	agency_commissions	application_id	2	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	job_id	3	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	freelancer_id	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	client_id	5	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	freelancer_payment	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	commission_percentage	7	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	commission_amount	8	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	difficulty_level	9	enum	6	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	status	10	enum	9	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	created_at	11	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	agency_commissions	collected_at	12	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	code	3	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	used	4	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	backup_codes	used_at	6	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	title	4	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	description	5	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	budget_min	6	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	budget_max	7	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	budget_display	8	varchar	100	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	category	9	enum	17	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	specialization	10	varchar	100	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	location	11	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	job_type	12	enum	9	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	experience_level	13	enum	12	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	posted_at	14	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	deadline	15	date	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	images	16	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	status	17	enum	11	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	views	18	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	applications_count	19	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	created_at	20	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	updated_at	21	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	max_applicants	22	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	subscription_plan_id	23	int	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	subscription_start_date	24	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	subscription_end_date	25	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	is_featured	26	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	auto_expire	27	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	sss_contribution	28	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	philhealth_contribution	29	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	pagibig_contribution	30	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	insurance_deduction	31	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	investment_deduction	32	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	location_city	33	varchar	100	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	location_country	34	varchar	100	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	is_remote	35	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	salary_min	36	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	salary_max	37	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	salary_currency	38	varchar	3	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	expiration_date	39	date	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	jobs	expired	40	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	cover_letter	4	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	proposed_budget	5	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	estimated_duration	6	varchar	50	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	portfolio_link	7	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	resume_path	8	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	resume_filename	9	varchar	255	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	status	10	enum	9	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	withdrawal_reason	11	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	withdrawn_at	12	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	applied_at	13	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	reviewed_at	14	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_applications	notes	15	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_skills	required	4	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_skills	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	ip_address	4	varchar	45	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	user_agent	5	text	65535	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	created_at	6	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	messages	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	messages	sender_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	messages	recipient_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	message_attachments	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	message_attachments	message_id	2	int	NULL	FOREIGN KEY	kld_jobs	messages	id	
+mysql	kld_jobs	notifications	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	notifications	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	notification_preferences	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	notification_preferences	user_id	2	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	notification_preferences	notification_type	3	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	notification_preferences	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	payments	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	payment_invoices	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	payment_invoices	invoice_number	3	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	payment_refunds	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	portfolio_items	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	portfolio_items	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	profile_views	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	profile_views	profile_user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	profile_views	viewer_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	rate_limits	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	rate_limits	identifier	2	varchar	255	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	rate_limits	action	3	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	reviews	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	reviews	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
+mysql	kld_jobs	reviews	reviewer_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	reviews	reviewee_id	4	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	kld_jobs	saved_jobs	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	saved_jobs	user_id	2	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	saved_jobs	job_id	3	int	NULL	UNIQUE	NULL	NULL	NULL	
+mysql	kld_jobs	saved_jobs	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
