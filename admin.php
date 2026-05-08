@@ -285,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?, controller_count = ?
                       WHERE console_id = ?"
                 );
-                $stmt->bind_param('sssdi i', $name, $type, $unit, $rate, $ctrl_count, $console_id);
+                $stmt->bind_param('sssdii', $name, $type, $unit, $rate, $ctrl_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
