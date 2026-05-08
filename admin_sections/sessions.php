@@ -298,7 +298,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 $psEndTs = strtotime($ps['end_time'] ?? '');
                                 if ($isCompleted && $psEndTs && (time() - $psEndTs < 3600)): ?>
                                     <button class="btn-restore btn-sm" 
-                                        onclick="restoreSession(<?= $ps['session_id'] ?>, '<?= sessionCustomerLabel($ps, true) ?>', '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>', <?= $psEndTs ?>)"
+                                        onclick="restoreSession(<?= $ps['session_id'] ?>, '<?= sessionCustomerLabel($ps, true) ?>', '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>', <?= $psEndTs ?>, this)"
                                         data-end-ts="<?= $psEndTs ?>"
                                         style="background:rgba(32,200,161,.12);color:#20c8a1;border:1.5px solid rgba(32,200,161,.3);justify-content:center;font-size:11px;padding:4px 8px;margin-top:4px;">
                                         <i class="fas fa-undo"></i> Undo <span class="restore-timer"></span>
@@ -496,7 +496,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                             ?>
                                             <?php if ($canRestore): ?>
                                                 <button class="btn-restore btn-sm" 
-                                                        onclick="restoreSession(<?= $sess['session_id'] ?>, '<?= sessionCustomerLabel($sess, true) ?>', '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>', <?= $endTs ?>)"
+                                                        onclick="restoreSession(<?= $sess['session_id'] ?>, '<?= sessionCustomerLabel($sess, true) ?>', '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>', <?= $endTs ?>, this)"
                                                         data-end-ts="<?= $endTs ?>"
                                                         style="background:rgba(32,200,161,.12);color:#20c8a1;border:1.5px solid rgba(32,200,161,.3);justify-content:center;font-size:11px;padding:4px 8px;">
                                                     <i class="fas fa-undo"></i> Undo <span class="restore-timer"></span>
@@ -873,7 +873,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         setTimeout(() => el.remove(), 4500);
     }
 
-    function restoreSession(sessionId, customer, console, endTs) {
+    function restoreSession(sessionId, customer, console, endTs, btn) {
         const now = Math.floor(Date.now() / 1000);
         const elapsedSec = now - endTs;
         const m = Math.floor(elapsedSec / 60);
@@ -892,6 +892,31 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         .then(r => r.json())
         .then(d => {
             if (d.success) {
+                // Immediate UI feedback: hide button and update status badge
+                if (btn) {
+                    btn.style.display = 'none';
+                    const row = btn.closest('tr');
+                    if (row) {
+                        // Find any "Ended" or "Completed" badge and swap it to "Active"
+                        const badges = row.querySelectorAll('.badge, span');
+                        badges.forEach(b => {
+                            const txt = b.textContent.trim().toLowerCase();
+                            if (txt === 'ended' || txt === 'completed') {
+                                b.className = 'badge active';
+                                b.textContent = 'Active';
+                                b.style.background = 'rgba(32,200,161,.15)';
+                                b.style.color = '#20c8a1';
+                                b.style.border = '1px solid rgba(32,200,161,.3)';
+                            }
+                        });
+                        // If it's the pending payments table, the status cell might contain the timer instead
+                        const timer = row.querySelector('.session-timer');
+                        if (timer) {
+                            timer.style.display = 'inline-block';
+                        }
+                    }
+                }
+
                 if (typeof showAdminToast === 'function') {
                     showAdminToast(d.message, 'success');
                 } else if (typeof showInlineToast === 'function') {

@@ -16,16 +16,12 @@ if (isset($conn)) {
 
 // Slot count for this tournament
 $evSlotsTaken = 0;
-$evSlotsMax   = 16;
 if ($evTournament) {
-    $evMax = (int)$evTournament['max_participants'];
-    $evSlotsMax = $evMax;
     $evSlotRes  = $conn->prepare("SELECT COUNT(*) AS cnt FROM tournament_participants WHERE tournament_id = ?");
     $evSlotRes->bind_param('i', $evTournament['tournament_id']);
     $evSlotRes->execute();
     $evSlotsTaken = (int)$evSlotRes->get_result()->fetch_assoc()['cnt'];
 }
-$evIsFull    = false; // Unlimited participants
 $evIsOpen    = $evTournament && $evTournament['status'] === 'scheduled';
 
 $evStatusLabel = [
@@ -79,7 +75,7 @@ $evSColor = $evTournament ? ($evStatusColor[$evTournament['status']] ?? '#f1a83c
                         <div class="gsh-event-info">
                             <div class="gsh-event-status-row">
                                 <span class="gsh-status-tag" style="background:rgba(<?= $evTournament['status']==='scheduled'?'32,200,161':'241,168,60' ?>,.15); border-color: rgba(<?= $evTournament['status']==='scheduled'?'32,200,161':'241,168,60' ?>,.3); color:<?= $evSColor ?>;">
-                                    <?= $evIsFull ? 'Full' : $evSLabel ?>
+                                    <?= $evSLabel ?>
                                 </span>
                                 <span class="gsh-console-tag">
                                     <i class="fab fa-playstation"></i><?= htmlspecialchars($evTournament['console_type']) ?>
@@ -121,10 +117,6 @@ $evSColor = $evTournament ? ($evStatusColor[$evTournament['status']] ?? '#f1a83c
                             <a href="tournament_register.php" class="gsh-register-btn open">
                                 <i class="fas fa-trophy"></i> Register Now
                             </a>
-                            <?php elseif ($evIsFull): ?>
-                            <span class="gsh-register-btn full">
-                                <i class="fas fa-users-slash"></i> Tournament Full
-                            </span>
                             <?php else: ?>
                             <a href="tournament_register.php" class="gsh-register-btn soon">
                                 <i class="fas fa-clock"></i> Registration Opening Soon

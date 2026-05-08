@@ -69,15 +69,12 @@ try {
     $updC->execute();
 
     // 5. Audit Log
-    $action = "Restore Session";
     $details = "Restored session #{$session_id} for " . ($sess['is_walkin'] ? 'Walk-in' : "User #{$sess['user_id']}") . ". "
              . "Time elapsed since end: " . floor($elapsedSec / 60) . "m " . ($elapsedSec % 60) . "s. "
              . "Console: {$console['unit_number']}. "
              . "Original End Time: {$sess['end_time']}. Payments made at end were voided.";
     
-    $log = $conn->prepare("INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)");
-    $log->bind_param("iss", $staff_id, $action, $details);
-    $log->execute();
+    logActivity($staff_id, "Restore Session", $details);
 
     $conn->commit();
     echo json_encode([
