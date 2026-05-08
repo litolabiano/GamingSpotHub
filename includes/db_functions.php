@@ -318,38 +318,6 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
             $stored_minutes = paidToTotalMinutes((int)$planned_minutes);
         }
 
-        // ── Reservation Conflict Check ───────────────────────────────────────
-        $tz = new DateTimeZone('Asia/Manila');
-        $now = new DateTime('now', $tz);
-        $nowStr = $now->format('Y-m-d H:i:s');
-        
-        $resStmt = $conn->prepare(
-            "SELECT reserved_date, reserved_time FROM reservations 
-              WHERE console_id = ? AND status IN ('reserved', 'pending') 
-                AND CONCAT(reserved_date, ' ', reserved_time) > ? 
-              ORDER BY reserved_date ASC, reserved_time ASC LIMIT 1"
-        );
-        $resStmt->bind_param("is", $console_id, $nowStr);
-        $resStmt->execute();
-        $nextRes = $resStmt->get_result()->fetch_assoc();
-
-        if ($nextRes) {
-            $resDt = new DateTime($nextRes['reserved_date'] . ' ' . $nextRes['reserved_time'], $tz);
-            $diff = $now->diff($resDt);
-            $minsAway = ($diff->days * 1440) + ($diff->h * 60) + $diff->i;
-
-            if ($rental_mode === 'open_time' || $rental_mode === 'unlimited') {
-                $conn->rollback();
-                return ['success' => false, 'message' => 'Cannot start Open Time or Unlimited session. This console has an upcoming reservation in ' . $minsAway . ' minutes.'];
-            }
-
-            if ($stored_minutes !== null && $stored_minutes > $minsAway) {
-                $conn->rollback();
-                return ['success' => false, 'message' => 'Session duration exceeds the available time window before the next reservation.'];
-            }
-        }
-        // ───────────────────────────────────────────────────────────────────────
-
         // Create session
         $stmt = $conn->prepare(
             "INSERT INTO gaming_sessions (user_id, console_id, rental_mode, planned_minutes, hourly_rate, created_by)

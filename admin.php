@@ -1063,6 +1063,7 @@ function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
+<<<<<<< HEAD
     const group  = document.getElementById('controllerRentalGroup');
     const toggle = document.getElementById('controllerRentalToggle');
     const label  = document.getElementById('controllerRentalLabel');
@@ -1099,6 +1100,14 @@ function onConsoleChange() {
                 text.style.color = '#fb566b';
             }
         }
+=======
+    const isXbox = type.toLowerCase().includes('xbox');
+    const group  = document.getElementById('controllerRentalGroup');
+    const toggle = document.getElementById('controllerRentalToggle');
+    if (!group) return;
+    if (isXbox) {
+        group.style.display = 'block';
+>>>>>>> parent of c5f7c0f (extend and reservation)
     } else {
         group.style.display = 'none';
         if (toggle && toggle.checked) {

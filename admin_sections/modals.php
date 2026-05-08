@@ -995,17 +995,9 @@ function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, ren
     // Reset fields
     document.getElementById('extendMinutes').value = '';
     document.getElementById('extendCostPreview').style.display = 'none';
-    if(document.getElementById('extendPaymentFields')) document.getElementById('extendPaymentFields').style.display = 'none';
-    if(document.getElementById('extendTendered')) document.getElementById('extendTendered').value = '';
-    if(document.getElementById('extendChangeDisplay')) document.getElementById('extendChangeDisplay').style.display = 'none';
-    
-    // Reset error state and button
-    document.getElementById('extendErrorMsg').style.display = 'none';
-    const btn = document.getElementById('extendConfirmBtn');
-    btn.disabled = false;
-    btn.style.opacity = '1';
-    btn.style.cursor = 'pointer';
-
+    document.getElementById('extendPaymentFields').style.display = 'none';
+    document.getElementById('extendTendered').value = '';
+    document.getElementById('extendChangeDisplay').style.display = 'none';
     // Reset the tendered toggle to locked state
     const toggle = document.getElementById('extendTenderedToggle');
     if (toggle) { toggle.checked = false; _lockExtendTendered(); }
@@ -1049,72 +1041,35 @@ function loadPendingExtensions(sessionId) {
 function updateExtendCost() {
     const mins    = parseInt(document.getElementById('extendMinutes').value) || 0;
     const mode    = document.getElementById('extendSessionMode').value;
-    const sessionId = document.getElementById('extendSessionId').value;
     const preview = document.getElementById('extendCostPreview');
     const payFlds = document.getElementById('extendPaymentFields');
     const freeNote = document.getElementById('extendFreeNote');
     const costEl  = document.getElementById('extendCostAmt');
     const holder  = document.getElementById('extendCostHolder');
-    const errorMsg = document.getElementById('extendErrorMsg');
-    const errorText = document.getElementById('extendErrorText');
-    const btn = document.getElementById('extendConfirmBtn');
 
-    if (!mins) { 
-        preview.style.display = 'none'; 
-        if(payFlds) payFlds.style.display = 'none'; 
-        errorMsg.style.display = 'none';
-        btn.disabled = false;
-        btn.style.opacity = '1';
-        btn.style.cursor = 'pointer';
-        return; 
+    if (!mins) { preview.style.display = 'none'; payFlds.style.display = 'none'; return; }
+    preview.style.display = 'block';
+
+    if (mode === 'open_time' || mode === 'unlimited') {
+        costEl.textContent = '₱0';
+        freeNote.style.display = 'block';
+        payFlds.style.display  = 'none';
+        holder.value = '0';
+    } else {
+        // Hourly: straight ₱80/hr
+        const cost = computeExtCost(mins);
+        costEl.textContent = '₱' + cost;
+        freeNote.style.display = 'none';
+        payFlds.style.display  = 'block';
+        holder.value = cost;
+        // Pre-fill tendered with the exact cost; keep it locked
+        const tendInput = document.getElementById('extendTendered');
+        tendInput.value = cost;
+        // Reset the toggle checkbox so the field stays locked
+        const toggle = document.getElementById('extendTenderedToggle');
+        if (toggle) { toggle.checked = false; _lockExtendTendered(); }
+        document.getElementById('extendChangeDisplay').style.display = 'none';
     }
-
-    // Check for conflict first
-    fetch(`ajax/check_extend_conflict.php?session_id=${sessionId}&extra_minutes=${mins}`, { credentials: 'same-origin' })
-        .then(r => r.json())
-        .then(data => {
-            if (data.conflict) {
-                // Show conflict error, hide preview, disable button
-                errorText.textContent = data.message;
-                errorMsg.style.display = 'block';
-                preview.style.display = 'none';
-                if(payFlds) payFlds.style.display = 'none';
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-            } else {
-                // No conflict, proceed
-                errorMsg.style.display = 'none';
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-                preview.style.display = 'block';
-
-                if (mode === 'open_time' || mode === 'unlimited') {
-                    costEl.textContent = '₱0';
-                    freeNote.style.display = 'inline-block';
-                    if(payFlds) payFlds.style.display  = 'none';
-                    holder.value = '0';
-                } else {
-                    // Hourly: straight ₱80/hr
-                    const cost = computeExtCost(mins);
-                    costEl.textContent = '₱' + cost;
-                    freeNote.style.display = 'none';
-                    if(payFlds) payFlds.style.display  = 'block';
-                    holder.value = cost;
-                    // Pre-fill tendered
-                    const tendInput = document.getElementById('extendTendered');
-                    if(tendInput) tendInput.value = cost;
-                    const toggle = document.getElementById('extendTenderedToggle');
-                    if (toggle) { toggle.checked = false; _lockExtendTendered(); }
-                    const changeDisp = document.getElementById('extendChangeDisplay');
-                    if(changeDisp) changeDisp.style.display = 'none';
-                }
-            }
-        })
-        .catch(err => {
-            console.warn('[GSpot] Conflict check error:', err);
-        });
 }
 
 // JS mirror of extension pricing: straight ₱80/hr, no session-start minimum
