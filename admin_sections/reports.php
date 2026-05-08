@@ -128,10 +128,15 @@
         $cancelConsoleCounts = array_column($cancelByConsole, 'cnt');
     ?>
 
-    <h3 style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:#fff;
-               margin:32px 0 16px;display:flex;align-items:center;gap:10px;">
-        <i class="fas fa-ban" style="color:#fb566b"></i> Reservation Cancellation Analytics
-    </h3>
+    <div id="cancellationAnalyticsPrintArea">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:32px 0 16px;">
+            <h3 style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:#fff; margin:0; display:flex;align-items:center;gap:10px;">
+                <i class="fas fa-ban" style="color:#fb566b"></i> Reservation Cancellation Analytics
+            </h3>
+            <button class="btn-prim btn-sm" onclick="printCancellationAnalytics()" style="background:#fb566b; border-color:#fb566b; color:#fff; height: 32px; padding: 0 16px;">
+                <i class="fas fa-print"></i> Print Graphs
+            </button>
+        </div>
 
     <!-- Stat cards row -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">
@@ -255,6 +260,7 @@
             </tbody>
         </table>
     </div>
+    </div> <!-- end cancellationAnalyticsPrintArea -->
 </div>
 
 <!-- ══ CANCELLATION CHARTS JAVASCRIPT ════════════════════════════════════════ -->
@@ -416,4 +422,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
     usagePag.apply();
 });
+
+function printCancellationAnalytics() {
+    document.body.classList.add('print-cancel-mode');
+    // Allow a tiny delay for browser to apply class if necessary before invoking print
+    setTimeout(() => {
+        window.print();
+        document.body.classList.remove('print-cancel-mode');
+    }, 100);
+}
 </script>
+
+<style>
+@media print {
+    body.print-cancel-mode {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    body.print-cancel-mode * {
+        visibility: hidden;
+    }
+    body.print-cancel-mode #cancellationAnalyticsPrintArea, 
+    body.print-cancel-mode #cancellationAnalyticsPrintArea * {
+        visibility: visible;
+    }
+    body.print-cancel-mode #cancellationAnalyticsPrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+    }
+    /* Chart.js canvases need specific sizing rules to print properly */
+    body.print-cancel-mode canvas {
+        max-width: 100% !important;
+    }
+    /* Hide the print button when printing */
+    body.print-cancel-mode button[onclick="printCancellationAnalytics()"] {
+        display: none !important;
+    }
+}
+</style>
