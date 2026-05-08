@@ -82,6 +82,49 @@ try {
         $finalDate = $chosenDate;
         $finalTime = $chosenTime;
 
+        // ── COUNTER-PROPOSAL CHECK ──────────────────────────────────────────
+        // Normalize time strings for comparison (remove seconds if present)
+        $normChosenTime   = substr($chosenTime, 0, 5);
+        $normProposedTime = substr($proposedTime, 0, 5);
+
+        // If the user changed the date or time from what the admin proposed,
+        // it must go back to the admin for review.
+        if ($chosenDate !== $proposedDate || $normChosenTime !== $normProposedTime) {
+            $userReason = trim($_POST['reason'] ?? '');
+            if (!$userReason) {
+                jsonOut(false, 'Please provide a reason for changing the proposed schedule.');
+            }
+
+            $mark = $conn->prepare(
+                "UPDATE reservation_reschedules
+                    SET status        = 'pending',
+                        new_date      = ?,
+                        new_time      = ?,
+                        reason        = 'user_request',
+                        reason_detail = ?,
+                        initiated_by  = 'user',
+                        seen_by_user  = 1
+                  WHERE reschedule_id = ?"
+            );
+            $mark->bind_param('sssi', $finalDate, $finalTime, $userReason, $rescheduleId);
+            if (!$mark->execute()) {
+                throw new Exception('Failed to update reschedule request.');
+            }
+            $mark->close();
+
+            $conn->commit();
+            
+            ob_clean();
+            echo json_encode([
+                'success' => true, 
+                'counter_proposal' => true, 
+                'message' => 'Your counter-proposal has been sent back to the admin for review.'
+            ]);
+            exit;
+        }
+
+        // ── DIRECT CONFIRMATION ─────────────────────────────────────────────
+        // If the user accepted the admin's exact proposal, finalize it.
         if ($newConsoleId && $newConsoleType) {
             $upd = $conn->prepare(
                 "UPDATE reservations
