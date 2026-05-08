@@ -57,18 +57,9 @@ if ($action === 'approve') {
     $payment_method = trim($_POST['payment_method'] ?? 'cash');
     $tendered       = isset($_POST['tendered']) ? (float)$_POST['tendered'] : null;
     $result = approveExtension($extension_id, $staff_id, $payment_method, $tendered);
-    if ($result['success']) {
-        $sid = $result['session_id'] ?? 'Unknown';
-        $mins = $result['extra_minutes'] ?? 'Unknown';
-        logActivity($staff_id, "Extend Session", "Approved extension #{$extension_id} for Session #{$sid} (+{$mins} min). Method: " . ucfirst($payment_method));
-    }
 } else {
     $note   = trim($_POST['note'] ?? 'Denied by staff');
     $result = denyExtension($extension_id, $staff_id, $note);
-    if ($result['success']) {
-        $sid = $result['session_id'] ?? 'Unknown';
-        logActivity($staff_id, "Extend Session", "Denied extension #{$extension_id} for Session #{$sid}. Reason: {$note}");
-    }
 }
 
 echo json_encode($result);

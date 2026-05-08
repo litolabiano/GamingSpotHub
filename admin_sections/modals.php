@@ -326,7 +326,6 @@
             <input type="hidden" name="action" value="start_session">
             <input type="hidden" name="planned_minutes" id="plannedMinutesInput" value="">
             <input type="hidden" name="user_id" id="ssUserId" value="">
-            <input type="hidden" name="unit_number" id="ssUnitNumber" value="">
             <div class="form-group">
                 <label>Customer <span style="color:#888;font-size:11px;font-weight:400;">(optional — leave blank for walk-in)</span></label>
                 <div class="cs-wrap" id="ssWrap">

@@ -59,7 +59,7 @@ try {
 
         $message = 'Reschedule request approved. The reservation schedule, console type, and unit assignment have been updated.';
 
-        logActivity($user['user_id'], "Reschedule Approve", "Approved reschedule request #{$reschedule_id} for Reservation #{$reservation_id}");
+
     } else {
         // Reject the reschedule: revert to OLD date/time/console and set status to reserved
         $upd_rs = $conn->prepare("UPDATE reservation_reschedules SET status = 'rejected', seen_by_user = 0 WHERE reschedule_id = ?");
@@ -71,8 +71,6 @@ try {
         $upd_r->execute();
 
         $message = 'Reschedule request rejected. The reservation remains on its original schedule.';
-
-        logActivity($user['user_id'], "Reschedule Reject", "Rejected reschedule request #{$reschedule_id} for Reservation #{$reservation_id}");
     }
 
     $conn->commit();

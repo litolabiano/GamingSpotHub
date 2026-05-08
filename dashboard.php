@@ -54,10 +54,11 @@ $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
             rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
-            r.console_type, c.unit_number
+            ct.type_name AS console_type, c.unit_number
        FROM reservation_reschedules rs
-       JOIN reservations r ON rs.reservation_id = r.reservation_id
-       LEFT JOIN consoles c ON r.console_id = c.console_id
+       JOIN reservations r      ON rs.reservation_id = r.reservation_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+       LEFT JOIN consoles c      ON r.console_id       = c.console_id
       WHERE rs.user_id = ? AND rs.seen_by_user = 0
       ORDER BY rs.created_at DESC"
 );
@@ -66,19 +67,20 @@ $rescheduleStmt->execute();
 $unseenReschedules = $rescheduleStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $rescheduleReasonLabels = [
-    'typhoon'       => 'ðŸŒ€ Typhoon / Bad Weather',
-    'power_outage'  => 'âš¡ Power Outage',
-    'emergency'     => 'ðŸš¨ Emergency',
-    'maintenance'   => 'ðŸ”§ Equipment Maintenance',
-    'other'         => 'ðŸ“‹ Other Reason',
+    'typhoon'       => ' Typhoon / Bad Weather',
+    'power_outage'  => ' Power Outage',
+    'emergency'     => 'Emergency',
+    'maintenance'   => 'Equipment Maintenance',
+    'other'         => 'Other Reason',
 ];
 
 // Active session for THIS user (if any)
 $activeSession = null;
 $stmt = $conn->prepare(
-    "SELECT gs.*, c.console_name, c.console_type, c.unit_number
+    "SELECT gs.*, c.console_name, ct.type_name AS console_type, c.unit_number
        FROM gaming_sessions gs
-       JOIN consoles c ON gs.console_id = c.console_id
+       JOIN consoles c      ON gs.console_id    = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.user_id = ? AND gs.status = 'active'
       ORDER BY gs.start_time DESC LIMIT 1"
 );
@@ -132,11 +134,12 @@ $timeStats = $timeStmt->get_result()->fetch_assoc();
 
 // Favourite console type
 $favStmt = $conn->prepare(
-    "SELECT c.console_type, COUNT(*) AS cnt
+    "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM gaming_sessions gs
-       JOIN consoles c ON gs.console_id = c.console_id
+       JOIN consoles c      ON gs.console_id    = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.user_id = ? AND gs.status = 'completed'
-      GROUP BY c.console_type
+      GROUP BY ct.type_name
       ORDER BY cnt DESC LIMIT 1"
 );
 $favStmt->bind_param('i', $user_id);
@@ -158,7 +161,7 @@ $favMode = $modStmt->get_result()->fetch_assoc();
 // Upcoming reservations (pending/confirmed) for this user
 $upcomingRes = array_filter($myReservations, fn($r) => in_array($r['status'], ['pending','reserved']));
 
-// Sessions by day (last 14 days) â€” for activity chart
+// Sessions by day (last 14 days) - for activity chart
 $activityData = [];
 $activityLabels = [];
 $nowTs = time();
@@ -178,7 +181,7 @@ for ($i = 13; $i >= 0; $i--) {
     $activityData[] = (int) $s->get_result()->fetch_assoc()['mins'];
 }
 
-// Spending by day (last 14 days) â€” for spend chart
+// Spending by day (last 14 days) - for spend chart
 $spendData  = [];
 for ($i = 13; $i >= 0; $i--) {
     $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
@@ -228,10 +231,11 @@ $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
             rc.cancel_reason_type, rc.cancel_reason_detail,
             rc.cancelled_at, rc.refund_issued,
-            r.console_type, r.rental_mode, r.reserved_date,
+            ct.type_name AS console_type, r.rental_mode, r.reserved_date,
             r.downpayment_amount
        FROM reservation_cancellations rc
-       JOIN reservations r ON rc.reservation_id = r.reservation_id
+       JOIN reservations r      ON rc.reservation_id = r.reservation_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE rc.user_id = ?
       ORDER BY rc.cancelled_at DESC
       LIMIT 50"
@@ -286,7 +290,7 @@ function fmtMins(int $m): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Dashboard â€“ GSpot Gaming Hub</title>
+    <title>My Dashboard  GSpot Gaming Hub</title>
     <meta name="description" content="Track your gaming sessions, reservations, and spending at GSpot Gaming Hub.">
 
     <!-- Bootstrap CSS (required by the shared navbar) -->
@@ -310,7 +314,7 @@ function fmtMins(int $m): string {
 
     <style>
         /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-           CUSTOMER DASHBOARD â€“ STYLES
+           CUSTOMER DASHBOARD  STYLES
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
         :root {
             --mint   : #20c8a1;
@@ -339,7 +343,7 @@ function fmtMins(int $m): string {
             overflow-x: hidden;
         }
 
-        /*  Page wrapper (not a grid â€” sidebar is fixed)  */
+        /*  Page wrapper (not a grid - sidebar is fixed)  */
         .cd-wrapper {
             display: block;
             min-height: 100vh;
@@ -367,7 +371,7 @@ function fmtMins(int $m): string {
         .cd-sidebar::-webkit-scrollbar-track { background: transparent; }
         .cd-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
 
-        /*  Sidebar header (logo area â€” mirrors admin sidebar-header)  */
+        /*  Sidebar header (logo area - mirrors admin sidebar-header)  */
         .cd-sidebar-header {
             display: flex;
             align-items: center;
@@ -455,7 +459,7 @@ function fmtMins(int $m): string {
         }
         .cd-sidebar-bottom { margin-top: auto; }
 
-        /*  Topbar (fixed, right of sidebar â€” mirrors admin topbar)  */
+        /*  Topbar (fixed, right of sidebar - mirrors admin topbar)  */
         .cd-topbar {
             position: fixed;
             left: 240px;
@@ -782,7 +786,7 @@ function fmtMins(int $m): string {
         .cd-2col-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
         /*  Responsive  */        @media (max-width: 900px) {
-            /* Hard-clip the viewport â€” nothing bleeds horizontally */
+            /* Hard-clip the viewport - nothing bleeds horizontally */
             html, body { overflow-x: hidden; max-width: 100vw; }
 
             /* Topbar & sidebar stack on mobile */
@@ -799,7 +803,7 @@ function fmtMins(int $m): string {
                 box-sizing: border-box;
             }
 
-            /* Old horizontal scroll nav â€” completely hidden on mobile now */
+            /* Old horizontal scroll nav - completely hidden on mobile now */
             .cd-mobile-nav { display: none !important; }
 
             /* Topbar welcome text: shorter on small screens */
@@ -892,7 +896,7 @@ function fmtMins(int $m): string {
         }
         .pf-input::placeholder { color: rgba(255,255,255,0.25); }
 
-        /* Flash â€” sit below the new topbar */
+        /* Flash - sit below the new topbar */
         .cd-flash {
             position: fixed; top: 72px; right: 20px; z-index: 9999;
             padding: 13px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
@@ -911,7 +915,7 @@ function fmtMins(int $m): string {
         ::-webkit-scrollbar-thumb { background: rgba(95,133,218,0.3); border-radius: 3px; }
 
         /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-           LOGO & NAVBAR ALIGNMENT â€” dashboard-specific
+           LOGO & NAVBAR ALIGNMENT - dashboard-specific
            Shifts the Bootstrap .container left-padding so the navbar brand
            (GSpot logo) visually aligns with the sidebar/content boundary
            rather than the raw viewport edge.
@@ -923,7 +927,7 @@ function fmtMins(int $m): string {
         }
 
         /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-           UI CONSISTENCY â€” align user dashboard sidebar with admin panel
+           UI CONSISTENCY - align user dashboard sidebar with admin panel
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
         /* Sidebar background: match admin's #07101f deep dark */
@@ -1143,7 +1147,7 @@ function fmtMins(int $m): string {
                             <?php if ($rs['status']==='pending' && $rs['initiated_by']==='admin'): ?>
                                 â³ Action Required: Confirm Your New Schedule
                             <?php else: ?>
-                                ðŸ“… Your Reservation Has Been Rescheduled
+                               Your Reservation Has Been Rescheduled
                             <?php endif; ?>
                         </div>
                         <div style="font-size:13px;color:#ccc;line-height:1.7;">
@@ -1156,7 +1160,7 @@ function fmtMins(int $m): string {
                             <span style="color:#888;">Reason:</span>
                             <span style="color:#f1a83c;"><?= $rescheduleReasonLabels[$rs['reason']] ?? ucfirst($rs['reason']) ?></span>
                             <?php if ($rs['reason_detail']): ?>
-                            â€” <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
+                            - <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
                             <?php endif; ?>
                             <?php if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin'): ?>
                                 <div style="display:flex;gap:10px;margin-top:12px;">
@@ -1302,7 +1306,7 @@ function fmtMins(int $m): string {
                 <div class="cd-live-meta">
                     <div class="cd-live-item">
                         <div class="cd-live-label">Console</div>
-                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?></div>
+                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?>  <?= htmlspecialchars($activeSession['unit_number']) ?></div>
                     </div>
                     <div class="cd-live-item">
                         <div class="cd-live-label">Mode</div>
@@ -1321,17 +1325,11 @@ function fmtMins(int $m): string {
                     </div>
                     <?php endif; ?>
                     <div class="cd-live-item">
-                        <div class="cd-live-label">End Time</div>
-                        <div class="cd-live-val" style="color:var(--mint); font-weight:700;">
-                            <?php 
-                                if ($activeSession['rental_mode'] === 'unlimited') {
-                                    echo '12:00 AM';
-                                } elseif ($activeSession['planned_minutes']) {
-                                    echo date('h:i A', strtotime($activeSession['start_time'] . ' + ' . (int)$activeSession['planned_minutes'] . ' minutes'));
-                                } else {
-                                    echo 'Until Logout';
-                                }
-                            ?>
+                        <div class="cd-live-label">Elapsed</div>
+                        <div class="cd-live-timer" id="liveTimer"
+                             data-start="<?= $activeSession['start_time'] ?>"
+                             data-planned="<?= $activeSession['planned_minutes'] ?? 0 ?>">
+                            :
                         </div>
                     </div>
                 </div>
@@ -1438,7 +1436,7 @@ function fmtMins(int $m): string {
                             <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
                             <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                         </td>
-                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' â€“ <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
+                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? '  <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td>
                             <?php $statusMap = ['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
@@ -1468,8 +1466,8 @@ function fmtMins(int $m): string {
                         <td style="color:var(--muted)">#<?= $s['session_id'] ?></td>
                         <td><?= htmlspecialchars($s['console_type']) ?></td>
                         <td><?= match($s['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
-                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : 'â€”' ?></td>
+                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : '-' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : '-' ?></td>
                         <td style="color:var(--muted)"><?= date('M d, Y', strtotime($s['start_time'])) ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -1492,13 +1490,13 @@ function fmtMins(int $m): string {
                 ?>
                 <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(241,168,60,0.12);">
                     <div style="width:36px;height:36px;border-radius:10px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.25);
-                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">ðŸ†</div>
+                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">-</div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:700;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                             <?= htmlspecialchars($ot['tournament_name']) ?>
                         </div>
                         <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">
-                            IGN: <span style="color:var(--mint);"><?= htmlspecialchars($ot['ign'] ?? 'â€”') ?></span>
+                            IGN: <span style="color:var(--mint);"><?= htmlspecialchars($ot['ign'] ?? '-') ?></span>
                             &nbsp;&middot;&nbsp;<?= date('M d, Y', strtotime($ot['start_date'])) ?>
                         </div>
                     </div>
@@ -1580,8 +1578,8 @@ function fmtMins(int $m): string {
                             <span style="font-weight:600"><?= date('M d, Y', strtotime($s['start_time'])) ?></span><br>
                             <span style="color:var(--muted);font-size:11px"><?= date('h:i A', strtotime($s['start_time'])) ?></span>
                         </td>
-                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : 'â€”' ?></td>
+                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : '-' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : '-' ?></td>
                         <td>
                             <?php $stMap=['active'=>['blue','Active'],'completed'=>['mint','Done'],'cancelled'=>['coral','Cancelled']]; $st=$stMap[$s['status']]??['gray',ucfirst($s['status'])]; ?>
                             <span class="cd-badge <?= $st[0] ?>"><?= $st[1] ?></span>
@@ -1620,7 +1618,7 @@ function fmtMins(int $m): string {
                     <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.7;">
                         Your account has been placed on a temporary <strong>1-week reservation ban</strong> due to 3 consecutive cancellations.
                         This restriction will be <strong style="color:#fb566b;">automatically lifted on <?= $banExpiry ?></strong>.
-                        <br>You are still welcome to walk in and use any available unit â€” only online reservations are restricted.
+                        <br>You are still welcome to walk in and use any available unit - only online reservations are restricted.
                     </div>
                 </div>
             </div>
@@ -1707,7 +1705,7 @@ function fmtMins(int $m): string {
                             <?php endif; ?>
                         </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
-                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">â€“</span>' ?></td>
+                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)"></span>' ?></td>
                         <td>
                             <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
@@ -1720,7 +1718,7 @@ function fmtMins(int $m): string {
                                     <br><span style="font-size:10px;color:var(--muted);">- <?= htmlspecialchars($pendingAdminResched['reason_detail']) ?></span>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : 'â€“' ?>
+                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : '' ?>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -2048,7 +2046,7 @@ function fmtMins(int $m): string {
                         </div>
                     </div>
                     <?php if ($done): ?>
-                    <span style="font-size:16px">ðŸ†</span>
+                    <span style="font-size:16px">-</span>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
@@ -2166,9 +2164,9 @@ function fmtMins(int $m): string {
                                 <?php if ($isBanned): ?>
                                 <span style="color:var(--coral)"><i class="fas fa-ban" style="margin-right:4px"></i>You are currently banned from reservations until <?= $banExpiry ?>.</span>
                                 <?php elseif ($streak >= 2): ?>
-                                <span style="color:#f1a83c"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Warning â€” 1 more cancellation will trigger a 7-day ban.</span>
+                                <span style="color:#f1a83c"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Warning - 1 more cancellation will trigger a 7-day ban.</span>
                                 <?php else: ?>
-                                <span style="color:var(--muted)">Good standing â€” no restrictions.</span>
+                                <span style="color:var(--muted)">Good standing - no restrictions.</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -2232,7 +2230,7 @@ function fmtMins(int $m): string {
                             <?php if ((float)$mc['downpayment_amount'] > 0): ?>
                             <span style="color:var(--coral)">₱ <?= number_format($mc['downpayment_amount'], 2) ?></span>
                             <?php else: ?>
-                            <span style="color:var(--muted)">â€”</span>
+                            <span style="color:var(--muted)">-</span>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -2244,7 +2242,7 @@ function fmtMins(int $m): string {
             <?php else: ?>
             <div class="cd-empty">
                 <i class="fas fa-check-circle" style="color:var(--mint)"></i>
-                <p>No cancellations on record â€” great track record! ðŸŽ‰</p>
+                <p>No cancellations on record - great track record!</p>
             </div>
             <?php endif; ?>
         </div><!-- /page-cancellations -->
@@ -2396,7 +2394,7 @@ function fmtMins(int $m): string {
                             <div style="display:flex;gap:20px;flex-wrap:wrap;">
                                 <div style="background:rgba(32,200,161,0.08);border:1px solid rgba(32,200,161,0.2);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Your IGN</div>
-                                    <div style="font-size:13px;font-weight:700;color:#20c8a1;"><?= htmlspecialchars($tr['ign'] ?? 'â€”') ?></div>
+                                    <div style="font-size:13px;font-weight:700;color:#20c8a1;"><?= htmlspecialchars($tr['ign'] ?? '-') ?></div>
                                 </div>
                                 <div style="background:rgba(95,133,218,0.08);border:1px solid rgba(95,133,218,0.2);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Entry Fee</div>
@@ -2421,7 +2419,7 @@ function fmtMins(int $m): string {
                         <!-- Trophy icon -->
                         <div style="width:52px;height:52px;border-radius:14px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.3);
                                     display:flex;align-items:center;justify-content:center;font-size:22px;color:#f1a83c;flex-shrink:0;">
-                            ðŸ†
+                            -
                         </div>
                     </div>
                     <?php if ($tr['notes']): ?>
@@ -2454,9 +2452,9 @@ function fmtMins(int $m): string {
                     ?>
                     <tr>
                         <td style="font-weight:600;"><?= htmlspecialchars($tr['tournament_name']) ?></td>
-                        <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: 'â€”') ?></td>
+                        <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: '-') ?></td>
                         <td><?= date('M d, Y', strtotime($tr['start_date'])) ?></td>
-                        <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? 'â€”') ?></span></td>
+                        <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? '-') ?></span></td>
                         <td style="color:var(--mint);font-weight:700;">₱ <?= number_format($tr['entry_fee'],0) ?></td>
                         <td><span class="cd-badge <?= $tsm[0] ?>"><i class="fas fa-<?= $tsm[1] ?>" style="margin-right:4px;"></i><?= $tsm[2] ?></span></td>
                         <td>
@@ -2466,7 +2464,7 @@ function fmtMins(int $m): string {
                             <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+₱ <?= number_format($tr['prize_amount'],0) ?></span>
                             <?php endif; ?>
                             <?php else: ?>
-                            <span style="color:var(--muted);">â€”</span>
+                            <span style="color:var(--muted);">-</span>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -2545,7 +2543,7 @@ function fmtMins(int $m): string {
                                     <?= htmlspecialchars(substr($refDisplay, 0, 20)) . (strlen($refDisplay) > 20 ? 'â€¦' : '') ?>
                                 </span>
                             <?php else: ?>
-                                <span style="color:var(--muted);">â€”</span>
+                                <span style="color:var(--muted);">-</span>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -2584,7 +2582,7 @@ function fmtMins(int $m): string {
                         </div>
                         <div>
                             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Phone Number</div>
-                            <div id="dispPhone" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['phone'] ?? 'â€”') ?></div>
+                            <div id="dispPhone" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['phone'] ?? '-') ?></div>
                         </div>
                         <div>
                             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Email</div>
@@ -2821,7 +2819,28 @@ function cdShowPage(page, el) {
 })();
 
 /* â•â• Live session timer â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+(function () {
+    const el = document.getElementById('liveTimer');
+    if (!el) return;
+    const startUtc = new Date(el.dataset.start.replace(' ', 'T') + '+08:00').getTime();
+    const planned  = parseInt(el.dataset.planned, 10) || 0;
 
+    function tick() {
+        const elapsed = Math.floor((Date.now() - startUtc) / 1000);
+        const h = Math.floor(elapsed / 3600);
+        const m = Math.floor((elapsed % 3600) / 60);
+        const s = elapsed % 60;
+        const pad = n => String(n).padStart(2, '0');
+        el.textContent = (h ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
+
+        if (planned > 0) {
+            const remaining = planned * 60 - elapsed;
+            if (remaining < 0) el.style.color = '#fb566b';  // overtime
+        }
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
 
 /* â•â• Charts â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const activityLabels = <?= json_encode($activityLabels) ?>;
@@ -2961,7 +2980,7 @@ function cancelStep2Back() {
 function submitCancelReservation() {
     if (!_cancelResId) return;
 
-    // Capture the ID NOW â€” closeCancelModal() will null _cancelResId
+    // Capture the ID NOW - closeCancelModal() will null _cancelResId
     const resId        = _cancelResId;
     const reasonType   = document.getElementById('cancelReasonType').value;
     const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
@@ -2993,7 +3012,7 @@ function submitCancelReservation() {
                 // Store message in sessionStorage so it survives the reload
                 sessionStorage.setItem('dashToastMsg',  data.message);
                 sessionStorage.setItem('dashToastType', 'success');
-                // Reload to #cancellations â€” message will re-appear for 10s after load
+                // Reload to #cancellations - message will re-appear for 10s after load
                 setTimeout(() => {
                     location.href = location.pathname + '#cancellations';
                     location.reload();
@@ -3006,7 +3025,7 @@ function submitCancelReservation() {
         })
         .catch(() => {
             closeCancelModal();
-            showDashToast('Network error â€” please try again.', 'error');
+            showDashToast('Network error - please try again.', 'error');
         });
 }
 
@@ -3109,7 +3128,7 @@ if (mainNav) {
         <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.2);
                     border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
             <strong style="color:#fff;">
-                <?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?>
+                <?= htmlspecialchars($activeSession['console_type']) ?>  <?= htmlspecialchars($activeSession['unit_number']) ?>
             </strong>
             <span style="color:var(--muted);margin-left:8px;">
                 Booked: <?= fmtMins((int)($activeSession['planned_minutes'] ?? 0)) ?>
@@ -3123,7 +3142,7 @@ if (mainNav) {
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="reqExtBtns">
                 <?php
-                // DB-driven extension options â€” reads rate and bonus rule from system_settings
+                // DB-driven extension options - reads rate and bonus rule from system_settings
                 $extRules = getPricingRules();
                 $extRate  = $extRules['hourly_rate'];   // ₱ /hr for extensions
                 // Extension options: 30 min steps up to 2 hrs (no minimum charge for extensions)
@@ -3270,7 +3289,7 @@ function submitReqExt() {
         .catch(function() {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request to Staff';
-            showDashToast('Network error â€” please try again.', 'error');
+            showDashToast('Network error - please try again.', 'error');
         });
 }
 
@@ -3344,7 +3363,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </div>
 
 <script>
-// Valid slots 12:00â€“23:00 in 30-min steps
+// Valid slots 12:0023:00 in 30-min steps
 const DASH_TIME_SLOTS = (function () {
     const s = [];
     for (let h = 12; h <= 23; h++) {
@@ -3487,7 +3506,7 @@ function submitUserReschedule(e) {
 </script>
 
 <script>
-/* â•â• My Account â€“ Profile Edit â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* â•â• My Account  Profile Edit â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 function startProfileEdit() {
     document.getElementById('profileDisplay').style.display = 'none';
@@ -3537,7 +3556,7 @@ function submitProfileEdit(e) {
 
     const phone = document.getElementById('pf_phone').value;
     if (phone !== '' && !/^\d{10,11}$/.test(phone)) {
-        pfShowAlert(true, false, 'Phone must be 10â€“11 digits (numbers only).');
+        pfShowAlert(true, false, 'Phone must be 1011 digits (numbers only).');
         return;
     }
 
@@ -3556,7 +3575,7 @@ function submitProfileEdit(e) {
             if (res.success) {
                 // Update display values
                 document.getElementById('dispName').textContent  = res.full_name;
-                document.getElementById('dispPhone').textContent = res.phone || 'â€”';
+                document.getElementById('dispPhone').textContent = res.phone || '-';
                 
                 // Also update the sidebar header
                 const sidebarName = document.querySelector('.cd-avatar-name');

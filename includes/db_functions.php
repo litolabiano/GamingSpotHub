@@ -40,19 +40,6 @@ function getWalkinUserId(): int {
     return WALKIN_USER_ID;
 }
 
-/**
- * Log an activity performed by an admin or shopkeeper.
- * @param int $user_id The ID of the staff member performing the action.
- * @param string $action The category or title of the action (e.g. "Start Session").
- * @param string $details A readable description of what was done.
- */
-function logActivity(int $user_id, string $action, string $details) {
-    global $conn;
-    $stmt = $conn->prepare("INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)");
-    $stmt->bind_param("iss", $user_id, $action, $details);
-    return $stmt->execute();
-}
-
 // ============================================================================
 // PRICING RULES (DB-DRIVEN — single source of truth)
 // ============================================================================
@@ -981,9 +968,10 @@ function registerForTournament($tournament_id, $user_id) {
         return ['success' => false, 'message' => 'Already registered for this tournament'];
     }
 
-    // Check if registration is open
+    // Check max participants
     $stmt = $conn->prepare(
-        "SELECT t.tournament_id
+        "SELECT t.max_participants,
+                (SELECT COUNT(*) FROM tournament_participants tp WHERE tp.tournament_id = t.tournament_id) AS current_count
          FROM tournaments t WHERE t.tournament_id = ? AND t.status = 'upcoming'"
     );
     $stmt->bind_param("i", $tournament_id);
@@ -992,6 +980,11 @@ function registerForTournament($tournament_id, $user_id) {
 
     if ($result->num_rows === 0) {
         return ['success' => false, 'message' => 'Tournament not found or registration closed'];
+    }
+
+    $tournament = $result->fetch_assoc();
+    if ($tournament['current_count'] >= $tournament['max_participants']) {
+        return ['success' => false, 'message' => 'Tournament is full'];
     }
 
     // Register — set registered_by = user_id for self-registration (customer registered themselves)

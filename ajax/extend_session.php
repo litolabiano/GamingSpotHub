@@ -41,15 +41,10 @@ $processed_by = $_SESSION['user_id'];
 $result = extendSession($session_id, $extra_minutes, $payment_method, $processed_by, $tendered);
 
 // Surface the bonus so the admin UI can show it in the toast
-if ($result['success']) {
-    $logMsg = "Directly extended Session #{$session_id} by {$extra_minutes} min. Total added: {$result['total_added']} min (including bonus).";
-    logActivity($processed_by, "Extend Session", $logMsg);
-    
-    if (($result['bonus_earned'] ?? 0) > 0) {
-        $result['message'] = '+' . $extra_minutes . ' min applied'
-            . ' (+ ' . $result['bonus_earned'] . ' min free bonus!). Total added: '
-            . $result['total_added'] . ' min.';
-    }
+if ($result['success'] && ($result['bonus_earned'] ?? 0) > 0) {
+    $result['message'] = '+' . $extra_minutes . ' min applied'
+        . ' (+ ' . $result['bonus_earned'] . ' min free bonus!). Total added: '
+        . $result['total_added'] . ' min.';
 }
 
 echo json_encode($result);

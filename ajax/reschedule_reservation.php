@@ -168,8 +168,6 @@ try {
 
     $conn->commit();
 
-    logActivity($staff_id, "Reschedule Proposal", "Proposed new schedule for Reservation #{$reservation_id}: {$new_date} {$new_time}. Reason: " . ucfirst($reason));
-
     // Notify user by email that a reschedule proposal is pending their confirmation
     $fullName = trim($res['full_name']);
     try {
