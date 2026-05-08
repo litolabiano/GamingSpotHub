@@ -100,7 +100,7 @@ if (!in_array($res['status'], ['pending', 'reserved'])) {
 // reservation_id was created by the customer themselves.
 $chk = $conn->prepare(
     "SELECT reschedule_id FROM reservation_reschedules
-      WHERE reservation_id = ? AND rescheduled_by = ?
+      WHERE reservation_id = ? AND rescheduled_by = ? AND status != 'rejected'
       LIMIT 1"
 );
 $chk->bind_param('ii', $res_id, $uid);
@@ -178,7 +178,7 @@ try {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-        'iisssisssisss',
+        'iississsisssi',
         $res_id, $uid,
         $old_date, $old_time, $old_console_id, $old_console_type,
         $new_date, $new_time, $new_console_id, $new_console_type,
