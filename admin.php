@@ -1029,6 +1029,82 @@ function onRentalModeChange() {
     if (mode === 'hourly') {
         toggle.checked = false;
         document.getElementById('startPaymentFields').style.display = 'none';
+        document.getElementById('startTendered').value = '';
+    }
+
+    // Pre-fill unlimTendered with flat rate and lock it when switching to unlimited
+    if (mode === 'unlimited') {
+        const cost = parseFloat(document.getElementById('unlimCostAmt').textContent) || 0;
+        const inp  = document.getElementById('unlimTendered');
+        if (inp) {
+            inp.value    = cost > 0 ? cost.toFixed(2) : '';
+            inp.readOnly = true;
+        }
+        const tog     = document.getElementById('unlimTenderedToggle');
+        const wrapper = document.getElementById('unlimTenderedWrapper');
+        const icon    = document.getElementById('unlimTenderedIcon');
+        const hint    = document.getElementById('unlimTenderedHintText');
+        if (tog)     tog.checked = false;
+        if (wrapper) { wrapper.classList.remove('tendered-wrapper-unlocked'); wrapper.classList.add('tendered-wrapper-locked'); }
+        if (icon)    { icon.className = 'fas fa-lock tendered-lock'; }
+        if (hint)    { hint.style.display = 'block'; }
+        document.getElementById('unlimChangeDisplay').style.display = 'none';
+    }
+
+    // Re-evaluate Start button for the new mode
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
+}
+
+/* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
+Hides/shows the controller rental checkbox depending on the selected
+console type. Only Xbox units support controller rentals.
+*/
+function onConsoleChange() {
+    const sel    = document.getElementById('consoleSelect');
+    const opt    = sel ? sel.options[sel.selectedIndex] : null;
+    const type   = opt ? (opt.dataset.type || '') : '';
+    const group  = document.getElementById('controllerRentalGroup');
+    const toggle = document.getElementById('controllerRentalToggle');
+    const label  = document.getElementById('controllerRentalLabel');
+    const icon   = document.getElementById('ctrlRentalIcon');
+    const text   = document.getElementById('ctrlAvailText');
+    if (!group) return;
+
+    // Look up availability for this console type
+    const info      = (typeof CTRL_AVAIL_BY_TYPE !== 'undefined' && type) ? (CTRL_AVAIL_BY_TYPE[type] || null) : null;
+    const hasCtrl   = info && info.total > 0;
+    const available = info ? info.available : 0;
+    const total     = info ? info.total : 0;
+
+    if (hasCtrl) {
+        group.style.display = 'block';
+        const hasAvail = available > 0;
+        if (toggle) {
+            toggle.disabled = !hasAvail;
+            if (!hasAvail && toggle.checked) {
+                toggle.checked = false;
+                if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+            }
+        }
+        if (label) label.style.cursor = hasAvail ? 'pointer' : 'not-allowed';
+        if (icon)  icon.style.color   = hasAvail ? 'var(--clr-mint)' : '#666';
+        if (text) {
+            if (hasAvail) {
+                text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
+                               + `<strong style="color:#20c8a1;">${available}</strong>`
+                               + ` of ${total} controller${total !== 1 ? 's' : ''} available`;
+                text.style.color = '#888';
+            } else {
+                text.innerHTML = `<i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>No controllers available right now`;
+                text.style.color = '#fb566b';
+            }
+        }
+    } else {
+        group.style.display = 'none';
+        if (toggle && toggle.checked) {
+            toggle.checked = false;
+            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+        }
     }
 }
 
@@ -1911,6 +1987,297 @@ function renderCharts() {
 }
 
 AOS.init({ duration: 600, once: true });
+
+// ── Bell notification icon - styles ──
+(function injectNotifStyles() {
+    const s = document.createElement('style');
+    s.textContent = `
+    @keyframes bellPop {
+        0%   { transform: scale(0); }
+        70%  { transform: scale(1.25); }
+        100% { transform: scale(1); }
+    }
+    @keyframes bellShake {
+        0%,100% { transform: rotate(0deg); }
+        20%     { transform: rotate(-14deg); }
+        40%     { transform: rotate(12deg); }
+        60%     { transform: rotate(-8deg); }
+        80%     { transform: rotate(6deg); }
+    }
+    @keyframes dropIn {
+        from { opacity:0; transform:translateY(-8px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    #notifBellBtn:hover { background:rgba(32,200,161,.15) !important; border-color:rgba(32,200,161,.4) !important; color:#20c8a1 !important; }
+    #notifBellBtn.has-notif i { animation:bellShake .5s ease; }
+    #notifList::-webkit-scrollbar { width:4px; }
+    #notifList::-webkit-scrollbar-track { background:transparent; }
+    #notifList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:4px; }
+    `;
+    document.head.appendChild(s);
+})();
+
+// Bell state
+var _notifItems = [];
+var _notifDropdownOpen = false;
+
+function toggleNotifDropdown() {
+    var drop = document.getElementById('notifDropdown');
+    if (!drop) return;
+    _notifDropdownOpen = !_notifDropdownOpen;
+    drop.style.display = _notifDropdownOpen ? 'block' : 'none';
+    // Clear badge when opened
+    if (_notifDropdownOpen) {
+        document.getElementById('notifBellBadge').style.display = 'none';
+        document.getElementById('notifBellBtn').classList.remove('has-notif');
+    }
+}
+
+function closeNotifDropdown() {
+    _notifDropdownOpen = false;
+    var drop = document.getElementById('notifDropdown');
+    if (drop) drop.style.display = 'none';
+}
+
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('notifBellWrap');
+    if (wrap && !wrap.contains(e.target) && _notifDropdownOpen) closeNotifDropdown();
+});
+
+function _addNotifItems(newItems) {
+    _notifItems = newItems.concat(_notifItems).slice(0, 20);
+    var list   = document.getElementById('notifList');
+    var empty  = document.getElementById('notifEmpty');
+    var badge  = document.getElementById('notifBellBadge');
+    var hBadge = document.getElementById('notifHeaderBadge');
+    var btn    = document.getElementById('notifBellBtn');
+
+    console.log('[GSpot Notif] _addNotifItems called. newItems:', newItems.length, '| badge el:', !!badge, '| list el:', !!list);
+    if (!list || !badge || !btn) {
+        console.warn('[GSpot Notif] Missing DOM elements - bell notification cannot display.');
+        return;
+    }
+
+    // Rebuild list
+    list.innerHTML = '';
+    _notifItems.forEach(function(r) {
+        var dateStr = '';
+        if (r.reserved_date) {
+            try { dateStr = new Date(r.reserved_date).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'}); } catch(e) { dateStr = r.reserved_date; }
+        }
+        var timeStr = r.reserved_time ? r.reserved_time.substring(0, 5) : '';
+        var mode    = r.rental_mode === 'open_time' ? 'Open Time' : r.rental_mode === 'unlimited' ? 'Unlimited' : 'Hourly';
+        var row     = document.createElement('div');
+        row.style.cssText = 'padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .15s;';
+        row.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div style="width:34px;height:34px;border-radius:9px;flex-shrink:0;background:rgba(32,200,161,.12);' +
+            'border:1px solid rgba(32,200,161,.25);display:flex;align-items:center;justify-content:center;color:#20c8a1;font-size:13px;">' +
+            '<i class="fas fa-calendar-check"></i></div>' +
+            '<div style="min-width:0;flex:1;">' +
+            '<div style="font-weight:600;font-size:13px;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+            (r.customer_name || 'A customer') + '</div>' +
+            '<div style="font-size:11px;color:#888;margin-top:1px;">' +
+            (r.console_type || '') + ' · ' + mode + (dateStr ? ' · ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
+            '</div></div>' +
+            '<span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);' +
+            'border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;">Pending</span>' +
+            '</div>';
+        row.addEventListener('mouseover',  function() { this.style.background = 'rgba(32,200,161,.06)'; });
+        row.addEventListener('mouseout',   function() { this.style.background = ''; });
+        row.addEventListener('click', function() {
+            showPage('reservations', document.querySelector('.nav-item[onclick*="reservations"]'));
+            closeNotifDropdown();
+        });
+        list.appendChild(row);
+    });
+
+    if (empty) empty.style.display = _notifItems.length > 0 ? 'none' : 'block';
+
+    if (newItems.length > 0) {
+        var count = _notifItems.length;
+        badge.textContent = count > 9 ? '9+' : String(count);
+        // Force-set display using setAttribute to bypass any inline style conflict
+        badge.setAttribute('style',
+            'display:flex !important;align-items:center;justify-content:center;' +
+            'position:absolute;top:-5px;right:-5px;' +
+            'background:#fb566b;color:#fff;border-radius:50%;' +
+            'min-width:18px;height:18px;font-size:10px;font-weight:700;' +
+            'line-height:18px;text-align:center;padding:0 3px;' +
+            'box-shadow:0 0 0 2px #0a0f1c;animation:bellPop .3s ease;'
+        );
+        if (hBadge) { hBadge.textContent = count + ' new'; hBadge.style.display = 'inline-block'; }
+        btn.classList.add('has-notif');
+        var bellI = btn.querySelector('i');
+        if (bellI) {
+            bellI.style.animation = 'none';
+            void bellI.offsetWidth;
+            bellI.style.animation = 'bellShake .5s ease';
+        }
+        console.log('[GSpot Notif] Badge shown. count=', count);
+    }
+}
+
+// ── Reservation notification poller ───────────────────────────────────
+// Polls every 8 s. Baseline from PHP is ALWAYS authoritative at page load -
+// localStorage is only used to avoid re-alerting the same IDs within one session,
+// but NEVER to INCREASE the baseline above what the server reported.
+(function () {
+    const POLL_MS = 8000;
+
+    // ── BUG FIX #1: Never let localStorage INCREASE the baseline.
+    // Old localStorage values from past sessions would block all future alerts.
+    let lastTime = <?= time() ?>;
+    
+    // Only use localStorage to SKIP re-alerting IDs already seen THIS session,
+    // but only if stored is between our PHP baseline and max - not to raise it above PHP.
+    // Simplest correct fix: always trust PHP baseline, ignore localStorage override.
+    
+
+    function poll() {
+        fetch('ajax/poll_notifications.php?last_time=' + lastTime, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.new_count > 0) {
+                    _addNotifItems(data.items);
+                    // Ping sound
+                    try {
+                        var ctx  = new (window.AudioContext || window.webkitAudioContext)();
+                        var osc  = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.connect(gain); gain.connect(ctx.destination);
+                        osc.type = 'sine'; osc.frequency.value = 660;
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                        osc.start(); osc.stop(ctx.currentTime + 0.5);
+                    } catch(e) {}
+                }
+                if (data.max_time > lastTime) {
+                    lastTime = data.max_time;
+                    
+                }
+            })
+            .catch(function() {});
+    }
+
+    // ── BUG FIX #3: First poll at 3 s, then every 8 s (was 15 s / 30 s)
+    setTimeout(function() {
+        poll();
+        setInterval(poll, POLL_MS);
+    }, 3000);
+})();
+
+// ── Unlimited Session Auto-Termination at 12:00 AM ────────────────────────
+// Monitors the clock every 30 s. When midnight (00:00 - 00:10) is detected,
+// calls ajax/auto_end_unlimited.php once to close all active Unlimited sessions.
+// Strictly Unlimited only — Hourly and Open Time sessions are unaffected.
+(function () {
+    var _midnightJobFired = false;   // prevent double-firing within the same midnight window
+    var POLL_MS = 30000;             // check every 30 seconds
+
+    function _checkMidnight() {
+        var now = new Date();
+        var h   = now.getHours();
+        var m   = now.getMinutes();
+
+        // Trigger window: 00:00 – 00:10 (covers late tab wake-ups)
+        if (h !== 0 || m > 10) {
+            // Outside the midnight window — reset the flag so next midnight fires again
+            if (_midnightJobFired && (h !== 0 || m > 10)) {
+                _midnightJobFired = false;
+            }
+            return;
+        }
+
+        // Already fired this midnight window — skip
+        if (_midnightJobFired) return;
+        _midnightJobFired = true;
+
+        console.log('[GSpot] Midnight detected — triggering auto-end for Unlimited sessions…');
+
+        fetch('ajax/auto_end_unlimited.php', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data || !data.success && data.ended === undefined) return;
+
+                var count = data.ended || 0;
+                if (count === 0) {
+                    console.log('[GSpot] Midnight auto-end: No active Unlimited sessions found.');
+                    return;
+                }
+
+                // ── Build a rich notification toast ──────────────────────────
+                var sessionLines = (data.sessions || []).map(function(s) {
+                    var h = Math.floor(s.duration_minutes / 60);
+                    var m = s.duration_minutes % 60;
+                    var dur = (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
+                    return '• ' + s.customer + ' (' + s.unit + ') — ' + dur + ' — ₱' + parseFloat(s.total_cost).toFixed(2);
+                }).join('\n');
+
+                var toastMsg = count + ' Unlimited session' + (count > 1 ? 's' : '') +
+                    ' automatically ended at 12:00 AM (shop closing).\n' + sessionLines;
+
+                console.log('[GSpot] Midnight auto-end complete:', data);
+
+                // Show toast if available, otherwise use a non-blocking banner
+                if (window.showToast) {
+                    window.showToast(
+                        count + ' Unlimited session' + (count > 1 ? 's' : '') +
+                        ' auto-ended at 12:00 AM — ₱400.00 flat rate applied.',
+                        'success'
+                    );
+                } else {
+                    // Fallback: inline status banner at top of admin panel
+                    var banner = document.createElement('div');
+                    banner.style.cssText =
+                        'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+                        'z-index:999999;background:linear-gradient(135deg,#0d2e22,#102e1a);' +
+                        'border:1px solid rgba(32,200,161,.5);border-radius:14px;' +
+                        'padding:16px 24px;max-width:480px;width:92%;' +
+                        'box-shadow:0 8px 32px rgba(0,0,0,.6);color:#eee;font-size:13px;' +
+                        'animation:gspotSirenFadeIn .3s ease;';
+                    banner.innerHTML =
+                        '<div style="display:flex;align-items:center;gap:12px;">' +
+                        '<div style="width:36px;height:36px;border-radius:10px;flex-shrink:0;' +
+                        'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);' +
+                        'display:flex;align-items:center;justify-content:center;font-size:16px;">' +
+                        '<i class="fas fa-moon" style="color:#20c8a1;"></i></div>' +
+                        '<div>' +
+                        '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
+                        'Shop Closing — Unlimited Sessions Ended</div>' +
+                        '<div style="color:#aaa;font-size:12px;">' +
+                        count + ' session' + (count > 1 ? 's' : '') +
+                        ' ended at 12:00 AM · ₱400.00 flat rate applied each</div>' +
+                        '</div>' +
+                        '<button onclick="this.parentElement.parentElement.remove()" ' +
+                        'style="background:none;border:none;color:#555;font-size:16px;' +
+                        'cursor:pointer;margin-left:auto;flex-shrink:0;">×</button>' +
+                        '</div>';
+                    document.body.appendChild(banner);
+                    setTimeout(function() {
+                        if (banner.parentNode) banner.parentNode.removeChild(banner);
+                    }, 12000);
+                }
+
+                // Refresh the dashboard view so ended sessions disappear from Live Sessions
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+            })
+            .catch(function(err) {
+                console.warn('[GSpot] Midnight auto-end fetch error:', err);
+                // Reset flag so it retries on the next poll if something went wrong
+                _midnightJobFired = false;
+            });
+    }
+
+    // First check at 5 s after page load (catches admin pages open past midnight)
+    setTimeout(function() {
+        _checkMidnight();
+        setInterval(_checkMidnight, POLL_MS);
+    }, 5000);
+})();
 </script>
 </body>
 </html>
