@@ -1205,11 +1205,36 @@ function fmtMins(int $m): string {
                 const timeSelect = document.getElementById('rcmTime');
                 dateInput.min    = minDate;
                 dateInput.value  = minDate;
-                if (timeSelect && preTime) timeSelect.value = preTime;
+                // Store original proposed values
+                dateInput.dataset.original = minDate;
+                if (timeSelect && preTime) {
+                    timeSelect.value = preTime;
+                    timeSelect.dataset.original = preTime;
+                }
                 const d = new Date(minDate + 'T00:00:00');
                 document.getElementById('rcmProposedDate').textContent =
                     d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+                
+                // Reset reason field
+                document.getElementById('rcmReasonGroup').style.display = 'none';
+                document.getElementById('rcmReason').value = '';
+                
                 document.getElementById('rescheduleConfirmModal').style.display = 'flex';
+            }
+
+            function checkRcmChanges() {
+                const dateInput = document.getElementById('rcmDate');
+                const timeInput = document.getElementById('rcmTime');
+                const reasonGroup = document.getElementById('rcmReasonGroup');
+                
+                const propDate = dateInput.dataset.original;
+                const propTime = (timeInput.dataset.original || '').substring(0, 5);
+                
+                if (dateInput.value !== propDate || timeInput.value !== propTime) {
+                    reasonGroup.style.display = 'block';
+                } else {
+                    reasonGroup.style.display = 'none';
+                }
             }
             function closeRescheduleConfirmModal() {
                 document.getElementById('rescheduleConfirmModal').style.display = 'none';
@@ -1218,18 +1243,36 @@ function fmtMins(int $m): string {
                 const id   = document.getElementById('rcmRescheduleId').value;
                 const date = document.getElementById('rcmDate').value;
                 const time = document.getElementById('rcmTime').value;
+                const reasonGroup = document.getElementById('rcmReasonGroup');
+                const reason = document.getElementById('rcmReason').value.trim();
+
                 if (!date) { alert('Please select a date.'); return; }
+                if (!time) { alert('Please select a time.'); return; }
+
+                // If date or time changed, reason is mandatory
+                if (reasonGroup.style.display !== 'none' && !reason) {
+                    alert('Please provide a reason for changing the proposed schedule.');
+                    return;
+                }
+
                 const btn = document.getElementById('rcmSubmitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                
                 fetch('ajax/respond_reschedule.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time)
+                    body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time) + '&reason=' + encodeURIComponent(reason)
                 }).then(r => r.json()).then(d => {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
-                    if (d.success) { closeRescheduleConfirmModal(); location.reload(); }
+                    if (d.success) { 
+                        if (d.counter_proposal) {
+                            alert('Your counter-proposal has been sent back to the admin for review.');
+                        }
+                        closeRescheduleConfirmModal(); 
+                        location.reload(); 
+                    }
                     else alert(d.message);
                 }).catch(() => {
                     btn.disabled = false;
@@ -1681,6 +1724,7 @@ function fmtMins(int $m): string {
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
+                                $rConsoleId   = (int)($r['console_id'] ?? 0);
                                 $alreadyResched = !empty($userRescheduledIds[$rid]);
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -1693,7 +1737,7 @@ function fmtMins(int $m): string {
                                     </button>
                                 <?php elseif ($r['status'] === 'reserved'): ?>
                                     <?php if (!$alreadyResched): ?>
-                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
+                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
                                     <?php endif; ?>
@@ -3430,10 +3474,13 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
                 <input type="hidden" id="reschedResId">
                 
                 <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Unit</label>
                     <select id="reschedConsole" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
-                        <?php foreach (getConsoleTypes(true) as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <option value="" disabled selected>— Select console unit —</option>
+                        <?php foreach (getAvailableConsoles() as $con): ?>
+                            <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
+                                <?= htmlspecialchars($con['unit_number']) ?> — <?= htmlspecialchars($con['console_type']) ?> (₱<?= number_format($con['hourly_rate'], 2) ?>/hr)
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -3513,9 +3560,22 @@ function buildReschedTimeSelect() {
     });
 }
 
-function openUserRescheduleModal(id, date, time, consoleType) {
+function openUserRescheduleModal(id, date, time, consoleType, consoleId) {
     document.getElementById('reschedResId').value = id;
-    document.getElementById('reschedConsole').value = consoleType;
+    
+    const selC = document.getElementById('reschedConsole');
+    if (consoleId) {
+        selC.value = consoleId;
+    } else {
+        // Fallback to select first matching type
+        for(let i=0; i<selC.options.length; i++) {
+            if(selC.options[i].dataset.type === consoleType) {
+                selC.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    
     document.getElementById('reschedDate').value = date;
     
     buildReschedTimeSelect();
@@ -3545,7 +3605,15 @@ function submitUserReschedule(e) {
     const rid  = document.getElementById('reschedResId').value;
     const date = document.getElementById('reschedDate').value;
     const time = document.getElementById('reschedTime').value;
-    const consoleType = document.getElementById('reschedConsole').value;
+    const consSel = document.getElementById('reschedConsole');
+    const opt = consSel.options[consSel.selectedIndex];
+    if (!opt || !opt.value) {
+        err.textContent = 'Please select a console unit.';
+        err.style.display = 'block';
+        return;
+    }
+    const consoleId = opt.value;
+    const consoleType = opt.dataset.type;
 
     if (!rid || !date || !time) {
         err.textContent = 'Please fill out all required fields.';
@@ -3561,6 +3629,7 @@ function submitUserReschedule(e) {
     fd.append('reservation_id', rid);
     fd.append('new_date', date);
     fd.append('new_time', time);
+    fd.append('console_id', consoleId);
     fd.append('console_type', consoleType);
 
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
@@ -3786,16 +3855,16 @@ function togglePwVisibility(inputId, btnId) {
         <div style="margin-bottom:14px;">
             <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                           text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
-            <input type="date" id="rcmDate"
+            <input type="date" id="rcmDate" onchange="checkRcmChanges()"
                 style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                        color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                        font-family:inherit;outline:none;box-sizing:border-box;">
         </div>
 
-        <div style="margin-bottom:24px;">
+        <div style="margin-bottom:18px;">
             <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                           text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
-            <select id="rcmTime"
+            <select id="rcmTime" onchange="checkRcmChanges()"
                 style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                        color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                        font-family:inherit;outline:none;">
@@ -3804,6 +3873,16 @@ function togglePwVisibility(inputId, btnId) {
                     echo '<option value="'.$v.'">'.date('g:i A',strtotime('2000-01-01 '.$v)).'</option>'.PHP_EOL;
                 } ?>
             </select>
+        </div>
+
+        <!-- Reason for change (Hidden by default, shown if date/time differs from proposal) -->
+        <div id="rcmReasonGroup" style="display:none;margin-bottom:24px;">
+            <label style="font-size:11px;font-weight:700;color:#fb566b;display:block;margin-bottom:6px;
+                          text-transform:uppercase;letter-spacing:.6px;">Reason for change *</label>
+            <textarea id="rcmReason" rows="2" placeholder="Please explain why you need a different schedule..."
+                style="width:100%;background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.25);
+                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:13px;
+                       font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
         </div>
 
         <div style="display:flex;gap:10px;">

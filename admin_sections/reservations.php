@@ -188,7 +188,8 @@
                             $isToday = ($r['reserved_date'] === date('Y-m-d'));
                             $statusColors = [
                                 'pending'   => ['bg' => 'rgba(241,168,60,.12)',  'text' => '#f1a83c',  'border' => 'rgba(241,168,60,.3)'],
-                                'reserved' => ['bg' => 'rgba(32,200,161,.12)',  'text' => '#20c8a1',  'border' => 'rgba(32,200,161,.3)'],
+                                'reserved'  => ['bg' => 'rgba(32,200,161,.12)',  'text' => '#20c8a1',  'border' => 'rgba(32,200,161,.3)'],
+                                'no_show'   => ['bg' => 'rgba(251,86,107,.12)',  'text' => '#fb566b',  'border' => 'rgba(251,86,107,.3)'],
                             ];
                             $sc = $statusColors[$r['status']] ?? ['bg' => 'rgba(100,100,100,.1)', 'text' => '#888', 'border' => 'rgba(100,100,100,.2)'];
                         ?>
@@ -247,6 +248,11 @@
                                         </button>
 
 
+                                         <button class="btn-sec btn-sm" title="No Show" 
+                                            onclick="markNoShow(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>')"
+                                            style="background:rgba(251,86,107,.15);border:1.5px solid rgba(251,86,107,.45);color:#fb566b;">
+                                            <i class="fas fa-user-slash"></i> No Show
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -713,8 +719,35 @@ function adminRespondReschedule(rescheduleId, action) {
         }
         if (d.success) refreshReservationsUI();
     }).catch(e => {
-        alert('Network error. Please try again.');
+        console.error(e);
+        alert('Network error');
     });
 }
 
+function markNoShow(resId, name) {
+    if (!confirm('Mark reservation for "' + name + '" as NO SHOW?\n\nThis will forfeit the reservation fee and release the console unit. No refund will be issued.')) return;
+
+    fetch('ajax/mark_no_show.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'reservation_id=' + resId
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(data.message, 'success');
+            } else {
+                alert('✓ ' + data.message);
+            }
+            refreshReservationsUI();
+        } else {
+            alert('✕ ' + (data.message || 'Failed to mark as no show'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error');
+    });
+}
 </script>

@@ -88,40 +88,61 @@ if ($new_date === $old_date &&
     exit;
 }
 
-// Check if there's already a pending admin-initiated proposal for this reservation
+// Check if there's already a pending proposal for this reservation
 $chk = $conn->prepare(
-    "SELECT COUNT(*) AS n FROM reservation_reschedules
-      WHERE reservation_id = ? AND status = 'pending' AND initiated_by = 'admin'"
+    "SELECT reschedule_id FROM reservation_reschedules
+      WHERE reservation_id = ? AND status = 'pending' LIMIT 1"
 );
 $chk->bind_param('i', $reservation_id);
 $chk->execute();
-$existing = (int)$chk->get_result()->fetch_assoc()['n'];
-if ($existing > 0) {
-    echo json_encode(['success' => false, 'message' => 'There is already a pending reschedule proposal for this reservation. Please wait for the customer to respond.']);
-    exit;
-}
+$existingRow = $chk->get_result()->fetch_assoc();
+$existingId = $existingRow ? (int)$existingRow['reschedule_id'] : null;
+$chk->close();
 
 $conn->begin_transaction();
 try {
     $staff_id = (int)$user['user_id'];
 
-    // Insert a PENDING proposal — reservation is NOT updated yet
-    $log = $conn->prepare(
-        "INSERT INTO reservation_reschedules
-            (reservation_id, user_id,
-             old_date, old_time, old_console_id, old_console_type,
-             new_date, new_time, console_id, console_type,
-             reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
-    );
-    $log->bind_param(
-        'iississsisssi',
-        $reservation_id, $user_id,
-        $old_date, $old_time, $old_console_id, $old_console_type,
-        $new_date, $new_time, $new_console_id, $new_console_type,
-        $reason, $reason_detail,
-        $staff_id
-    );
+    if ($existingId) {
+        // Update existing pending proposal
+        $log = $conn->prepare(
+            "UPDATE reservation_reschedules
+                SET new_date         = ?,
+                    new_time         = ?,
+                    console_id       = ?,
+                    console_type     = ?,
+                    reason           = ?,
+                    reason_detail    = ?,
+                    rescheduled_by   = ?,
+                    initiated_by     = 'admin',
+                    seen_by_user     = 0,
+                    created_at       = NOW()
+              WHERE reschedule_id    = ?"
+        );
+        $log->bind_param(
+            'ssisssii',
+            $new_date, $new_time, $new_console_id, $new_console_type,
+            $reason, $reason_detail, $staff_id, $existingId
+        );
+    } else {
+        // Insert a NEW pending proposal
+        $log = $conn->prepare(
+            "INSERT INTO reservation_reschedules
+                (reservation_id, user_id,
+                 old_date, old_time, old_console_id, old_console_type,
+                 new_date, new_time, console_id, console_type,
+                 reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
+        );
+        $log->bind_param(
+            'iississsisssi',
+            $reservation_id, $user_id,
+            $old_date, $old_time, $old_console_id, $old_console_type,
+            $new_date, $new_time, $new_console_id, $new_console_type,
+            $reason, $reason_detail,
+            $staff_id
+        );
+    }
     $log->execute();
     $log->close();
 

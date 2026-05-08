@@ -292,7 +292,17 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         )">
                                         <i class="fas fa-peso-sign"></i> Pay
                                     </button>
+                                <?php endif; ?>
 
+                                <?php 
+                                $psEndTs = strtotime($ps['end_time'] ?? '');
+                                if ($isCompleted && $psEndTs && (time() - $psEndTs < 3600)): ?>
+                                    <button class="btn-restore btn-sm" 
+                                        onclick="restoreSession(<?= $ps['session_id'] ?>, '<?= sessionCustomerLabel($ps, true) ?>', '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>', <?= $psEndTs ?>)"
+                                        data-end-ts="<?= $psEndTs ?>"
+                                        style="background:rgba(32,200,161,.12);color:#20c8a1;border:1.5px solid rgba(32,200,161,.3);justify-content:center;font-size:11px;padding:4px 8px;margin-top:4px;">
+                                        <i class="fas fa-undo"></i> Undo <span class="restore-timer"></span>
+                                    </button>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -475,7 +485,30 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     <?php endif; ?>
                                 </div>
 
-                                <?php else: ?>—<?php endif; ?>
+                                <?php else: ?>
+                                    <div style="display:flex;flex-direction:column;gap:4px;">
+                                        <?php if ($sess['status'] === 'completed'): ?>
+                                            <?php 
+                                            $endTs = strtotime($sess['end_time']);
+                                            $now = time();
+                                            $diff = $now - $endTs;
+                                            $canRestore = ($diff < 3600); // 1 hour window
+                                            ?>
+                                            <?php if ($canRestore): ?>
+                                                <button class="btn-restore btn-sm" 
+                                                        onclick="restoreSession(<?= $sess['session_id'] ?>, '<?= sessionCustomerLabel($sess, true) ?>', '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>', <?= $endTs ?>)"
+                                                        data-end-ts="<?= $endTs ?>"
+                                                        style="background:rgba(32,200,161,.12);color:#20c8a1;border:1.5px solid rgba(32,200,161,.3);justify-content:center;font-size:11px;padding:4px 8px;">
+                                                    <i class="fas fa-undo"></i> Undo <span class="restore-timer"></span>
+                                                </button>
+                                            <?php else: ?>
+                                                —
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            —
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                         </td>
 
                     </tr>
@@ -838,5 +871,79 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         el.innerHTML = `<i class="fas ${colors.icon}"></i> ${msg}`;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 4500);
+    }
+
+    function restoreSession(sessionId, customer, console, endTs) {
+        const now = Math.floor(Date.now() / 1000);
+        const elapsedSec = now - endTs;
+        const m = Math.floor(elapsedSec / 60);
+        const s = elapsedSec % 60;
+        const timeStr = (m > 0 ? `${m}m ` : "") + `${s}s`;
+
+        if (!confirm(`Restore session for ${customer} on ${console}?\n\nIt has been ${timeStr} since this session was ended. This time will be deducted from the remaining session time.`)) {
+            return;
+        }
+
+        fetch('ajax/restore_session.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `session_id=${sessionId}`
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                if (typeof showAdminToast === 'function') {
+                    showAdminToast(d.message, 'success');
+                } else if (typeof showInlineToast === 'function') {
+                    showInlineToast(d.message, 'success');
+                } else {
+                    alert('✓ ' + d.message);
+                }
+                if (typeof refreshSection === 'function') refreshSection();
+            } else {
+                alert('✕ ' + d.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Network error');
+        });
+    }
+
+    /* ── Restore Countdown Logic ── */
+    function initRestoreTimers() {
+        document.querySelectorAll('.btn-restore').forEach(btn => {
+            if (btn.dataset.timerInit) return;
+            btn.dataset.timerInit = 'true';
+
+            const endTs = parseInt(btn.dataset.endTs);
+            const updateTimer = () => {
+                const now = Math.floor(Date.now() / 1000);
+                const diff = 3600 - (now - endTs);
+                if (diff <= 0) {
+                    const parent = btn.parentElement;
+                    if (parent) parent.innerHTML = '—';
+                    return;
+                }
+                const m = Math.floor(diff / 60);
+                const s = diff % 60;
+                const timerSpan = btn.querySelector('.restore-timer');
+                if (timerSpan) timerSpan.textContent = `(${m}:${s.toString().padStart(2, '0')})`;
+                setTimeout(updateTimer, 1000);
+            };
+            updateTimer();
+        });
+    }
+
+    // Initial call
+    initRestoreTimers();
+
+    // Use MutationObserver to re-init timers when the section content is updated by live_section.php
+    const sessionsContainer = document.getElementById('sessions');
+    if (sessionsContainer) {
+        const observer = new MutationObserver((mutations) => {
+            initRestoreTimers();
+        });
+        observer.observe(sessionsContainer, { childList: true, subtree: true });
     }
 </script>
