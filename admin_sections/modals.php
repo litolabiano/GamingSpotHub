@@ -414,50 +414,62 @@
             </div>
 
 <?php
-$ctrlAvailCount = $conn->query(
-    "SELECT COUNT(*) AS n FROM controllers WHERE status = 'available' AND controller_type = 'Xbox Controller'"
-)->fetch_assoc()['n'] ?? 0;
-$ctrlTotal = $conn->query(
-    "SELECT COUNT(*) AS n FROM controllers WHERE controller_type = 'Xbox Controller'"
-)->fetch_assoc()['n'] ?? 0;
+// Load controller availability grouped by console type (joins through controller_types → console_types)
+$ctrlAvailByType = [];
+$ctrlRes = $conn->query(
+    "SELECT cs.type_name AS console_type,
+            COUNT(*) AS total,
+            SUM(c.status = 'available') AS available
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types    cs ON cs.type_id  = ct.console_type_id
+      GROUP BY cs.type_name"
+);
+if ($ctrlRes) {
+    while ($row = $ctrlRes->fetch_assoc()) {
+        $ctrlAvailByType[$row['console_type']] = [
+            'available' => (int)$row['available'],
+            'total'     => (int)$row['total'],
+        ];
+    }
+}
+$ctrlAvailJson = json_encode($ctrlAvailByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>
+<script>
+/* Controller availability per console type — used by onConsoleChange() */
+const CTRL_AVAIL_BY_TYPE = <?= $ctrlAvailJson ?>;
+</script>
+
 <div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
     <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
                 border-radius:12px;padding:14px 16px;">
         <div class="form-check" style="margin:0;">
             <input type="checkbox" id="controllerRentalToggle"
                    name="controller_rental" value="1"
-                   onchange="recalcSessionPreview()"
-                   <?= $ctrlAvailCount === 0 ? 'disabled' : '' ?>>
+                   onchange="recalcSessionPreview()">
             <input type="hidden" name="controller_rental_fee_amt"
                    id="controllerFeeAmt"
                    value="<?= htmlspecialchars(getSetting('controller_rental_fee') ?? 20) ?>">
-            <label for="controllerRentalToggle" style="display:flex;align-items:center;gap:10px;cursor:<?= $ctrlAvailCount === 0 ? 'not-allowed' : 'pointer' ?>;">
-                <i class="fas fa-gamepad" style="color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;font-size:16px;"></i>
+            <label for="controllerRentalToggle" id="controllerRentalLabel"
+                   style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <i class="fas fa-gamepad" id="ctrlRentalIcon" style="color:var(--clr-mint);font-size:16px;"></i>
                 <div>
                     <div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;
-                                color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;">
+                                color:var(--clr-mint);">
                         Controller Rental
                         <span style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
-                            +₱<?= getSetting('controller_rental_fee') ?? 20 ?>/session
+                            +&#8369;<?= getSetting('controller_rental_fee') ?? 20 ?>/session
                         </span>
                     </div>
-                    <div style="font-size:11px;margin-top:3px;
-                                color:<?= $ctrlAvailCount > 0 ? '#888' : '#fb566b' ?>;">
-                        <?php if ($ctrlAvailCount > 0): ?>
-                            <i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>
-                            <strong style="color:#20c8a1;"><?= $ctrlAvailCount ?></strong>
-                            of <?= $ctrlTotal ?> controller<?= $ctrlTotal !== 1 ? 's' : '' ?> available
-                        <?php else: ?>
-                            <i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>
-                            No controllers available right now
-                        <?php endif; ?>
+                    <div id="ctrlAvailText" style="font-size:11px;margin-top:3px;color:#888;">
+                        <!-- Populated by onConsoleChange() -->
                     </div>
                 </div>
             </label>
         </div>
     </div>
 </div>
+
 
             <!-- ── Optional upfront payment (hourly only) ── -->
             <div id="startPaymentGroup" style="display:none;">
@@ -1760,15 +1772,23 @@ function openConvertModal(res) {
 
                 <div class="form-group">
                     <label>Controller Type *</label>
-                    <select name="controller_type" required>
+                    <select name="controller_type_id" required
+                            onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
                         <option value="" disabled selected>— Select Type —</option>
                         <?php foreach ($controllerTypes as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>">
+                            <option value="<?= $ct['type_id'] ?>"
+                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>">
                                 <?= htmlspecialchars($ct['type_name']) ?>
+                                <?php if (!empty($ct['parent_console_name'])): ?>
+                                    (<?= htmlspecialchars($ct['parent_console_name']) ?>)
+                                <?php endif; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <!-- Hidden: keeps the type name in sync for the legacy controller_type text column -->
+                    <input type="hidden" name="controller_type" value="">
                 </div>
+
 
                 <div class="form-group">
                     <textarea name="controller_notes" rows="2"

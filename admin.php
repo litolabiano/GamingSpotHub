@@ -13,10 +13,10 @@ header("Pragma: no-cache");
 header("Expires: 0"); 
 
 $user = getCurrentUser();
-$consoleTypes         = getConsoleTypes(true, 'console');           // active console types only
-$controllerTypes      = getControllerTypes(true);                   // active controller types only
-$archivedConsoleTypes = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'console');
-$archivedCtrlTypes    = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'controller');
+$consoleTypes         = getConsoleTypes(true);              // active console types (console_types table)
+$controllerTypes      = getControllerTypes(true);           // active controller types (controller_types table)
+$archivedConsoleTypes = array_filter(getConsoleTypes(false),    fn($ct) => $ct['is_archived'] == 1);
+$archivedCtrlTypes    = array_filter(getControllerTypes(false), fn($ct) => $ct['is_archived'] == 1);
 $message = '';
 $messageType = '';
 
@@ -314,26 +314,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
-        $typeName      = trim($_POST['type_name'] ?? '');
-        $category      = in_array($_POST['category'] ?? '', ['console', 'controller']) ? $_POST['category'] : 'console';
-        $consoleTypeId = ($category === 'controller' && !empty($_POST['console_type_id']))
-                         ? (int)$_POST['console_type_id'] : null;
+        $typeName = trim($_POST['type_name'] ?? '');
         if ($typeName) {
-            if (addConsoleType($typeName, $category, $consoleTypeId)) {
-                $parentNote = '';
-                if ($consoleTypeId) {
-                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
-                    $pRes->bind_param('i', $consoleTypeId);
-                    $pRes->execute();
-                    $pRow = $pRes->get_result()->fetch_assoc();
-                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
-                }
-                $message = ($category === 'controller' ? 'Controller' : 'Console') . ' type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added successfully.';
+            if (addConsoleType($typeName)) {
+                $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
                 $messageType = 'success';
             } else {
-                $message = 'Failed to add type. It might already exist.';
+                $message = 'Failed to add console type. It might already exist.';
                 $messageType = 'error';
             }
         }
@@ -342,66 +332,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ARCHIVE CONSOLE TYPE
     elseif ($action === 'archive_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (archiveConsoleType($typeId)) {
-                $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to archive console type.';
-                $messageType = 'error';
-            }
+        if ($typeId && archiveConsoleType($typeId)) {
+            $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive console type.';
+            $messageType = 'error';
         }
     }
 
     // RESTORE CONSOLE TYPE
     elseif ($action === 'restore_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (restoreConsoleType($typeId)) {
-                $message = 'Console type restored successfully.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to restore console type.';
-                $messageType = 'error';
-            }
+        if ($typeId && restoreConsoleType($typeId)) {
+            $message = 'Console type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore console type.';
+            $messageType = 'error';
         }
     }
 
     // PERMANENTLY DELETE CONSOLE TYPE
     elseif ($action === 'delete_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (deleteConsoleType($typeId)) {
-                $message = 'Console type permanently removed from the system.';
+        if ($typeId && deleteConsoleType($typeId)) {
+            $message = 'Console type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete console type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER TYPE ACTIONS ───────────────────────────────────────────────
+    // ADD CONTROLLER TYPE
+    elseif ($action === 'add_controller_type') {
+        $typeName      = trim($_POST['type_name'] ?? '');
+        $consoleTypeId = !empty($_POST['console_type_id']) ? (int)$_POST['console_type_id'] : null;
+        if ($typeName) {
+            if (addControllerType($typeName, $consoleTypeId)) {
+                $parentNote = '';
+                if ($consoleTypeId) {
+                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+                    $pRes->bind_param('i', $consoleTypeId); $pRes->execute();
+                    $pRow = $pRes->get_result()->fetch_assoc();
+                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
+                }
+                $message = 'Controller type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added.';
                 $messageType = 'success';
             } else {
-                $message = 'Failed to permanently delete console type.';
+                $message = 'Failed to add controller type. It might already exist.';
                 $messageType = 'error';
             }
         }
     }
 
-    // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
+    // ARCHIVE CONTROLLER TYPE
+    elseif ($action === 'archive_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && archiveControllerType($typeId)) {
+            $message = 'Controller type archived successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // RESTORE CONTROLLER TYPE
+    elseif ($action === 'restore_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && restoreControllerType($typeId)) {
+            $message = 'Controller type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // PERMANENTLY DELETE CONTROLLER TYPE
+    elseif ($action === 'delete_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && deleteControllerType($typeId)) {
+            $message = 'Controller type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER (UNIT) ACTIONS ─────────────────────────────────────────────
     elseif ($action === 'add_controller') {
-        $ctrl_name  = trim($_POST['controller_name'] ?? '');
-        $ctrl_type  = $_POST['controller_type'] ?? '';
-        $ctrl_unit  = trim($_POST['ctrl_unit_number'] ?? '');
-        $ctrl_notes = trim($_POST['controller_notes'] ?? '');
-        // Validate against DB-driven controller types (category = 'controller')
-        $validCtrlTypes = array_column(getControllerTypes(true), 'type_name');
-        if ($ctrl_name && in_array($ctrl_type, $validCtrlTypes) && $ctrl_unit) {
-            // Check for duplicate unit number first
+        $ctrl_name   = trim($_POST['controller_name'] ?? '');
+        $ctrl_type   = trim($_POST['controller_type'] ?? '');  // legacy text field
+        $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
+        $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes  = trim($_POST['controller_notes'] ?? '');
+
+        // Validate: must match a real controller type by ID
+        $validTypeIds = array_column(getControllerTypes(true), 'type_id');
+        if ($ctrl_name && $ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
+            // Also get the type name for the legacy column
+            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['type_id'] === $ctrl_typeId))[0] ?? null;
+            $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
+
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
-            $dupCheck->bind_param('s', $ctrl_unit);
-            $dupCheck->execute();
+            $dupCheck->bind_param('s', $ctrl_unit); $dupCheck->execute();
             if ($dupCheck->get_result()->num_rows > 0) {
-                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists. Please use a different unit number (e.g. CTRL-02, CTRL-03).';
+                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists.';
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
+                    "INSERT INTO controllers (controller_name, controller_type, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('ssiss', $ctrl_name, $ctrl_type, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
@@ -413,7 +460,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $dupCheck->close();
         } else {
-            $message = 'Invalid input for new controller.';
+            $message = 'Invalid input for new controller. Ensure all fields are filled and a valid controller type is selected.';
             $messageType = 'error';
         }
     }
@@ -1862,12 +1909,42 @@ function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
-    const isXbox = type.toLowerCase().includes('xbox');
     const group  = document.getElementById('controllerRentalGroup');
     const toggle = document.getElementById('controllerRentalToggle');
+    const label  = document.getElementById('controllerRentalLabel');
+    const icon   = document.getElementById('ctrlRentalIcon');
+    const text   = document.getElementById('ctrlAvailText');
     if (!group) return;
-    if (isXbox) {
+
+    // Look up availability for this console type
+    const info      = (typeof CTRL_AVAIL_BY_TYPE !== 'undefined' && type) ? (CTRL_AVAIL_BY_TYPE[type] || null) : null;
+    const hasCtrl   = info && info.total > 0;
+    const available = info ? info.available : 0;
+    const total     = info ? info.total : 0;
+
+    if (hasCtrl) {
         group.style.display = 'block';
+        const hasAvail = available > 0;
+        if (toggle) {
+            toggle.disabled = !hasAvail;
+            if (!hasAvail && toggle.checked) {
+                toggle.checked = false;
+                if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+            }
+        }
+        if (label) label.style.cursor = hasAvail ? 'pointer' : 'not-allowed';
+        if (icon)  icon.style.color   = hasAvail ? 'var(--clr-mint)' : '#666';
+        if (text) {
+            if (hasAvail) {
+                text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
+                               + `<strong style="color:#20c8a1;">${available}</strong>`
+                               + ` of ${total} controller${total !== 1 ? 's' : ''} available`;
+                text.style.color = '#888';
+            } else {
+                text.innerHTML = `<i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>No controllers available right now`;
+                text.style.color = '#fb566b';
+            }
+        }
     } else {
         group.style.display = 'none';
         if (toggle && toggle.checked) {

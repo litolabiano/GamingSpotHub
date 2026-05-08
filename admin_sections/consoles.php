@@ -234,7 +234,7 @@
         </div>
     </div>
 
-    <!-- ── Xbox Controller Inventory (INSIDE #consoles so it only shows here) ── -->
+    <!-- ── Controller Inventory (INSIDE #consoles so it only shows here) ── -->
     <div id="activeControllersSection">
     <?php
         $allControllers = [];
@@ -252,7 +252,7 @@
             <div class="page-title-group" style="flex:1;">
                 <h2 class="page-title">
                     <i class="fa-solid fa-gamepad" style="color:#20c8a1;margin-right:10px;"></i>
-                    Xbox Controller Inventory
+                    Controller Inventory
                 </h2>
                 <p class="page-subtitle">Manage physical controllers available for rental</p>
             </div>
@@ -424,7 +424,7 @@
             </div>
         </div>
     </div>
-    <!-- ── END Xbox Controller Inventory ── -->
+    <!-- ── END Controller Inventory ── -->
     </div>
 
 </div><!-- /#consoles — CLOSED HERE after controller inventory -->
@@ -629,11 +629,10 @@ function toggleArchiveSection(showArchive) {
                 <!-- Active Console Types -->
                 <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:12px;">Active Console Types</label>
                 <div style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;padding-right:5px;margin-bottom:20px;">
-                    <?php $consoleOnlyTypes = array_filter($consoleTypes, fn($ct) => ($ct['category'] ?? 'console') === 'console'); ?>
-                    <?php if (empty($consoleOnlyTypes)): ?>
+                    <?php if (empty($consoleTypes)): ?>
                         <div style="text-align:center;padding:20px;color:#555;font-style:italic;">No active console types.</div>
                     <?php else: ?>
-                        <?php foreach ($consoleOnlyTypes as $ct): ?>
+                        <?php foreach ($consoleTypes as $ct): ?>
                             <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(32,200,161,.05);padding:10px 14px;border-radius:8px;border:1px solid rgba(32,200,161,.1);">
                                 <div style="display:flex;align-items:center;gap:10px;">
                                     <i class="fas fa-desktop" style="color:#20c8a1;font-size:12px;"></i>
@@ -686,8 +685,7 @@ function toggleArchiveSection(showArchive) {
             <div id="panelController" style="display:none;">
                 <!-- Add New Controller Type -->
                 <form method="POST" action="admin.php#consoles" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1);">
-                    <input type="hidden" name="action" value="add_console_type">
-                    <input type="hidden" name="category" value="controller">
+                    <input type="hidden" name="action" value="add_controller_type">
                     <?= csrfField() ?>
                     <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:8px;">Add New Controller Type</label>
                     <div style="display:flex;flex-direction:column;gap:10px;">
@@ -726,8 +724,8 @@ function toggleArchiveSection(showArchive) {
                                         <?php endif; ?>
                                     </div>
                                 </div>
-                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this controller type?');">
-                                    <input type="hidden" name="action" value="archive_console_type">
+                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this controller type?')">
+                                    <input type="hidden" name="action" value="archive_controller_type">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
                                     <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
@@ -751,13 +749,13 @@ function toggleArchiveSection(showArchive) {
                             </div>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <form method="POST" action="admin.php#consoles">
-                                    <input type="hidden" name="action" value="restore_console_type">
+                                    <input type="hidden" name="action" value="restore_controller_type">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
                                     <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
                                 </form>
                                 <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
-                                    <input type="hidden" name="action" value="delete_console_type">
+                                    <input type="hidden" name="action" value="delete_controller_type">
                                     <?= csrfField() ?>
                                     <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
                                     <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>

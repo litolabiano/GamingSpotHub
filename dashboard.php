@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * GamingSpotHub - Customer Dashboard
  * Lets logged-in customers track reservations, session history, spending, and more.
@@ -17,7 +17,7 @@ require_once __DIR__ . '/includes/db_functions.php';
 $user    = getCurrentUser();
 $user_id = $user['user_id'];
 
-// ── Data fetching ──────────────────────────────────────────────────────────────
+// â”€â”€ Data fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Session history (all, ordered newest-first)
 $sessionHistory = getUserSessionHistory($user_id, 50);
@@ -43,7 +43,7 @@ if (!empty($myReservations)) {
     }
 }
 
-// ── Cancellation ban / streak status ────────────────────────────────────────
+// â”€â”€ Cancellation ban / streak status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $banStmt = $conn->prepare("SELECT consecutive_cancellations, reservation_banned_until FROM users WHERE user_id = ?");
 $banStmt->bind_param('i', $user_id);
 $banStmt->execute();
@@ -52,7 +52,7 @@ $isBanned  = !empty($banData['reservation_banned_until']) && strtotime($banData[
 $banExpiry = $isBanned ? date('F j, Y \a\t g:i A', strtotime($banData['reservation_banned_until'])) : '';
 $cancelStreak = (int)($banData['consecutive_cancellations'] ?? 0);
 
-// ── Reschedule notifications (unseen reschedules for this user) ──────────────
+// â”€â”€ Reschedule notifications (unseen reschedules for this user) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $rescheduleStmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.old_date, rs.old_time,
             rs.new_date, rs.new_time, rs.reason, rs.reason_detail, rs.created_at, rs.status, rs.initiated_by,
@@ -68,11 +68,11 @@ $rescheduleStmt->execute();
 $unseenReschedules = $rescheduleStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $rescheduleReasonLabels = [
-    'typhoon'       => '🌀 Typhoon / Bad Weather',
-    'power_outage'  => '⚡ Power Outage',
-    'emergency'     => '🚨 Emergency',
-    'maintenance'   => '🔧 Equipment Maintenance',
-    'other'         => '📋 Other Reason',
+    'typhoon'       => 'ðŸŒ€ Typhoon / Bad Weather',
+    'power_outage'  => 'âš¡ Power Outage',
+    'emergency'     => 'ðŸš¨ Emergency',
+    'maintenance'   => 'ðŸ”§ Equipment Maintenance',
+    'other'         => 'ðŸ“‹ Other Reason',
 ];
 
 // Active session for THIS user (if any)
@@ -160,7 +160,7 @@ $favMode = $modStmt->get_result()->fetch_assoc();
 // Upcoming reservations (pending/confirmed) for this user
 $upcomingRes = array_filter($myReservations, fn($r) => in_array($r['status'], ['pending','reserved']));
 
-// Sessions by day (last 14 days) — for activity chart
+// Sessions by day (last 14 days) â€” for activity chart
 $activityData = [];
 $activityLabels = [];
 $nowTs = time();
@@ -180,7 +180,7 @@ for ($i = 13; $i >= 0; $i--) {
     $activityData[] = (int) $s->get_result()->fetch_assoc()['mins'];
 }
 
-// Spending by day (last 14 days) — for spend chart
+// Spending by day (last 14 days) â€” for spend chart
 $spendData  = [];
 for ($i = 13; $i >= 0; $i--) {
     $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
@@ -197,7 +197,7 @@ for ($i = 13; $i >= 0; $i--) {
     $spendData[] = (float) $s->get_result()->fetch_assoc()['rev'];
 }
 
-// ── My Payments (all transactions for this user) ────────────────────────────
+// â”€â”€ My Payments (all transactions for this user) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $myPaymentsStmt = $conn->prepare(
     "SELECT t.*,
             CASE
@@ -224,7 +224,7 @@ $myPaymentsStmt->execute();
 $myPayments = $myPaymentsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $myPaymentsCount = count($myPayments);
 
-// ── My Cancellations ────────────────────────────────────────────────────────
+// â”€â”€ My Cancellations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $myCancels = [];
 $cancelLog = $conn->prepare(
     "SELECT rc.cancel_id, rc.reservation_id, rc.cancelled_by,
@@ -244,7 +244,7 @@ $myCancels = $cancelLog->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $myCancelCount = count($myCancels);
 
-// ── My Tournament Registrations ───────────────────────────────────────────
+// â”€â”€ My Tournament Registrations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $myTournaments = [];
 $tStmt = $conn->prepare(
     "SELECT tp.participant_id, tp.tournament_id, tp.registration_date,
@@ -288,7 +288,7 @@ function fmtMins(int $m): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Dashboard – GSpot Gaming Hub</title>
+    <title>My Dashboard â€“ GSpot Gaming Hub</title>
     <meta name="description" content="Track your gaming sessions, reservations, and spending at GSpot Gaming Hub.">
 
     <!-- Bootstrap CSS (required by the shared navbar) -->
@@ -311,9 +311,9 @@ function fmtMins(int $m): string {
     <script src="assets/libs/chartjs/chart.min.js"></script>
 
     <style>
-        /* ══════════════════════════════════════════════════════════════════
-           CUSTOMER DASHBOARD – STYLES
-        ══════════════════════════════════════════════════════════════════ */
+        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           CUSTOMER DASHBOARD â€“ STYLES
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
         :root {
             --mint   : #20c8a1;
             --blue   : #5f85da;
@@ -341,13 +341,13 @@ function fmtMins(int $m): string {
             overflow-x: hidden;
         }
 
-        /* ── Page wrapper (not a grid — sidebar is fixed) ────────────────── */
+        /* â”€â”€ Page wrapper (not a grid â€” sidebar is fixed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-wrapper {
             display: block;
             min-height: 100vh;
         }
 
-        /* ── Sidebar (fixed, like admin) ────────────────────────────── */
+        /* â”€â”€ Sidebar (fixed, like admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-sidebar {
             position: fixed;
             left: 0;
@@ -369,7 +369,7 @@ function fmtMins(int $m): string {
         .cd-sidebar::-webkit-scrollbar-track { background: transparent; }
         .cd-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
 
-        /* ── Sidebar header (logo area — mirrors admin sidebar-header) ────── */
+        /* â”€â”€ Sidebar header (logo area â€” mirrors admin sidebar-header) â”€â”€â”€â”€â”€â”€ */
         .cd-sidebar-header {
             display: flex;
             align-items: center;
@@ -396,7 +396,7 @@ function fmtMins(int $m): string {
             white-space: nowrap;
         }
 
-        /* ── Sidebar user section (below logo) ────────────────────────── */
+        /* â”€â”€ Sidebar user section (below logo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
         .cd-sidebar-avatar {
             display: flex;
@@ -457,7 +457,7 @@ function fmtMins(int $m): string {
         }
         .cd-sidebar-bottom { margin-top: auto; }
 
-        /* ── Topbar (fixed, right of sidebar — mirrors admin topbar) ──────── */
+        /* â”€â”€ Topbar (fixed, right of sidebar â€” mirrors admin topbar) â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-topbar {
             position: fixed;
             left: 240px;
@@ -574,7 +574,7 @@ function fmtMins(int $m): string {
         /* Nav items: inside padded area */
         .cd-sidebar-nav { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
-        /* ── Main area (margin-based, like admin .main-content) ──────────── */
+        /* â”€â”€ Main area (margin-based, like admin .main-content) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-main {
             margin-left: 240px;
             margin-top: 60px;
@@ -583,7 +583,7 @@ function fmtMins(int $m): string {
             min-width: 0;
         }
 
-        /* ── Account page: two-column layout ─────────────────────────── */
+        /* â”€â”€ Account page: two-column layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-account-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -594,7 +594,7 @@ function fmtMins(int $m): string {
             .cd-account-grid { grid-template-columns: 1fr; }
         }
 
-        /* ── Page switching ───────────────────────────────────────────── */
+        /* â”€â”€ Page switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-page { display: none; animation: cdFade .35s ease; }
         .cd-page.active { display: block; }
         @keyframes cdFade {
@@ -602,7 +602,7 @@ function fmtMins(int $m): string {
             to   { opacity:1; transform:translateY(0); }
         }
 
-        /* ── Section title ────────────────────────────────────────────── */
+        /* â”€â”€ Section title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-section-title {
             font-family: 'Outfit', sans-serif;
             font-size: 22px;
@@ -615,7 +615,7 @@ function fmtMins(int $m): string {
         }
         .cd-section-title i { color: var(--mint); font-size: 20px; }
 
-        /* ── Stats grid ───────────────────────────────────────────────── */
+        /* â”€â”€ Stats grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 16px; margin-bottom: 24px; }
         .cd-stat-card {
             background: var(--panel);
@@ -649,7 +649,7 @@ function fmtMins(int $m): string {
         .cd-stat-value { font-size: 28px; font-weight: 800; font-family: 'Outfit', sans-serif; color: #fff; }
         .cd-stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-        /* ── Card ─────────────────────────────────────────────────────── */
+        /* â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-card {
             background: var(--panel);
             border: 1px solid var(--border);
@@ -674,7 +674,7 @@ function fmtMins(int $m): string {
         }
         .cd-card-title i { color: var(--mint); }
 
-        /* ── Table ────────────────────────────────────────────────────── */
+        /* â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-table { width: 100%; border-collapse: collapse; }
         .cd-table th {
             background: rgba(10,33,81,0.5);
@@ -696,7 +696,7 @@ function fmtMins(int $m): string {
         .cd-table tr:hover td { background: rgba(32,200,161,0.04); }
         .cd-table tr:last-child td { border-bottom: none; }
 
-        /* ── Badge ────────────────────────────────────────────────────── */
+        /* â”€â”€ Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-badge {
             display: inline-block;
             padding: 3px 10px;
@@ -711,7 +711,7 @@ function fmtMins(int $m): string {
         .cd-badge.gold    { background: rgba(241,168,60,0.15); color: var(--gold); }
         .cd-badge.gray    { background: rgba(150,150,150,0.15); color: #aaa; }
 
-        /* ── Cancel reservation button ────────────────────────────────── */
+        /* â”€â”€ Cancel reservation button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-cancel-btn {
             display: inline-flex; align-items: center; gap: 6px;
             padding: 5px 12px; border-radius: 8px; border: 1px solid rgba(251,86,107,.35);
@@ -724,7 +724,7 @@ function fmtMins(int $m): string {
             background: rgba(251,86,107,.15); border-color: rgba(251,86,107,.6);
         }
 
-        /* ── Active session live card ─────────────────────────────────── */
+        /* â”€â”€ Active session live card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-live-card {
             background: linear-gradient(135deg, rgba(32,200,161,0.14), rgba(95,133,218,0.07));
             border: 1px solid rgba(32,200,161,0.35);
@@ -764,7 +764,7 @@ function fmtMins(int $m): string {
         .cd-live-val   { font-size: 15px; font-weight: 700; color: #fff; }
         .cd-live-timer { font-family: monospace; font-size: 22px; font-weight: 800; color: var(--mint); }
 
-        /* ── Empty state ──────────────────────────────────────────────── */
+        /* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-empty {
             text-align: center;
             padding: 40px 20px;
@@ -773,18 +773,18 @@ function fmtMins(int $m): string {
         .cd-empty i { font-size: 36px; margin-bottom: 12px; display: block; opacity: .5; }
         .cd-empty p { font-size: 13px; }
 
-        /* ── Reservation row glow ─────────────────────────────────────── */
+        /* â”€â”€ Reservation row glow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         tr.res-today td { background: rgba(32,200,161,0.04) !important; }
 
-        /* ── Chart container ──────────────────────────────────────────── */
+        /* â”€â”€ Chart container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-chart-wrap { position: relative; height: 180px; }
 
-        /* ── Charts grid ──────────────────────────────────────────────── */
+        /* â”€â”€ Charts grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .cd-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .cd-2col-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
-        /* ── Responsive ──────────────────────────────────────────────── */        @media (max-width: 900px) {
-            /* Hard-clip the viewport — nothing bleeds horizontally */
+        /* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */        @media (max-width: 900px) {
+            /* Hard-clip the viewport â€” nothing bleeds horizontally */
             html, body { overflow-x: hidden; max-width: 100vw; }
 
             /* Topbar & sidebar stack on mobile */
@@ -801,14 +801,14 @@ function fmtMins(int $m): string {
                 box-sizing: border-box;
             }
 
-            /* Old horizontal scroll nav — completely hidden on mobile now */
+            /* Old horizontal scroll nav â€” completely hidden on mobile now */
             .cd-mobile-nav { display: none !important; }
 
             /* Topbar welcome text: shorter on small screens */
             .cd-topbar-title { font-size: 14px; }
             .cd-topbar-title .cd-live-dot { display: none; }
 
-            /* ── Bottom navigation bar ───────────────────────────────── */
+            /* â”€â”€ Bottom navigation bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
             .cd-bottom-nav {
                 display: flex;
                 position: fixed;
@@ -867,7 +867,7 @@ function fmtMins(int $m): string {
         }
 
 
-        /* ── Profile Edit Form ─────────────────────────────────────────── */
+        /* â”€â”€ Profile Edit Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .pf-field-group { display: flex; flex-direction: column; gap: 6px; }
         .pf-label {
             font-size: 12px; font-weight: 600;
@@ -894,7 +894,7 @@ function fmtMins(int $m): string {
         }
         .pf-input::placeholder { color: rgba(255,255,255,0.25); }
 
-        /* Flash — sit below the new topbar */
+        /* Flash â€” sit below the new topbar */
         .cd-flash {
             position: fixed; top: 72px; right: 20px; z-index: 9999;
             padding: 13px 18px; border-radius: 10px; font-size: 13px; font-weight: 500;
@@ -912,21 +912,21 @@ function fmtMins(int $m): string {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(95,133,218,0.3); border-radius: 3px; }
 
-        /* ══════════════════════════════════════════════════════════════════
-           LOGO & NAVBAR ALIGNMENT — dashboard-specific
+        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           LOGO & NAVBAR ALIGNMENT â€” dashboard-specific
            Shifts the Bootstrap .container left-padding so the navbar brand
            (GSpot logo) visually aligns with the sidebar/content boundary
            rather than the raw viewport edge.
-        ══════════════════════════════════════════════════════════════════ */
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
         @media (min-width: 901px) {
             #mainNav .container {
                 padding-left: calc(240px + 16px);
             }
         }
 
-        /* ══════════════════════════════════════════════════════════════════
-           UI CONSISTENCY — align user dashboard sidebar with admin panel
-        ══════════════════════════════════════════════════════════════════ */
+        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+           UI CONSISTENCY â€” align user dashboard sidebar with admin panel
+        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
         /* Sidebar background: match admin's #07101f deep dark */
         .cd-sidebar {
@@ -987,7 +987,7 @@ function fmtMins(int $m): string {
 ?>
 <body>
 
-<!-- ══ SIDEBAR ════════════════════════════════════════════════════════════════ -->
+<!-- â•â• SIDEBAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <aside class="cd-sidebar">
 
     <!-- Logo header (mirrors admin sidebar-header) -->
@@ -1064,7 +1064,7 @@ function fmtMins(int $m): string {
 
 </aside>
 
-<!-- ══ TOPBAR ═════════════════════════════════════════════════════════════════ -->
+<!-- â•â• TOPBAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="cd-topbar" id="cdTopbar">
     <!-- Left: Welcome message (dynamic, from session) -->
     <div class="cd-topbar-left">
@@ -1109,19 +1109,19 @@ function fmtMins(int $m): string {
     </div>
 </div>
 
-<!-- ══ MAIN CONTENT ═══════════════════════════════════════════════════════════ -->
+<!-- â•â• MAIN CONTENT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <main class="cd-main">
 
     <!-- Mobile nav placeholder (hidden on desktop) -->
     <div class="cd-mobile-nav"></div>
 
 
-        <!-- ══ PAGE: OVERVIEW ═════════════════════════════════════════════ -->
+        <!-- â•â• PAGE: OVERVIEW â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page active" id="page-overview">
             <h2 class="cd-section-title"><i class="fas fa-chart-line"></i> Welcome back, <?= htmlspecialchars(explode(' ', $user['full_name'])[0]) ?>!</h2>
 
             <?php if (!empty($unseenReschedules)): ?>
-            <!-- ── Reschedule notification banners ──────────────────── -->
+            <!-- â”€â”€ Reschedule notification banners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
             <div id="reschedule-notifications">
                 <?php foreach ($unseenReschedules as $rs): ?>
                 <div id="rn-<?= $rs['reschedule_id'] ?>" style="
@@ -1143,9 +1143,9 @@ function fmtMins(int $m): string {
                         <div style="font-weight:800;font-size:14px;margin-bottom:4px;
                             color:<?= ($rs['status']==='pending' && $rs['initiated_by']==='admin') ? '#f1a83c' : '#20c8a1' ?>;">
                             <?php if ($rs['status']==='pending' && $rs['initiated_by']==='admin'): ?>
-                                ⏳ Action Required: Confirm Your New Schedule
+                                â³ Action Required: Confirm Your New Schedule
                             <?php else: ?>
-                                📅 Your Reservation Has Been Rescheduled
+                                ðŸ“… Your Reservation Has Been Rescheduled
                             <?php endif; ?>
                         </div>
                         <div style="font-size:13px;color:#ccc;line-height:1.7;">
@@ -1158,7 +1158,7 @@ function fmtMins(int $m): string {
                             <span style="color:#888;">Reason:</span>
                             <span style="color:#f1a83c;"><?= $rescheduleReasonLabels[$rs['reason']] ?? ucfirst($rs['reason']) ?></span>
                             <?php if ($rs['reason_detail']): ?>
-                            — <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
+                            â€” <em style="color:#aaa;"><?= htmlspecialchars($rs['reason_detail']) ?></em>
                             <?php endif; ?>
                             <?php if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin'): ?>
                                 <div style="display:flex;gap:10px;margin-top:12px;">
@@ -1261,7 +1261,7 @@ function fmtMins(int $m): string {
                 <div class="cd-live-meta">
                     <div class="cd-live-item">
                         <div class="cd-live-label">Console</div>
-                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?> – <?= htmlspecialchars($activeSession['unit_number']) ?></div>
+                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?></div>
                     </div>
                     <div class="cd-live-item">
                         <div class="cd-live-label">Mode</div>
@@ -1284,7 +1284,7 @@ function fmtMins(int $m): string {
                         <div class="cd-live-timer" id="liveTimer"
                              data-start="<?= $activeSession['start_time'] ?>"
                              data-planned="<?= $activeSession['planned_minutes'] ?? 0 ?>">
-                            –:––
+                            â€“:â€“â€“
                         </div>
                     </div>
                 </div>
@@ -1331,7 +1331,7 @@ function fmtMins(int $m): string {
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
                         <div>
-                            <div class="cd-stat-value">₱<?= number_format($spending['total'], 2) ?></div>
+                            <div class="cd-stat-value">â‚±<?= number_format($spending['total'], 2) ?></div>
                             <div class="cd-stat-label">Total Spent</div>
                         </div>
                         <div class="cd-stat-icon coral"><i class="fas fa-peso-sign"></i></div>
@@ -1391,7 +1391,7 @@ function fmtMins(int $m): string {
                             <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
                             <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                         </td>
-                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' – <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
+                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' â€“ <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td>
                             <?php $statusMap = ['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
@@ -1421,8 +1421,8 @@ function fmtMins(int $m): string {
                         <td style="color:var(--muted)">#<?= $s['session_id'] ?></td>
                         <td><?= htmlspecialchars($s['console_type']) ?></td>
                         <td><?= match($s['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
-                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : '—' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱'.number_format($s['total_cost'],2) : '—' ?></td>
+                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? 'â‚±'.number_format($s['total_cost'],2) : 'â€”' ?></td>
                         <td style="color:var(--muted)"><?= date('M d, Y', strtotime($s['start_time'])) ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -1445,13 +1445,13 @@ function fmtMins(int $m): string {
                 ?>
                 <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(241,168,60,0.12);">
                     <div style="width:36px;height:36px;border-radius:10px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.25);
-                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏆</div>
+                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">ðŸ†</div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:700;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                             <?= htmlspecialchars($ot['tournament_name']) ?>
                         </div>
                         <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">
-                            IGN: <span style="color:var(--mint);"><?= htmlspecialchars($ot['ign'] ?? '—') ?></span>
+                            IGN: <span style="color:var(--mint);"><?= htmlspecialchars($ot['ign'] ?? 'â€”') ?></span>
                             &nbsp;&middot;&nbsp;<?= date('M d, Y', strtotime($ot['start_date'])) ?>
                         </div>
                     </div>
@@ -1472,7 +1472,7 @@ function fmtMins(int $m): string {
         </div>
 
 
-        <!-- ══ PAGE: SESSION HISTORY ═══════════════════════════════════════ -->
+        <!-- â•â• PAGE: SESSION HISTORY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page" id="page-sessions">
             <h2 class="cd-section-title"><i class="fas fa-play-circle"></i> Session History</h2>
 
@@ -1533,8 +1533,8 @@ function fmtMins(int $m): string {
                             <span style="font-weight:600"><?= date('M d, Y', strtotime($s['start_time'])) ?></span><br>
                             <span style="color:var(--muted);font-size:11px"><?= date('h:i A', strtotime($s['start_time'])) ?></span>
                         </td>
-                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : '—' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱'.number_format($s['total_cost'],2) : '—' ?></td>
+                        <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? 'â‚±'.number_format($s['total_cost'],2) : 'â€”' ?></td>
                         <td>
                             <?php $stMap=['active'=>['blue','Active'],'completed'=>['mint','Done'],'cancelled'=>['coral','Cancelled']]; $st=$stMap[$s['status']]??['gray',ucfirst($s['status'])]; ?>
                             <span class="cd-badge <?= $st[0] ?>"><?= $st[1] ?></span>
@@ -1549,7 +1549,7 @@ function fmtMins(int $m): string {
         </div>
 
 
-        <!-- ══ PAGE: RESERVATIONS ══════════════════════════════════════════ -->
+        <!-- â•â• PAGE: RESERVATIONS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page" id="page-reservations">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
                 <h2 class="cd-section-title" style="margin:0"><i class="fas fa-calendar-check"></i> My Reservations</h2>
@@ -1559,7 +1559,7 @@ function fmtMins(int $m): string {
             </div>
 
             <?php if ($isBanned): ?>
-            <!-- ── Reservation Ban Alert ───────────────────────────────────── -->
+            <!-- â”€â”€ Reservation Ban Alert â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
             <div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.4);border-radius:16px;
                         padding:18px 22px;margin-bottom:24px;display:flex;align-items:flex-start;gap:16px;">
                 <div style="width:44px;height:44px;border-radius:12px;background:rgba(251,86,107,.2);
@@ -1573,12 +1573,12 @@ function fmtMins(int $m): string {
                     <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.7;">
                         Your account has been placed on a temporary <strong>1-week reservation ban</strong> due to 3 consecutive cancellations.
                         This restriction will be <strong style="color:#fb566b;">automatically lifted on <?= $banExpiry ?></strong>.
-                        <br>You are still welcome to walk in and use any available unit — only online reservations are restricted.
+                        <br>You are still welcome to walk in and use any available unit â€” only online reservations are restricted.
                     </div>
                 </div>
             </div>
             <?php elseif ($cancelStreak === 2): ?>
-            <!-- ── 2nd-Strike Warning ─────────────────────────────────────── -->
+            <!-- â”€â”€ 2nd-Strike Warning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
             <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.35);border-radius:16px;
                         padding:16px 20px;margin-bottom:24px;display:flex;align-items:flex-start;gap:14px;">
                 <div style="width:40px;height:40px;border-radius:12px;background:rgba(241,168,60,.18);
@@ -1587,7 +1587,7 @@ function fmtMins(int $m): string {
                 </div>
                 <div>
                     <div style="font-weight:800;color:#f1a83c;font-size:14px;margin-bottom:3px;">
-                        ⚠️ Final Warning — 2 of 3 Cancellations Used
+                         Final Warning 2 of 3 Cancellations Used
                     </div>
                     <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;">
                         You have <strong>2 consecutive cancellations</strong> on record. One more cancellation will result in a
@@ -1660,7 +1660,7 @@ function fmtMins(int $m): string {
                             <?php endif; ?>
                         </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
-                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱'.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">–</span>' ?></td>
+                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">â‚±'.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">â€“</span>' ?></td>
                         <td>
                             <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
@@ -1673,11 +1673,11 @@ function fmtMins(int $m): string {
                                     <br><span style="font-size:10px;color:var(--muted);">- <?= htmlspecialchars($pendingAdminResched['reason_detail']) ?></span>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : '–' ?>
+                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : 'â€“' ?>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if (in_array($r['status'], ['pending','reserved'])): 
+                            <?php 
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
@@ -1700,22 +1700,20 @@ function fmtMins(int $m): string {
                                     <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
                                         <i class="fas fa-times"></i> Cancel
                                     </button>
-                                <?php endif; ?>
-                                <?php else: ?>
+                                <?php else: /* pending */ ?>
                                     <?php if (!$alreadyResched): ?>
-                                <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-calendar-alt"></i> Reschedule
-                                </button>
-                                <?php else: ?>
-                                <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
+                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
+                                            <i class="fas fa-calendar-alt"></i> Reschedule
+                                        </button>
+                                    <?php else: ?>
+                                        <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
+                                    <?php endif; ?>
+                                    <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
                                 <?php endif; ?>
-                                <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
-                            <?php endif; ?>
                             </div>
-                            <?php endif; ?>
-                        </td>
+                        
                     </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -1784,7 +1782,7 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </div>
 
-        <!-- ── Cancel Reservation Modal (two-step: Reason → Confirm) ── -->
+        <!-- â”€â”€ Cancel Reservation Modal (two-step: Reason â†’ Confirm) â”€â”€ -->
         <div id="cancelResModal" style="display:none;position:fixed;inset:0;z-index:9999;
              background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
              align-items:center;justify-content:center;">
@@ -1901,7 +1899,7 @@ function fmtMins(int $m): string {
         </div>
 
 
-        <!-- ── User-Initiated Reschedule Modal ── -->
+        <!-- â”€â”€ User-Initiated Reschedule Modal â”€â”€ -->
         <div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
              background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
              align-items:center;justify-content:center;">
@@ -1984,7 +1982,7 @@ function fmtMins(int $m): string {
 
 
 
-        <!-- ══ PAGE: MY STATS ══════════════════════════════════════════════ -->
+        <!-- â•â• PAGE: MY STATS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page" id="page-stats">
             <h2 class="cd-section-title"><i class="fas fa-trophy"></i> My Gaming Stats</h2>
 
@@ -2004,13 +2002,13 @@ function fmtMins(int $m): string {
                 </div>
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
-                        <div><div class="cd-stat-value">₱<?= number_format($spending['total'],2) ?></div><div class="cd-stat-label">Total Spent (All Time)</div></div>
+                        <div><div class="cd-stat-value">â‚±<?= number_format($spending['total'],2) ?></div><div class="cd-stat-label">Total Spent (All Time)</div></div>
                         <div class="cd-stat-icon coral"><i class="fas fa-peso-sign"></i></div>
                     </div>
                 </div>
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
-                        <div><div class="cd-stat-value">₱<?= number_format($spending['this_month'],2) ?></div><div class="cd-stat-label">Spent This Month</div></div>
+                        <div><div class="cd-stat-value">â‚±<?= number_format($spending['this_month'],2) ?></div><div class="cd-stat-label">Spent This Month</div></div>
                         <div class="cd-stat-icon gold"><i class="fas fa-calendar-alt"></i></div>
                     </div>
                 </div>
@@ -2076,7 +2074,7 @@ function fmtMins(int $m): string {
                         </div>
                     </div>
                     <?php if ($done): ?>
-                    <span style="font-size:16px">🏆</span>
+                    <span style="font-size:16px">ðŸ†</span>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
@@ -2091,27 +2089,27 @@ function fmtMins(int $m): string {
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px">
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Today</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--mint)">₱<?= number_format($spending['today'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--mint)">â‚±<?= number_format($spending['today'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">This Month</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--blue)">₱<?= number_format($spending['this_month'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--blue)">â‚±<?= number_format($spending['this_month'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">All Time</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--purple)">₱<?= number_format($spending['total'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--purple)">â‚±<?= number_format($spending['total'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Avg / Session</div>
                         <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--gold)">
-                            ₱<?= $timeStats['total_sessions'] > 0 ? number_format($spending['total'] / $timeStats['total_sessions'], 2) : '0.00' ?>
+                            â‚±<?= $timeStats['total_sessions'] > 0 ? number_format($spending['total'] / $timeStats['total_sessions'], 2) : '0.00' ?>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ══ PAGE: MY CANCELLATIONS ════════════════════════════════════ -->
+        <!-- â•â• PAGE: MY CANCELLATIONS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <?php
             // Aggregate per-reason counts for mini doughnut
             $myReasonCounts = [];
@@ -2194,9 +2192,9 @@ function fmtMins(int $m): string {
                                 <?php if ($isBanned): ?>
                                 <span style="color:var(--coral)"><i class="fas fa-ban" style="margin-right:4px"></i>You are currently banned from reservations until <?= $banExpiry ?>.</span>
                                 <?php elseif ($streak >= 2): ?>
-                                <span style="color:#f1a83c"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Warning — 1 more cancellation will trigger a 7-day ban.</span>
+                                <span style="color:#f1a83c"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Warning â€” 1 more cancellation will trigger a 7-day ban.</span>
                                 <?php else: ?>
-                                <span style="color:var(--muted)">Good standing — no restrictions.</span>
+                                <span style="color:var(--muted)">Good standing â€” no restrictions.</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -2245,7 +2243,7 @@ function fmtMins(int $m): string {
                             <span class="cd-badge coral" style="font-size:10px"><?= htmlspecialchars($rtLabel) ?></span>
                             <?php if (!empty($mc['cancel_reason_detail'])): ?>
                             <div style="font-size:11px;color:var(--muted);margin-top:3px;max-width:180px;white-space:normal">
-                                <?= htmlspecialchars(mb_strimwidth($mc['cancel_reason_detail'], 0, 60, '…')) ?>
+                                <?= htmlspecialchars(mb_strimwidth($mc['cancel_reason_detail'], 0, 60, 'â€¦')) ?>
                             </div>
                             <?php endif; ?>
                         </td>
@@ -2258,9 +2256,9 @@ function fmtMins(int $m): string {
                         </td>
                         <td>
                             <?php if ((float)$mc['downpayment_amount'] > 0): ?>
-                            <span style="color:var(--coral)">₱<?= number_format($mc['downpayment_amount'], 2) ?></span>
+                            <span style="color:var(--coral)">â‚±<?= number_format($mc['downpayment_amount'], 2) ?></span>
                             <?php else: ?>
-                            <span style="color:var(--muted)">—</span>
+                            <span style="color:var(--muted)">â€”</span>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -2272,7 +2270,7 @@ function fmtMins(int $m): string {
             <?php else: ?>
             <div class="cd-empty">
                 <i class="fas fa-check-circle" style="color:var(--mint)"></i>
-                <p>No cancellations on record — great track record! 🎉</p>
+                <p>No cancellations on record â€” great track record! ðŸŽ‰</p>
             </div>
             <?php endif; ?>
         </div><!-- /page-cancellations -->
@@ -2308,7 +2306,7 @@ function fmtMins(int $m): string {
         })();
         </script>
 
-        <!-- ══ PAGE: MY TOURNAMENTS ════════════════════════════════════════ -->
+        <!-- â•â• PAGE: MY TOURNAMENTS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <?php
             $upcomingTournaments  = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing']));
             $completedTournaments = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['completed','cancelled']));
@@ -2417,18 +2415,18 @@ function fmtMins(int $m): string {
                                 </span>
                                 <span><i class="fas fa-calendar" style="color:#f1a83c;margin-right:4px;"></i><?= date('M d, Y', strtotime($tr['start_date'])) ?></span>
                                 <?php if ($tr['prize_pool'] > 0): ?>
-                                <span><i class="fas fa-gift" style="color:#20c8a1;margin-right:4px;"></i>Prize: ₱<?= number_format($tr['prize_pool'],0) ?></span>
+                                <span><i class="fas fa-gift" style="color:#20c8a1;margin-right:4px;"></i>Prize: â‚±<?= number_format($tr['prize_pool'],0) ?></span>
                                 <?php endif; ?>
                             </div>
                             <!-- Player details row -->
                             <div style="display:flex;gap:20px;flex-wrap:wrap;">
                                 <div style="background:rgba(32,200,161,0.08);border:1px solid rgba(32,200,161,0.2);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Your IGN</div>
-                                    <div style="font-size:13px;font-weight:700;color:#20c8a1;"><?= htmlspecialchars($tr['ign'] ?? '—') ?></div>
+                                    <div style="font-size:13px;font-weight:700;color:#20c8a1;"><?= htmlspecialchars($tr['ign'] ?? 'â€”') ?></div>
                                 </div>
                                 <div style="background:rgba(95,133,218,0.08);border:1px solid rgba(95,133,218,0.2);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Entry Fee</div>
-                                    <div style="font-size:13px;font-weight:700;color:#5f85da;">₱<?= number_format($tr['entry_fee'],0) ?></div>
+                                    <div style="font-size:13px;font-weight:700;color:#5f85da;">â‚±<?= number_format($tr['entry_fee'],0) ?></div>
                                 </div>
                                 <div style="background:rgba(32,200,161,0.06);border:1px solid rgba(32,200,161,0.15);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Payment</div>
@@ -2449,7 +2447,7 @@ function fmtMins(int $m): string {
                         <!-- Trophy icon -->
                         <div style="width:52px;height:52px;border-radius:14px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.3);
                                     display:flex;align-items:center;justify-content:center;font-size:22px;color:#f1a83c;flex-shrink:0;">
-                            🏆
+                            ðŸ†
                         </div>
                     </div>
                     <?php if ($tr['notes']): ?>
@@ -2482,19 +2480,19 @@ function fmtMins(int $m): string {
                     ?>
                     <tr>
                         <td style="font-weight:600;"><?= htmlspecialchars($tr['tournament_name']) ?></td>
-                        <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: '—') ?></td>
+                        <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: 'â€”') ?></td>
                         <td><?= date('M d, Y', strtotime($tr['start_date'])) ?></td>
-                        <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? '—') ?></span></td>
-                        <td style="color:var(--mint);font-weight:700;">₱<?= number_format($tr['entry_fee'],0) ?></td>
+                        <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? 'â€”') ?></span></td>
+                        <td style="color:var(--mint);font-weight:700;">â‚±<?= number_format($tr['entry_fee'],0) ?></td>
                         <td><span class="cd-badge <?= $tsm[0] ?>"><i class="fas fa-<?= $tsm[1] ?>" style="margin-right:4px;"></i><?= $tsm[2] ?></span></td>
                         <td>
                             <?php if ($tr['placement']): ?>
                             <span style="font-weight:700;color:#f1a83c;">#<?= $tr['placement'] ?></span>
                             <?php if ($tr['prize_amount'] > 0): ?>
-                            <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+₱<?= number_format($tr['prize_amount'],0) ?></span>
+                            <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+â‚±<?= number_format($tr['prize_amount'],0) ?></span>
                             <?php endif; ?>
                             <?php else: ?>
-                            <span style="color:var(--muted);">—</span>
+                            <span style="color:var(--muted);">â€”</span>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -2508,7 +2506,7 @@ function fmtMins(int $m): string {
             <?php endif; ?>
         </div><!-- /page-tournaments -->
 
-        <!-- ══ PAGE: MY PAYMENTS ══════════════════════════════════════════ -->
+        <!-- â•â• PAGE: MY PAYMENTS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page" id="page-payments">
             <h2 class="cd-section-title"><i class="fas fa-receipt"></i> My Payments</h2>
 
@@ -2565,15 +2563,15 @@ function fmtMins(int $m): string {
                         <td><span class="cd-badge blue"><?= ucfirst($pay['payment_method']) ?></span></td>
                         <td style="font-weight:700;white-space:nowrap;
                             <?= $isRefund ? 'color:var(--coral);' : 'color:var(--mint);' ?>">
-                            <?= $isRefund ? '−' : '+' ?>₱<?= number_format(abs((float)$pay['amount']), 2) ?>
+                            <?= $isRefund ? 'âˆ’' : '+' ?>â‚±<?= number_format(abs((float)$pay['amount']), 2) ?>
                         </td>
                         <td style="font-size:11px;font-family:monospace;">
                             <?php if ($refDisplay): ?>
                                 <span style="color:var(--mint);" title="<?= htmlspecialchars($refDisplay) ?>">
-                                    <?= htmlspecialchars(substr($refDisplay, 0, 20)) . (strlen($refDisplay) > 20 ? '…' : '') ?>
+                                    <?= htmlspecialchars(substr($refDisplay, 0, 20)) . (strlen($refDisplay) > 20 ? 'â€¦' : '') ?>
                                 </span>
                             <?php else: ?>
-                                <span style="color:var(--muted);">—</span>
+                                <span style="color:var(--muted);">â€”</span>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -2591,7 +2589,7 @@ function fmtMins(int $m): string {
         </div><!-- /page-payments -->
 
 
-        <!-- ══ PAGE: MY ACCOUNT ════════════════════════════════════════════ -->
+        <!-- â•â• PAGE: MY ACCOUNT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="cd-page" id="page-account">
             <h2 class="cd-section-title"><i class="fas fa-user-cog"></i> My Account</h2>
 
@@ -2612,7 +2610,7 @@ function fmtMins(int $m): string {
                         </div>
                         <div>
                             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Phone Number</div>
-                            <div id="dispPhone" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['phone'] ?? '—') ?></div>
+                            <div id="dispPhone" style="font-weight:600;color:#fff;font-size:14px;"><?= htmlspecialchars($user['phone'] ?? 'â€”') ?></div>
                         </div>
                         <div>
                             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Email</div>
@@ -2751,7 +2749,7 @@ function fmtMins(int $m): string {
 
     </main>
 
-<!-- ══ MOBILE BOTTOM NAVIGATION BAR ══════════════════════════════════════ -->
+<!-- â•â• MOBILE BOTTOM NAVIGATION BAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <nav class="cd-bottom-nav" id="cdBottomNav">
     <button class="cd-bnav-btn active" id="bnavOverview" onclick="cdShowPage('overview', this)">
         <i class="fas fa-home"></i>
@@ -2793,7 +2791,7 @@ function fmtMins(int $m): string {
 </nav>
 
 <script>
-/* ══ Navigation ══════════════════════════════════════════════════════════════ */
+/* â•â• Navigation â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const BNAV_MAP = {
     overview:      'bnavOverview',
     sessions:      'bnavSessions',
@@ -2848,7 +2846,7 @@ function cdShowPage(page, el) {
     }
 })();
 
-/* ══ Live session timer ══════════════════════════════════════════════════════ */
+/* â•â• Live session timer â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 (function () {
     const el = document.getElementById('liveTimer');
     if (!el) return;
@@ -2872,7 +2870,7 @@ function cdShowPage(page, el) {
     setInterval(tick, 1000);
 })();
 
-/* ══ Charts ══════════════════════════════════════════════════════════════════ */
+/* â•â• Charts â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const activityLabels = <?= json_encode($activityLabels) ?>;
 const activityData   = <?= json_encode($activityData) ?>;
 const spendData      = <?= json_encode($spendData) ?>;
@@ -2934,15 +2932,15 @@ new Chart(document.getElementById('chartSpend'), {
         scales: {
             ...chartDefaults.scales,
             y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks,
-                callback: val => '₱' + val
+                callback: val => 'â‚±' + val
             }}
         }
     }
 });
 
-/* ═══════════════════════════════════════════════════════════
-   CANCEL RESERVATION LOGIC (two-step: reason → confirm)
-═══════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   CANCEL RESERVATION LOGIC (two-step: reason â†’ confirm)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _cancelResId = null;
 
 const CANCEL_REASON_LABELS = {
@@ -3010,14 +3008,14 @@ function cancelStep2Back() {
 function submitCancelReservation() {
     if (!_cancelResId) return;
 
-    // Capture the ID NOW — closeCancelModal() will null _cancelResId
+    // Capture the ID NOW â€” closeCancelModal() will null _cancelResId
     const resId        = _cancelResId;
     const reasonType   = document.getElementById('cancelReasonType').value;
     const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
 
     const btn = document.getElementById('cancelResConfirmBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling…';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancellingâ€¦';
 
     const fd = new FormData();
     fd.append('reservation_id',      resId);
@@ -3042,7 +3040,7 @@ function submitCancelReservation() {
                 // Store message in sessionStorage so it survives the reload
                 sessionStorage.setItem('dashToastMsg',  data.message);
                 sessionStorage.setItem('dashToastType', 'success');
-                // Reload to #cancellations — message will re-appear for 10s after load
+                // Reload to #cancellations â€” message will re-appear for 10s after load
                 setTimeout(() => {
                     location.href = location.pathname + '#cancellations';
                     location.reload();
@@ -3055,7 +3053,7 @@ function submitCancelReservation() {
         })
         .catch(() => {
             closeCancelModal();
-            showDashToast('Network error — please try again.', 'error');
+            showDashToast('Network error â€” please try again.', 'error');
         });
 }
 
@@ -3074,7 +3072,7 @@ function showDashToast(msg, type, duration) {
     t._timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; }, 320); }, ms);
 }
 
-// ── Re-display toast saved before page reload ─────────────────────────────────
+// â”€â”€ Re-display toast saved before page reload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.addEventListener('DOMContentLoaded', function () {
     const msg  = sessionStorage.getItem('dashToastMsg');
     const type = sessionStorage.getItem('dashToastType');
@@ -3091,9 +3089,9 @@ document.getElementById('cancelResModal')?.addEventListener('click', function(e)
     if (e.target === this) closeCancelModal();
 });
 
-/* ═══════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    USER-INITIATED RESCHEDULE LOGIC
-═══════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 let _urmResId = null;
 let _urmConsole = null;
 
@@ -3185,7 +3183,7 @@ document.getElementById('userRescheduleModal')?.addEventListener('click', functi
 <script src="assets/libs/aos/aos.js"></script>
 
 <script>
-// ── Navbar scroll effect (same as index.php) ──────────────────────────────
+// â”€â”€ Navbar scroll effect (same as index.php) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 AOS.init({ duration: 800, once: true, offset: 80 });
 
 const mainNav = document.getElementById('mainNav');
@@ -3203,7 +3201,7 @@ if (mainNav) {
 </script>
 
 <?php if ($activeSession && $activeSession['rental_mode'] === 'hourly'): ?>
-<!-- ══ REQUEST EXTENSION MODAL ══════════════════════════════════════════════ -->
+<!-- â•â• REQUEST EXTENSION MODAL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="reqExtModal" style="
     display:none;position:fixed;inset:0;z-index:99999;
     background:rgba(0,0,0,0.75);backdrop-filter:blur(7px);
@@ -3228,14 +3226,14 @@ if (mainNav) {
                     <div style="font-size:12px;color:var(--muted);">Staff will approve &amp; collect payment</div>
                 </div>
             </div>
-            <button onclick="closeReqExtModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px;">×</button>
+            <button onclick="closeReqExtModal()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px;">Ã—</button>
         </div>
 
         <!-- Current session info -->
         <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.2);
                     border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
             <strong style="color:#fff;">
-                <?= htmlspecialchars($activeSession['console_type']) ?> – <?= htmlspecialchars($activeSession['unit_number']) ?>
+                <?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?>
             </strong>
             <span style="color:var(--muted);margin-left:8px;">
                 Booked: <?= fmtMins((int)($activeSession['planned_minutes'] ?? 0)) ?>
@@ -3249,9 +3247,9 @@ if (mainNav) {
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="reqExtBtns">
                 <?php
-                // DB-driven extension options — reads rate and bonus rule from system_settings
+                // DB-driven extension options â€” reads rate and bonus rule from system_settings
                 $extRules = getPricingRules();
-                $extRate  = $extRules['hourly_rate'];   // ₱/hr for extensions
+                $extRate  = $extRules['hourly_rate'];   // â‚±/hr for extensions
                 // Extension options: 30 min steps up to 2 hrs (no minimum charge for extensions)
                 $extSteps = [30, 60, 90, 120];
                 foreach ($extSteps as $extMins):
@@ -3293,7 +3291,7 @@ if (mainNav) {
                 <span style="font-size:13px;color:#8aa4e8;">
                     <i class="fas fa-receipt" style="margin-right:5px;"></i> Estimated Cost
                 </span>
-                <span id="reqExtCostDisplay" style="font-size:20px;font-weight:800;color:#f1e1aa;">₱0</span>
+                <span id="reqExtCostDisplay" style="font-size:20px;font-weight:800;color:#f1e1aa;">â‚±0</span>
             </div>
             <div style="margin-top:6px;font-size:11px;color:var(--muted);">
                 <i class="fas fa-info-circle" style="margin-right:4px;"></i>
@@ -3354,7 +3352,7 @@ function selectExtOpt(el) {
     const mins = el.dataset.mins;
     const cost = el.dataset.cost;
     document.getElementById('reqExtMins').value = mins;
-    document.getElementById('reqExtCostDisplay').textContent = '₱' + cost;
+    document.getElementById('reqExtCostDisplay').textContent = 'â‚±' + cost;
     document.getElementById('reqExtCostBox').style.display = 'block';
     const btn = document.getElementById('reqExtSubmitBtn');
     btn.disabled = false;
@@ -3367,7 +3365,7 @@ function submitReqExt() {
 
     const btn = document.getElementById('reqExtSubmitBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sendingâ€¦';
 
     const fd = new FormData();
     fd.append('session_id',   REQ_EXT_SESSION_ID);
@@ -3396,7 +3394,7 @@ function submitReqExt() {
         .catch(function() {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request to Staff';
-            showDashToast('Network error — please try again.', 'error');
+            showDashToast('Network error â€” please try again.', 'error');
         });
 }
 
@@ -3407,7 +3405,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </script>
 <?php endif; ?>
 
-<!-- ── Reschedule Modal ── -->
+<!-- â”€â”€ Reschedule Modal â”€â”€ -->
 <div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
      background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
      align-items:center;justify-content:center;">
@@ -3467,7 +3465,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </div>
 
 <script>
-// Valid slots 12:00–23:00 in 30-min steps
+// Valid slots 12:00â€“23:00 in 30-min steps
 const DASH_TIME_SLOTS = (function () {
     const s = [];
     for (let h = 12; h <= 23; h++) {
@@ -3588,7 +3586,7 @@ function submitUserReschedule(e) {
 </script>
 
 <script>
-/* ══ My Account – Profile Edit ══════════════════════════════════════════════ */
+/* â•â• My Account â€“ Profile Edit â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 function startProfileEdit() {
     document.getElementById('profileDisplay').style.display = 'none';
@@ -3638,13 +3636,13 @@ function submitProfileEdit(e) {
 
     const phone = document.getElementById('pf_phone').value;
     if (phone !== '' && !/^\d{10,11}$/.test(phone)) {
-        pfShowAlert(true, false, 'Phone must be 10–11 digits (numbers only).');
+        pfShowAlert(true, false, 'Phone must be 10â€“11 digits (numbers only).');
         return;
     }
 
     const btn = document.getElementById('pfSaveBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Savingâ€¦';
 
     const form = document.getElementById('profileEditForm');
     const data = new FormData(form);
@@ -3657,7 +3655,7 @@ function submitProfileEdit(e) {
             if (res.success) {
                 // Update display values
                 document.getElementById('dispName').textContent  = res.full_name;
-                document.getElementById('dispPhone').textContent = res.phone || '—';
+                document.getElementById('dispPhone').textContent = res.phone || 'â€”';
                 
                 // Also update the sidebar header
                 const sidebarName = document.querySelector('.cd-avatar-name');
@@ -3704,7 +3702,7 @@ function submitPasswordChange(e) {
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating…';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updatingâ€¦';
     showPwAlert(false);
 
     const fd = new FormData(document.getElementById('passwordChangeForm'));
@@ -3742,7 +3740,7 @@ function togglePwVisibility(inputId, btnId) {
 }
 </script>
 
-<!-- ── Reschedule Confirm Modal ── -->
+<!-- â”€â”€ Reschedule Confirm Modal â”€â”€ -->
 <div id="rescheduleConfirmModal" style="display:none;position:fixed;inset:0;z-index:99999;
      background:rgba(0,0,0,.82);backdrop-filter:blur(10px);
      align-items:center;justify-content:center;padding:20px;">

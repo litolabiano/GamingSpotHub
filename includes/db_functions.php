@@ -1095,7 +1095,9 @@ function createReservation(
     $reserved_date, $reserved_time, $notes = null,
     $downpayment_amount = 0.0, $downpayment_method = null,
     $preferred_unit_id = null,
-    $payment_proof = null   // uploaded GCash screenshot filename
+    $payment_proof = null,   // uploaded GCash screenshot filename
+    $controller_id = null,   // optional: selected controller FK
+    $controller_fee = 0.0    // fee snapshot from system_settings at booking time
 ) {
     global $conn;
 
@@ -1134,24 +1136,29 @@ function createReservation(
 
 
     // Payment proof is required — payment_proof_status starts as 'pending' (awaiting admin verify)
-    $downpayment_paid  = 0;  // NOT marked paid until admin verifies the GCash proof
+    $downpayment_paid  = 0;
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
     $proof_status      = $payment_proof ? 'pending' : null;
+    $with_controller   = $controller_id ? 1 : 0;
+    $controller_id     = $controller_id ? (int)$controller_id : null;
+    $controller_fee    = (float)$controller_fee;
 
     $stmt = $conn->prepare(
         "INSERT INTO reservations
             (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
-             notes, downpayment_amount, downpayment_method, downpayment_paid,
+             notes, with_controller, controller_id, controller_fee,
+             downpayment_amount, downpayment_method, downpayment_paid,
              payment_proof, payment_proof_status, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
-        'iississsdsissi',
+        'iississsiidssissi',
         $user_id, $preferred_unit_id, $console_type, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
+        $with_controller, $controller_id, $controller_fee,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
         $payment_proof, $proof_status,
-        $user_id   // created_by = the customer themselves
+        $user_id
     );
 
 
@@ -1161,15 +1168,16 @@ function createReservation(
 
         // Record the downpayment as a transaction so it appears in financial reports
         if ($downpayment_amount > 0 && $downpayment_method !== null) {
+            $ctrlNote = $with_controller ? ' (+₱' . number_format($controller_fee,2) . ' controller rental)' : '';
             recordTransaction(
-                null,                   // no session yet
-                $user_id,               // who paid
-                $downpayment_amount,    // amount paid
-                $downpayment_method,    // payment method
-                $user_id,               // processed_by = the customer (self-serve)
-                $downpayment_amount,    // tendered = same as amount (exact)
-                null,                   // no shortfall
-                'Downpayment for reservation #' . $reservation_id
+                null,
+                $user_id,
+                $downpayment_amount,
+                $downpayment_method,
+                $user_id,
+                $downpayment_amount,
+                null,
+                'Downpayment for reservation #' . $reservation_id . $ctrlNote
             );
         }
 
@@ -1464,147 +1472,58 @@ function getOperatingDayBounds($operating_date) {
 /**
  * Get all available console types from the database.
  */
-function getConsoleTypes(bool $onlyActive = true, ?string $category = null): array {
-    global $conn;
+// ============================================================================
+// CONSOLE TYPE FUNCTIONS  (table: console_types)
+// ============================================================================
 
-    // Check if table exists
+/**
+ * Get console types from the console_types table.
+ * $onlyActive = true  → only non-archived rows
+ * $onlyActive = false → all rows (used to build archived list)
+ */
+function getConsoleTypes(bool $onlyActive = true): array {
+    global $conn;
     $check = $conn->query("SHOW TABLES LIKE 'console_types'");
-    if ($check->num_rows === 0) {
-        // Table missing — create it fresh with the category column
-        $conn->query("CREATE TABLE IF NOT EXISTS console_types (
-            type_id    INT AUTO_INCREMENT PRIMARY KEY,
-            type_name  VARCHAR(50) NOT NULL UNIQUE,
-            category   ENUM('console','controller') NOT NULL DEFAULT 'console',
-            is_archived TINYINT(1) DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+    if (!$check || $check->num_rows === 0) return [];
 
-        // Seed defaults: console types + controller types separated
-        $conn->query("INSERT IGNORE INTO console_types (type_name, category) VALUES
-            ('PS5',        'console'),
-            ('PS4',        'console'),
-            ('Xbox Series X','console'),
-            ('DualSense',     'controller'),
-            ('DualShock 4',   'controller'),
-            ('Xbox Controller','controller');");
-
-        // Ensure other tables use VARCHAR (not ENUM)
-        $conn->query("ALTER TABLE consoles MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
-        $conn->query("ALTER TABLE reservations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
-        $conn->query("ALTER TABLE tournaments MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
-        $conn->query("ALTER TABLE reservation_cancellations MODIFY COLUMN console_type VARCHAR(50) NOT NULL;");
-    } else {
-        // Ensure columns exist on pre-existing installs
-        $conn->query("ALTER TABLE console_types ADD COLUMN IF NOT EXISTS is_archived TINYINT(1) DEFAULT 0 AFTER type_name;");
-        $conn->query("ALTER TABLE console_types ADD COLUMN IF NOT EXISTS category ENUM('console','controller') NOT NULL DEFAULT 'console' AFTER is_archived;");
-
-        // Back-fill category for known controller-type names that may exist without category
-        $conn->query("UPDATE console_types SET category = 'controller'
-                      WHERE type_name IN ('DualSense','DualShock 4','Xbox Controller','Other')
-                        AND category = 'console';");
-
-        // Ensure the default controller types exist
-        $conn->query("INSERT IGNORE INTO console_types (type_name, category) VALUES
-            ('DualSense',       'controller'),
-            ('DualShock 4',     'controller'),
-            ('Xbox Controller', 'controller');");
-    }
-
-    $conditions = [];
-    if ($onlyActive)        $conditions[] = "c.is_archived = 0";
-    if ($category !== null) $conditions[] = "c.category = '" . $conn->real_escape_string($category) . "'";
-    $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
-
-    $types = [];
-    $res = $conn->query(
-        "SELECT c.*, p.type_name AS parent_console_name
-         FROM console_types c
-         LEFT JOIN console_types p ON p.type_id = c.console_type_id
-         $where
-         ORDER BY c.type_name ASC"
-    );
-    if ($res) {
-        while ($row = $res->fetch_assoc()) {
-            $types[] = $row;
-        }
-    }
-    return $types;
+    $where = $onlyActive ? "WHERE is_archived = 0" : "";
+    $res = $conn->query("SELECT * FROM console_types $where ORDER BY type_name ASC");
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
 }
 
 /**
- * Convenience wrapper — returns active controller types only.
- * Optionally filtered to controllers for a specific console_type_id.
+ * Add a new console type.
+ * Returns true on success, false on duplicate or error.
  */
-function getControllerTypes(bool $onlyActive = true, ?int $consoleTypeId = null): array {
+function addConsoleType(string $typeName): bool {
     global $conn;
-    $types = getConsoleTypes($onlyActive, 'controller');
-    if ($consoleTypeId !== null) {
-        $types = array_filter($types, fn($t) => (int)($t['console_type_id'] ?? 0) === $consoleTypeId);
-    }
-    return array_values($types);
+    $stmt = $conn->prepare("INSERT INTO console_types (type_name) VALUES (?)");
+    $stmt->bind_param("s", $typeName);
+    try { return $stmt->execute(); } catch (Exception $e) { return false; }
 }
 
 /**
- * Add a new console or controller type.
- * For controller types, pass the parent $consoleTypeId to link via FK.
- * Returns true on success, false on failure (e.g. duplicate name).
- */
-function addConsoleType(string $typeName, string $category = 'console', ?int $consoleTypeId = null): bool {
-    global $conn;
-    $category = in_array($category, ['console', 'controller']) ? $category : 'console';
-    // Only controller types can have a console_type_id
-    if ($category !== 'controller') $consoleTypeId = null;
-    $stmt = $conn->prepare("INSERT INTO console_types (type_name, category, console_type_id) VALUES (?, ?, ?)");
-    $stmt->bind_param("ssi", $typeName, $category, $consoleTypeId);
-    try {
-        return $stmt->execute();
-    } catch (Exception $e) {
-        return false;
-    }
-}
-
-/**
- * Archive a console type and archive all consoles of that type.
+ * Archive a console type AND archive all consoles of that type.
  */
 function archiveConsoleType(int $typeId): bool {
     global $conn;
-    
-    // Start transaction
     $conn->begin_transaction();
-    
     try {
-        // Get the type name first
         $stmtName = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
         $stmtName->bind_param("i", $typeId);
         $stmtName->execute();
-        $resName = $stmtName->get_result();
-        if (!$resName || $resName->num_rows === 0) {
-            $conn->rollback();
-            return false;
-        }
-        $typeName = $resName->fetch_assoc()['type_name'];
-        
-        // 1. Archive all consoles of this type
-        $stmtArchive = $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type = ?");
-        $stmtArchive->bind_param("s", $typeName);
-        $stmtArchive->execute();
-        
-        // 2. Archive the type
-        $stmtType = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
-        $stmtType->bind_param("i", $typeId);
-        $stmtType->execute();
-        
-        $conn->commit();
-        return true;
-    } catch (Exception $e) {
-        $conn->rollback();
-        return false;
-    }
+        $row = $stmtName->get_result()->fetch_assoc();
+        if (!$row) { $conn->rollback(); return false; }
+
+        $typeName = $row['type_name'];
+        $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type = ?")->execute([$typeName]) ;
+        $s = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
+        $s->bind_param("i", $typeId); $s->execute();
+        $conn->commit(); return true;
+    } catch (Exception $e) { $conn->rollback(); return false; }
 }
 
-/**
- * Restore an archived console type.
- */
+/** Restore an archived console type. */
 function restoreConsoleType(int $typeId): bool {
     global $conn;
     $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE type_id = ?");
@@ -1612,15 +1531,83 @@ function restoreConsoleType(int $typeId): bool {
     return $stmt->execute();
 }
 
-/**
- * Permanently delete a console type (if needed, but we use archiving now).
- */
+/** Permanently delete a console type. */
 function deleteConsoleType(int $typeId): bool {
     global $conn;
     $stmt = $conn->prepare("DELETE FROM console_types WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
+
+// ============================================================================
+// CONTROLLER TYPE FUNCTIONS  (table: controller_types)
+// ============================================================================
+
+/**
+ * Get controller types from the controller_types table.
+ * Joins console_types to expose parent_console_name.
+ * $onlyActive = true  → only non-archived
+ * $consoleTypeId      → optional filter: only controllers for that console
+ */
+function getControllerTypes(bool $onlyActive = true, ?int $consoleTypeId = null): array {
+    global $conn;
+    $check = $conn->query("SHOW TABLES LIKE 'controller_types'");
+    if (!$check || $check->num_rows === 0) return [];
+
+    $conditions = [];
+    if ($onlyActive)            $conditions[] = "ct.is_archived = 0";
+    if ($consoleTypeId !== null) $conditions[] = "ct.console_type_id = " . (int)$consoleTypeId;
+    $where = $conditions ? "WHERE " . implode(" AND ", $conditions) : "";
+
+    $res = $conn->query(
+        "SELECT ct.*, c.type_name AS parent_console_name
+         FROM controller_types ct
+         LEFT JOIN console_types c ON c.type_id = ct.console_type_id
+         $where
+         ORDER BY ct.type_name ASC"
+    );
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Add a new controller type.
+ * $consoleTypeId: optional FK to console_types.type_id (the platform it belongs to).
+ */
+function addControllerType(string $typeName, ?int $consoleTypeId = null): bool {
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO controller_types (type_name, console_type_id) VALUES (?, ?)");
+    $stmt->bind_param("si", $typeName, $consoleTypeId);
+    try { return $stmt->execute(); } catch (Exception $e) { return false; }
+}
+
+/** Archive a controller type. */
+function archiveControllerType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/** Restore an archived controller type. */
+function restoreControllerType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/**
+ * Permanently delete a controller type.
+ * Detaches any controllers using it first (sets their console_type_id to NULL).
+ */
+function deleteControllerType(int $typeId): bool {
+    global $conn;
+    $conn->query("UPDATE controllers SET console_type_id = NULL WHERE console_type_id = $typeId");
+    $stmt = $conn->prepare("DELETE FROM controller_types WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
 // ============================================================================
 // DATE BLOCKING FUNCTIONS
 // ============================================================================

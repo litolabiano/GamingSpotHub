@@ -50,8 +50,29 @@ foreach ($allConsoles as $c) {
 $blockedDatesList = array_column(getBlockedDates(), 'blocked_date');
 
 
-$unlimitedRate = getSetting('unlimited_rate') ?? 300;
-$gcashNumber   = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
+$unlimitedRate       = (float)(getSetting('unlimited_rate')      ?? 300);
+$gcashNumber         = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
+$controllerRentalFee = (float)(getSetting('controller_rental_fee') ?? 20.0);
+
+// ── Load available controllers for rental (status=available) ─────────────────
+$availableControllers = [];
+$ctrlRes = $conn->query(
+    "SELECT c.controller_id, c.controller_name, c.unit_number,
+            ct.type_name AS type_name, ct.console_type_id,
+            cs.type_name AS console_type_name
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types cs    ON cs.type_id = ct.console_type_id
+      WHERE c.status = 'available'
+      ORDER BY cs.type_name, ct.type_name, c.unit_number"
+);
+if ($ctrlRes) {
+    while ($row = $ctrlRes->fetch_assoc()) {
+        $availableControllers[] = $row;
+    }
+}
+// JSON-encode for JS use
+$controllersJson = json_encode($availableControllers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STALE PENDING SESSION CLEANUP
@@ -162,7 +183,9 @@ if (!empty($_GET['paymongo']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                 (float)$pending['dp_amount'],
                 'gcash',
                 $pending['preferred_unit_id'] ?? null,
-                null   // no screenshot — PayMongo handled it
+                null,   // no screenshot — PayMongo handled it
+                $pending['controller_id']  ?? null,
+                $pending['controller_fee'] ?? 0.0
             );
 
             if ($result['success']) {
@@ -239,6 +262,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $preferred_unit_id = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
     $dp_amount         = (float)($_POST['downpayment_amount']  ?? 0);
     $pay_via           = $_POST['pay_via'] ?? 'paymongo';   // 'paymongo' or 'screenshot'
+    // Controller add-on
+    $with_ctrl         = !empty($_POST['with_controller']) && $_POST['with_controller'] === '1';
+    $ctrl_id           = $with_ctrl ? ((int)($_POST['selected_controller_id'] ?? 0) ?: null) : null;
+    $ctrl_fee          = $with_ctrl && $ctrl_id ? $controllerRentalFee : 0.0;
 
     // ── Reservation ban check ─────────────────────────────────────────────────
     $banStmt = $conn->prepare(
@@ -337,8 +364,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'notes'             => $notes,
                     'dp_amount'         => $dp_amount,
                     'preferred_unit_id' => $preferred_unit_id,
-                    'session_id'        => $pm['session_id'],   // Checkout Session ID
+                    'session_id'        => $pm['session_id'],
                     'created_at'        => time(),
+                    // Controller add-on
+                    'controller_id'     => $ctrl_id,
+                    'controller_fee'    => $ctrl_fee,
                 ];
 
                 // Redirect to PayMongo hosted checkout page
@@ -391,7 +421,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $notes ?: null,
                     $dp_amount, 'gcash',
                     $preferred_unit_id,
-                    $payment_proof_file
+                    $payment_proof_file,
+                    $ctrl_id,
+                    $ctrl_fee
                 );
 
                 if ($result['success']) {
@@ -1477,6 +1509,28 @@ if (!empty($_GET['console'])) {
                         </div>
                     </div>
 
+                    <!-- ── Step 3b: Add-ons ── -->
+                    <div class="reserve-card" style="margin-bottom:24px;" id="addonsCard">
+                        <h2><i class="fas fa-plus-circle"></i> Step 3b &mdash; Add-ons
+                            <span style="font-size:12px;font-weight:500;color:#888;margin-left:6px;">(Optional)</span>
+                        </h2>
+                        
+                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.02);transition:.2s;" id="ctrlLabel" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='rgba(255,255,255,.02)'">
+                            <input type="checkbox" name="with_controller" id="withControllerCheck" value="1" onchange="onExtraControllerToggle()" style="margin-top:4px;width:16px;height:16px;accent-color:#20c8a1;">
+                            <div style="flex:1;">
+                                <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Rent an Extra Controller</div>
+                                <div style="font-size:11px;color:#888;">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> and will be added to your reservation fee.</div>
+                                
+                                <div id="controllerSelectorBlock" style="display:none;margin-top:12px;">
+                                    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Controller</div>
+                                    <select name="selected_controller_id" id="selectedControllerId" class="res-input" style="margin-bottom:0;padding:10px;font-size:13px;" onchange="recalcFee()">
+                                        <!-- Populated via JS based on selected console type -->
+                                    </select>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
                     <!-- ── Step 4: Reservation Fee / GCash Payment ── -->
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
                         <h2><i class="fas fa-peso-sign"></i> Step 4 &mdash; Reservation Fee
@@ -1945,6 +1999,9 @@ function selectConsoleType(type) {
     // Reset unit selection; show picker only if date+time already chosen
     selectUnit(null, true);
     refreshUnitPicker();
+    
+    // Update Add-ons controller dropdown
+    updateControllerDropdown();
 
     updateSummary();
     checkAvailability();
@@ -2158,10 +2215,7 @@ function selectMode(mode) {
 
     if (mode === 'unlimited') {
         // Fee is deterministic for unlimited — show panel immediately
-        const pct = Math.round(unlimitedRate * 0.05);
-        const fee = 20 + pct;
-        setGcashFee(unlimitedRate, pct, fee);
-        showGcashPanel();
+        recalcFee();
     } else {
         // Hourly — wait for duration pick
         document.getElementById('dpAmount').value = '0';
@@ -2250,18 +2304,58 @@ function selectDuration(mins) {
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
-    const fullCost = mins <= 30 ? PRICING.session_min_charge : _timedCost(mins);
+    recalcFee();
+}
 
-    // Reservation fee = \u20b120 + 5% of session cost
-    const pct = Math.round(fullCost * 0.05);
-    const fee = 20 + pct;
+function recalcFee() {
+    let baseCost = 0;
+    if (selectedMode === 'unlimited') {
+        baseCost = PRICING.unlimited_rate;
+    } else if (selectedMode === 'hourly') {
+        if (!selectedDuration) return; // not ready
+        baseCost = selectedDuration <= 30 ? PRICING.session_min_charge : _timedCost(selectedDuration);
+    } else {
+        return;
+    }
 
-    setGcashFee(fullCost, pct, fee);
+    const withCtrl = document.getElementById('withControllerCheck')?.checked;
+    const ctrlFee = withCtrl ? PRICING.controller_rental_fee : 0;
+    
+    // Reservation fee = \u20b120 + 5% of session cost + controller fee (if any)
+    const pct = Math.round(baseCost * 0.05);
+    const fee = 20 + pct + ctrlFee;
+
+    setGcashFee(baseCost, pct, fee, ctrlFee);
     showGcashPanel();
-
     updateSummary();
 }
 
+function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
+    document.getElementById('dpAmount').value = fee;
+    document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
+    document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
+    
+    // Add extra controller line item if needed
+    let extraLine = document.getElementById('feeCtrlLine');
+    if (ctrlFee > 0) {
+        if (!extraLine) {
+            extraLine = document.createElement('div');
+            extraLine.id = 'feeCtrlLine';
+            extraLine.style = 'display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;';
+            document.getElementById('feePctAmount').parentNode.after(extraLine);
+        }
+        extraLine.innerHTML = `<span>Extra Controller</span><span>₱${ctrlFee.toFixed(2)}</span>`;
+        extraLine.style.display = 'flex';
+    } else if (extraLine) {
+        extraLine.style.display = 'none';
+    }
+
+    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee;
+    const gcashDisp = document.getElementById('gcashAmountDisplay');
+    if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee;
+    const pmBtn = document.getElementById('pmBtnAmount');
+    if (pmBtn) pmBtn.textContent = '\u20b1' + fee;
+}
 
 /* ── Downpayment ────────────────────────────────────── */
 /* Read-only field — driven entirely by selectDuration(). No manual input needed. */
