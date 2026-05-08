@@ -751,8 +751,3 @@ function markNoShow(resId, name) {
     });
 }
 </script>
-        alert('Network error. Please try again.');
-    });
-}
-
-</script>
