@@ -13,10 +13,10 @@ header("Pragma: no-cache");
 header("Expires: 0"); 
 
 $user = getCurrentUser();
-$consoleTypes         = getConsoleTypes(true, 'console');           // active console types only
-$controllerTypes      = getControllerTypes(true);                   // active controller types only
-$archivedConsoleTypes = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'console');
-$archivedCtrlTypes    = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'controller');
+$consoleTypes         = getConsoleTypes(true);              // active console types (console_types table)
+$controllerTypes      = getControllerTypes(true);           // active controller types (controller_types table)
+$archivedConsoleTypes = array_filter(getConsoleTypes(false),    fn($ct) => $ct['is_archived'] == 1);
+$archivedCtrlTypes    = array_filter(getControllerTypes(false), fn($ct) => $ct['is_archived'] == 1);
 $message = '';
 $messageType = '';
 
@@ -314,26 +314,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
-        $typeName      = trim($_POST['type_name'] ?? '');
-        $category      = in_array($_POST['category'] ?? '', ['console', 'controller']) ? $_POST['category'] : 'console';
-        $consoleTypeId = ($category === 'controller' && !empty($_POST['console_type_id']))
-                         ? (int)$_POST['console_type_id'] : null;
+        $typeName = trim($_POST['type_name'] ?? '');
         if ($typeName) {
-            if (addConsoleType($typeName, $category, $consoleTypeId)) {
-                $parentNote = '';
-                if ($consoleTypeId) {
-                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
-                    $pRes->bind_param('i', $consoleTypeId);
-                    $pRes->execute();
-                    $pRow = $pRes->get_result()->fetch_assoc();
-                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
-                }
-                $message = ($category === 'controller' ? 'Controller' : 'Console') . ' type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added successfully.';
+            if (addConsoleType($typeName)) {
+                $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
                 $messageType = 'success';
             } else {
-                $message = 'Failed to add type. It might already exist.';
+                $message = 'Failed to add console type. It might already exist.';
                 $messageType = 'error';
             }
         }
@@ -342,66 +332,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ARCHIVE CONSOLE TYPE
     elseif ($action === 'archive_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (archiveConsoleType($typeId)) {
-                $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to archive console type.';
-                $messageType = 'error';
-            }
+        if ($typeId && archiveConsoleType($typeId)) {
+            $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive console type.';
+            $messageType = 'error';
         }
     }
 
     // RESTORE CONSOLE TYPE
     elseif ($action === 'restore_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (restoreConsoleType($typeId)) {
-                $message = 'Console type restored successfully.';
-                $messageType = 'success';
-            } else {
-                $message = 'Failed to restore console type.';
-                $messageType = 'error';
-            }
+        if ($typeId && restoreConsoleType($typeId)) {
+            $message = 'Console type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore console type.';
+            $messageType = 'error';
         }
     }
 
     // PERMANENTLY DELETE CONSOLE TYPE
     elseif ($action === 'delete_console_type') {
         $typeId = (int)($_POST['type_id'] ?? 0);
-        if ($typeId) {
-            if (deleteConsoleType($typeId)) {
-                $message = 'Console type permanently removed from the system.';
+        if ($typeId && deleteConsoleType($typeId)) {
+            $message = 'Console type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete console type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER TYPE ACTIONS ───────────────────────────────────────────────
+    // ADD CONTROLLER TYPE
+    elseif ($action === 'add_controller_type') {
+        $typeName      = trim($_POST['type_name'] ?? '');
+        $consoleTypeId = !empty($_POST['console_type_id']) ? (int)$_POST['console_type_id'] : null;
+        if ($typeName) {
+            if (addControllerType($typeName, $consoleTypeId)) {
+                $parentNote = '';
+                if ($consoleTypeId) {
+                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+                    $pRes->bind_param('i', $consoleTypeId); $pRes->execute();
+                    $pRow = $pRes->get_result()->fetch_assoc();
+                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
+                }
+                $message = 'Controller type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added.';
                 $messageType = 'success';
             } else {
-                $message = 'Failed to permanently delete console type.';
+                $message = 'Failed to add controller type. It might already exist.';
                 $messageType = 'error';
             }
         }
     }
 
-    // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
+    // ARCHIVE CONTROLLER TYPE
+    elseif ($action === 'archive_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && archiveControllerType($typeId)) {
+            $message = 'Controller type archived successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // RESTORE CONTROLLER TYPE
+    elseif ($action === 'restore_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && restoreControllerType($typeId)) {
+            $message = 'Controller type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // PERMANENTLY DELETE CONTROLLER TYPE
+    elseif ($action === 'delete_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && deleteControllerType($typeId)) {
+            $message = 'Controller type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER (UNIT) ACTIONS ─────────────────────────────────────────────
     elseif ($action === 'add_controller') {
-        $ctrl_name  = trim($_POST['controller_name'] ?? '');
-        $ctrl_type  = $_POST['controller_type'] ?? '';
-        $ctrl_unit  = trim($_POST['ctrl_unit_number'] ?? '');
-        $ctrl_notes = trim($_POST['controller_notes'] ?? '');
-        // Validate against DB-driven controller types (category = 'controller')
-        $validCtrlTypes = array_column(getControllerTypes(true), 'type_name');
-        if ($ctrl_name && in_array($ctrl_type, $validCtrlTypes) && $ctrl_unit) {
-            // Check for duplicate unit number first
+        $ctrl_name   = trim($_POST['controller_name'] ?? '');
+        $ctrl_type   = trim($_POST['controller_type'] ?? '');  // legacy text field
+        $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
+        $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes  = trim($_POST['controller_notes'] ?? '');
+
+        // Validate: must match a real controller type by ID
+        $validTypeIds = array_column(getControllerTypes(true), 'type_id');
+        if ($ctrl_name && $ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
+            // Also get the type name for the legacy column
+            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['type_id'] === $ctrl_typeId))[0] ?? null;
+            $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
+
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
-            $dupCheck->bind_param('s', $ctrl_unit);
-            $dupCheck->execute();
+            $dupCheck->bind_param('s', $ctrl_unit); $dupCheck->execute();
             if ($dupCheck->get_result()->num_rows > 0) {
-                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists. Please use a different unit number (e.g. CTRL-02, CTRL-03).';
+                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists.';
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
+                    "INSERT INTO controllers (controller_name, controller_type, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('ssiss', $ctrl_name, $ctrl_type, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
@@ -413,7 +460,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $dupCheck->close();
         } else {
-            $message = 'Invalid input for new controller.';
+            $message = 'Invalid input for new controller. Ensure all fields are filled and a valid controller type is selected.';
             $messageType = 'error';
         }
     }
@@ -518,12 +565,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare(
                 "UPDATE reservations
                     SET status               = 'cancelled',
-                        cancelled_by         = 'admin',
-                        cancel_reason_type   = ?,
-                        cancel_reason_detail = ?
+                        cancelled_by         = 'admin'
                   WHERE reservation_id = ?"
             );
-            $stmt->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
+            $stmt->bind_param('i', $res_id);
             $stmt->execute();
 
             // ── Log to reservation_cancellations audit table ──────────────
@@ -539,12 +584,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
                      VALUES (?, ?, 'admin', ?, ?, NOW())"
                 );
-                $logStmt->execute([
+                $logStmt->bind_param('iiss',
                     $res_id,
                     $logRow['user_id'],
                     $reasonType,
-                    $reasonDetail,
-                ]);
+                    $reasonDetail
+                );
+                $logStmt->execute();
             }
 
             $message     = 'Reservation #' . $res_id . ' cancelled.';
@@ -1863,107 +1909,51 @@ function onRentalModeChange() {
 Hides/shows the controller rental checkbox depending on the selected
 console type. Only Xbox units support controller rentals.
 */
-window.currentConsoleMaxMins = null;
 function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
-    const consoleId = sel ? sel.value : null;
-
-    const isXbox = type.toLowerCase().includes('xbox');
     const group  = document.getElementById('controllerRentalGroup');
     const toggle = document.getElementById('controllerRentalToggle');
-    if (group) {
-        if (isXbox) {
-            group.style.display = 'block';
-        } else {
-            group.style.display = 'none';
-            if (toggle && toggle.checked) {
+    const label  = document.getElementById('controllerRentalLabel');
+    const icon   = document.getElementById('ctrlRentalIcon');
+    const text   = document.getElementById('ctrlAvailText');
+    if (!group) return;
+
+    // Look up availability for this console type
+    const info      = (typeof CTRL_AVAIL_BY_TYPE !== 'undefined' && type) ? (CTRL_AVAIL_BY_TYPE[type] || null) : null;
+    const hasCtrl   = info && info.total > 0;
+    const available = info ? info.available : 0;
+    const total     = info ? info.total : 0;
+
+    if (hasCtrl) {
+        group.style.display = 'block';
+        const hasAvail = available > 0;
+        if (toggle) {
+            toggle.disabled = !hasAvail;
+            if (!hasAvail && toggle.checked) {
                 toggle.checked = false;
-            }
-        }
-    }
-
-    let resNotice = document.getElementById('consoleReservationNotice');
-    if (!resNotice && sel) {
-        resNotice = document.createElement('div');
-        resNotice.id = 'consoleReservationNotice';
-        resNotice.style.cssText = 'display:none; margin-top:8px; font-size:12px; color:#fb566b; font-weight:600; padding:8px 12px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); border-radius:8px;';
-        sel.parentNode.appendChild(resNotice);
-    }
-
-    window.currentConsoleMaxMins = null;
-    if (consoleId) {
-        fetch('ajax/check_start_conflict.php?console_id=' + consoleId)
-            .then(r => r.json())
-            .then(data => {
-                if (data.has_reservation) {
-                    window.currentConsoleMaxMins = data.minutes_away;
-                    if (resNotice) {
-                        resNotice.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:5px;"></i>' + data.message;
-                        resNotice.style.display = 'block';
-                    }
-                } else {
-                    if (resNotice) resNotice.style.display = 'none';
-                }
-                _enforceDurationLimits();
                 if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-            })
-            .catch(err => console.warn(err));
+            }
+        }
+        if (label) label.style.cursor = hasAvail ? 'pointer' : 'not-allowed';
+        if (icon)  icon.style.color   = hasAvail ? 'var(--clr-mint)' : '#666';
+        if (text) {
+            if (hasAvail) {
+                text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
+                               + `<strong style="color:#20c8a1;">${available}</strong>`
+                               + ` of ${total} controller${total !== 1 ? 's' : ''} available`;
+                text.style.color = '#888';
+            } else {
+                text.innerHTML = `<i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>No controllers available right now`;
+                text.style.color = '#fb566b';
+            }
+        }
     } else {
-        if (resNotice) resNotice.style.display = 'none';
-        _enforceDurationLimits();
-        if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-    }
-}
-
-function _enforceDurationLimits() {
-    const durSel = document.getElementById('durationSelect');
-    const modeSel = document.getElementById('rentalModeSelect');
-    if (!durSel || !modeSel) return;
-    const maxMins = window.currentConsoleMaxMins;
-
-    // Reset duration options
-    Array.from(durSel.options).forEach(opt => {
-        if (opt.value) { // skip placeholder
-            opt.disabled = false;
-            opt.textContent = opt.dataset.originalText || opt.textContent;
-        }
-    });
-
-    // Reset rental mode options
-    Array.from(modeSel.options).forEach(opt => {
-        opt.disabled = false;
-        opt.textContent = opt.dataset.originalText || opt.textContent;
-    });
-
-    if (maxMins !== null) {
-        // Enforce max duration for hourly
-        Array.from(durSel.options).forEach(opt => {
-            if (opt.value) {
-                const totalMin = parseInt(opt.dataset.total || opt.value);
-                if (totalMin > maxMins) { 
-                    if (!opt.dataset.originalText) opt.dataset.originalText = opt.textContent;
-                    opt.disabled = true;
-                    opt.textContent = opt.dataset.originalText + ' (Conflicts with reservation)';
-                }
-            }
-        });
-        if (durSel.selectedIndex > 0 && durSel.options[durSel.selectedIndex].disabled) {
-            durSel.value = '';
-        }
-
-        // Disable open_time and unlimited
-        Array.from(modeSel.options).forEach(opt => {
-            if (opt.value === 'open_time' || opt.value === 'unlimited') {
-                if (!opt.dataset.originalText) opt.dataset.originalText = opt.textContent;
-                opt.disabled = true;
-                opt.textContent = opt.dataset.originalText + ' (Unavailable due to reservation)';
-            }
-        });
-        if (modeSel.value === 'open_time' || modeSel.value === 'unlimited') {
-            modeSel.value = 'hourly';
-            onRentalModeChange();
+        group.style.display = 'none';
+        if (toggle && toggle.checked) {
+            toggle.checked = false;
+            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
         }
     }
 }
@@ -2284,7 +2274,7 @@ function _syncStartBtn() {
 }
 
 
-// Ã¢”â‚¬Ã¢”â‚¬ Modals Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
+
 
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
@@ -3825,76 +3815,6 @@ function _addNotifItems(newItems) {
         _checkMidnight();
         setInterval(_checkMidnight, POLL_MS);
     }, 5000);
-})();
-
-// ── Reservation Auto-Start Poller ─────────────────────────────────────────────
-// Checks every 60 s for reservations whose reserved date+time has been reached
-// and automatically converts them to active gaming sessions.
-// Paired with ajax/auto_start_sessions.php on the backend.
-(function () {
-    var POLL_MS = 60000; // every 60 seconds
-
-    function _autoStartSessions() {
-        fetch('ajax/auto_start_sessions.php', { credentials: 'same-origin' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data || !data.success) return;
-                var count = data.started || 0;
-                if (count === 0) return;
-
-                console.log('[GSpot] Auto-start: ' + count + ' session(s) started.', data.sessions);
-
-                // Show admin toast notification
-                var sessionLines = (data.sessions || []).map(function(s) {
-                    return '• Reservation #' + s.reservation_id + ' → Session #' + s.session_id + ' (' + s.console_type + ')';
-                }).join('\n');
-
-                if (window.showToast) {
-                    window.showToast(
-                        count + ' reservation(s) auto-started as active session(s).',
-                        'success'
-                    );
-                } else {
-                    var banner = document.createElement('div');
-                    banner.style.cssText =
-                        'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
-                        'z-index:999999;background:linear-gradient(135deg,#0a2218,#0d2e22);' +
-                        'border:1px solid rgba(32,200,161,.5);border-radius:14px;' +
-                        'padding:16px 24px;max-width:500px;width:92%;' +
-                        'box-shadow:0 8px 32px rgba(0,0,0,.6);color:#eee;font-size:13px;';
-                    banner.innerHTML =
-                        '<div style="display:flex;align-items:center;gap:12px;">' +
-                        '<div style="width:36px;height:36px;border-radius:10px;flex-shrink:0;' +
-                        'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);' +
-                        'display:flex;align-items:center;justify-content:center;font-size:16px;">' +
-                        '<i class="fas fa-play-circle" style="color:#20c8a1;"></i></div>' +
-                        '<div>' +
-                        '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
-                        count + ' Session' + (count > 1 ? 's' : '') + ' Auto-Started</div>' +
-                        '<div style="color:#aaa;font-size:12px;">Reservations converted to active sessions at their scheduled time.</div>' +
-                        '</div>' +
-                        '<button onclick="this.parentElement.parentElement.remove()" ' +
-                        'style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;margin-left:auto;flex-shrink:0;">×</button>' +
-                        '</div>';
-                    document.body.appendChild(banner);
-                    setTimeout(function() {
-                        if (banner.parentNode) banner.parentNode.removeChild(banner);
-                    }, 10000);
-                }
-
-                // Refresh the live section so new sessions appear immediately
-                setTimeout(function() { location.reload(); }, 2000);
-            })
-            .catch(function(err) {
-                console.warn('[GSpot] Auto-start fetch error:', err);
-            });
-    }
-
-    // Run once at page load (after 10s) then every 60s
-    setTimeout(function() {
-        _autoStartSessions();
-        setInterval(_autoStartSessions, POLL_MS);
-    }, 10000);
 })();
 </script>
 </body>

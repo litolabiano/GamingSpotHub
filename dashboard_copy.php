@@ -779,7 +779,7 @@ function fmtMins(int $m): string {
         /* ── Chart container ──────────────────────────────────────────── */
         .cd-chart-wrap { position: relative; height: 180px; }
 
-        /* ── Charts grid ──────────────────────�        /* ── Responsive ─────────────────────────────────────────────── */
+        /* ── Charts grid ──────────────────────�        /* ── Responsive ─────────────────────────────────────────────── */
         @media (max-width: 900px) {
             /* Hard-clip the viewport — nothing bleeds horizontally */
             html, body { overflow-x: hidden; max-width: 100vw; }
@@ -1696,12 +1696,7 @@ der: none;
                                 <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                             <?php endif; ?>
                         </td>
-                        <td>
-                            <?= htmlspecialchars($r['console_type']) ?>
-                            <?php if ($r['unit_number']): ?>
-                            <br><span style="color:var(--mint);font-size:11px;font-weight:700"><?= htmlspecialchars($r['unit_number']) ?></span>
-                            <?php endif; ?>
-                        </td>
+
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱'.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">–</span>' ?></td>
                         <td>
