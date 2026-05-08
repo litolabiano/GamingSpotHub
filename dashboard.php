@@ -1331,7 +1331,7 @@ function fmtMins(int $m): string {
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
                         <div>
-                            <div class="cd-stat-value">â‚±<?= number_format($spending['total'], 2) ?></div>
+                            <div class="cd-stat-value">₱ <?= number_format($spending['total'], 2) ?></div>
                             <div class="cd-stat-label">Total Spent</div>
                         </div>
                         <div class="cd-stat-icon coral"><i class="fas fa-peso-sign"></i></div>
@@ -1422,7 +1422,7 @@ function fmtMins(int $m): string {
                         <td><?= htmlspecialchars($s['console_type']) ?></td>
                         <td><?= match($s['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
                         <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? 'â‚±'.number_format($s['total_cost'],2) : 'â€”' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : 'â€”' ?></td>
                         <td style="color:var(--muted)"><?= date('M d, Y', strtotime($s['start_time'])) ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -1534,7 +1534,7 @@ function fmtMins(int $m): string {
                             <span style="color:var(--muted);font-size:11px"><?= date('h:i A', strtotime($s['start_time'])) ?></span>
                         </td>
                         <td><?= $s['duration_minutes'] !== null ? fmtMins((int)$s['duration_minutes']) : 'â€”' ?></td>
-                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? 'â‚±'.number_format($s['total_cost'],2) : 'â€”' ?></td>
+                        <td style="color:var(--mint);font-weight:700"><?= $s['total_cost'] ? '₱ '.number_format($s['total_cost'],2) : 'â€”' ?></td>
                         <td>
                             <?php $stMap=['active'=>['blue','Active'],'completed'=>['mint','Done'],'cancelled'=>['coral','Cancelled']]; $st=$stMap[$s['status']]??['gray',ucfirst($s['status'])]; ?>
                             <span class="cd-badge <?= $st[0] ?>"><?= $st[1] ?></span>
@@ -1660,7 +1660,7 @@ function fmtMins(int $m): string {
                             <?php endif; ?>
                         </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
-                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">â‚±'.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">â€“</span>' ?></td>
+                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">â€“</span>' ?></td>
                         <td>
                             <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
@@ -2002,13 +2002,13 @@ function fmtMins(int $m): string {
                 </div>
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
-                        <div><div class="cd-stat-value">â‚±<?= number_format($spending['total'],2) ?></div><div class="cd-stat-label">Total Spent (All Time)</div></div>
+                        <div><div class="cd-stat-value">₱ <?= number_format($spending['total'],2) ?></div><div class="cd-stat-label">Total Spent (All Time)</div></div>
                         <div class="cd-stat-icon coral"><i class="fas fa-peso-sign"></i></div>
                     </div>
                 </div>
                 <div class="cd-stat-card">
                     <div class="cd-stat-top">
-                        <div><div class="cd-stat-value">â‚±<?= number_format($spending['this_month'],2) ?></div><div class="cd-stat-label">Spent This Month</div></div>
+                        <div><div class="cd-stat-value">₱ <?= number_format($spending['this_month'],2) ?></div><div class="cd-stat-label">Spent This Month</div></div>
                         <div class="cd-stat-icon gold"><i class="fas fa-calendar-alt"></i></div>
                     </div>
                 </div>
@@ -2089,20 +2089,20 @@ function fmtMins(int $m): string {
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px">
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Today</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--mint)">â‚±<?= number_format($spending['today'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--mint)">₱ <?= number_format($spending['today'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">This Month</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--blue)">â‚±<?= number_format($spending['this_month'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--blue)">₱ <?= number_format($spending['this_month'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">All Time</div>
-                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--purple)">â‚±<?= number_format($spending['total'],2) ?></div>
+                        <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--purple)">₱ <?= number_format($spending['total'],2) ?></div>
                     </div>
                     <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:10px">
                         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Avg / Session</div>
                         <div style="font-size:24px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--gold)">
-                            â‚±<?= $timeStats['total_sessions'] > 0 ? number_format($spending['total'] / $timeStats['total_sessions'], 2) : '0.00' ?>
+                            ₱ <?= $timeStats['total_sessions'] > 0 ? number_format($spending['total'] / $timeStats['total_sessions'], 2) : '0.00' ?>
                         </div>
                     </div>
                 </div>
@@ -2256,7 +2256,7 @@ function fmtMins(int $m): string {
                         </td>
                         <td>
                             <?php if ((float)$mc['downpayment_amount'] > 0): ?>
-                            <span style="color:var(--coral)">â‚±<?= number_format($mc['downpayment_amount'], 2) ?></span>
+                            <span style="color:var(--coral)">₱ <?= number_format($mc['downpayment_amount'], 2) ?></span>
                             <?php else: ?>
                             <span style="color:var(--muted)">â€”</span>
                             <?php endif; ?>
@@ -2415,7 +2415,7 @@ function fmtMins(int $m): string {
                                 </span>
                                 <span><i class="fas fa-calendar" style="color:#f1a83c;margin-right:4px;"></i><?= date('M d, Y', strtotime($tr['start_date'])) ?></span>
                                 <?php if ($tr['prize_pool'] > 0): ?>
-                                <span><i class="fas fa-gift" style="color:#20c8a1;margin-right:4px;"></i>Prize: â‚±<?= number_format($tr['prize_pool'],0) ?></span>
+                                <span><i class="fas fa-gift" style="color:#20c8a1;margin-right:4px;"></i>Prize: ₱ <?= number_format($tr['prize_pool'],0) ?></span>
                                 <?php endif; ?>
                             </div>
                             <!-- Player details row -->
@@ -2426,7 +2426,7 @@ function fmtMins(int $m): string {
                                 </div>
                                 <div style="background:rgba(95,133,218,0.08);border:1px solid rgba(95,133,218,0.2);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Entry Fee</div>
-                                    <div style="font-size:13px;font-weight:700;color:#5f85da;">â‚±<?= number_format($tr['entry_fee'],0) ?></div>
+                                    <div style="font-size:13px;font-weight:700;color:#5f85da;">₱ <?= number_format($tr['entry_fee'],0) ?></div>
                                 </div>
                                 <div style="background:rgba(32,200,161,0.06);border:1px solid rgba(32,200,161,0.15);border-radius:8px;padding:8px 14px;">
                                     <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">Payment</div>
@@ -2483,13 +2483,13 @@ function fmtMins(int $m): string {
                         <td style="color:var(--muted);"><?= htmlspecialchars($tr['game_name'] ?: 'â€”') ?></td>
                         <td><?= date('M d, Y', strtotime($tr['start_date'])) ?></td>
                         <td><span style="color:var(--mint);font-weight:600;"><?= htmlspecialchars($tr['ign'] ?? 'â€”') ?></span></td>
-                        <td style="color:var(--mint);font-weight:700;">â‚±<?= number_format($tr['entry_fee'],0) ?></td>
+                        <td style="color:var(--mint);font-weight:700;">₱ <?= number_format($tr['entry_fee'],0) ?></td>
                         <td><span class="cd-badge <?= $tsm[0] ?>"><i class="fas fa-<?= $tsm[1] ?>" style="margin-right:4px;"></i><?= $tsm[2] ?></span></td>
                         <td>
                             <?php if ($tr['placement']): ?>
                             <span style="font-weight:700;color:#f1a83c;">#<?= $tr['placement'] ?></span>
                             <?php if ($tr['prize_amount'] > 0): ?>
-                            <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+â‚±<?= number_format($tr['prize_amount'],0) ?></span>
+                            <span style="font-size:11px;color:#20c8a1;margin-left:4px;">+₱ <?= number_format($tr['prize_amount'],0) ?></span>
                             <?php endif; ?>
                             <?php else: ?>
                             <span style="color:var(--muted);">â€”</span>
@@ -2563,7 +2563,7 @@ function fmtMins(int $m): string {
                         <td><span class="cd-badge blue"><?= ucfirst($pay['payment_method']) ?></span></td>
                         <td style="font-weight:700;white-space:nowrap;
                             <?= $isRefund ? 'color:var(--coral);' : 'color:var(--mint);' ?>">
-                            <?= $isRefund ? 'âˆ’' : '+' ?>â‚±<?= number_format(abs((float)$pay['amount']), 2) ?>
+                            <?= $isRefund ? 'âˆ’' : '+' ?>₱ <?= number_format(abs((float)$pay['amount']), 2) ?>
                         </td>
                         <td style="font-size:11px;font-family:monospace;">
                             <?php if ($refDisplay): ?>
@@ -2932,7 +2932,7 @@ new Chart(document.getElementById('chartSpend'), {
         scales: {
             ...chartDefaults.scales,
             y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks,
-                callback: val => 'â‚±' + val
+                callback: val => '₱ ' + val
             }}
         }
     }
@@ -3249,7 +3249,7 @@ if (mainNav) {
                 <?php
                 // DB-driven extension options â€” reads rate and bonus rule from system_settings
                 $extRules = getPricingRules();
-                $extRate  = $extRules['hourly_rate'];   // â‚±/hr for extensions
+                $extRate  = $extRules['hourly_rate'];   // ₱ /hr for extensions
                 // Extension options: 30 min steps up to 2 hrs (no minimum charge for extensions)
                 $extSteps = [30, 60, 90, 120];
                 foreach ($extSteps as $extMins):
@@ -3291,7 +3291,7 @@ if (mainNav) {
                 <span style="font-size:13px;color:#8aa4e8;">
                     <i class="fas fa-receipt" style="margin-right:5px;"></i> Estimated Cost
                 </span>
-                <span id="reqExtCostDisplay" style="font-size:20px;font-weight:800;color:#f1e1aa;">â‚±0</span>
+                <span id="reqExtCostDisplay" style="font-size:20px;font-weight:800;color:#f1e1aa;">₱ 0</span>
             </div>
             <div style="margin-top:6px;font-size:11px;color:var(--muted);">
                 <i class="fas fa-info-circle" style="margin-right:4px;"></i>
@@ -3352,7 +3352,7 @@ function selectExtOpt(el) {
     const mins = el.dataset.mins;
     const cost = el.dataset.cost;
     document.getElementById('reqExtMins').value = mins;
-    document.getElementById('reqExtCostDisplay').textContent = 'â‚±' + cost;
+    document.getElementById('reqExtCostDisplay').textContent = '₱ ' + cost;
     document.getElementById('reqExtCostBox').style.display = 'block';
     const btn = document.getElementById('reqExtSubmitBtn');
     btn.disabled = false;
