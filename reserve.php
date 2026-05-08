@@ -74,6 +74,28 @@ if ($ctrlRes) {
 // JSON-encode for JS use
 $controllersJson = json_encode($availableControllers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 
+// ── Controller stats per console type (available vs total) ────────────────────
+$controllerStatsByType = [];
+$ctrlStats = $conn->query(
+    "SELECT cs.type_name AS console_type,
+            COUNT(*) AS total,
+            SUM(c.status = 'available') AS available
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types    cs ON cs.type_id  = ct.console_type_id
+      GROUP BY cs.type_name"
+);
+if ($ctrlStats) {
+    while ($row = $ctrlStats->fetch_assoc()) {
+        $controllerStatsByType[$row['console_type']] = [
+            'available' => (int)$row['available'],
+            'total'     => (int)$row['total'],
+        ];
+    }
+}
+$controllerStatsJson = json_encode($controllerStatsByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+
 // ══════════════════════════════════════════════════════════════════════════════
 // STALE PENDING SESSION CLEANUP
 // If the user previously initiated a PayMongo checkout but navigated away
@@ -1448,8 +1470,7 @@ if (!empty($_GET['console'])) {
                         </p>
                         <div id="unitPickerGrid"
                              style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:12px;"></div>
-
-                        <div id="unitPickerAny" onclick="selectUnit(null)"
+        <div id="unitPickerAny" onclick="selectUnit(null)"
                              style="padding:10px 16px;border-radius:10px;border:2px solid rgba(32,200,161,.35);
                                     background:rgba(32,200,161,.06);color:#20c8a1;font-size:13px;font-weight:700;
                                     cursor:pointer;text-align:center;transition:.2s;"

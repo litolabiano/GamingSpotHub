@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 08, 2026 at 05:41 AM
+-- Generation Time: May 08, 2026 at 08:42 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -87,8 +87,7 @@ INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_numb
 (5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (6, 'PS4 Unit 6', 'PS4', 'PS4-06', 2, 'maintenance', 80.00, '2026-02-21 19:55:41'),
 (7, 'Xbox Unit 7', 'Xbox Series X', 'XBX-07', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(8, 'Xbox Unit 8', 'Xbox Series X', 'XBX-08', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(3224, 'NINTENDO UNIT 10', 'NINTENDO', 'NTND-10', 2, 'available', 80.00, '2026-05-07 07:37:01');
+(8, 'Xbox Unit 8', 'Xbox Series X', 'XBX-08', 2, 'available', 80.00, '2026-02-21 19:55:41');
 
 -- --------------------------------------------------------
 
@@ -100,24 +99,19 @@ CREATE TABLE `console_types` (
   `type_id` int(11) NOT NULL,
   `type_name` varchar(50) NOT NULL,
   `is_archived` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `category` enum('console','controller') NOT NULL DEFAULT 'console',
-  `console_type_id` int(11) DEFAULT NULL COMMENT 'For controller rows: FK → the console type this controller is for'
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `console_types`
 --
 
-INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `created_at`, `category`, `console_type_id`) VALUES
-(1, 'PS5', 0, '2026-05-06 16:40:40', 'console', NULL),
-(2, 'PS4', 0, '2026-05-06 16:40:40', 'console', NULL),
-(3, 'Xbox Series X', 0, '2026-05-06 16:40:40', 'console', NULL),
-(11, 'NINTENDO', 0, '2026-05-06 23:36:32', 'console', NULL),
-(12, 'PS6', 0, '2026-05-07 00:45:28', 'console', NULL),
-(13, 'DualSense', 0, '2026-05-08 03:27:10', 'controller', 1),
-(14, 'DualShock 4', 0, '2026-05-08 03:27:10', 'controller', 2),
-(15, 'Xbox Controller', 0, '2026-05-08 03:27:10', 'controller', 3);
+INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `created_at`) VALUES
+(1, 'PS5', 0, '2026-05-08 04:10:19'),
+(2, 'PS4', 0, '2026-05-08 04:10:19'),
+(3, 'Xbox Series X', 0, '2026-05-08 04:10:19'),
+(11, 'NINTENDO', 0, '2026-05-08 04:10:19'),
+(12, 'PS6', 0, '2026-05-08 04:10:19');
 
 -- --------------------------------------------------------
 
@@ -128,24 +122,50 @@ INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `created_at`
 CREATE TABLE `controllers` (
   `controller_id` int(11) NOT NULL,
   `controller_name` varchar(100) NOT NULL,
-  `controller_type` varchar(50) DEFAULT NULL COMMENT 'Legacy text field — use console_type_id FK instead',
-  `console_type_id` int(11) DEFAULT NULL COMMENT 'FK → console_types.type_id (normalized controller type)',
+  `controller_type` varchar(50) DEFAULT NULL,
   `unit_number` varchar(50) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `console_type_id` int(11) DEFAULT NULL COMMENT 'FK → console_types.type_id (the controller type)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `controllers`
 --
 
-INSERT INTO `controllers` (`controller_id`, `controller_name`, `controller_type`, `console_type_id`, `unit_number`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(1,  'Xbox Controller', 'Xbox Controller', 15, 'CTRL-01', 'available', '', '2026-05-05 09:00:03', '2026-05-07 11:52:54'),
-(4,  'Xbox Controller', 'Xbox Controller', 15, 'CTRL-02', 'available', '', '2026-05-05 09:02:00', '2026-05-05 09:02:00'),
-(13, 'ARCADE STICK',    'Xbox Controller', 15, 'CTRL-03', 'available', '', '2026-05-07 00:36:15', '2026-05-07 00:36:15'),
-(14, 'NINTENDO',        'Xbox Controller', 15, 'CTRL-04', 'available', '', '2026-05-07 00:37:26', '2026-05-07 00:37:26');
+INSERT INTO `controllers` (`controller_id`, `controller_name`, `controller_type`, `unit_number`, `status`, `notes`, `created_at`, `updated_at`, `console_type_id`) VALUES
+(1, 'Xbox Controller', 'Xbox Controller', 'CTRL-01', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 06:15:33', 15),
+(4, 'Xbox Controller', 'Xbox Controller', 'CTRL-02', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 06:15:35', 15),
+(13, 'ARCADE STICK', 'Xbox Controller', 'CTRL-03', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 06:15:37', 15),
+(14, 'NINTENDO', 'Xbox Controller', 'CTRL-04', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 06:15:39', 15),
+(18, 'joy con', 'joy con', 'CTRL-06', 'available', 'joy con', '2026-05-08 05:05:20', '2026-05-08 05:05:20', 101),
+(19, 'ps5 Controller', 'DualSense', 'CTRL-07', 'available', '', '2026-05-08 06:14:28', '2026-05-08 06:14:28', 13);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `controller_types`
+--
+
+CREATE TABLE `controller_types` (
+  `type_id` int(11) NOT NULL,
+  `type_name` varchar(50) NOT NULL,
+  `console_type_id` int(11) DEFAULT NULL COMMENT 'FK → console_types.type_id: which console platform this controller belongs to',
+  `is_archived` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `controller_types`
+--
+
+INSERT INTO `controller_types` (`type_id`, `type_name`, `console_type_id`, `is_archived`, `created_at`) VALUES
+(13, 'DualSense', 1, 0, '2026-05-08 05:00:32'),
+(14, 'DualShock 4', 2, 0, '2026-05-08 05:00:32'),
+(15, 'Xbox Controller', 3, 0, '2026-05-08 05:00:32'),
+(101, 'joy con', 11, 0, '2026-05-08 05:04:46');
 
 -- --------------------------------------------------------
 
@@ -228,6 +248,9 @@ CREATE TABLE `reservations` (
   `reserved_date` date NOT NULL,
   `reserved_time` time NOT NULL,
   `notes` text DEFAULT NULL,
+  `with_controller` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Did customer add a controller rental?',
+  `controller_id` int(11) DEFAULT NULL COMMENT 'FK → controllers.controller_id',
+  `controller_fee` decimal(8,2) NOT NULL DEFAULT 0.00 COMMENT 'Controller rental fee at time of booking',
   `downpayment_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `downpayment_method` enum('cash','gcash','credit_card') DEFAULT NULL,
   `downpayment_paid` tinyint(1) NOT NULL DEFAULT 0,
@@ -246,6 +269,13 @@ CREATE TABLE `reservations` (
   `cancel_reason_type` enum('schedule_change','found_alternative','budget_issue','technical_issue','emergency','other','admin_decision') DEFAULT NULL,
   `cancel_reason_detail` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `reservations`
+--
+
+INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `with_controller`, `controller_id`, `controller_fee`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `payment_proof`, `payment_proof_status`, `paymongo_source_id`, `paymongo_payment_id`, `paymongo_status`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`, `cancel_reason_type`, `cancel_reason_detail`) VALUES
+(34, 12, 5, 'PS5', 'hourly', 30, '2026-05-08', '17:00:00', NULL, 0, NULL, 0.00, 23.00, 'gcash', 1, NULL, NULL, 'cs_ab9ba3f85c5983de8cc94a5d', 'pay_JnDVJwLJQwAAfFAyrU7stW8r', 'paid', 'reserved', 12, '2026-05-08 14:07:12', '2026-05-08 14:07:12', NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -509,6 +539,13 @@ CREATE TABLE `transactions` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `transactions`
+--
+
+INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`, `tendered_amount`, `shortfall_amount`, `payment_note`, `payment_method`, `payment_status`, `transaction_date`, `processed_by`, `created_at`) VALUES
+(123, NULL, 12, 23.00, 23.00, NULL, 'Downpayment for reservation #34', 'gcash', 'completed', '2026-05-08 14:07:12', 12, '2026-05-08 14:07:12');
+
 -- --------------------------------------------------------
 
 --
@@ -591,8 +628,7 @@ ALTER TABLE `consoles`
 --
 ALTER TABLE `console_types`
   ADD PRIMARY KEY (`type_id`),
-  ADD UNIQUE KEY `type_name` (`type_name`),
-  ADD KEY `fk_ctrl_console_type` (`console_type_id`);
+  ADD UNIQUE KEY `type_name` (`type_name`);
 
 --
 -- Indexes for table `controllers`
@@ -600,7 +636,14 @@ ALTER TABLE `console_types`
 ALTER TABLE `controllers`
   ADD PRIMARY KEY (`controller_id`),
   ADD UNIQUE KEY `unit_number` (`unit_number`),
-  ADD KEY `fk_controllers_type` (`console_type_id`);
+  ADD KEY `fk_controllers_ctrlt` (`console_type_id`);
+
+--
+-- Indexes for table `controller_types`
+--
+ALTER TABLE `controller_types`
+  ADD PRIMARY KEY (`type_id`),
+  ADD UNIQUE KEY `type_name` (`type_name`);
 
 --
 -- Indexes for table `gaming_sessions`
@@ -641,7 +684,8 @@ ALTER TABLE `reservations`
   ADD KEY `idx_res_console` (`console_id`),
   ADD KEY `idx_res_console_type` (`console_type`),
   ADD KEY `fk_res_created_by` (`created_by`),
-  ADD KEY `idx_res_paymongo_src` (`paymongo_source_id`);
+  ADD KEY `idx_res_paymongo_src` (`paymongo_source_id`),
+  ADD KEY `fk_res_controller` (`controller_id`);
 
 --
 -- Indexes for table `reservation_cancellations`
@@ -753,13 +797,19 @@ ALTER TABLE `consoles`
 -- AUTO_INCREMENT for table `console_types`
 --
 ALTER TABLE `console_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=101;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=105;
 
 --
 -- AUTO_INCREMENT for table `controllers`
 --
 ALTER TABLE `controllers`
-  MODIFY `controller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `controller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+
+--
+-- AUTO_INCREMENT for table `controller_types`
+--
+ALTER TABLE `controller_types`
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=102;
 
 --
 -- AUTO_INCREMENT for table `gaming_sessions`
@@ -783,7 +833,7 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `reservation_cancellations`
@@ -831,7 +881,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=123;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=124;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -850,16 +900,10 @@ ALTER TABLE `additional_requests`
   ADD CONSTRAINT `fk_addreq_session` FOREIGN KEY (`session_id`) REFERENCES `gaming_sessions` (`session_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `console_types`
---
-ALTER TABLE `console_types`
-  ADD CONSTRAINT `fk_ctrl_console_type` FOREIGN KEY (`console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
 -- Constraints for table `controllers`
 --
 ALTER TABLE `controllers`
-  ADD CONSTRAINT `fk_controllers_type` FOREIGN KEY (`console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_controllers_ctrlt` FOREIGN KEY (`console_type_id`) REFERENCES `controller_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `gaming_sessions`
@@ -880,6 +924,7 @@ ALTER TABLE `reports`
 --
 ALTER TABLE `reservations`
   ADD CONSTRAINT `fk_res_console` FOREIGN KEY (`console_id`) REFERENCES `consoles` (`console_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_res_controller` FOREIGN KEY (`controller_id`) REFERENCES `controllers` (`controller_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_res_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
 
