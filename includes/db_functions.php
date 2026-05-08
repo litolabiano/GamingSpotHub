@@ -244,8 +244,8 @@ function updateConsoleStatus($console_id, $status) {
 function addConsole($name, $type, $unit_number, $rate, $controller_count = 2, $compat_ctrl_type = null) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, controller_count, status, compatible_controller_type) VALUES (?, ?, ?, ?, ?, 'available', ?)");
-        $stmt->bind_param("sssdis", $name, $type, $unit_number, $rate, $controller_count, $compat_ctrl_type);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, controller_count, status) VALUES (?, ?, ?, ?, ?, 'available')");
+        $stmt->bind_param("sssdi", $name, $type, $unit_number, $rate, $controller_count);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         // Return false if duplicate entry or other SQL error

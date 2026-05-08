@@ -1681,6 +1681,7 @@ function fmtMins(int $m): string {
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
+                                $rConsoleId   = (int)($r['console_id'] ?? 0);
                                 $alreadyResched = !empty($userRescheduledIds[$rid]);
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -1693,7 +1694,7 @@ function fmtMins(int $m): string {
                                     </button>
                                 <?php elseif ($r['status'] === 'reserved'): ?>
                                     <?php if (!$alreadyResched): ?>
-                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
+                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
                                     <?php endif; ?>
@@ -3257,10 +3258,13 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
                 <input type="hidden" id="reschedResId">
                 
                 <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Unit</label>
                     <select id="reschedConsole" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
-                        <?php foreach (getConsoleTypes(true) as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <option value="" disabled selected>— Select console unit —</option>
+                        <?php foreach (getAvailableConsoles() as $con): ?>
+                            <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
+                                <?= htmlspecialchars($con['unit_number']) ?> — <?= htmlspecialchars($con['console_type']) ?> (₱<?= number_format($con['hourly_rate'], 2) ?>/hr)
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -3340,9 +3344,22 @@ function buildReschedTimeSelect() {
     });
 }
 
-function openUserRescheduleModal(id, date, time, consoleType) {
+function openUserRescheduleModal(id, date, time, consoleType, consoleId) {
     document.getElementById('reschedResId').value = id;
-    document.getElementById('reschedConsole').value = consoleType;
+    
+    const selC = document.getElementById('reschedConsole');
+    if (consoleId) {
+        selC.value = consoleId;
+    } else {
+        // Fallback to select first matching type
+        for(let i=0; i<selC.options.length; i++) {
+            if(selC.options[i].dataset.type === consoleType) {
+                selC.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    
     document.getElementById('reschedDate').value = date;
     
     buildReschedTimeSelect();
@@ -3372,7 +3389,15 @@ function submitUserReschedule(e) {
     const rid  = document.getElementById('reschedResId').value;
     const date = document.getElementById('reschedDate').value;
     const time = document.getElementById('reschedTime').value;
-    const consoleType = document.getElementById('reschedConsole').value;
+    const consSel = document.getElementById('reschedConsole');
+    const opt = consSel.options[consSel.selectedIndex];
+    if (!opt || !opt.value) {
+        err.textContent = 'Please select a console unit.';
+        err.style.display = 'block';
+        return;
+    }
+    const consoleId = opt.value;
+    const consoleType = opt.dataset.type;
 
     if (!rid || !date || !time) {
         err.textContent = 'Please fill out all required fields.';
@@ -3388,6 +3413,7 @@ function submitUserReschedule(e) {
     fd.append('reservation_id', rid);
     fd.append('new_date', date);
     fd.append('new_time', time);
+    fd.append('console_id', consoleId);
     fd.append('console_type', consoleType);
 
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
