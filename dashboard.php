@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * GamingSpotHub - Customer Dashboard
  * Lets logged-in customers track reservations, session history, spending, and more.
@@ -1941,81 +1941,7 @@ function fmtMins(int $m): string {
         </div>
 
 
-        <!--  User-Initiated Reschedule Modal  -->
-        <div id="userRescheduleModal" style="display:none;position:fixed;inset:0;z-index:9999;
-             background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
-             align-items:center;justify-content:center;">
-            <div style="background:#0e1d36;border:1px solid rgba(95,133,218,.35);border-radius:18px;
-                        padding:28px 28px 24px;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
-                
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-                    <div style="width:40px;height:40px;border-radius:12px;background:rgba(95,133,218,.15);
-                                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fas fa-calendar-alt" style="color:#5f85da;"></i>
-                    </div>
-                    <div>
-                        <div style="font-weight:800;color:#fff;font-size:15px;">Reschedule Reservation</div>
-                        <div style="font-size:12px;color:#888;" id="urmSubtitle">Reservation #...</div>
-                    </div>
-                </div>
 
-                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;margin-bottom:18px;">
-                    <div style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Current Schedule</div>
-                    <div style="font-size:13px;color:#fff;font-weight:600;" id="urmCurrentSched">...</div>
-                </div>
-
-                <div style="margin-bottom:16px;">
-                    <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Date</label>
-                    <input type="date" id="urmDate" style="
-                        width:100%;background:rgba(10,33,81,.7);
-                        border:1px solid rgba(95,133,218,.3);
-                        color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                        font-size:14px;font-family:inherit;outline:none;"
-                        min="<?= date('Y-m-d') ?>"
-                        max="<?= date('Y-m-d', strtotime('+1 month')) ?>">
-                </div>
-
-                <div style="margin-bottom:20px;">
-                    <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Time</label>
-                    <select id="urmTime" style="
-                        width:100%;background:rgba(10,33,81,.7);
-                        border:1px solid rgba(95,133,218,.3);
-                        color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                        font-size:14px;font-family:inherit;outline:none;">
-                        <?php for($h=12;$h<=23;$h++): ?>
-                            <?php 
-                                $val = sprintf("%02d:00", $h);
-                                $lbl = date("g:i A", strtotime($val));
-                            ?>
-                            <option value="<?= $val ?>"><?= $lbl ?></option>
-                            <?php if($h<23): ?>
-                                <?php 
-                                    $val2 = sprintf("%02d:30", $h);
-                                    $lbl2 = date("g:i A", strtotime($val2));
-                                ?>
-                                <option value="<?= $val2 ?>"><?= $lbl2 ?></option>
-                            <?php endif; ?>
-                        <?php endfor; ?>
-                    </select>
-                </div>
-
-                <div style="display:flex;gap:10px;">
-                    <button id="urmSubmitBtn"
-                        onclick="submitUserReschedule()"
-                        style="flex:1;padding:11px;border-radius:10px;border:none;
-                               background:linear-gradient(135deg,#5f85da,#2b59c3);color:#fff;
-                               font-weight:700;font-size:13px;cursor:pointer;transition:.2s;">
-                        <i class="fas fa-calendar-check"></i> Request Reschedule
-                    </button>
-                    <button onclick="closeUserRescheduleModal()"
-                        style="flex:1;padding:11px;border-radius:10px;
-                               border:1px solid rgba(255,255,255,.15);background:transparent;
-                               color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
 
         <!-- Toast notification -->
         <div id="dashToast" style="display:none;position:fixed;bottom:24px;right:24px;z-index:10000;
@@ -3137,83 +3063,6 @@ document.getElementById('cancelResModal')?.addEventListener('click', function(e)
 let _urmResId = null;
 let _urmConsole = null;
 
-function openUserRescheduleModal(rid, curDate, curTime, consoleType) {
-    _urmResId = rid;
-    _urmConsole = consoleType;
-    
-    document.getElementById('urmSubtitle').textContent = 'Reservation #' + rid;
-    
-    // Format current schedule display
-    const d = new Date(curDate + 'T00:00:00');
-    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeDisplay = formatTime(curTime);
-    
-    document.getElementById('urmCurrentSched').textContent = dateStr + ' at ' + timeDisplay;
-    
-    // Reset inputs
-    const dateInput = document.getElementById('urmDate');
-    dateInput.value = curDate;
-    document.getElementById('urmTime').value = curTime.substring(0, 5);
-    
-    document.getElementById('userRescheduleModal').style.display = 'flex';
-}
-
-function formatTime(t) {
-    let [h, m] = t.split(':');
-    h = parseInt(h);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return h + ':' + m + ' ' + ampm;
-}
-
-function closeUserRescheduleModal() {
-    document.getElementById('userRescheduleModal').style.display = 'none';
-    _urmResId = null;
-    _urmConsole = null;
-}
-
-function submitUserReschedule() {
-    if (!_urmResId) return;
-    
-    const newDate = document.getElementById('urmDate').value;
-    const newTime = document.getElementById('urmTime').value;
-    
-    if (!newDate || !newTime) {
-        showDashToast('Please select both date and time.', 'error');
-        return;
-    }
-    
-    const btn = document.getElementById('urmSubmitBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Requesting...';
-    
-    const fd = new FormData();
-    fd.append('reservation_id', _urmResId);
-    fd.append('new_date', newDate);
-    fd.append('new_time', newTime);
-    fd.append('console_type', _urmConsole);
-    
-    fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                closeUserRescheduleModal();
-                showDashToast(data.message, 'success');
-                sessionStorage.setItem('dashToastMsg', data.message);
-                sessionStorage.setItem('dashToastType', 'success');
-                setTimeout(() => { location.reload(); }, 1500);
-            } else {
-                showDashToast(data.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-calendar-check"></i> Request Reschedule';
-            }
-        })
-        .catch(() => {
-            showDashToast('Network error. Please try again.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-calendar-check"></i> Request Reschedule';
-        });
-}
 
 // Close user reschedule modal on backdrop click
 document.getElementById('userRescheduleModal')?.addEventListener('click', function(e) {
