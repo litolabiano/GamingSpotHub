@@ -1214,7 +1214,7 @@ function createReservation(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
-        'iiiissssiidssissi',
+        'iiisisssiiddsissi',
         $user_id, $preferred_unit_id, $console_type_id, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
         $with_controller, $controller_id, $controller_fee,

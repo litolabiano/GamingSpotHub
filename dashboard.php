@@ -290,7 +290,7 @@ function fmtMins(int $m): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Dashboard â€“ GSpot Gaming Hub</title>
+    <title>My Dashboard  GSpot Gaming Hub</title>
     <meta name="description" content="Track your gaming sessions, reservations, and spending at GSpot Gaming Hub.">
 
     <!-- Bootstrap CSS (required by the shared navbar) -->
@@ -314,7 +314,7 @@ function fmtMins(int $m): string {
 
     <style>
         /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-           CUSTOMER DASHBOARD â€“ STYLES
+           CUSTOMER DASHBOARD  STYLES
         â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
         :root {
             --mint   : #20c8a1;
@@ -1306,7 +1306,7 @@ function fmtMins(int $m): string {
                 <div class="cd-live-meta">
                     <div class="cd-live-item">
                         <div class="cd-live-label">Console</div>
-                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?></div>
+                        <div class="cd-live-val"><?= htmlspecialchars($activeSession['console_type']) ?>  <?= htmlspecialchars($activeSession['unit_number']) ?></div>
                     </div>
                     <div class="cd-live-item">
                         <div class="cd-live-label">Mode</div>
@@ -1329,7 +1329,7 @@ function fmtMins(int $m): string {
                         <div class="cd-live-timer" id="liveTimer"
                              data-start="<?= $activeSession['start_time'] ?>"
                              data-planned="<?= $activeSession['planned_minutes'] ?? 0 ?>">
-                            â€“:â€“â€“
+                            :
                         </div>
                     </div>
                 </div>
@@ -1436,7 +1436,7 @@ function fmtMins(int $m): string {
                             <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
                             <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                         </td>
-                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' â€“ <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
+                        <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? '  <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
                         <td>
                             <?php $statusMap = ['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
@@ -1705,7 +1705,7 @@ function fmtMins(int $m): string {
                             <?php endif; ?>
                         </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
-                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">â€“</span>' ?></td>
+                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)"></span>' ?></td>
                         <td>
                             <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
@@ -1718,7 +1718,7 @@ function fmtMins(int $m): string {
                                     <br><span style="font-size:10px;color:var(--muted);">- <?= htmlspecialchars($pendingAdminResched['reason_detail']) ?></span>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : 'â€“' ?>
+                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : '' ?>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -3128,7 +3128,7 @@ if (mainNav) {
         <div style="background:rgba(32,200,161,.06);border:1px solid rgba(32,200,161,.2);
                     border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
             <strong style="color:#fff;">
-                <?= htmlspecialchars($activeSession['console_type']) ?> â€“ <?= htmlspecialchars($activeSession['unit_number']) ?>
+                <?= htmlspecialchars($activeSession['console_type']) ?>  <?= htmlspecialchars($activeSession['unit_number']) ?>
             </strong>
             <span style="color:var(--muted);margin-left:8px;">
                 Booked: <?= fmtMins((int)($activeSession['planned_minutes'] ?? 0)) ?>
@@ -3363,7 +3363,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
 </div>
 
 <script>
-// Valid slots 12:00â€“23:00 in 30-min steps
+// Valid slots 12:0023:00 in 30-min steps
 const DASH_TIME_SLOTS = (function () {
     const s = [];
     for (let h = 12; h <= 23; h++) {
@@ -3506,7 +3506,7 @@ function submitUserReschedule(e) {
 </script>
 
 <script>
-/* â•â• My Account â€“ Profile Edit â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* â•â• My Account  Profile Edit â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 function startProfileEdit() {
     document.getElementById('profileDisplay').style.display = 'none';
@@ -3556,7 +3556,7 @@ function submitProfileEdit(e) {
 
     const phone = document.getElementById('pf_phone').value;
     if (phone !== '' && !/^\d{10,11}$/.test(phone)) {
-        pfShowAlert(true, false, 'Phone must be 10â€“11 digits (numbers only).');
+        pfShowAlert(true, false, 'Phone must be 1011 digits (numbers only).');
         return;
     }
 
