@@ -936,9 +936,9 @@ function registerForTournament($tournament_id, $user_id) {
         return ['success' => false, 'message' => 'Tournament is full'];
     }
 
-    // Register
-    $stmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id) VALUES (?, ?)");
-    $stmt->bind_param("ii", $tournament_id, $user_id);
+    // Register — set registered_by = user_id for self-registration (customer registered themselves)
+    $stmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, registered_by) VALUES (?, ?, ?)");
+    $stmt->bind_param("iii", $tournament_id, $user_id, $user_id);
     $stmt->execute();
 
     return ['success' => true, 'participant_id' => $conn->insert_id];
@@ -1425,10 +1425,13 @@ function getCancelledReservations() {
     global $conn;
     $stmt = $conn->prepare(
         "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
-                c.unit_number, c.console_name
+                c.unit_number, c.console_name,
+                rc.cancel_reason_type, rc.cancel_reason_detail,
+                rc.cancelled_at
            FROM reservations r
            JOIN users u ON r.user_id = u.user_id
            LEFT JOIN consoles c ON r.console_id = c.console_id
+           LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
           WHERE r.status = 'cancelled'
           ORDER BY r.updated_at DESC"
     );

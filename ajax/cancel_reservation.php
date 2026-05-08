@@ -76,12 +76,10 @@ if (!in_array($r['status'], ['pending', 'reserved'])) {
 $stmt2 = $conn->prepare(
     "UPDATE reservations
         SET status             = 'cancelled',
-            cancelled_by       = 'user',
-            cancel_reason_type = ?,
-            cancel_reason_detail = ?
+            cancelled_by       = 'user'
       WHERE reservation_id = ?"
 );
-$stmt2->bind_param('ssi', $reasonType, $reasonDetail, $res_id);
+$stmt2->bind_param('i', $res_id);
 $stmt2->execute();
 
 // ── Log this cancellation event to reservation_cancellations ─────────────────
