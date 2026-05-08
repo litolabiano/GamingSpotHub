@@ -1733,7 +1733,7 @@ function openConvertModal(res) {
 <div class="modal" id="addControllerModal">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3><i class="fas fa-gamepad" style="color:var(--clr-mint);margin-right:8px;"></i>Add Xbox Controller</h3>
+            <h3><i class="fas fa-gamepad" style="color:var(--clr-mint);margin-right:8px;"></i>Add Controller</h3>
             <button class="modal-close" onclick="closeModal('addController')">
                 <i class="fas fa-times"></i>
             </button>
@@ -1741,15 +1741,14 @@ function openConvertModal(res) {
         <form method="POST">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add_controller">
-            <input type="hidden" name="controller_type" value="Xbox Controller">
+
 
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Controller Name *</label>
                         <input type="text" name="controller_name" required
-                               placeholder="e.g. Xbox Controller"
-                               value="Xbox Controller">
+                               placeholder="e.g. DualSense Controller">
                     </div>
                     <div class="form-group">
                         <label>Unit Number *</label>
@@ -1760,7 +1759,18 @@ function openConvertModal(res) {
                 </div>
 
                 <div class="form-group">
-                    <label>Notes <span style="color:#666;font-weight:400;">(optional)</span></label>
+                    <label>Controller Type *</label>
+                    <select name="controller_type" required>
+                        <option value="" disabled selected>— Select Type —</option>
+                        <?php foreach ($controllerTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>">
+                                <?= htmlspecialchars($ct['type_name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <textarea name="controller_notes" rows="2"
                               placeholder="e.g. Minor stick drift, Cable-only..."></textarea>
                 </div>

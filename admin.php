@@ -13,10 +13,10 @@ header("Pragma: no-cache");
 header("Expires: 0"); 
 
 $user = getCurrentUser();
-$consoleTypes = getConsoleTypes(true); // only active
-$archivedConsoleTypes = getConsoleTypes(false); // only archived if we want, but let's filter in the view or fetch separately.
-// Actually, let's fetch all and filter in PHP or fetch separately.
-$archivedConsoleTypes = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1);
+$consoleTypes         = getConsoleTypes(true, 'console');           // active console types only
+$controllerTypes      = getControllerTypes(true);                   // active controller types only
+$archivedConsoleTypes = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'console');
+$archivedCtrlTypes    = array_filter(getConsoleTypes(false), fn($ct) => $ct['is_archived'] == 1 && $ct['category'] === 'controller');
 $message = '';
 $messageType = '';
 
@@ -316,13 +316,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
-        $typeName = trim($_POST['type_name'] ?? '');
+        $typeName      = trim($_POST['type_name'] ?? '');
+        $category      = in_array($_POST['category'] ?? '', ['console', 'controller']) ? $_POST['category'] : 'console';
+        $consoleTypeId = ($category === 'controller' && !empty($_POST['console_type_id']))
+                         ? (int)$_POST['console_type_id'] : null;
         if ($typeName) {
-            if (addConsoleType($typeName)) {
-                $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
+            if (addConsoleType($typeName, $category, $consoleTypeId)) {
+                $parentNote = '';
+                if ($consoleTypeId) {
+                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+                    $pRes->bind_param('i', $consoleTypeId);
+                    $pRes->execute();
+                    $pRow = $pRes->get_result()->fetch_assoc();
+                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
+                }
+                $message = ($category === 'controller' ? 'Controller' : 'Console') . ' type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added successfully.';
                 $messageType = 'success';
             } else {
-                $message = 'Failed to add console type. It might already exist.';
+                $message = 'Failed to add type. It might already exist.';
                 $messageType = 'error';
             }
         }
@@ -376,8 +387,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ctrl_type  = $_POST['controller_type'] ?? '';
         $ctrl_unit  = trim($_POST['ctrl_unit_number'] ?? '');
         $ctrl_notes = trim($_POST['controller_notes'] ?? '');
-        $valid_types = ['DualSense', 'DualShock 4', 'Xbox Controller', 'Other'];
-        if ($ctrl_name && in_array($ctrl_type, $valid_types) && $ctrl_unit) {
+        // Validate against DB-driven controller types (category = 'controller')
+        $validCtrlTypes = array_column(getControllerTypes(true), 'type_name');
+        if ($ctrl_name && in_array($ctrl_type, $validCtrlTypes) && $ctrl_unit) {
             // Check for duplicate unit number first
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
             $dupCheck->bind_param('s', $ctrl_unit);
