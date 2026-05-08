@@ -296,7 +296,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
                                 <?php 
                                 $psEndTs = strtotime($ps['end_time'] ?? '');
-                                if ($isCompleted && $psEndTs && (time() - $psEndTs < 300)): ?>
+                                if ($isCompleted && $psEndTs && (time() - $psEndTs < 3600)): ?>
                                     <button class="btn-restore btn-sm" 
                                         onclick="restoreSession(<?= $ps['session_id'] ?>, '<?= sessionCustomerLabel($ps, true) ?>', '<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>', <?= $psEndTs ?>)"
                                         data-end-ts="<?= $psEndTs ?>"
@@ -492,7 +492,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                             $endTs = strtotime($sess['end_time']);
                                             $now = time();
                                             $diff = $now - $endTs;
-                                            $canRestore = ($diff < 300); // 5 minutes window
+                                            $canRestore = ($diff < 3600); // 1 hour window
                                             ?>
                                             <?php if ($canRestore): ?>
                                                 <button class="btn-restore btn-sm" 
@@ -919,7 +919,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             const endTs = parseInt(btn.dataset.endTs);
             const updateTimer = () => {
                 const now = Math.floor(Date.now() / 1000);
-                const diff = 300 - (now - endTs);
+                const diff = 3600 - (now - endTs);
                 if (diff <= 0) {
                     const parent = btn.parentElement;
                     if (parent) parent.innerHTML = '—';
