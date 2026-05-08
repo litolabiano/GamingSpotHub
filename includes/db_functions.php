@@ -138,10 +138,10 @@ function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null):
     // paidToTotalMinutes(p) === total_minutes.
     for ($p = $total_minutes; $p >= 0; $p--) {
         if ($p + (int)floor($p / $bp) * $bf === $total_minutes) {
-            // Apply the new pricing structure: ₱50 for first 30m, ₱80/hr for the rest
+            // Apply the new pricing structure: ₱50 for first 30m, straight hourly rate thereafter
             if ($p <= 0) return 0.0;
             if ($p <= 30) return (float)$rules['session_min_charge'];
-            return (float)($rules['session_min_charge'] + round(($p - 30) / 60 * $rules['hourly_rate'], 2));
+            return (float)round($p / 60 * $rules['hourly_rate'], 2);
         }
     }
     // Fallback: no bonus found — treat all minutes as paid (shouldn't happen)
@@ -163,8 +163,8 @@ function getHourlyDurationOptions(?array $rules = null): array {
     for ($paid = 30; $paid <= $max; $paid += 30) {
         $bonus = calcBonusMinutes($paid, $rules);
         $total = $paid + $bonus;
-        // Pricing: ₱50 for first 30 mins, ₱40 for every 30 mins thereafter (derived from hourly_rate)
-        $cost  = ($paid <= 30) ? $minChg : ($minChg + round(($paid - 30) / 60 * $rate, 2));
+        // Pricing: ₱50 for first 30 mins, straight hourly rate thereafter
+        $cost  = ($paid <= 30) ? $minChg : round($paid / 60 * $rate, 2);
 
         // Human-readable label helpers
         $fmtMin = function(int $m): string {
@@ -753,9 +753,8 @@ function computeInitialSessionCost(int $total_minutes): float {
     if ($total_minutes <= 0) return 0.0;
     $rules = getPricingRules();
     $standardCost = computeTimedCost($total_minutes);
-    // Standard cost for 30m is ₱40. We want ₱50. So we add ₱10.
-    // We also ensure it's at least the session_min_charge (₱50).
-    return (float) max($rules['session_min_charge'], $standardCost + 10);
+    // We ensure it's at least the session_min_charge (₱50), but don't arbitrarily add ₱10 for > 30 min
+    return (float) max($rules['session_min_charge'], $standardCost);
 }
 
 /**
