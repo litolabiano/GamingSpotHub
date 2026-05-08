@@ -70,8 +70,20 @@
                 <div class="console-unit"><?= htmlspecialchars($con['unit_number']) ?></div>
                 <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
                 <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
+                <?php
+                    // Count available controllers for this console type
+                    $ctrlCountQ = $conn->prepare(
+                        "SELECT COUNT(*) AS n FROM controllers ct
+                         JOIN controller_types ctt ON ct.controller_type_id = ctt.type_id
+                         WHERE ct.status = 'available'
+                           AND ctt.console_type_id = ?"
+                    );
+                    $ctrlCountQ->bind_param('i', $con['console_type_id']);
+                    $ctrlCountQ->execute();
+                    $ctrlCountForType = (int)$ctrlCountQ->get_result()->fetch_assoc()['n'];
+                ?>
                 <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:2px;">
-                    <i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> <?= (int)($con['controller_count'] ?? 0) ?> Controller<?= (int)($con['controller_count'] ?? 0) != 1 ? 's' : '' ?>
+                    <i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> <?= $ctrlCountForType ?> Controller<?= $ctrlCountForType != 1 ? 's' : '' ?> Available
                 </div>
 
                 <?php
@@ -110,9 +122,7 @@
                 <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
-                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', '<?= $con['console_type'] ?>', '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= $con['hourly_rate'] ?>, <?= (int)$con['controller_count'] ?>)"
-
-                                class="btn-sec btn-sm">
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>')"                                class="btn-sec btn-sm">
                             <i class="fas fa-edit"></i> Edit Console
                         </button>
 
@@ -238,7 +248,13 @@
     <div id="activeControllersSection">
     <?php
         $allControllers = [];
-        $_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
+        $_res = $conn->query("
+            SELECT c.*, ct.type_name AS controller_type 
+            FROM controllers c 
+            LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+            WHERE c.status != 'archived' 
+            ORDER BY c.unit_number
+        ");
         if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
         unset($_res);
 
@@ -361,7 +377,13 @@
         <!-- Archived controllers (collapsible) -->
         <?php
             $archivedControllers = [];
-            $_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
+            $_res = $conn->query("
+                SELECT c.*, ct.type_name AS controller_type 
+                FROM controllers c 
+                LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+                WHERE c.status = 'archived' 
+                ORDER BY c.unit_number
+            ");
             if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
             unset($_res);
         ?>
@@ -446,24 +468,16 @@
                 </div>
                 <div class="form-group">
                     <label>Console Type</label>
-                    <select name="console_type" class="form-control" required>
+                    <select name="console_type_id" class="form-control" required>
                         <option value="" disabled selected>Select Type</option>
                         <?php foreach ($consoleTypes as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                            <option value="<?= $ct['type_id'] ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
                     <input type="text" name="unit_number" class="form-control" required maxlength="20" placeholder="e.g. PS5-01">
-                </div>
-                <div class="form-group">
-                    <label>Hourly Rate (₱)</label>
-                    <input type="number" name="hourly_rate" class="form-control" required min="0" step="0.01" value="100.00">
-                </div>
-                <div class="form-group">
-                    <label>Available Controllers</label>
-                    <input type="number" name="controller_count" class="form-control" required min="0" value="2">
                 </div>
 
             </div>
@@ -495,9 +509,9 @@
                 </div>
                 <div class="form-group">
                     <label>Console Type</label>
-                    <select name="console_type" id="editConsoleType" class="form-control" required>
+                    <select name="console_type_id" id="editConsoleType" class="form-control" required>
                         <?php foreach ($consoleTypes as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                            <option value="<?= $ct['type_id'] ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -505,16 +519,6 @@
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
                     <input type="text" name="unit_number" id="editConsoleUnit"
                            class="form-control" required maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label>Hourly Rate (₱)</label>
-                    <input type="number" name="hourly_rate" id="editConsoleRate"
-                           class="form-control" required min="0" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label>Available Controllers</label>
-                    <input type="number" name="controller_count" id="editConsoleControllerCount"
-                           class="form-control" required min="0">
                 </div>
 
             </div>
@@ -529,14 +533,45 @@
     </div>
 </div>
 
+<!-- Edit Console Type Modal -->
+<div class="modal" id="editConsoleTypeModal" style="z-index: 100000;">
+    <div class="modal-content" style="max-width:400px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit" style="color:#8aa4e8;margin-right:8px;"></i>Edit Console Type</h3>
+            <span class="modal-close" onclick="closeModal('editConsoleType')"><i class="fas fa-times"></i></span>
+        </div>
+        <form method="POST" action="admin.php#consoles" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';">
+            <input type="hidden" name="action" value="edit_console_type">
+            <?= csrfField() ?>
+            <input type="hidden" name="type_id" id="editConsoleTypeId">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Console Type Name</label>
+                    <input type="text" name="type_name" id="editConsoleTypeName"
+                           class="form-control" required placeholder="e.g. Nintendo Switch">
+                </div>
+                <div class="form-group">
+                    <label>Hourly Rate (₱)</label>
+                    <input type="number" name="hourly_rate" id="editConsoleTypeRate"
+                           class="form-control" required min="0" step="0.01">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-sec" onclick="closeModal('editConsoleType')">Cancel</button>
+                <button type="submit" class="btn-prim">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-function openEditConsoleModal(id, name, type, unit, rate, ctrlCount) {
+function openEditConsoleModal(id, name, type, unit) {
     document.getElementById('editConsoleId').value   = id;
     document.getElementById('editConsoleName').value = name;
     document.getElementById('editConsoleType').value = type;
     document.getElementById('editConsoleUnit').value = unit;
-    document.getElementById('editConsoleRate').value = parseFloat(rate).toFixed(2);
-    document.getElementById('editConsoleControllerCount').value = ctrlCount;
     openModal('editConsole');
 }
 
@@ -621,7 +656,8 @@ function toggleArchiveSection(showArchive) {
                     <?= csrfField() ?>
                     <label style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;display:block;margin-bottom:8px;">Add New Console Type</label>
                     <div style="display:flex;gap:10px;">
-                        <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:1;">
+                        <input type="text" name="type_name" class="form-control" required placeholder="e.g. Nintendo Switch" style="flex:2;">
+                        <input type="number" name="hourly_rate" class="form-control" required min="0" step="0.01" placeholder="Rate (₱)" style="flex:1;">
                         <button type="submit" class="btn-prim"><i class="fas fa-plus"></i> Add</button>
                     </div>
                 </form>
@@ -637,15 +673,21 @@ function toggleArchiveSection(showArchive) {
                                 <div style="display:flex;align-items:center;gap:10px;">
                                     <i class="fas fa-desktop" style="color:#20c8a1;font-size:12px;"></i>
                                     <span style="font-weight:600;font-size:14px;color:#f0f0f0;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                                    <span style="font-size:12px;color:#aaa;">(₱<?= number_format($ct['hourly_rate'] ?? 0, 2) ?>/hr)</span>
                                 </div>
-                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this console type? All associated consoles will be moved to ARCHIVE.');">
-                                    <input type="hidden" name="action" value="archive_console_type">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
-                                    <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
-                                        <i class="fas fa-archive"></i>
+                                <div style="display:flex;gap:10px;">
+                                    <button type="button" onclick="promptEditConsoleType(<?= $ct['type_id'] ?>, '<?= htmlspecialchars($ct['type_name'], ENT_QUOTES) ?>', <?= $ct['hourly_rate'] ?? 0 ?>)" title="Edit Rate" style="background:none;border:none;color:#8aa4e8;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                        <i class="fas fa-edit"></i>
                                     </button>
-                                </form>
+                                    <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this console type? All associated consoles will be moved to ARCHIVE.');">
+                                        <input type="hidden" name="action" value="archive_console_type">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="type_id" value="<?= $ct['type_id'] ?>">
+                                        <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+                                            <i class="fas fa-archive"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -788,5 +830,12 @@ function switchTypeTab(tab) {
     document.getElementById('tabConsole').style.color         = tab === 'console'    ? '#20c8a1' : '#888';
     document.getElementById('tabController').style.background = tab === 'controller' ? 'rgba(95,133,218,.2)'   : 'rgba(255,255,255,.04)';
     document.getElementById('tabController').style.color      = tab === 'controller' ? '#8aa4e8' : '#888';
+}
+
+function promptEditConsoleType(id, currentName, currentRate) {
+    document.getElementById('editConsoleTypeId').value = id;
+    document.getElementById('editConsoleTypeName').value = currentName;
+    document.getElementById('editConsoleTypeRate').value = parseFloat(currentRate).toFixed(2);
+    openModal('editConsoleType');
 }
 </script>

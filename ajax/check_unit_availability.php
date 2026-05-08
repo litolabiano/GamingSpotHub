@@ -13,7 +13,7 @@
  * GET params:
  *   date         YYYY-MM-DD
  *   time         HH:MM  (used only for the "in_use" status today check)
- *   console_type PS5 | PS4 | Xbox Series X
+ *   console_type PS5 | PS4 | Xbox Series X  (type_name from console_types)
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/db_config.php';
@@ -33,19 +33,19 @@ if ($date < $today) {
     exit;
 }
 
-// ── 1. Get all non-maintenance consoles of this type ─────
+// ── 1. Get all non-maintenance consoles of this type (join console_types) ─────
 $stmt = $conn->prepare(
-    "SELECT console_id, unit_number, console_name, status, controller_count
-       FROM consoles
-      WHERE console_type = ? AND status != 'maintenance'
-      ORDER BY unit_number"
+    "SELECT c.console_id, c.unit_number, c.console_name, c.status
+       FROM consoles c
+       JOIN console_types ct ON c.console_type_id = ct.type_id
+      WHERE ct.type_name = ? AND c.status != 'maintenance'
+      ORDER BY c.unit_number"
 );
 $stmt->bind_param('s', $console_type);
 $stmt->execute();
 $consoles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // ── 2. For each unit, check reservations table by date + console_id ──
-//    Separate query is simplest and most accurate.
 $stmtRes = $conn->prepare(
     "SELECT r.reservation_id, r.reserved_time, u.full_name AS reserved_by
        FROM reservations r
@@ -61,7 +61,8 @@ $stmtUnassigned = $conn->prepare(
     "SELECT r.reservation_id, r.reserved_time, u.full_name AS reserved_by
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
-      WHERE r.console_type  = ?
+       JOIN console_types ct ON r.console_type_id = ct.type_id
+      WHERE ct.type_name    = ?
         AND r.reserved_date  = ?
         AND r.console_id     IS NULL
         AND r.status IN ('pending','reserved')"
@@ -80,7 +81,6 @@ $units = [];
 foreach ($consoles as $c) {
     $cid = (int)$c['console_id'];
 
-    // Check reservation table: is there any booking for this unit on this date?
     $stmtRes->bind_param('is', $cid, $date);
     $stmtRes->execute();
     $resRow = $stmtRes->get_result()->fetch_assoc();
@@ -89,7 +89,6 @@ foreach ($consoles as $c) {
     $status   = 'available';
 
     if ($resRow) {
-        // A reservation exists for this unit on this date
         $status   = 'reserved';
         $conflict = [
             'reservation_id' => (int)$resRow['reservation_id'],
@@ -97,7 +96,6 @@ foreach ($consoles as $c) {
             'reserved_by'    => $resRow['reserved_by'],
         ];
     } elseif ($c['status'] === 'in_use' && $date === $today) {
-        // Live in-use status only relevant for today
         $status = 'in_use';
     }
 
@@ -106,11 +104,10 @@ foreach ($consoles as $c) {
         'unit'        => $c['unit_number'],
         'name'        => $c['console_name'],
         'status'      => $status,
-        'controllers' => (int)$c['controller_count'],
+        'controllers' => 2, // default; controller_count was removed
         'conflict'    => $conflict,
     ];
 }
-
 
 echo json_encode([
     'success'                 => true,

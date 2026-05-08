@@ -42,11 +42,13 @@ $stmt = $conn->prepare(
     "SELECT rs.reschedule_id, rs.reservation_id, rs.user_id,
             rs.new_date, rs.new_time,
             rs.console_id   AS new_console_id,
-            rs.console_type AS new_console_type,
+            rs.new_console_type_id,
+            ct.type_name    AS new_console_type,
             rs.old_date, rs.old_time,
             u.email, u.full_name
        FROM reservation_reschedules rs
        JOIN users u ON rs.user_id = u.user_id
+       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
       WHERE rs.reschedule_id = ?
         AND rs.user_id       = ?
         AND rs.status        = 'pending'
@@ -59,11 +61,12 @@ $stmt->close();
 
 if (!$row) jsonOut(false, 'Reschedule proposal not found or already processed.');
 
-$reservationId  = (int)$row['reservation_id'];
-$proposedDate   = $row['new_date'];    // admin's earliest proposed date
-$proposedTime   = $row['new_time'];
-$newConsoleId   = !empty($row['new_console_id'])  ? (int)$row['new_console_id']  : null;
-$newConsoleType = !empty($row['new_console_type']) ? $row['new_console_type']     : null;
+$reservationId       = (int)$row['reservation_id'];
+$proposedDate        = $row['new_date'];
+$proposedTime        = $row['new_time'];
+$newConsoleId        = !empty($row['new_console_id'])       ? (int)$row['new_console_id']       : null;
+$newConsoleTypeId    = !empty($row['new_console_type_id'])  ? (int)$row['new_console_type_id']  : null;
+$newConsoleType      = !empty($row['new_console_type'])     ? $row['new_console_type']           : null;
 
 $conn->begin_transaction();
 try {
@@ -125,15 +128,15 @@ try {
 
         // ── DIRECT CONFIRMATION ─────────────────────────────────────────────
         // If the user accepted the admin's exact proposal, finalize it.
-        if ($newConsoleId && $newConsoleType) {
+        if ($newConsoleId && $newConsoleTypeId) {
             $upd = $conn->prepare(
                 "UPDATE reservations
                     SET reserved_date = ?, reserved_time = ?,
-                        console_id    = ?, console_type  = ?,
+                        console_id    = ?, console_type_id = ?,
                         status        = 'reserved', updated_at = NOW()
                   WHERE reservation_id = ?"
             );
-            $upd->bind_param('ssisi', $finalDate, $finalTime, $newConsoleId, $newConsoleType, $reservationId);
+            $upd->bind_param('ssiiii', $finalDate, $finalTime, $newConsoleId, $newConsoleTypeId, $reservationId);
         } elseif ($newConsoleId) {
             $upd = $conn->prepare(
                 "UPDATE reservations

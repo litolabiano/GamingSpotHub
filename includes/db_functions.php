@@ -63,12 +63,12 @@ function getPricingRules(): array {
         'max_hourly_minutes' => 240,   // cap at 4 paid hrs
         'hourly_rate'        => 80.0,  // ₱80/hr default
         'session_min_charge' => 50.0,  // ₱50 for ≤30 min start
-        'xbox_hourly_rate'   => 80.0,  // Xbox rate (may differ)
-        'pricing_tiers'      => []     // Dynamic tiers
+        'pricing_tiers'      => [],    // Dynamic tiers
+        'console_rates_by_name' => []  // Rates mapped by console type name
     ];
 
     // Fetch system settings
-    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','ps5_hourly_rate','xbox_hourly_rate','session_min_charge'";
+    $keys = "'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'";
     $res  = $conn->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ($keys)");
     if ($res) {
         while ($row = $res->fetch_assoc()) {
@@ -76,10 +76,16 @@ function getPricingRules(): array {
                 case 'bonus_paid_minutes': $rules['bonus_paid_minutes'] = (int)  $row['setting_value']; break;
                 case 'bonus_free_minutes': $rules['bonus_free_minutes'] = (int)  $row['setting_value']; break;
                 case 'max_hourly_minutes': $rules['max_hourly_minutes'] = (int)  $row['setting_value']; break;
-                case 'ps5_hourly_rate':    $rules['hourly_rate']        = (float)$row['setting_value']; break;
-                case 'xbox_hourly_rate':   $rules['xbox_hourly_rate']   = (float)$row['setting_value']; break;
                 case 'session_min_charge': $rules['session_min_charge'] = (float)$row['setting_value']; break;
             }
+        }
+    }
+
+    // Fetch console rates
+    $resRates = $conn->query("SELECT type_name, hourly_rate FROM console_types WHERE is_archived = 0");
+    if ($resRates) {
+        while ($row = $resRates->fetch_assoc()) {
+            $rules['console_rates_by_name'][$row['type_name']] = (float)$row['hourly_rate'];
         }
     }
 
@@ -193,24 +199,27 @@ function getHourlyDurationOptions(?array $rules = null): array {
  */
 function getConsoles($status = null, $type = null) {
     global $conn;
-    $sql = "SELECT * FROM consoles WHERE 1=1";
+    $sql = "SELECT c.*, ct.type_name AS console_type, ct.hourly_rate
+            FROM consoles c 
+            LEFT JOIN console_types ct ON c.console_type_id = ct.type_id 
+            WHERE 1=1";
     $params = [];
     $types = "";
 
     if ($status) {
-        $sql .= " AND status = ?";
+        $sql .= " AND c.status = ?";
         $params[] = $status;
         $types .= "s";
     } else {
-        $sql .= " AND status != 'archived'";
+        $sql .= " AND c.status != 'archived'";
     }
     if ($type) {
-        $sql .= " AND console_type = ?";
+        $sql .= " AND ct.type_name = ?";
         $params[] = $type;
         $types .= "s";
     }
 
-    $sql .= " ORDER BY console_type, unit_number";
+    $sql .= " ORDER BY ct.type_name, c.unit_number";
     $stmt = $conn->prepare($sql);
 
     if (!empty($params)) {
@@ -240,27 +249,25 @@ function updateConsoleStatus($console_id, $status) {
 
 /**
  * Add a new console to the database.
+ * $type_id is the console_types.type_id FK.
  */
-function addConsole($name, $type, $unit_number, $rate, $controller_count = 2, $compat_ctrl_type = null) {
+function addConsole($name, $type_id, $unit_number) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, controller_count, status) VALUES (?, ?, ?, ?, ?, 'available')");
-        $stmt->bind_param("sssdi", $name, $type, $unit_number, $rate, $controller_count);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, status) VALUES (?, ?, ?, 'available')");
+        $stmt->bind_param("sis", $name, $type_id, $unit_number);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
-        // Return false if duplicate entry or other SQL error
         return false;
     }
 }
 
 /**
- * Update console controller count.
+ * Update console controller count — kept for BC; controller_count removed from schema,
+ * this now does nothing but avoids fatal errors in callers.
  */
 function updateConsoleControllerCount($console_id, $count) {
-    global $conn;
-    $stmt = $conn->prepare("UPDATE consoles SET controller_count = ? WHERE console_id = ?");
-    $stmt->bind_param("ii", $count, $console_id);
-    return $stmt->execute();
+    return true; // controller_count column removed; counts derived from controllers table
 }
 
 
@@ -297,8 +304,12 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
         $user_id = getWalkinUserId();
     }
 
-    // Get the console's hourly rate
-    $stmt = $conn->prepare("SELECT hourly_rate FROM consoles WHERE console_id = ? AND status = 'available'");
+    // Get the console's hourly rate from console_types (via FK)
+    $stmt = $conn->prepare(
+        "SELECT ct.hourly_rate FROM consoles c
+         JOIN console_types ct ON c.console_type_id = ct.type_id
+         WHERE c.console_id = ? AND c.status = 'available'"
+    );
     $stmt->bind_param("i", $console_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -836,7 +847,7 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.console_type, c.unit_number,
+    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, ct.type_name AS console_type, c.unit_number,
                    gs.source_reservation_id,
                    COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -844,6 +855,7 @@ function getActiveSessions() {
             FROM gaming_sessions gs
             JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id
+            LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
             LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
             WHERE gs.status = 'active'
             ORDER BY gs.start_time DESC";
@@ -1052,11 +1064,12 @@ function getDailySalesReport($date) {
 function getConsoleUsageReport($date_from, $date_to) {
     global $conn;
     $stmt = $conn->prepare(
-        "SELECT c.console_name, c.console_type, c.unit_number,
+        "SELECT c.console_name, ct.type_name AS console_type, c.unit_number,
                 COUNT(gs.session_id) AS total_sessions,
                 COALESCE(SUM(gs.duration_minutes), 0) AS total_minutes,
                 COALESCE(SUM(gs.total_cost), 0) AS total_revenue
          FROM consoles c
+         LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
          LEFT JOIN gaming_sessions gs ON c.console_id = gs.console_id
               AND gs.status = 'completed'
               AND DATE(gs.start_time) BETWEEN ? AND ?
@@ -1404,11 +1417,12 @@ function getUpcomingReservations($days = null) {
     if ($days !== null) {
         $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
         $stmt = $conn->prepare(
-            "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.phone AS customer_phone,
                     c.unit_number, c.console_name
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
+               LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
               WHERE r.reserved_date BETWEEN ? AND ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -1417,11 +1431,12 @@ function getUpcomingReservations($days = null) {
     } else {
         // Show ALL future reservations (no upper bound)
         $stmt = $conn->prepare(
-            "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.phone AS customer_phone,
                     c.unit_number, c.console_name
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
+               LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
               WHERE r.reserved_date >= ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -1438,9 +1453,10 @@ function getUpcomingReservations($days = null) {
 function getMyReservations($user_id) {
     global $conn;
     $stmt = $conn->prepare(
-        "SELECT r.*, c.unit_number, c.console_name
+        "SELECT r.*, ct.type_name AS console_type, c.unit_number, c.console_name
            FROM reservations r
            LEFT JOIN consoles c ON r.console_id = c.console_id
+           LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
           WHERE r.user_id = ?
           ORDER BY r.reserved_date DESC, r.reserved_time DESC"
     );
@@ -1530,10 +1546,10 @@ function getConsoleTypes(bool $onlyActive = true): array {
  * Add a new console type.
  * Returns true on success, false on duplicate or error.
  */
-function addConsoleType(string $typeName): bool {
+function addConsoleType(string $typeName, float $hourlyRate = 80.00): bool {
     global $conn;
-    $stmt = $conn->prepare("INSERT INTO console_types (type_name) VALUES (?)");
-    $stmt->bind_param("s", $typeName);
+    $stmt = $conn->prepare("INSERT INTO console_types (type_name, hourly_rate) VALUES (?, ?)");
+    $stmt->bind_param("sd", $typeName, $hourlyRate);
     try { return $stmt->execute(); } catch (Exception $e) { return false; }
 }
 
@@ -1551,7 +1567,7 @@ function archiveConsoleType(int $typeId): bool {
         if (!$row) { $conn->rollback(); return false; }
 
         $typeName = $row['type_name'];
-        $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type = ?")->execute([$typeName]) ;
+        $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type_id = ?")->execute([$typeId]) ;
         $s = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
         $s->bind_param("i", $typeId); $s->execute();
         $conn->commit(); return true;

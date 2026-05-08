@@ -53,7 +53,7 @@ if ($sRes) {
 }
 
 // Consoles
-$consolesResult = $conn->query("SELECT * FROM consoles ORDER BY console_type, unit_number");
+$consolesResult = $conn->query("SELECT c.*, ct.type_name AS console_type FROM consoles c LEFT JOIN console_types ct ON c.console_type_id = ct.type_id ORDER BY ct.type_name, c.unit_number");
 $consoles = $consolesResult ? $consolesResult->fetch_all(MYSQLI_ASSOC) : [];
 
 // Controllers (needed by consoles section)
@@ -115,7 +115,7 @@ unset($_crQ);
 $recentSessions = [];
 $rsQ = $conn->query(
     "SELECT gs.*, u.full_name AS customer_name, u.phone AS customer_phone,
-            c.console_type, c.unit_number,
+            ct.type_name AS console_type, c.unit_number,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(ar.extra_cost)
@@ -127,6 +127,7 @@ $rsQ = $conn->query(
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
        LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
       WHERE gs.status IN ('active','paused')
       ORDER BY gs.start_time DESC"
@@ -136,10 +137,11 @@ if ($rsQ) $recentSessions = $rsQ->fetch_all(MYSQLI_ASSOC);
 // Completed sessions (recent 50)
 $completedSessions = [];
 $csQ = $conn->query(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_type, c.unit_number
+    "SELECT gs.*, u.full_name AS customer_name, ct.type_name AS console_type, c.unit_number
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.status = 'completed'
       ORDER BY gs.end_time DESC LIMIT 50"
 );
@@ -252,21 +254,24 @@ if ($mrQ) $monthRevenue = (float)$mrQ->fetch_assoc()['rev'];
 // Reports data
 $revenueByConsole = [];
 $rbcQ = $conn->query(
-    "SELECT c.console_type, COALESCE(SUM(t.amount),0) AS total
+    "SELECT ct.type_name AS console_type, COALESCE(SUM(t.amount),0) AS total
        FROM transactions t
        JOIN gaming_sessions gs ON t.session_id = gs.session_id
        JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE t.type = 'payment'
-      GROUP BY c.console_type"
+      GROUP BY ct.type_name"
 );
 if ($rbcQ) $revenueByConsole = $rbcQ->fetch_all(MYSQLI_ASSOC);
 
 $typeUsage = [];
 $tuQ = $conn->query(
-    "SELECT c.console_type, COUNT(*) AS cnt
-       FROM gaming_sessions gs JOIN consoles c ON gs.console_id = c.console_id
+    "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
+       FROM gaming_sessions gs
+       JOIN consoles c ON gs.console_id = c.console_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE gs.status = 'completed'
-      GROUP BY c.console_type"
+      GROUP BY ct.type_name"
 );
 if ($tuQ) $typeUsage = $tuQ->fetch_all(MYSQLI_ASSOC);
 

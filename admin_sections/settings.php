@@ -19,24 +19,6 @@
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-peso-sign" style="color:#20c8a1;margin-right:6px;"></i>Pricing</h3></div>
 
                 <div class="form-group">
-                    <label>PS5 / PS4 Hourly Rate (₱/hr)</label>
-                    <input type="number" step="0.01" min="0" name="ps5_hourly_rate"
-                           value="<?= htmlspecialchars($settings['ps5_hourly_rate'] ?? '80') ?>">
-                    <div style="font-size:11px;color:#888;margin-top:4px;">
-                        <i class="fas fa-info-circle"></i> Applies to all PS5 &amp; PS4 units. Saves to each console row automatically.
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Xbox Series X Hourly Rate (₱/hr)</label>
-                    <input type="number" step="0.01" min="0" name="xbox_hourly_rate"
-                           value="<?= htmlspecialchars($settings['xbox_hourly_rate'] ?? '80') ?>">
-                    <div style="font-size:11px;color:#888;margin-top:4px;">
-                        <i class="fas fa-info-circle"></i> Applies to all Xbox units.
-                    </div>
-                </div>
-
-                <div class="form-group">
                     <label>Unlimited (whole day) Rate (₱)</label>
                     <input type="number" step="0.01" min="0" name="unlimited_rate"
                            value="<?= htmlspecialchars($settings['unlimited_rate'] ?? '400') ?>">
@@ -50,12 +32,6 @@
                         <i class="fas fa-info-circle"></i> Flat charge for sessions of 30 minutes or less.
                         This is the <strong>“first pay”</strong> amount shown in the duration dropdown.
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Controller Rental Fee (₱)</label>
-                    <input type="number" step="0.01" min="0" name="controller_rental_fee"
-                           value="<?= htmlspecialchars($settings['controller_rental_fee'] ?? '20') ?>">
                 </div>
             </div>
 

@@ -234,13 +234,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     elseif ($action === 'add_console') {
         $name = trim($_POST['console_name'] ?? '');
-        $type = $_POST['console_type'] ?? '';
+        $type_id = (int)($_POST['console_type_id'] ?? 0);
         $unit_number = trim($_POST['unit_number'] ?? '');
-        $rate = (float)($_POST['hourly_rate'] ?? 0);
-        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
-        $compat_ctrl = $_POST['compatible_controller_type'] ?? null;
         
-        if ($name && $type && $unit_number && $rate >= 0) {
+        if ($name && $type_id && $unit_number) {
             // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
             $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
             $checkStmt->bind_param("s", $unit_number);
@@ -249,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
             } else {
-                if (addConsole($name, $type, $unit_number, $rate, $ctrl_count, $compat_ctrl)) {
+                if (addConsole($name, $type_id, $unit_number)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                 } else {
@@ -265,12 +262,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'edit_console') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         $name       = trim($_POST['console_name'] ?? '');
-        $type       = $_POST['console_type'] ?? '';
+        $type_id    = (int)($_POST['console_type_id'] ?? 0);
         $unit       = trim($_POST['unit_number'] ?? '');
-        $rate       = (float)($_POST['hourly_rate'] ?? 0);
-        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
     
-        if ($console_id && $name && $type && $unit && $rate >= 0) {
+        if ($console_id && $name && $type_id && $unit) {
             // Check for duplicate unit number (exclude current console)
             $dupCheck = $conn->prepare(
                 "SELECT console_id FROM consoles WHERE unit_number = ? AND console_id != ?"
@@ -282,10 +277,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?, controller_count = ?
-                      WHERE console_id = ?"
+                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ? WHERE console_id = ?"
                 );
-                $stmt->bind_param('sssdii', $name, $type, $unit, $rate, $ctrl_count, $console_id);
+                $stmt->bind_param('sisi', $name, $type_id, $unit, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
@@ -318,14 +312,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
         $typeName = trim($_POST['type_name'] ?? '');
-        if ($typeName) {
-            if (addConsoleType($typeName)) {
+        $hourlyRate = (float)($_POST['hourly_rate'] ?? 0);
+        if ($typeName && $hourlyRate >= 0) {
+            if (addConsoleType($typeName, $hourlyRate)) {
                 $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
                 $messageType = 'success';
             } else {
                 $message = 'Failed to add console type. It might already exist.';
                 $messageType = 'error';
             }
+        }
+    }
+
+    // EDIT CONSOLE TYPE
+    elseif ($action === 'edit_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeName = trim($_POST['type_name'] ?? '');
+        $hourlyRate = (float)($_POST['hourly_rate'] ?? 0);
+        if ($typeId && $typeName && $hourlyRate >= 0) {
+            $stmt = $conn->prepare("UPDATE console_types SET type_name = ?, hourly_rate = ? WHERE type_id = ?");
+            $stmt->bind_param('sdi', $typeName, $hourlyRate, $typeId);
+            if ($stmt->execute()) {
+                $message = 'Console type updated successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to update console type: ' . $conn->error;
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Invalid input for console type update.';
+            $messageType = 'error';
         }
     }
 
@@ -504,7 +520,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Access denied. Only the owner can change settings.';
             $messageType = 'error';
         } else {
-        $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
+        $keys = ['unlimited_rate',
                  'business_hours_open','business_hours_close','shop_phone','contact_email',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge',
                  'brevo_api_key','sender_email'];
@@ -514,21 +530,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // ── Sync consoles.hourly_rate from system_settings ──────────────────
-        // This ensures the "Console" dropdown in Start Session always shows the
-        // live rate from system settings, not a stale per-row value.
-        $rateMap = [
-            'PS5'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80),
-            'PS4'          => (float)($_POST['ps5_hourly_rate']  ?? getSetting('ps5_hourly_rate')  ?? 80), // PS4 shares PS5 rate
-            'Xbox Series X'=> (float)($_POST['xbox_hourly_rate'] ?? getSetting('xbox_hourly_rate') ?? 80),
-        ];
-        foreach ($rateMap as $type => $rate) {
-            $stmt = $conn->prepare("UPDATE consoles SET hourly_rate = ? WHERE console_type = ?");
-            $stmt->bind_param('ds', $rate, $type);
-            $stmt->execute();
-        }
-
-        $message = 'Settings saved and console rates updated.';
+        $message = 'Settings saved successfully.';
         $messageType = 'success';
         } // end owner check
     }
@@ -957,19 +959,38 @@ if ($crQ) {
 // ── Controllers ──────────────────────────────────────────────────────────────
 $allControllers      = [];
 $archivedControllers = [];
-$_res = $conn->query("SELECT * FROM controllers WHERE status != 'archived' ORDER BY unit_number");
+$_res = $conn->query("
+    SELECT c.*, ct.type_name AS controller_type 
+    FROM controllers c 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    WHERE c.status != 'archived' 
+    ORDER BY c.unit_number
+");
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
-$_res = $conn->query("SELECT * FROM controllers WHERE status = 'archived' ORDER BY unit_number");
+
+$_res = $conn->query("
+    SELECT c.*, ct.type_name AS controller_type 
+    FROM controllers c 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    WHERE c.status = 'archived' 
+    ORDER BY c.unit_number
+");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 
 // Available controllers for the Start Session rental dropdown (injected to JS)
-$_avRes = $conn->query("SELECT controller_id, controller_name, controller_type, unit_number FROM controllers WHERE status = 'available' ORDER BY unit_number");
+$_avRes = $conn->query("
+    SELECT c.controller_id, c.controller_name, ct.type_name AS controller_type, c.unit_number 
+    FROM controllers c
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    WHERE c.status = 'available' 
+    ORDER BY c.unit_number
+");
 $availableControllers = $_avRes ? $_avRes->fetch_all(MYSQLI_ASSOC) : [];
 unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, c.console_type,
+    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, ct.type_name AS console_type,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -978,6 +999,7 @@ $stmt = $conn->prepare(
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
+     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
      LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
      ORDER BY
          CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
@@ -1008,11 +1030,12 @@ $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r[
 
 // Pending User-Initiated Reschedule Requests
 $purStmt = $conn->query(
-    "SELECT rs.*, r.console_type, u.full_name AS customer_name, c.unit_number
+    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, c.unit_number
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
      LEFT JOIN consoles c ON r.console_id = c.console_id
+     LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );
@@ -1127,10 +1150,11 @@ $cancelReasons = $conn->query(
 
 // Cancellations by console type
 $cancelByConsole = $conn->query(
-    "SELECT r.console_type, COUNT(*) AS cnt
+    "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM reservation_cancellations rc
        JOIN reservations r ON rc.reservation_id = r.reservation_id
-      GROUP BY r.console_type
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+      GROUP BY ct.type_name
       ORDER BY cnt DESC"
 )->fetch_all(MYSQLI_ASSOC);
 
@@ -1157,7 +1181,7 @@ $cancelByWho = $conn->query(
 )->fetch_all(MYSQLI_ASSOC);
 
 // Settings
-$settingsKeys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
+$settingsKeys = ['unlimited_rate',
                  'business_hours_open','business_hours_close','shop_name','shop_address','shop_phone',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
 $settings = [];
@@ -1181,10 +1205,11 @@ for ($i = 6; $i >= 0; $i--) {
 
 // Chart data: console type usage
 $typeUsage = $conn->query(
-    "SELECT c.console_type, COUNT(gs.session_id) AS cnt
+    "SELECT ct.type_name AS console_type, COUNT(gs.session_id) AS cnt
      FROM consoles c
+     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
      LEFT JOIN gaming_sessions gs ON c.console_id = gs.console_id AND gs.status = 'completed'
-     GROUP BY c.console_type"
+     GROUP BY ct.type_name"
 )->fetch_all(MYSQLI_ASSOC);
 $typeLabels = array_column($typeUsage, 'console_type');
 $typeCounts = array_column($typeUsage, 'cnt');

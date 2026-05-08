@@ -1808,7 +1808,12 @@ const unlimitedRate    = <?= (int)$unlimitedRate ?>;
 const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 
-function _bracketCost(partialMin) {
+function getConsoleRate() {
+    if (!selectedConsoleType) return PRICING.hourly_rate;
+    return (PRICING.console_rates_by_name && PRICING.console_rates_by_name[selectedConsoleType]) || PRICING.hourly_rate;
+}
+
+function _bracketCost(partialMin, rate) {
     if (partialMin <= 0) return 0;
     const tiers = PRICING.pricing_tiers || [];
     for (let i = 0; i < tiers.length; i++) {
@@ -1816,13 +1821,14 @@ function _bracketCost(partialMin) {
             return tiers[i].charge;
         }
     }
-    return PRICING.hourly_rate;
+    return rate;
 }
+
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
     const bp       = PRICING.bonus_paid_minutes;
     const bf       = PRICING.bonus_free_minutes;
-    const rate     = PRICING.hourly_rate;
+    const rate     = getConsoleRate();
     const cyclePay = bp / 60 * rate;
     const cycleLen = bp + bf;
     const full     = Math.floor(totalMin / cycleLen);
@@ -1831,9 +1837,22 @@ function _timedCost(totalMin) {
     if (rem > bp) {
         cost += cyclePay;
     } else {
-        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60, rate);
     }
     return cost;
+}
+
+function updateDurationLabels() {
+    const rate = getConsoleRate();
+                 
+    // Re-calculate the prices for each duration
+    const durBtns = document.querySelectorAll('.dur-btn');
+    durBtns.forEach(btn => {
+        const mins = parseInt(btn.getAttribute('data-mins'));
+        let newCost = mins <= 30 ? PRICING.session_min_charge : _timedCost(mins);
+        btn.setAttribute('data-cost', newCost);
+        btn.querySelector('.dur-price').innerText = '₱' + newCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+    });
 }
 
 /* ── Time select helpers ────────────────────────── */
@@ -1913,6 +1932,7 @@ function selectConsoleType(type) {
     // Update Add-ons controller dropdown
     updateControllerDropdown();
 
+    updateDurationLabels();
     updateSummary();
     checkAvailability();
 }
