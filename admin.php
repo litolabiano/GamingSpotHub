@@ -1948,97 +1948,15 @@ function onConsoleChange() {
     const isXbox = type.toLowerCase().includes('xbox');
     const group  = document.getElementById('controllerRentalGroup');
     const toggle = document.getElementById('controllerRentalToggle');
-    if (group) {
-        if (isXbox) {
-            group.style.display = 'block';
-        } else {
-            group.style.display = 'none';
-            if (toggle && toggle.checked) {
-                toggle.checked = false;
-            }
-        }
-    }
-
-    let resNotice = document.getElementById('consoleReservationNotice');
-    if (!resNotice && sel) {
-        resNotice = document.createElement('div');
-        resNotice.id = 'consoleReservationNotice';
-        resNotice.style.cssText = 'display:none; margin-top:8px; font-size:12px; color:#fb566b; font-weight:600; padding:8px 12px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); border-radius:8px;';
-        sel.parentNode.appendChild(resNotice);
-    }
-
-    window.currentConsoleMaxMins = null;
-    if (consoleId) {
-        fetch('ajax/check_start_conflict.php?console_id=' + consoleId)
-            .then(r => r.json())
-            .then(data => {
-                if (data.has_reservation) {
-                    window.currentConsoleMaxMins = data.minutes_away;
-                    if (resNotice) {
-                        resNotice.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:5px;"></i>' + data.message;
-                        resNotice.style.display = 'block';
-                    }
-                } else {
-                    if (resNotice) resNotice.style.display = 'none';
-                }
-                _enforceDurationLimits();
-                if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-            })
-            .catch(err => console.warn(err));
+    if (!group) return;
+    if (isXbox) {
+        group.style.display = 'block';
+>>>>>>> parent of c5f7c0f (extend and reservation)
     } else {
-        if (resNotice) resNotice.style.display = 'none';
-        _enforceDurationLimits();
-        if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-    }
-}
-
-function _enforceDurationLimits() {
-    const durSel = document.getElementById('durationSelect');
-    const modeSel = document.getElementById('rentalModeSelect');
-    if (!durSel || !modeSel) return;
-    const maxMins = window.currentConsoleMaxMins;
-
-    // Reset duration options
-    Array.from(durSel.options).forEach(opt => {
-        if (opt.value) { // skip placeholder
-            opt.disabled = false;
-            opt.textContent = opt.dataset.originalText || opt.textContent;
-        }
-    });
-
-    // Reset rental mode options
-    Array.from(modeSel.options).forEach(opt => {
-        opt.disabled = false;
-        opt.textContent = opt.dataset.originalText || opt.textContent;
-    });
-
-    if (maxMins !== null) {
-        // Enforce max duration for hourly
-        Array.from(durSel.options).forEach(opt => {
-            if (opt.value) {
-                const totalMin = parseInt(opt.dataset.total || opt.value);
-                if (totalMin > maxMins) { 
-                    if (!opt.dataset.originalText) opt.dataset.originalText = opt.textContent;
-                    opt.disabled = true;
-                    opt.textContent = opt.dataset.originalText + ' (Conflicts with reservation)';
-                }
-            }
-        });
-        if (durSel.selectedIndex > 0 && durSel.options[durSel.selectedIndex].disabled) {
-            durSel.value = '';
-        }
-
-        // Disable open_time and unlimited
-        Array.from(modeSel.options).forEach(opt => {
-            if (opt.value === 'open_time' || opt.value === 'unlimited') {
-                if (!opt.dataset.originalText) opt.dataset.originalText = opt.textContent;
-                opt.disabled = true;
-                opt.textContent = opt.dataset.originalText + ' (Unavailable due to reservation)';
-            }
-        });
-        if (modeSel.value === 'open_time' || modeSel.value === 'unlimited') {
-            modeSel.value = 'hourly';
-            onRentalModeChange();
+        group.style.display = 'none';
+        if (toggle && toggle.checked) {
+            toggle.checked = false;
+            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
         }
     }
 }
