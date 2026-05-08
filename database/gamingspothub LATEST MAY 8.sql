@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 08, 2026 at 04:51 AM
+-- Generation Time: May 08, 2026 at 05:49 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -91,10 +91,10 @@ CREATE TABLE `consoles` (
 
 INSERT INTO `consoles` (`console_id`, `console_name`, `console_type`, `unit_number`, `controller_count`, `status`, `hourly_rate`, `created_at`) VALUES
 (1, 'PS5 Unit 1', 'PS5', 'PS5-01', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 2, 'available', 80.00, '2026-02-21 19:55:41'),
+(2, 'PS5 Unit 2', 'PS5', 'PS5-02', 2, 'in_use', 80.00, '2026-02-21 19:55:41'),
 (3, 'PS5 Unit 3', 'PS5', 'PS5-03', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (4, 'PS5 Unit 4', 'PS5', 'PS5-04', 2, 'available', 80.00, '2026-02-21 19:55:41'),
-(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'available', 80.00, '2026-02-21 19:55:41'),
+(5, 'PS5 Unit 5', 'PS5', 'PS5-05', 2, 'in_use', 80.00, '2026-02-21 19:55:41'),
 (6, 'PS4 Unit 6', 'PS4', 'PS4-06', 2, 'maintenance', 80.00, '2026-02-21 19:55:41'),
 (7, 'Xbox Unit 7', 'Xbox Series X', 'XBX-07', 2, 'available', 80.00, '2026-02-21 19:55:41'),
 (8, 'Xbox Unit 8', 'Xbox Series X', 'XBX-08', 2, 'available', 80.00, '2026-02-21 19:55:41'),
@@ -235,7 +235,9 @@ INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mo
 (54, 0, 2, 'hourly', 540, '2026-05-07 10:22:17', '2026-05-07 14:21:06', 238, 80.00, 280.00, 'completed', NULL, 12, '2026-05-07 10:22:17', 120, NULL),
 (55, 0, 8, 'hourly', 30, '2026-05-07 10:29:45', '2026-05-07 14:21:04', 231, 80.00, 290.00, 'completed', NULL, 12, '2026-05-07 10:29:45', 0, NULL),
 (56, 0, 3, 'hourly', 150, '2026-05-07 18:27:01', '2026-05-07 21:24:04', 177, 80.00, 210.00, 'completed', NULL, 12, '2026-05-07 18:27:01', 30, NULL),
-(57, 33, 2, 'hourly', 300, '2026-05-08 10:34:15', '2026-05-08 10:44:12', 9, 80.00, 20.00, 'completed', NULL, 12, '2026-05-08 10:34:15', 0, NULL);
+(57, 33, 2, 'hourly', 300, '2026-05-08 10:34:15', '2026-05-08 10:44:12', 9, 80.00, 20.00, 'completed', NULL, 12, '2026-05-08 10:34:15', 0, NULL),
+(58, 0, 5, 'unlimited', NULL, '2026-05-08 11:23:12', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-05-08 11:23:12', 0, NULL),
+(59, 32, 2, 'open_time', NULL, '2026-05-08 11:48:06', NULL, NULL, 80.00, NULL, 'active', NULL, 12, '2026-05-08 11:48:06', 0, 30);
 
 -- --------------------------------------------------------
 
@@ -345,7 +347,9 @@ INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_
 (26, 26, NULL, 'PS5', 'hourly', 150, '2026-05-07', '19:30:00', NULL, 100.00, 'cash', 0, NULL, NULL, NULL, NULL, NULL, 'cancelled', 26, '2026-05-07 09:10:31', '2026-05-07 10:01:15', 'user', 'User rejected admin reschedule', 0, 'schedule_change', NULL),
 (27, 26, 2, 'PS5', 'hourly', 240, '2026-05-29', '17:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_f2ff79193d883682944a074f', 'pay_J9EqndZZ4DQhMT6EyYQ7Erak', 'paid', 'cancelled', 26, '2026-05-07 17:00:26', '2026-05-07 18:11:52', 'user', NULL, 0, 'emergency', NULL),
 (28, 26, 3, 'PS5', 'hourly', 210, '2026-05-15', '18:00:00', NULL, 32.00, 'gcash', 1, NULL, NULL, 'cs_dddff26363b03eee90cf2fc4', 'pay_EPKiR5TG16TXcDgNhvNx5BW6', 'paid', 'reserved', 26, '2026-05-07 18:12:57', '2026-05-07 20:19:21', NULL, NULL, 0, NULL, NULL),
-(29, 33, 3, 'PS5', 'hourly', 240, '2026-05-09', '20:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_d2a37d9c4472be4fde66db66', 'pay_Z5FXPgSXVCtDs3MUCEm8UkeS', 'paid', 'reserved', 33, '2026-05-08 09:53:12', '2026-05-08 10:34:48', NULL, NULL, 0, NULL, NULL);
+(29, 33, 3, 'PS5', 'hourly', 240, '2026-05-09', '20:00:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_d2a37d9c4472be4fde66db66', 'pay_Z5FXPgSXVCtDs3MUCEm8UkeS', 'paid', 'cancelled', 33, '2026-05-08 09:53:12', '2026-05-08 11:31:11', 'user', NULL, 0, 'budget_issue', NULL),
+(30, 32, 2, 'PS5', 'open_time', NULL, '2026-05-27', '12:00:00', NULL, 0.00, NULL, 0, NULL, NULL, NULL, NULL, NULL, 'converted', 32, '2026-05-08 11:13:47', '2026-05-08 11:48:06', NULL, NULL, 0, NULL, NULL),
+(31, 33, 2, 'PS5', 'hourly', 240, '2026-05-15', '17:30:00', NULL, 34.00, 'gcash', 1, NULL, NULL, 'cs_614b3d53d7b832c520aed34e', 'pay_GZW6yHrTLKEPSr3cSx9nDG9K', 'paid', 'reserved', 33, '2026-05-08 11:45:52', '2026-05-08 11:45:52', NULL, NULL, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -380,7 +384,8 @@ INSERT INTO `reservation_cancellations` (`cancel_id`, `reservation_id`, `user_id
 (9, 22, 32, 'user', 'emergency', NULL, 0, '2026-05-05 20:11:33'),
 (10, 23, 32, 'user', 'budget_issue', NULL, 0, '2026-05-07 07:38:38'),
 (11, 25, 26, 'user', 'schedule_change', NULL, 0, '2026-05-07 08:09:11'),
-(12, 27, 26, 'user', 'emergency', NULL, 0, '2026-05-07 18:11:52');
+(12, 27, 26, 'user', 'emergency', NULL, 0, '2026-05-07 18:11:52'),
+(13, 29, 33, 'user', 'budget_issue', NULL, 0, '2026-05-08 11:31:11');
 
 -- --------------------------------------------------------
 
@@ -744,7 +749,9 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (114, 56, 0, 200.00, 200.00, 10.00, 'Short payment - collected ₱200.00, short by ₱10.00', 'cash', 'completed', '2026-05-07 21:24:04', 12, '2026-05-07 21:24:04'),
 (115, 56, 0, 800.00, 800.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 09:50:38', 12, '2026-05-08 09:50:38'),
 (116, NULL, 33, 34.00, 34.00, NULL, 'Downpayment for reservation #29', 'gcash', 'completed', '2026-05-08 09:53:12', 33, '2026-05-08 09:53:12'),
-(117, 57, 33, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 10:44:12', 12, '2026-05-08 10:44:12');
+(117, 57, 33, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 10:44:12', 12, '2026-05-08 10:44:12'),
+(118, 58, 0, 400.00, 400.00, 0.00, NULL, 'cash', 'completed', '2026-05-08 11:23:12', 12, '2026-05-08 11:23:12'),
+(119, NULL, 33, 34.00, 34.00, NULL, 'Downpayment for reservation #31', 'gcash', 'completed', '2026-05-08 11:45:52', 33, '2026-05-08 11:45:52');
 
 -- --------------------------------------------------------
 
@@ -788,8 +795,8 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 (29, 'test@example.com', '$2y$10$mLQD41zmi3vIoJ8sR8/Ntu6uZojYGjvzKbNb3Y.evmmQ3SyMB7evC', 'Test User', '09171234567', 'customer', 'active', 0, '0ae0598c1a671992ec26dfae71eabe5e2f9269bb1da1ae9f85c78695949d6184', '2026-04-30 20:29:21', NULL, NULL, '2026-04-29 20:29:21', 0, NULL),
 (30, '09171234567test@gmail.com', '$2y$10$jyNy.ykur0jghOW.APBCwOpx.Y5fTLFYDdfTbek92i6AffjjIlcBq', 'test@gmail.comTest User', 'Password123!09171234', 'customer', 'active', 0, '6a296a2ad91537491af9a4309082ea6e25e0a818b60dd86e65ccc5e842ccd700', '2026-05-01 00:13:31', NULL, NULL, '2026-04-30 00:13:32', 0, NULL),
 (31, 'mariejoy.12.mji@gmail.com', '$2y$10$VDFqBSZiRt9I1ZLIRaVBdOSQ0Red0aogx.VqXx1EMrGP.905x0bX2', 'MJ IGNACIO', '', 'customer', 'active', 0, 'd0e91ebfe1587c05cd41f92225bfa010276bb3e2c5c3ae0e7fefabd03a28c942', '2026-05-01 08:01:11', NULL, NULL, '2026-04-30 08:01:11', 0, NULL),
-(32, 'harvieloresco2004@gmail.com', '$2y$10$5ra6ycYpFWsty4s.ikJESuw688uGiHUCKkXPlA8z44ZS9CzZnGU86', 'Harvie Loresco', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 14:34:15', 0, '2026-05-14 07:38:38'),
-(33, 'sibeloresco@gmail.com', '$2y$10$th7lcBzspd8ES7d3oyIM7utZLr3u5r9zPJiCkIkpuWI44vi/ICxc6', 'Sibe Loresco', '', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 20:26:57', 0, NULL),
+(32, 'harvieloresco2004@gmail.com', '$2y$10$5ra6ycYpFWsty4s.ikJESuw688uGiHUCKkXPlA8z44ZS9CzZnGU86', 'Harvie Loresco', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 14:34:15', 0, NULL),
+(33, 'sibeloresco@gmail.com', '$2y$10$th7lcBzspd8ES7d3oyIM7utZLr3u5r9zPJiCkIkpuWI44vi/ICxc6', 'Sibe Loresco', '', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 20:26:57', 1, NULL),
 (35, 'kianpablo1996@gmail.com', '$2y$10$9HVf3fBPYcbdleA0/2fo8emj4MH52KuVtwHR1uXszxWT9yQJy/vo6', 'Kian Pablo', '09944084214', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-06 00:25:13', 0, NULL),
 (37, 'zerotwo02darlingninelota@gmail.com', '$2y$10$Q72iGgv0rWvD6I9OaSk6Iuq7BxVJY5Tmw2HuYCH.kGlLT6tSVqNom', 'Gelo', '09123455666', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-07 09:01:18', 0, NULL),
 (38, 'unique_tester_99@example.com', '$2y$10$KlQu2AzHZNth7OfEOAY5T.iRsiw9FsKR9MAkplksBodg/vMp84vny', 'Test User', '', 'customer', 'active', 0, 'c2d332cbbbde9a33cc7e290f45c9ce3acaa51ce1bb1d9e9836f5c2504f018794', '2026-05-08 13:02:28', NULL, NULL, '2026-05-07 13:02:28', 0, NULL);
@@ -1000,7 +1007,7 @@ ALTER TABLE `controllers`
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT for table `pricing_tiers`
@@ -1018,13 +1025,13 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- AUTO_INCREMENT for table `reservation_cancellations`
 --
 ALTER TABLE `reservation_cancellations`
-  MODIFY `cancel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `cancel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `reservation_reschedules`
@@ -1066,7 +1073,7 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=118;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=120;
 
 --
 -- AUTO_INCREMENT for table `users`
