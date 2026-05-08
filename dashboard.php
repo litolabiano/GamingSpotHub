@@ -31,7 +31,7 @@ $allRescheduledIds = [];
 if (!empty($myReservations)) {
     $rStmt = $conn->prepare(
         "SELECT reservation_id, rescheduled_by FROM reservation_reschedules
-          WHERE user_id = ?"
+          WHERE user_id = ? AND status != 'rejected'"
     );
     $rStmt->bind_param('i', $user_id);
     $rStmt->execute();
@@ -1691,6 +1691,17 @@ function fmtMins(int $m): string {
                                     <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
                                         <i class="fas fa-times"></i> Decline
                                     </button>
+                                <?php else: ?>
+                                    <?php if (!$alreadyResched): ?>
+                                <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
+                                    <i class="fas fa-calendar-alt"></i> Reschedule
+                                </button>
+                                <?php else: ?>
+                                <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
+                                <?php endif; ?>
+                                <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
                             <?php endif; ?>
                             </div>
                             <?php endif; ?>
@@ -3247,7 +3258,11 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
                 
                 <div style="margin-bottom:12px;">
                     <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
-                    <div style="background:rgba(255,255,255,.05);padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;" id="reschedConsoleLbl"></div>
+                    <select id="reschedConsole" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
+                        <?php foreach (getConsoleTypes(true) as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <div style="display:flex;gap:12px;margin-bottom:20px;">
@@ -3327,7 +3342,7 @@ function buildReschedTimeSelect() {
 
 function openUserRescheduleModal(id, date, time, consoleType) {
     document.getElementById('reschedResId').value = id;
-    document.getElementById('reschedConsoleLbl').textContent = consoleType;
+    document.getElementById('reschedConsole').value = consoleType;
     document.getElementById('reschedDate').value = date;
     
     buildReschedTimeSelect();
@@ -3357,6 +3372,7 @@ function submitUserReschedule(e) {
     const rid  = document.getElementById('reschedResId').value;
     const date = document.getElementById('reschedDate').value;
     const time = document.getElementById('reschedTime').value;
+    const consoleType = document.getElementById('reschedConsole').value;
 
     if (!rid || !date || !time) {
         err.textContent = 'Please fill out all required fields.';
@@ -3372,6 +3388,7 @@ function submitUserReschedule(e) {
     fd.append('reservation_id', rid);
     fd.append('new_date', date);
     fd.append('new_time', time);
+    fd.append('console_type', consoleType);
 
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
     .then(r => r.json())
