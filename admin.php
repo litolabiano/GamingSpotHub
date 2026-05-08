@@ -507,7 +507,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
                  'business_hours_open','business_hours_close','shop_phone','contact_email',
                  'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge',
-                 'brevo_api_key','sender_email'];
+                 'brevo_api_key','sender_email','base_url'];
         foreach ($keys as $key) {
             if (isset($_POST[$key])) {
                 updateSetting($key, trim($_POST[$key]));

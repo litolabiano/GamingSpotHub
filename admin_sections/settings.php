@@ -132,6 +132,13 @@
                         <i class="fas fa-info-circle"></i> This is where all contact form submissions will be sent.
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Public System URL (Base URL)</label>
+                    <input type="url" name="base_url" placeholder="http://192.168.x.x/GamingSpotHub" value="<?= htmlspecialchars($settings['base_url'] ?? '') ?>">
+                    <div style="font-size:11px;color:#888;margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> <strong>Crucial for Email Verification:</strong> Set this to your Public IP or Domain (e.g. <code>http://112.198.x.x/GamingSpotHub</code>) so verification links work on mobile devices outside your local Wi-Fi.
+                    </div>
+                </div>
             </div>
 
             <!-- ── Email Configuration (Brevo API) ── -->

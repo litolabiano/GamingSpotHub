@@ -71,16 +71,21 @@ function sendVerificationEmail($email, $fullName, $token) {
                         <p>Email Verification</p>
                     </div>
                     <div class="body">
-                        <p>Hey <strong>' . htmlspecialchars($fullName) . '</strong>! </p>
-                        <p>Welcome to Good Spot Gaming Hub! Please verify your email address to activate your account and start gaming.</p>
-                        <div class="btn-wrap">
-                            <a href="' . $verifyUrl . '" class="btn">Verify My Email</a>
-                        </div>
-                        <p style="font-size: 13px; color: #888;">This link expires in <strong>24 hours</strong>. If you didn\'t create an account, please ignore this email.</p>
+                    <p>Welcome to Good Spot Gaming Hub, <strong>' . htmlspecialchars($fullName) . '</strong>!</p>
+                    <p>Please click the button below to verify your email address and activate your account:</p>
+                    <div class="btn-wrap">
+                        <a href="' . $verifyUrl . '" class="btn">Verify Email Address</a>
                     </div>
-                    <div class="footer">
-                        <p>Good Spot Gaming Hub &bull; Don Placido Avenue, Dasmariñas</p>
-                    </div>
+                    <p style="text-align: center; font-size: 13px; color: #888;">
+                        Link not working? Use this 8-character verification code instead:
+                        <br><br>
+                        <span style="font-size: 24px; color: #20c8a1; font-family: monospace; font-weight: 700; background: rgba(32,200,161,0.1); padding: 10px 20px; border-radius: 8px; border: 1px dashed rgba(32,200,161,0.5); letter-spacing: 4px;">
+                            ' . $token . '
+                        </span>
+                    </p>
+                    <p style="font-size: 12px; color: #666; margin-top: 30px;">
+                        This verification link and code will expire in 24 hours. If you did not create an account, please ignore this email.
+                    </p>
                 </div>
             </div>
         </body>

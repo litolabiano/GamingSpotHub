@@ -37,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->get_result()->num_rows > 0) {
             $error = 'An account with this email already exists.';
         } else {
-            $token = bin2hex(random_bytes(32));
+            // Generate a shorter 8-character alphanumeric token for easier manual entry
+            $token = strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
             $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
 

@@ -15,20 +15,26 @@ define('MAIL_ENCRYPTION', 'tls');                // tls or ssl
 define('MAIL_FROM_EMAIL', 'goodspotgaminghub@gmail.com');
 define('MAIL_FROM_NAME', 'Good Spot Gaming Hub');
 
-// Site URL (Dynamic generation for multi-device/network access)
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+// Site URL (Prioritize database configuration for multi-device/network access)
+$dbBaseUrl = function_exists('getSetting') ? getSetting('base_url') : '';
+if (!empty($dbBaseUrl)) {
+    $siteUrl = rtrim($dbBaseUrl, '/');
+} else {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-// If running locally, swap "localhost" with the actual local IPv4 address 
-// so that mobile devices on the same Wi-Fi can correctly resolve the verification link
-if (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false) {
-    $localIP = gethostbyname(gethostname());
-    if ($localIP && $localIP !== '127.0.0.1') {
-        $host = str_replace(['localhost', '127.0.0.1'], $localIP, $host);
+    // If running locally, swap "localhost" with the actual local IPv4 address 
+    // so that mobile devices on the same Wi-Fi can correctly resolve the verification link
+    if (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false) {
+        $localIP = gethostbyname(gethostname());
+        if ($localIP && $localIP !== '127.0.0.1') {
+            $host = str_replace(['localhost', '127.0.0.1'], $localIP, $host);
+        }
     }
+    $siteUrl = $protocol . $host;
 }
 
-define('SITE_URL', $protocol . $host . '/GamingSpotHub');
+define('SITE_URL', $siteUrl . '/GamingSpotHub');
 
 /*
  * ============================================================================
