@@ -42,19 +42,19 @@ CREATE TABLE `activity_logs` (
 INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `created_at`) VALUES
 (1, 12, 'Restore Session', 'Restored session #4 for User #33. Time elapsed since end: 1m 45s. Console: PS5-02. Original End Time: 2026-05-08 18:17:41.', '2026-05-08 18:19:26'),
 (2, 12, 'Restore Session', 'Restored session #4 for User #33. Time elapsed since end: 1m 10s. Console: PS5-02. Original End Time: 2026-05-08 18:19:47.', '2026-05-08 18:20:57'),
-(3, 12, 'Restore Session', 'Restored session #8 for User #0. Time elapsed since end: 0m 16s. Console: PS5-02. Original End Time: 2026-05-08 18:49:16.', '2026-05-08 18:49:32'),
-(4, 12, 'Restore Session', 'Restored session #9 for User #0. Time elapsed since end: 0m 46s. Console: PS5-03. Original End Time: 2026-05-08 18:51:25.', '2026-05-08 18:52:11'),
-(5, 12, 'Restore Session', 'Restored session #10 for User #0. Time elapsed since end: 0m 43s. Console: PS5-01. Original End Time: 2026-05-08 18:53:30.', '2026-05-08 18:54:13'),
-(6, 12, 'Restore Session', 'Restored session #11 for User #0. Time elapsed since end: 0m 58s. Console: PS5-05. Original End Time: 2026-05-08 19:13:45.', '2026-05-08 19:14:43'),
-(7, 12, 'Restore Session', 'Restored session #7 for User #0. Time elapsed since end: 41m 21s. Console: 1. Original End Time: 2026-05-08 18:40:47.', '2026-05-08 19:22:08'),
-(8, 12, 'Restore Session', 'Restored session #9 for User #0. Time elapsed since end: 1m 7s. Console: PS5-03. Original End Time: 2026-05-08 19:21:20.', '2026-05-08 19:22:27'),
-(9, 12, 'Restore Session', 'Restored session #11 for User #0. Time elapsed since end: -6m -52s. Console: PS5-05. Original End Time: 2026-05-08 19:30:00.', '2026-05-08 19:24:08'),
-(10, 12, 'Restore Session', 'Restored session #10 for User #0. Time elapsed since end: 10m 30s. Console: PS5-01. Original End Time: 2026-05-08 19:22:53.', '2026-05-08 19:33:23'),
-(11, 12, 'Restore Session', 'Restored session #12 for User #0. Time elapsed since end: 1m 5s. Console: PS5-02. Original End Time: 2026-05-08 19:42:17. Payments made at end were voided.', '2026-05-08 19:43:22'),
-(12, 12, 'Restore Session', 'Restored session #12 for User #0. Time elapsed since end: 54m 45s. Console: PS5-02. Original End Time: 2026-05-08 19:45:13. Payments made at end were voided.', '2026-05-08 20:39:58'),
-(13, 12, 'Tournament Status', 'Updated Tournament #2 status to Upcoming', '2026-05-09 00:14:24'),
-(14, 12, 'Tournament Status', 'Updated Tournament #2 status to Scheduled', '2026-05-09 00:14:28'),
-(15, 12, 'End Session', 'Ended Session #13. Console: PS5-03. Duration: 59 min. Total Cost: ₱100.00.', '2026-05-09 00:23:30');
+(3, 12, 'Restore Session', 'Restored session #5 for User #0. Time elapsed since end: 1m 34s. Console: PS5-05. Original End Time: 2026-05-08 19:17:12.', '2026-05-08 19:18:46'),
+(4, 12, 'Restore Session', 'Restored session #6 for User #0. Time elapsed since end: 7m 12s. Console: PS5-01. Original End Time: 2026-05-08 19:49:11. Payments made at end were voided.', '2026-05-08 19:56:23'),
+(5, 12, 'Restore Session', 'Restored session #5 for User #0. Time elapsed since end: 26m 13s. Console: PS5-05. Original End Time: 2026-05-08 22:17:56. Payments made at end were voided.', '2026-05-08 22:44:09'),
+(6, 12, 'Restore Session', 'Restored session #4 for User #33. Time elapsed since end: 34m 22s. Console: PS5-02. Original End Time: 2026-05-08 22:17:59. Payments made at end were voided.', '2026-05-08 22:52:21'),
+(7, 35, 'Start Session', 'Started Session #9 for Walk-in. Console: Unknown. Mode: Hourly (30 min)', '2026-05-08 23:20:34'),
+(8, 35, 'Start Session', 'Started Session #10 for User #26. Console: Unknown. Mode: Unlimited', '2026-05-08 23:21:22'),
+(9, 12, 'Console Status', 'Updated Console ID #3228 status to Archived', '2026-05-08 23:24:50'),
+(10, 12, 'Console Status', 'Updated Console ID #3227 status to Archived', '2026-05-08 23:25:06'),
+(11, 12, 'Console Status', 'Updated Console ID #3229 status to Archived', '2026-05-08 23:25:13'),
+(12, 12, 'Console Status', 'Updated Console ID #3230 status to Archived', '2026-05-08 23:25:19'),
+(13, 35, 'End Session', 'Ended Session #8. Console: PS5-11. Duration: 79 min. Total Cost: ₱100.00.', '2026-05-08 23:49:25'),
+(14, 12, 'Auto-End Session', 'Auto-ended Unlimited Session #2 for Walk-in Customer on Console: PS5-03 at 12:00 AM', '2026-05-09 00:00:00'),
+(15, 12, 'Auto-End Session', 'Auto-ended Unlimited Session #10 for Harvie Bernesto on Console: PS5-05 at 12:00 AM', '2026-05-09 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -77,8 +77,8 @@ CREATE TABLE `additional_requests` (
 --
 
 INSERT INTO `additional_requests` (`request_id`, `session_id`, `request_type`, `description`, `extra_cost`, `status`, `created_at`) VALUES
-(14, 12, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 19:42:11'),
-(15, 13, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 23:23:40');
+(13, 7, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 22:18:17'),
+(14, 10, 'controller_rental', 'Controller rental fee', 20.00, 'approved', '2026-05-08 23:21:22');
 
 -- --------------------------------------------------------
 
@@ -109,28 +109,31 @@ INSERT INTO `blocked_dates` (`id`, `blocked_date`, `reason`, `created_at`) VALUE
 CREATE TABLE `consoles` (
   `console_id` int(11) NOT NULL,
   `console_name` varchar(50) NOT NULL,
-  `console_type_id` int(11) DEFAULT NULL,
   `unit_number` varchar(20) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `console_type` varchar(255) DEFAULT NULL,
+  `controller_count` int(11) DEFAULT NULL,
+  `hourly_rate` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `consoles`
 --
 
-INSERT INTO `consoles` (`console_id`, `console_name`, `console_type_id`, `unit_number`, `status`, `created_at`) VALUES
-(1, 'PS5 Unit 1', 1, 'PS5-01', 'in_use', '2026-02-21 19:55:41'),
-(2, 'PS5 Unit 2', 1, 'PS5-02', 'available', '2026-02-21 19:55:41'),
-(3, 'PS5 Unit 3', 1, 'PS5-03', 'available', '2026-02-21 19:55:41'),
-(4, 'PS5 Unit 4', 1, 'PS5-04', 'available', '2026-02-21 19:55:41'),
-(5, 'PS5 Unit 5', 1, 'PS5-05', 'in_use', '2026-02-21 19:55:41'),
-(6, 'PS4 Unit 6', 2, 'PS4-06', 'maintenance', '2026-02-21 19:55:41'),
-(7, 'Xbox Unit 7', 3, 'XBX-07', 'available', '2026-02-21 19:55:41'),
-(8, 'Xbox Unit 8', 3, 'XBX-08', 'available', '2026-02-21 19:55:41'),
-(3225, 'PS5', 1, 'PS5-9', 'available', '2026-05-08 17:32:01'),
-(3226, 'ps 6', 12, 'NINTENDO-01', 'available', '2026-05-08 17:34:13'),
-(3227, 'PS5', 138, '1', 'available', '2026-05-08 17:39:52');
+INSERT INTO `consoles` (`console_id`, `console_name`, `unit_number`, `status`, `created_at`, `console_type`, `controller_count`, `hourly_rate`) VALUES
+(1, 'PS5 Unit 1', 'PS5-01', 'in_use', '2026-02-21 19:55:41', 'PS5', NULL, NULL),
+(2, 'PS5 Unit 2', 'PS5-02', 'available', '2026-02-21 19:55:41', 'PS5', NULL, NULL),
+(3, 'PS5 Unit 3', 'PS5-03', 'available', '2026-02-21 19:55:41', 'PS5', NULL, NULL),
+(4, 'PS5 Unit 4', 'PS5-04', 'available', '2026-02-21 19:55:41', 'PS5', NULL, NULL),
+(5, 'PS5 Unit 5', 'PS5-05', 'available', '2026-02-21 19:55:41', 'PS5', NULL, NULL),
+(6, 'PS4 Unit 6', 'PS4-06', 'maintenance', '2026-02-21 19:55:41', 'PS4', NULL, NULL),
+(7, 'Xbox Unit 7', 'XBX-07', 'available', '2026-02-21 19:55:41', 'Xbox Series X', NULL, NULL),
+(8, 'Xbox Unit 8', 'XBX-08', 'available', '2026-02-21 19:55:41', 'Xbox Series X', NULL, NULL),
+(3227, 'Xbox Unit 7', 'PS5-10', 'archived', '2026-05-08 19:45:19', 'AMD RADEON', NULL, NULL),
+(3228, 'PS5 UNIT 10', 'PS5-11', 'available', '2026-05-08 19:45:28', 'NINTENDO', NULL, NULL),
+(3229, 'TEST1', 'TEST1', 'archived', '2026-05-08 19:46:04', 'TEST1', NULL, NULL),
+(3230, 'TEST2', 'TEST2', 'archived', '2026-05-08 19:46:20', 'TEST2', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -142,25 +145,22 @@ CREATE TABLE `console_types` (
   `type_id` int(11) NOT NULL,
   `type_name` varchar(50) NOT NULL,
   `is_archived` tinyint(1) DEFAULT 0,
-  `category` enum('console') NOT NULL DEFAULT 'console',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `hourly_rate` decimal(10,2) NOT NULL DEFAULT 80.00
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `console_types`
 --
 
-INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `category`, `created_at`, `hourly_rate`) VALUES
-(1, 'PS5', 0, 'console', '2026-05-08 04:10:19', 90.00),
-(2, 'PS4', 0, 'console', '2026-05-08 04:10:19', 80.00),
-(3, 'Xbox Series X', 0, 'console', '2026-05-08 04:10:19', 80.00),
-(11, 'NINTENDO', 0, 'console', '2026-05-08 04:10:19', 90.00),
-(12, 'PS6', 0, 'console', '2026-05-08 04:10:19', 80.00),
-(138, 'hello', 0, 'console', '2026-05-08 09:39:33', 180.00),
-(148, 'DualSense', 1, '', '2026-05-08 10:44:34', 80.00),
-(149, 'DualShock 4', 1, '', '2026-05-08 10:44:34', 80.00),
-(150, 'Xbox Controller', 1, '', '2026-05-08 10:44:34', 80.00);
+INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `created_at`) VALUES
+(1, 'PS5', 0, '2026-05-08 04:10:19'),
+(2, 'PS4', 0, '2026-05-08 04:10:19'),
+(3, 'Xbox Series X', 0, '2026-05-08 04:10:19'),
+(11, 'NINTENDO', 0, '2026-05-08 04:10:19'),
+(12, 'PS6', 0, '2026-05-08 04:10:19'),
+(105, 'AMD RADEON', 0, '2026-05-08 11:42:33'),
+(106, 'TEST1', 0, '2026-05-08 11:45:43'),
+(107, 'TEST2', 0, '2026-05-08 11:46:11');
 
 -- --------------------------------------------------------
 
@@ -171,27 +171,26 @@ INSERT INTO `console_types` (`type_id`, `type_name`, `is_archived`, `category`, 
 CREATE TABLE `controllers` (
   `controller_id` int(11) NOT NULL,
   `controller_name` varchar(100) NOT NULL,
-  `controller_type_id` int(11) DEFAULT NULL,
   `unit_number` varchar(50) NOT NULL,
   `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `console_type_id` int(11) DEFAULT NULL
+  `console_type_id` int(11) DEFAULT NULL,
+  `controller_type` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `controllers`
 --
 
-INSERT INTO `controllers` (`controller_id`, `controller_name`, `controller_type_id`, `unit_number`, `status`, `notes`, `created_at`, `updated_at`, `console_type_id`) VALUES
-(1, 'Xbox Controller', 15, 'CTRL-01', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 12:53:39', 15),
-(4, 'Xbox Controller', 15, 'CTRL-02', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 12:53:39', 15),
-(13, 'ARCADE STICK', 15, 'CTRL-03', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 12:53:39', 15),
-(14, 'NINTENDO', 15, 'CTRL-04', 'archived', NULL, '2026-05-08 04:10:19', '2026-05-08 12:53:39', 15),
-(18, 'joy con', 101, 'CTRL-06', 'available', 'joy con', '2026-05-08 05:05:20', '2026-05-08 12:53:39', 101),
-(19, 'ps5 Controller', 13, 'CTRL-07', 'available', '', '2026-05-08 06:14:28', '2026-05-08 12:53:39', 13),
-(20, 'ps5', 13, '8', 'available', '', '2026-05-08 14:07:22', '2026-05-08 14:07:22', 13);
+INSERT INTO `controllers` (`controller_id`, `controller_name`, `unit_number`, `status`, `notes`, `created_at`, `updated_at`, `console_type_id`, `controller_type`) VALUES
+(1, 'Xbox Controller', 'CTRL-01', 'available', NULL, '2026-05-08 04:10:19', '2026-05-08 16:34:31', 15, 'Xbox Controller'),
+(4, 'Xbox Controller', 'CTRL-02', 'available', NULL, '2026-05-08 04:10:19', '2026-05-08 16:34:31', 15, 'Xbox Controller'),
+(13, 'ARCADE STICK', 'CTRL-03', 'available', NULL, '2026-05-08 04:10:19', '2026-05-08 16:34:31', 15, 'Xbox Controller'),
+(14, 'NINTENDO', 'CTRL-04', 'available', NULL, '2026-05-08 04:10:19', '2026-05-08 16:34:31', 15, 'Xbox Controller'),
+(18, 'joy con', 'CTRL-06', 'available', 'joy con', '2026-05-08 05:05:20', '2026-05-08 16:34:31', 101, 'joy con'),
+(19, 'ps5 Controller', 'CTRL-07', 'available', '', '2026-05-08 06:14:28', '2026-05-08 16:34:31', 13, 'DualSense');
 
 -- --------------------------------------------------------
 
@@ -215,7 +214,8 @@ INSERT INTO `controller_types` (`type_id`, `type_name`, `console_type_id`, `is_a
 (13, 'DualSense', 1, 0, '2026-05-08 05:00:32'),
 (14, 'DualShock 4', 2, 0, '2026-05-08 05:00:32'),
 (15, 'Xbox Controller', 3, 0, '2026-05-08 05:00:32'),
-(101, 'joy con', 11, 0, '2026-05-08 05:04:46');
+(101, 'joy con', 11, 0, '2026-05-08 05:04:46'),
+(102, 'PS5 CONTROLLER', 1, 0, '2026-05-08 14:16:18');
 
 -- --------------------------------------------------------
 
@@ -247,8 +247,16 @@ CREATE TABLE `gaming_sessions` (
 --
 
 INSERT INTO `gaming_sessions` (`session_id`, `user_id`, `console_id`, `rental_mode`, `planned_minutes`, `start_time`, `end_time`, `duration_minutes`, `hourly_rate`, `total_cost`, `status`, `payment_status`, `created_by`, `created_at`, `extended_minutes`, `source_reservation_id`) VALUES
-(12, 0, 3, 'hourly', 90, '2026-05-08 19:42:11', '2026-05-08 20:40:06', 57, 90.00, 100.00, 'completed', NULL, 12, '2026-05-08 19:42:11', 0, NULL),
-(13, 0, 3, 'hourly', 60, '2026-05-08 23:23:40', '2026-05-09 00:23:30', 59, 90.00, 100.00, 'completed', NULL, 12, '2026-05-08 23:23:40', 0, NULL);
+(1, 33, 8, 'hourly', 300, '2026-05-08 13:55:35', '2026-05-08 14:18:18', 22, 80.00, 40.00, 'completed', NULL, 12, '2026-05-08 13:55:35', 0, 35),
+(2, 0, 3, 'unlimited', NULL, '2026-05-08 14:20:05', '2026-05-09 00:00:00', 579, 80.00, 400.00, 'completed', NULL, 12, '2026-05-08 14:20:05', 0, NULL),
+(3, 0, 1, 'hourly', 30, '2026-05-08 14:25:55', '2026-05-08 15:43:00', 77, 80.00, 120.00, 'completed', NULL, 12, '2026-05-08 14:25:55', 0, NULL),
+(4, 33, 2, 'hourly', 300, '2026-05-08 14:30:08', '2026-05-08 22:52:29', 502, 80.00, 560.00, 'completed', NULL, 12, '2026-05-08 14:30:08', 0, 36),
+(5, 0, 5, 'hourly', 90, '2026-05-08 18:37:07', '2026-05-08 23:03:05', 265, 80.00, 320.00, 'completed', NULL, 12, '2026-05-08 18:37:07', 0, NULL),
+(6, 0, 1, 'hourly', 480, '2026-05-08 19:24:16', '2026-05-08 19:57:14', 32, 80.00, 40.00, 'completed', NULL, 12, '2026-05-08 19:24:16', 240, NULL),
+(7, 0, 2, 'hourly', 30, '2026-05-08 22:20:17', '2026-05-08 22:52:17', 32, 90.00, 80.00, 'completed', NULL, 12, '2026-05-08 22:18:17', 0, NULL),
+(8, 33, 3228, 'hourly', 60, '2026-05-08 22:29:42', '2026-05-08 23:49:25', 79, 100.00, 100.00, 'completed', NULL, 12, '2026-05-08 22:29:42', 0, NULL),
+(9, 0, 1, 'hourly', 30, '2026-05-08 23:20:34', NULL, NULL, 90.00, NULL, 'active', NULL, 35, '2026-05-08 23:20:34', 0, NULL),
+(10, 26, 5, 'unlimited', NULL, '2026-05-08 23:21:22', '2026-05-09 00:00:00', 38, 90.00, 400.00, 'completed', NULL, 35, '2026-05-08 23:21:22', 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -300,7 +308,6 @@ CREATE TABLE `reservations` (
   `reservation_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `console_id` int(11) DEFAULT NULL,
-  `console_type_id` int(11) DEFAULT NULL,
   `rental_mode` enum('hourly','open_time','unlimited') NOT NULL DEFAULT 'hourly',
   `planned_minutes` int(11) DEFAULT NULL,
   `reserved_date` date NOT NULL,
@@ -325,26 +332,21 @@ CREATE TABLE `reservations` (
   `cancellation_reason` varchar(300) DEFAULT NULL,
   `refund_issued` tinyint(1) NOT NULL DEFAULT 0,
   `cancel_reason_type` enum('schedule_change','found_alternative','budget_issue','technical_issue','emergency','other','admin_decision') DEFAULT NULL,
-  `cancel_reason_detail` text DEFAULT NULL
+  `cancel_reason_detail` text DEFAULT NULL,
+  `console_type` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `reservations`
 --
 
-INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `console_type_id`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `with_controller`, `controller_id`, `controller_fee`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `payment_proof`, `payment_proof_status`, `paymongo_source_id`, `paymongo_payment_id`, `paymongo_status`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`, `cancel_reason_type`, `cancel_reason_detail`) VALUES
-(34, 33, NULL, 1, 'hourly', 240, '2026-05-22', '18:30:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_928743a630058ce10ce5cc66', 'pay_DhnSXceBRGJDFqg38uxEXzPj', 'paid', 'cancelled', 33, '2026-05-08 12:01:01', '2026-05-08 20:53:39', 'user', NULL, 0, 'found_alternative', NULL),
-(35, 33, 7, 3, 'hourly', 240, '2026-05-08', '13:55:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_a01260486b81a2d7bb98fb40', 'pay_Be76ri2h4vWmgKQxuFSADYQk', 'paid', 'converted', 33, '2026-05-08 13:51:55', '2026-05-08 20:53:39', NULL, NULL, 0, NULL, NULL),
-(36, 33, 2, 1, 'hourly', 240, '2026-05-08', '14:30:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_25248cb3641ac3715f2a704e', 'pay_EttvLKi58zJ5WTcVYjKZJNRX', 'paid', 'converted', 33, '2026-05-08 14:24:45', '2026-05-08 20:53:39', NULL, NULL, 0, NULL, NULL),
-(37, 33, 4, 1, 'unlimited', NULL, '2026-05-08', '16:00:00', NULL, 0, NULL, 0.00, 40.00, 'gcash', 1, NULL, NULL, 'cs_09a12d218a06eef4a27540fe', 'pay_GmjQcojsJJG5CwGjB8QfgmEc', 'paid', 'cancelled', 33, '2026-05-08 14:39:15', '2026-05-08 20:53:39', 'user', NULL, 0, 'found_alternative', NULL),
-(38, 27, 1, 1, 'open_time', NULL, '2026-05-08', '17:00:00', NULL, 0, NULL, 0.00, 0.00, NULL, 0, NULL, NULL, NULL, NULL, NULL, 'converted', 27, '2026-05-08 17:04:00', '2026-05-08 20:53:39', NULL, NULL, 0, NULL, NULL),
-(39, 27, NULL, NULL, 'hourly', 30, '2026-05-08', '17:45:00', NULL, 0, NULL, 0.00, 25.00, 'cash', 0, NULL, NULL, NULL, NULL, NULL, 'no_show', 27, '2026-05-08 17:43:26', '2026-05-08 17:46:59', NULL, NULL, 0, NULL, NULL),
-(40, 27, 1, 1, 'hourly', 30, '2026-05-08', '17:30:00', NULL, 0, NULL, 0.00, 25.00, 'cash', 0, NULL, NULL, NULL, NULL, NULL, 'converted', 27, '2026-05-08 17:47:40', '2026-05-08 20:53:39', NULL, NULL, 0, NULL, NULL),
-(41, 27, NULL, 1, 'hourly', 60, '2026-05-08', '21:00:00', NULL, 0, NULL, 0.00, 24.00, 'gcash', 1, NULL, NULL, 'cs_11d736455a4ffc8ca849ed2f', 'pay_ruaBB7xY2yKdqFnpJ2oNcwo6', 'paid', 'cancelled', 27, '2026-05-08 17:58:10', '2026-05-08 20:53:39', 'user', NULL, 0, NULL, NULL),
-(42, 27, 2, 1, 'hourly', 60, '2026-05-09', '20:00:00', NULL, 0, NULL, 0.00, 24.00, 'gcash', 1, NULL, NULL, 'cs_bd003f675afac8fa22184a46', 'pay_dYN2kJPnV8a6ydcgtCZZZFqi', 'paid', 'cancelled', 27, '2026-05-08 18:05:08', '2026-05-08 20:53:39', 'user', NULL, 0, NULL, NULL),
-(43, 27, 1, 1, 'hourly', 60, '2026-05-22', '17:30:00', NULL, 0, NULL, 0.00, 24.00, 'gcash', 1, NULL, NULL, 'cs_855c4d477beb9942fa347747', 'pay_uUPwrLdjMX8TBo3e4EFX8QoA', 'paid', 'cancelled', 27, '2026-05-08 18:24:56', '2026-05-08 20:53:39', 'user', NULL, 0, NULL, NULL),
-(44, 27, 2, 1, '', NULL, '2026-05-09', '19:30:00', NULL, 0, NULL, 0.00, 40.00, 'gcash', 1, NULL, NULL, 'cs_84b2975b2e99fdfeb53b2f63', 'pay_JuSktbWrLZmL1ZUfHdoFSfTT', 'paid', 'cancelled', 27, '2026-05-08 23:20:19', '2026-05-08 23:37:15', 'user', NULL, 0, NULL, NULL),
-(45, 37, NULL, 11, '', NULL, '2026-05-28', '14:15:00', NULL, 0, NULL, 0.00, 0.00, NULL, 0, NULL, NULL, NULL, NULL, NULL, 'reserved', 37, '2026-05-08 23:23:14', '2026-05-08 23:23:14', NULL, NULL, 0, NULL, NULL);
+INSERT INTO `reservations` (`reservation_id`, `user_id`, `console_id`, `rental_mode`, `planned_minutes`, `reserved_date`, `reserved_time`, `notes`, `with_controller`, `controller_id`, `controller_fee`, `downpayment_amount`, `downpayment_method`, `downpayment_paid`, `payment_proof`, `payment_proof_status`, `paymongo_source_id`, `paymongo_payment_id`, `paymongo_status`, `status`, `created_by`, `created_at`, `updated_at`, `cancelled_by`, `cancellation_reason`, `refund_issued`, `cancel_reason_type`, `cancel_reason_detail`, `console_type`) VALUES
+(34, 33, NULL, 'hourly', 240, '2026-05-22', '18:30:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_928743a630058ce10ce5cc66', 'pay_DhnSXceBRGJDFqg38uxEXzPj', 'paid', 'cancelled', 33, '2026-05-08 12:01:01', '2026-05-09 00:34:31', 'user', NULL, 0, 'found_alternative', NULL, 'PS5'),
+(35, 33, 7, 'hourly', 240, '2026-05-08', '13:55:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_a01260486b81a2d7bb98fb40', 'pay_Be76ri2h4vWmgKQxuFSADYQk', 'paid', 'converted', 33, '2026-05-08 13:51:55', '2026-05-09 00:34:31', NULL, NULL, 0, NULL, NULL, 'Xbox Series X'),
+(36, 33, 2, 'hourly', 240, '2026-05-08', '14:30:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_25248cb3641ac3715f2a704e', 'pay_EttvLKi58zJ5WTcVYjKZJNRX', 'paid', 'converted', 33, '2026-05-08 14:24:45', '2026-05-09 00:34:31', NULL, NULL, 0, NULL, NULL, 'PS5'),
+(37, 33, 4, 'unlimited', NULL, '2026-05-08', '16:00:00', NULL, 0, NULL, 0.00, 40.00, 'gcash', 1, NULL, NULL, 'cs_09a12d218a06eef4a27540fe', 'pay_GmjQcojsJJG5CwGjB8QfgmEc', 'paid', 'cancelled', 33, '2026-05-08 14:39:15', '2026-05-09 00:34:31', 'user', NULL, 0, 'found_alternative', NULL, 'PS5'),
+(38, 33, 4, 'hourly', 240, '2026-05-12', '17:00:00', NULL, 0, NULL, 0.00, 34.00, 'gcash', 1, NULL, NULL, 'cs_2c901bc199227463ea604510', 'pay_sNqhcfovfktDdYSBoopq8yAN', 'paid', 'cancelled', 33, '2026-05-08 17:43:22', '2026-05-09 00:34:31', 'user', NULL, 0, NULL, NULL, 'PS5'),
+(39, 33, 7, 'hourly', 150, '2026-05-12', '13:00:00', NULL, 0, NULL, 0.00, 28.00, 'gcash', 1, NULL, NULL, 'cs_22c5b45631b69b529079ea9f', 'pay_VD4iqJiqERsBxJCUv6TRiEzF', 'paid', 'reserved', 33, '2026-05-08 23:49:05', '2026-05-09 00:34:31', NULL, NULL, 0, NULL, NULL, 'Xbox Series X');
 
 -- --------------------------------------------------------
 
@@ -370,10 +372,7 @@ CREATE TABLE `reservation_cancellations` (
 INSERT INTO `reservation_cancellations` (`cancel_id`, `reservation_id`, `user_id`, `cancelled_by`, `cancel_reason_type`, `cancel_reason_detail`, `refund_issued`, `cancelled_at`) VALUES
 (18, 34, 33, 'user', 'found_alternative', NULL, 0, '2026-05-08 13:38:43'),
 (19, 37, 33, 'user', 'found_alternative', NULL, 0, '2026-05-08 14:40:23'),
-(20, 41, 27, 'user', 'schedule_change', NULL, 0, '2026-05-08 18:02:45'),
-(21, 42, 27, 'user', 'technical_issue', NULL, 0, '2026-05-08 18:12:42'),
-(22, 43, 27, 'user', 'schedule_change', NULL, 0, '2026-05-08 18:25:45'),
-(23, 44, 27, 'user', 'budget_issue', NULL, 0, '2026-05-08 23:37:15');
+(20, 38, 33, 'user', 'found_alternative', NULL, 0, '2026-05-08 19:40:11');
 
 -- --------------------------------------------------------
 
@@ -388,11 +387,9 @@ CREATE TABLE `reservation_reschedules` (
   `old_date` date NOT NULL,
   `old_time` time NOT NULL,
   `old_console_id` int(11) DEFAULT NULL,
-  `old_console_type_id` int(11) DEFAULT NULL,
   `new_date` date NOT NULL,
   `new_time` time NOT NULL,
   `console_id` int(11) DEFAULT NULL,
-  `new_console_type_id` int(11) DEFAULT NULL,
   `reason` enum('typhoon','power_outage','emergency','maintenance','user_request','other') NOT NULL DEFAULT 'other',
   `reason_detail` varchar(300) DEFAULT NULL,
   `rescheduled_by` int(11) NOT NULL,
@@ -401,42 +398,45 @@ CREATE TABLE `reservation_reschedules` (
   `seen_by_user` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `reviewed_by` int(11) DEFAULT NULL,
-  `reviewed_at` datetime DEFAULT NULL
+  `reviewed_at` datetime DEFAULT NULL,
+  `old_console_type` varchar(255) DEFAULT NULL,
+  `console_type` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `reservation_reschedules`
 --
 
-INSERT INTO `reservation_reschedules` (`reschedule_id`, `reservation_id`, `user_id`, `old_date`, `old_time`, `old_console_id`, `old_console_type_id`, `new_date`, `new_time`, `console_id`, `new_console_type_id`, `reason`, `reason_detail`, `rescheduled_by`, `initiated_by`, `status`, `seen_by_user`, `created_at`, `reviewed_by`, `reviewed_at`) VALUES
-(1, 21, 32, '2026-05-06', '16:00:00', NULL, NULL, '2026-05-07', '17:00:00', NULL, NULL, 'other', 'Customer self-reschedule.', 32, 'admin', 'approved', 1, '2026-05-05 14:38:38', NULL, NULL),
-(2, 21, 32, '2026-05-07', '17:00:00', NULL, NULL, '2026-05-07', '17:00:00', NULL, NULL, 'other', 'aalis kami sa wednesday', 12, 'admin', 'approved', 1, '2026-05-05 14:42:37', NULL, NULL),
-(3, 21, 32, '2026-05-07', '17:00:00', NULL, NULL, '2026-05-08', '17:00:00', NULL, NULL, 'other', 'aalis kami sa wednesday', 12, 'admin', 'approved', 1, '2026-05-05 14:43:08', NULL, NULL),
-(4, 23, 32, '2026-05-07', '13:30:00', NULL, NULL, '2026-05-08', '21:00:00', NULL, NULL, 'user_request', 'Customer self-reschedule request.', 32, 'user', 'approved', 1, '2026-05-05 20:18:25', NULL, NULL),
-(5, 24, 33, '2026-05-07', '17:00:00', NULL, NULL, '2026-05-08', '17:00:00', NULL, NULL, 'typhoon', 'confirm mo to baka bigwasan kita', 12, 'admin', 'approved', 1, '2026-05-05 20:33:22', NULL, NULL),
-(6, 23, 32, '2026-05-08', '21:00:00', NULL, NULL, '2026-05-09', '21:00:00', NULL, NULL, 'emergency', 'nagka emergency', 12, 'admin', 'approved', 1, '2026-05-07 07:28:34', NULL, NULL),
-(7, 25, 26, '2026-05-08', '15:30:00', NULL, NULL, '2026-05-09', '12:00:00', NULL, NULL, 'user_request', 'Customer self-reschedule request.', 26, 'user', 'approved', 1, '2026-05-07 08:00:03', NULL, NULL),
-(8, 26, 26, '2026-05-07', '09:15:00', NULL, NULL, '2026-05-07', '19:30:00', NULL, NULL, 'emergency', 'asdasdkashd', 12, 'admin', 'cancelled', 1, '2026-05-07 09:51:00', NULL, NULL),
-(9, 28, 26, '2026-05-08', '12:30:00', 1, 1, '2026-05-14', '19:00:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 26, 'user', 'approved', 0, '2026-05-07 18:25:37', NULL, NULL),
-(10, 28, 26, '2026-05-14', '19:00:00', NULL, 1, '2026-05-15', '19:00:00', NULL, 1, 'maintenance', NULL, 12, 'admin', 'approved', 1, '2026-05-07 19:24:59', NULL, NULL),
-(11, 28, 26, '2026-05-15', '19:00:00', NULL, 1, '2026-05-16', '19:00:00', 1, 1, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:10:46', NULL, NULL),
-(12, 29, 27, '2026-05-07', '22:00:00', 2, 1, '2026-05-08', '22:00:00', NULL, 1, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:13:47', NULL, NULL),
-(13, 29, 27, '2026-05-08', '22:00:00', NULL, 1, '2026-05-08', '22:00:00', NULL, 3, 'emergency', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:17:15', NULL, NULL),
-(14, 29, 27, '2026-05-08', '22:00:00', NULL, 3, '2026-05-09', '22:00:00', NULL, 3, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 21:08:11', NULL, NULL),
-(15, 29, 27, '2026-05-09', '22:00:00', NULL, 1, '2026-05-10', '13:30:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'rejected', 1, '2026-05-07 22:15:06', NULL, NULL),
-(16, 29, 27, '2026-05-09', '22:00:00', NULL, 1, '2026-05-22', '22:00:00', NULL, 2, 'maintenance', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:16:07', NULL, NULL),
-(17, 29, 27, '2026-05-22', '22:00:00', NULL, 1, '2026-05-22', '22:00:00', NULL, 3, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:17:39', NULL, NULL),
-(18, 29, 27, '2026-05-22', '22:00:00', NULL, 1, '2026-05-13', '22:00:00', NULL, 1, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:18:01', NULL, NULL),
-(19, 30, 27, '2026-05-08', '14:00:00', NULL, 1, '2026-05-08', '14:00:00', 7, 3, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:20:04', NULL, NULL),
-(20, 31, 27, '2026-05-08', '18:30:00', 1, 1, '2026-05-22', '15:30:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'rejected', 1, '2026-05-07 22:22:48', NULL, NULL),
-(21, 31, 27, '2026-05-08', '18:30:00', 1, 1, '2026-05-22', '12:00:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 1, '2026-05-07 22:32:20', NULL, NULL),
-(22, 32, 27, '2026-05-08', '14:00:00', 1, 1, '2026-05-08', '14:00:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 1, '2026-05-07 22:34:59', NULL, NULL),
-(23, 33, 27, '2026-05-08', '17:00:00', 1, 1, '2026-05-08', '17:00:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 0, '2026-05-07 22:44:37', NULL, NULL),
-(24, 34, 33, '2026-05-15', '16:30:00', 1, 1, '2026-05-22', '18:30:00', NULL, 1, 'user_request', 'Customer self-reschedule request.', 33, 'user', 'approved', 1, '2026-05-08 12:22:21', NULL, NULL),
-(25, 35, 33, '2026-05-13', '13:30:00', 7, 3, '2026-05-08', '13:55:00', NULL, 3, 'user_request', 'Customer self-reschedule request.', 33, 'user', 'approved', 1, '2026-05-08 13:52:25', NULL, NULL),
-(26, 38, 27, '2026-05-08', '17:15:00', NULL, 1, '2026-05-08', '17:00:00', 1, 1, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-08 17:06:21', NULL, NULL),
-(27, 41, 27, '2026-05-08', '19:30:00', 3, 1, '2026-05-08', '21:00:00', NULL, 1, 'user_request', 'not avail that time', 12, 'user', 'approved', 1, '2026-05-08 17:59:41', NULL, NULL),
-(28, 43, 27, '2026-05-08', '20:00:00', NULL, 1, '2026-05-22', '17:30:00', 1, 1, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 1, '2026-05-08 18:25:08', NULL, NULL);
+INSERT INTO `reservation_reschedules` (`reschedule_id`, `reservation_id`, `user_id`, `old_date`, `old_time`, `old_console_id`, `new_date`, `new_time`, `console_id`, `reason`, `reason_detail`, `rescheduled_by`, `initiated_by`, `status`, `seen_by_user`, `created_at`, `reviewed_by`, `reviewed_at`, `old_console_type`, `console_type`) VALUES
+(1, 21, 32, '2026-05-06', '16:00:00', NULL, '2026-05-07', '17:00:00', NULL, 'other', 'Customer self-reschedule.', 32, 'admin', 'approved', 1, '2026-05-05 14:38:38', NULL, NULL, NULL, NULL),
+(2, 21, 32, '2026-05-07', '17:00:00', NULL, '2026-05-07', '17:00:00', NULL, 'other', 'aalis kami sa wednesday', 12, 'admin', 'approved', 1, '2026-05-05 14:42:37', NULL, NULL, NULL, NULL),
+(3, 21, 32, '2026-05-07', '17:00:00', NULL, '2026-05-08', '17:00:00', NULL, 'other', 'aalis kami sa wednesday', 12, 'admin', 'approved', 1, '2026-05-05 14:43:08', NULL, NULL, NULL, NULL),
+(4, 23, 32, '2026-05-07', '13:30:00', NULL, '2026-05-08', '21:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 32, 'user', 'approved', 1, '2026-05-05 20:18:25', NULL, NULL, NULL, NULL),
+(5, 24, 33, '2026-05-07', '17:00:00', NULL, '2026-05-08', '17:00:00', NULL, 'typhoon', 'confirm mo to baka bigwasan kita', 12, 'admin', 'approved', 1, '2026-05-05 20:33:22', NULL, NULL, NULL, NULL),
+(6, 23, 32, '2026-05-08', '21:00:00', NULL, '2026-05-09', '21:00:00', NULL, 'emergency', 'nagka emergency', 12, 'admin', 'approved', 1, '2026-05-07 07:28:34', NULL, NULL, NULL, NULL),
+(7, 25, 26, '2026-05-08', '15:30:00', NULL, '2026-05-09', '12:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 26, 'user', 'approved', 1, '2026-05-07 08:00:03', NULL, NULL, NULL, NULL),
+(8, 26, 26, '2026-05-07', '09:15:00', NULL, '2026-05-07', '19:30:00', NULL, 'emergency', 'asdasdkashd', 12, 'admin', 'cancelled', 1, '2026-05-07 09:51:00', NULL, NULL, NULL, NULL),
+(9, 28, 26, '2026-05-08', '12:30:00', 1, '2026-05-14', '19:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 26, 'user', 'approved', 0, '2026-05-07 18:25:37', NULL, NULL, 'PS5', 'PS5'),
+(10, 28, 26, '2026-05-14', '19:00:00', NULL, '2026-05-15', '19:00:00', NULL, 'maintenance', NULL, 12, 'admin', 'approved', 1, '2026-05-07 19:24:59', NULL, NULL, 'PS5', 'PS5'),
+(11, 28, 26, '2026-05-15', '19:00:00', NULL, '2026-05-16', '19:00:00', 1, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:10:46', NULL, NULL, 'PS5', 'PS5'),
+(12, 29, 27, '2026-05-07', '22:00:00', 2, '2026-05-08', '22:00:00', NULL, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:13:47', NULL, NULL, 'PS5', 'PS5'),
+(13, 29, 27, '2026-05-08', '22:00:00', NULL, '2026-05-08', '22:00:00', NULL, 'emergency', NULL, 12, 'admin', 'approved', 1, '2026-05-07 20:17:15', NULL, NULL, 'PS5', 'Xbox Series X'),
+(14, 29, 27, '2026-05-08', '22:00:00', NULL, '2026-05-09', '22:00:00', NULL, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 21:08:11', NULL, NULL, 'Xbox Series X', 'Xbox Series X'),
+(15, 29, 27, '2026-05-09', '22:00:00', NULL, '2026-05-10', '13:30:00', NULL, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'rejected', 1, '2026-05-07 22:15:06', NULL, NULL, 'PS5', 'PS5'),
+(16, 29, 27, '2026-05-09', '22:00:00', NULL, '2026-05-22', '22:00:00', NULL, 'maintenance', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:16:07', NULL, NULL, 'PS5', 'PS4'),
+(17, 29, 27, '2026-05-22', '22:00:00', NULL, '2026-05-22', '22:00:00', NULL, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:17:39', NULL, NULL, 'PS5', 'Xbox Series X'),
+(18, 29, 27, '2026-05-22', '22:00:00', NULL, '2026-05-13', '22:00:00', NULL, 'typhoon', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:18:01', NULL, NULL, 'PS5', 'PS5'),
+(19, 30, 27, '2026-05-08', '14:00:00', NULL, '2026-05-08', '14:00:00', 7, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-07 22:20:04', NULL, NULL, 'PS5', 'Xbox Series X'),
+(20, 31, 27, '2026-05-08', '18:30:00', 1, '2026-05-22', '15:30:00', NULL, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'rejected', 1, '2026-05-07 22:22:48', NULL, NULL, 'PS5', 'PS5'),
+(21, 31, 27, '2026-05-08', '18:30:00', 1, '2026-05-22', '12:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 1, '2026-05-07 22:32:20', NULL, NULL, 'PS5', 'PS5'),
+(22, 32, 27, '2026-05-08', '14:00:00', 1, '2026-05-08', '14:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 1, '2026-05-07 22:34:59', NULL, NULL, 'PS5', 'PS5'),
+(23, 33, 27, '2026-05-08', '17:00:00', 1, '2026-05-08', '17:00:00', NULL, 'user_request', 'Customer self-reschedule request.', 27, 'user', 'approved', 0, '2026-05-07 22:44:37', NULL, NULL, 'PS5', 'PS5'),
+(24, 34, 33, '2026-05-15', '16:30:00', 1, '2026-05-22', '18:30:00', NULL, 'user_request', 'Customer self-reschedule request.', 33, 'user', 'approved', 1, '2026-05-08 12:22:21', NULL, NULL, 'PS5', 'PS5'),
+(25, 35, 33, '2026-05-13', '13:30:00', 7, '2026-05-08', '13:55:00', NULL, 'user_request', 'Customer self-reschedule request.', 33, 'user', 'approved', 1, '2026-05-08 13:52:25', NULL, NULL, 'Xbox Series X', 'Xbox Series X'),
+(26, 38, 33, '2026-05-08', '19:00:00', 4, '2026-05-10', '19:00:00', 1, 'user_request', 'wala po kasi ako sa may 9', 12, 'user', 'rejected', 1, '2026-05-08 17:44:34', NULL, NULL, 'PS5', 'PS5'),
+(27, 38, 33, '2026-05-08', '19:00:00', 4, '2026-05-10', '19:00:00', 3, 'power_outage', NULL, 12, 'admin', 'approved', 1, '2026-05-08 17:45:51', NULL, NULL, 'PS5', 'PS5'),
+(28, 38, 33, '2026-05-10', '19:00:00', 3, '2026-05-11', '19:00:00', 4, 'maintenance', 'sira', 12, 'admin', 'approved', 1, '2026-05-08 18:01:45', NULL, NULL, 'PS5', 'PS5'),
+(29, 38, 33, '2026-05-11', '19:00:00', 4, '2026-05-12', '17:00:00', 4, 'user_request', 'Customer self-reschedule request.', 33, 'user', 'approved', 1, '2026-05-08 18:02:25', NULL, NULL, 'PS5', 'PS5');
 
 -- --------------------------------------------------------
 
@@ -478,22 +478,8 @@ INSERT INTO `session_extensions` (`extension_id`, `session_id`, `requested_by`, 
 (13, 51, 12, 12, 60, 80.00, 'cash', 'approved', 'Direct extension by staff', '2026-05-07 09:54:19', '2026-05-07 09:54:19'),
 (14, 54, 12, 12, 120, 160.00, 'cash', 'approved', 'Direct extension by staff', '2026-05-07 10:22:39', '2026-05-07 10:22:39'),
 (15, 56, 12, 12, 30, 40.00, 'cash', 'approved', 'Direct extension by staff', '2026-05-07 18:27:14', '2026-05-07 18:27:14'),
-(16, 4, 33, NULL, 120, 160.00, NULL, 'pending', NULL, '2026-05-08 14:38:14', NULL);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `shop_hours_overrides`
---
-
-CREATE TABLE `shop_hours_overrides` (
-  `override_id` int(11) NOT NULL,
-  `activated_by` int(11) NOT NULL,
-  `action` enum('enabled','disabled') NOT NULL,
-  `extended_until` varchar(5) DEFAULT NULL COMMENT 'HH:MM or NULL = no specific end time',
-  `note` varchar(255) DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+(16, 4, 33, NULL, 120, 160.00, NULL, 'pending', NULL, '2026-05-08 14:38:14', NULL),
+(17, 6, 12, 12, 240, 320.00, 'cash', 'approved', 'Direct extension by staff', '2026-05-08 19:26:04', '2026-05-08 19:26:04');
 
 -- --------------------------------------------------------
 
@@ -514,7 +500,9 @@ CREATE TABLE `system_settings` (
 --
 
 INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `description`, `updated_at`) VALUES
-(3, 'unlimited_rate', '400', 'Rate for unlimited play (whole day) in ₱', '2026-05-08 23:38:35'),
+(1, 'ps5_hourly_rate', '80', 'Default hourly rate for PS5 units in ₱', '2026-05-08 10:49:51'),
+(2, 'xbox_hourly_rate', '80.00', 'Default hourly rate for Xbox Series X units in ₱', '2026-04-26 23:09:54'),
+(3, 'unlimited_rate', '400.00', 'Rate for unlimited play (whole day) in ₱', '2026-04-14 09:56:44'),
 (4, 'controller_rental_fee', '20.00', 'Additional controller rental fee in ₱', '2026-02-21 19:55:41'),
 (5, 'business_hours_open', '12:00', 'Shop opening time', '2026-05-07 10:20:23'),
 (6, 'business_hours_close', '00:00', 'Shop closing time', '2026-04-14 09:56:44'),
@@ -525,7 +513,7 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (21, 'bonus_paid_minutes', '120', NULL, '2026-04-26 16:47:16'),
 (22, 'bonus_free_minutes', '30', NULL, '2026-05-07 10:23:13'),
 (23, 'max_hourly_minutes', '240', NULL, '2026-04-26 16:47:16'),
-(24, 'session_min_charge', '50', NULL, '2026-05-08 23:41:00'),
+(24, 'session_min_charge', '60', NULL, '2026-05-08 10:57:43'),
 (152, 'gcash_number', '09XX-XXX-XXXX', 'Shop GCash number displayed on reservation payment screen', '2026-04-28 19:21:02'),
 (164, 'shop_override_enabled', '0', NULL, '2026-05-06 19:55:24'),
 (165, 'shop_override_closing_time', '', NULL, '2026-05-06 19:55:24'),
@@ -536,8 +524,7 @@ INSERT INTO `system_settings` (`setting_id`, `setting_key`, `setting_value`, `de
 (182, 'smtp_password', '4th1ngss', NULL, '2026-05-06 22:57:45'),
 (183, 'smtp_encryption', 'tls', NULL, '2026-05-06 22:57:45'),
 (196, 'brevo_api_key', '', NULL, '2026-05-07 10:16:55'),
-(197, 'sender_email', 'goodspotgaminghub@gmail.com', NULL, '2026-05-06 23:13:14'),
-(405, 'base_url', '', NULL, '2026-05-08 23:38:15');
+(197, 'sender_email', 'goodspotgaminghub@gmail.com', NULL, '2026-05-06 23:13:14');
 
 -- --------------------------------------------------------
 
@@ -568,7 +555,7 @@ CREATE TABLE `tournaments` (
 
 INSERT INTO `tournaments` (`tournament_id`, `tournament_name`, `game_id`, `game_name`, `console_type`, `start_date`, `end_date`, `entry_fee`, `prize_pool`, `max_participants`, `status`, `announcement`, `created_by`, `created_at`) VALUES
 (1, 'tekken 7', NULL, 'tekken 7', 'PS5', '2026-05-09 08:00:00', '2026-05-15 19:00:00', 500.00, 0.00, 16, 'cancelled', 'join na', 12, '2026-05-02 15:04:42'),
-(2, 'asdas', NULL, 'asdad', 'NINTENDO', '2026-05-14 14:30:00', '2026-05-14 16:00:00', 250.00, 10000.00, 16, 'scheduled', '', 12, '2026-05-07 09:22:00');
+(2, 'tikin 8', NULL, 'tikin et', 'PS5', '2026-05-14 14:30:00', '2026-05-14 16:00:00', 250.00, 10000.00, 16, 'cancelled', '', 12, '2026-05-07 09:22:00');
 
 -- --------------------------------------------------------
 
@@ -636,34 +623,20 @@ INSERT INTO `transactions` (`transaction_id`, `session_id`, `user_id`, `amount`,
 (126, 2, 0, 400.00, 400.00, 0.00, NULL, 'cash', 'completed', '2026-05-08 14:20:05', 12, '2026-05-08 14:20:05'),
 (127, 4, 33, 34.00, 34.00, NULL, 'Downpayment transferred from reservation #36', 'gcash', 'completed', '2026-05-08 14:24:45', 12, '2026-05-08 14:24:45'),
 (128, NULL, 33, 40.00, 40.00, NULL, 'Downpayment for reservation #37', 'gcash', 'completed', '2026-05-08 14:39:15', 33, '2026-05-08 14:39:15'),
-(129, NULL, 27, 25.00, 25.00, NULL, 'Downpayment for reservation #39', 'cash', 'completed', '2026-05-08 17:43:26', 27, '2026-05-08 17:43:26'),
-(130, 5, 27, 60.00, 60.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 17:46:45', 12, '2026-05-08 17:46:45'),
-(131, 6, 27, 25.00, 25.00, NULL, 'Downpayment transferred from reservation #40', 'cash', 'completed', '2026-05-08 17:47:40', 12, '2026-05-08 17:47:40'),
-(132, 3, 0, 260.00, 260.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 17:57:03', 12, '2026-05-08 17:57:03'),
-(133, 4, 33, 206.00, 206.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 17:57:09', 12, '2026-05-08 17:57:09'),
-(134, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #41', 'gcash', 'completed', '2026-05-08 17:58:10', 27, '2026-05-08 17:58:10'),
-(135, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #42', 'gcash', 'completed', '2026-05-08 18:05:08', 27, '2026-05-08 18:05:08'),
-(136, 6, 27, 15.00, 15.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 18:19:17', 12, '2026-05-08 18:19:17'),
-(137, 4, 33, 20.00, 20.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 18:19:29', 12, '2026-05-08 18:19:29'),
-(138, 3, 0, 40.00, 240.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 18:19:35', 12, '2026-05-08 18:19:35'),
-(139, NULL, 27, 24.00, 24.00, NULL, 'Downpayment for reservation #43', 'gcash', 'completed', '2026-05-08 18:24:56', 27, '2026-05-08 18:24:56'),
-(140, 7, 0, 120.00, 120.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:40:30', 12, '2026-05-08 18:40:30'),
-(141, 7, 0, -120.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱120.00)', '', 'completed', '2026-05-08 18:40:47', 12, '2026-05-08 18:40:47'),
-(142, 8, 0, 60.00, 60.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:49:11', 12, '2026-05-08 18:49:11'),
-(143, 8, 0, -60.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱60.00)', '', 'completed', '2026-05-08 18:49:16', 12, '2026-05-08 18:49:16'),
-(144, 9, 0, 80.00, 80.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:51:18', 12, '2026-05-08 18:51:18'),
-(145, 9, 0, -60.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱60.00)', '', 'completed', '2026-05-08 18:51:25', 12, '2026-05-08 18:51:25'),
-(146, 10, 0, 60.00, 60.00, NULL, NULL, 'cash', 'completed', '2026-05-08 18:53:05', 12, '2026-05-08 18:53:05'),
-(147, 10, 0, -60.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱60.00)', '', 'completed', '2026-05-08 18:53:30', 12, '2026-05-08 18:53:30'),
-(148, 9, 0, 40.00, NULL, NULL, NULL, 'cash', 'completed', '2026-05-08 19:21:20', 12, '2026-05-08 19:21:20'),
-(149, 10, 0, 40.00, NULL, NULL, NULL, 'cash', 'completed', '2026-05-08 19:22:53', 12, '2026-05-08 19:22:53'),
-(150, 8, 0, 60.00, NULL, NULL, NULL, 'cash', 'completed', '2026-05-08 19:23:31', 12, '2026-05-08 19:23:31'),
-(151, 9, 0, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:23:34', 12, '2026-05-08 19:23:34'),
-(152, 11, 0, 20.00, 20.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:23:38', 12, '2026-05-08 19:23:38'),
-(153, 12, 0, 140.00, 140.00, NULL, NULL, 'cash', 'completed', '2026-05-08 19:42:11', 12, '2026-05-08 19:42:11'),
-(156, 12, 0, -40.00, NULL, NULL, 'Early end – refund for unused time: Early end – used 57m (₱100.00), refunding unused time (₱40.00)', '', 'completed', '2026-05-08 20:40:06', 12, '2026-05-08 20:40:06'),
-(157, NULL, 27, 40.00, 40.00, NULL, 'Downpayment for reservation #44', 'gcash', 'completed', '2026-05-08 23:20:19', 27, '2026-05-08 23:20:19'),
-(158, 13, 0, 100.00, 110.00, NULL, NULL, 'cash', 'completed', '2026-05-08 23:23:40', 12, '2026-05-08 23:23:40');
+(129, NULL, 33, 34.00, 34.00, NULL, 'Downpayment for reservation #38', 'gcash', 'completed', '2026-05-08 17:43:22', 33, '2026-05-08 17:43:22'),
+(130, 3, 0, 120.00, 240.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 17:43:52', 12, '2026-05-08 17:43:52'),
+(131, 4, 33, 226.00, 226.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 18:17:41', 12, '2026-05-08 18:17:41'),
+(132, 5, 0, 60.00, 60.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:17:12', 12, '2026-05-08 19:17:12'),
+(133, 6, 0, 0.00, 0.00, 320.00, 'Extension +240 min via staff (Extension #17)', 'cash', 'completed', '2026-05-08 19:26:04', 12, '2026-05-08 19:26:04'),
+(135, 6, 0, 40.00, 40.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 19:57:14', 12, '2026-05-08 19:57:14'),
+(139, 7, 0, 80.00, 80.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 22:52:17', 12, '2026-05-08 22:52:17'),
+(140, 4, 33, 240.00, 240.00, 60.00, 'Short payment - collected ₱240.00, short by ₱60.00', 'cash', 'completed', '2026-05-08 22:52:29', 12, '2026-05-08 22:52:29'),
+(141, 4, 33, 60.00, 60.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 22:52:35', 12, '2026-05-08 22:52:35'),
+(142, 5, 0, 200.00, 200.00, 60.00, 'Short payment - collected ₱200.00, short by ₱60.00', 'cash', 'completed', '2026-05-08 23:03:05', 12, '2026-05-08 23:03:05'),
+(143, 5, 0, 60.00, 60.00, NULL, 'Balance payment collected', 'cash', 'completed', '2026-05-08 23:03:32', 12, '2026-05-08 23:03:32'),
+(144, 10, 26, 400.00, 400.00, 0.00, NULL, 'cash', 'completed', '2026-05-08 23:21:22', 35, '2026-05-08 23:21:22'),
+(145, NULL, 33, 28.00, 28.00, NULL, 'Downpayment for reservation #39', 'gcash', 'completed', '2026-05-08 23:49:05', 33, '2026-05-08 23:49:05'),
+(146, 8, 33, 100.00, 100.00, NULL, 'Balance payment collected at session end', 'cash', 'completed', '2026-05-08 23:49:25', 35, '2026-05-08 23:49:25');
 
 -- --------------------------------------------------------
 
@@ -702,16 +675,18 @@ INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, 
 (23, 'customer@example.com', '$2y$10$8mmAlQ1UknZorTRMn6NVneRRA5JrVSOO8oMAuDEVll.pICMikYieO', 'Test Customer', '', 'customer', 'active', 0, '5337f25a858a79327c9001f982e6629f2f64be6579986d9da00c816159a6a75c', '2026-04-20 20:49:05', NULL, NULL, '2026-04-19 20:49:05', 0, NULL),
 (24, 'lito@example.com', '$2y$10$b1z6jAajQr5NjOyHWkU5kOJ7kx/BdeM6HbUg/qLWdElsilx20bLta', 'Lito Test', '', 'customer', 'active', 0, '10512cc414ac02ff1b961698a17863ad87e3e55d976dc1e14d92a2af161ee3bd', '2026-04-20 20:52:01', NULL, NULL, '2026-04-19 20:52:01', 0, NULL),
 (26, 'hbernesto@kld.edu.ph', '$2y$10$/cCpA7hhbUMKxyVwk9r4Uuh5p6r4qo70eP9Wv1UmFfVnLl8rD4vLG', 'Harvie Bernesto', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 23:19:32', 1, '2026-05-07 07:36:37'),
-(27, 'helios@gmail.com', '$2y$10$R0HlhoPj53cgV9MwvalomuJxieeDE5JWQ4T7trpO.ttzu/U0rXJnm', 'helios', 'helios@gmail.com', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 23:29:14', 0, NULL),
+(27, 'helios@gmail.com', '$2y$10$R0HlhoPj53cgV9MwvalomuJxieeDE5JWQ4T7trpO.ttzu/U0rXJnm', 'helios', 'helios@gmail.com', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-04-27 23:29:14', 2, NULL),
 (28, 'testcustomer@example.com', '$2y$10$kGbRHj87ratNFmTwi2pmTOqMaV2KV0fvB2H5sMYMsEzMfFVM4Uku2', 'Test Customer', '09123456789', 'customer', 'active', 0, '29333d3de426116e2f4f7d304d0b9f4b4b3b76feb6ee30a877d3d5457179f6e1', '2026-04-28 23:52:37', NULL, NULL, '2026-04-27 23:52:37', 0, NULL),
-(29, 'test@example.com', '$2y$10$mLQD41zmi3vIoJ8sR8/Ntu6uZojYGjvzKbNb3Y.evmmQ3SyMB7evC', 'Test User', '09171234567', 'customer', 'active', 1, '0ae0598c1a671992ec26dfae71eabe5e2f9269bb1da1ae9f85c78695949d6184', '2026-04-30 20:29:21', NULL, NULL, '2026-04-29 20:29:21', 0, NULL),
+(29, 'test@example.com', '$2y$10$mLQD41zmi3vIoJ8sR8/Ntu6uZojYGjvzKbNb3Y.evmmQ3SyMB7evC', 'Test User', '09171234567', 'customer', 'active', 0, '0ae0598c1a671992ec26dfae71eabe5e2f9269bb1da1ae9f85c78695949d6184', '2026-04-30 20:29:21', NULL, NULL, '2026-04-29 20:29:21', 0, NULL),
 (30, '09171234567test@gmail.com', '$2y$10$jyNy.ykur0jghOW.APBCwOpx.Y5fTLFYDdfTbek92i6AffjjIlcBq', 'test@gmail.comTest User', 'Password123!09171234', 'customer', 'active', 0, '6a296a2ad91537491af9a4309082ea6e25e0a818b60dd86e65ccc5e842ccd700', '2026-05-01 00:13:31', NULL, NULL, '2026-04-30 00:13:32', 0, NULL),
 (31, 'mariejoy.12.mji@gmail.com', '$2y$10$VDFqBSZiRt9I1ZLIRaVBdOSQ0Red0aogx.VqXx1EMrGP.905x0bX2', 'MJ IGNACIO', '', 'customer', 'active', 0, 'd0e91ebfe1587c05cd41f92225bfa010276bb3e2c5c3ae0e7fefabd03a28c942', '2026-05-01 08:01:11', NULL, NULL, '2026-04-30 08:01:11', 0, NULL),
 (32, 'harvieloresco2004@gmail.com', '$2y$10$5ra6ycYpFWsty4s.ikJESuw688uGiHUCKkXPlA8z44ZS9CzZnGU86', 'Harvie Loresco', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 14:34:15', 0, '2026-05-14 07:38:38'),
-(33, 'sibeloresco@gmail.com', '$2y$10$th7lcBzspd8ES7d3oyIM7utZLr3u5r9zPJiCkIkpuWI44vi/ICxc6', 'Sibe Loresco', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 20:26:57', 0, NULL),
+(33, 'sibeloresco@gmail.com', '$2y$10$th7lcBzspd8ES7d3oyIM7utZLr3u5r9zPJiCkIkpuWI44vi/ICxc6', 'Sibe Loresco', '09944084214', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-05 20:26:57', 1, NULL),
 (35, 'kianpablo1996@gmail.com', '$2y$10$9HVf3fBPYcbdleA0/2fo8emj4MH52KuVtwHR1uXszxWT9yQJy/vo6', 'Kian Pablo', '09944084214', 'shopkeeper', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-06 00:25:13', 0, NULL),
 (37, 'zerotwo02darlingninelota@gmail.com', '$2y$10$Q72iGgv0rWvD6I9OaSk6Iuq7BxVJY5Tmw2HuYCH.kGlLT6tSVqNom', 'Gelo', '09123455666', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-07 09:01:18', 0, NULL),
-(38, 'unique_tester_99@example.com', '$2y$10$KlQu2AzHZNth7OfEOAY5T.iRsiw9FsKR9MAkplksBodg/vMp84vny', 'Test User', '', 'customer', 'active', 0, 'c2d332cbbbde9a33cc7e290f45c9ce3acaa51ce1bb1d9e9836f5c2504f018794', '2026-05-08 13:02:28', NULL, NULL, '2026-05-07 13:02:28', 0, NULL);
+(38, 'unique_tester_99@example.com', '$2y$10$KlQu2AzHZNth7OfEOAY5T.iRsiw9FsKR9MAkplksBodg/vMp84vny', 'Test User', '', 'customer', 'active', 0, 'c2d332cbbbde9a33cc7e290f45c9ce3acaa51ce1bb1d9e9836f5c2504f018794', '2026-05-08 13:02:28', NULL, NULL, '2026-05-07 13:02:28', 0, NULL),
+(40, 'notribbie0@gmail.com', '$2y$10$sWea1ry/llho6m8b5s7qCeN1A/jqfeOmDwX.icUkYC7rJHEF.gYL2', 'Gelo', '09944084214', 'customer', 'active', 0, '6808a3a05fa16f91b2026817302f94e6f4911197d6d82a34a46a562e63e04250', '2026-05-09 19:58:16', NULL, NULL, '2026-05-08 19:58:16', 0, NULL),
+(41, 'bernadittealmoguerra@gmail.com', '$2y$10$tf8LuMS4fG2kx5CW51hpmu3q5nTPMeOZzgdehdb17/FSAGJ//zmpS', 'bernadit', '', 'customer', 'active', 1, NULL, NULL, NULL, NULL, '2026-05-08 20:01:41', 0, NULL);
 
 --
 -- Indexes for dumped tables
@@ -744,8 +719,7 @@ ALTER TABLE `blocked_dates`
 ALTER TABLE `consoles`
   ADD PRIMARY KEY (`console_id`),
   ADD UNIQUE KEY `unit_number` (`unit_number`),
-  ADD KEY `idx_consoles_status` (`status`),
-  ADD KEY `idx_consoles_type` (`console_type_id`);
+  ADD KEY `idx_consoles_status` (`status`);
 
 --
 -- Indexes for table `console_types`
@@ -760,8 +734,7 @@ ALTER TABLE `console_types`
 ALTER TABLE `controllers`
   ADD PRIMARY KEY (`controller_id`),
   ADD UNIQUE KEY `unit_number` (`unit_number`),
-  ADD KEY `fk_controllers_ctrlt` (`console_type_id`),
-  ADD KEY `fk_controllers_type` (`controller_type_id`);
+  ADD KEY `fk_controllers_ctrlt` (`console_type_id`);
 
 --
 -- Indexes for table `controller_types`
@@ -809,8 +782,7 @@ ALTER TABLE `reservations`
   ADD KEY `idx_res_console` (`console_id`),
   ADD KEY `fk_res_created_by` (`created_by`),
   ADD KEY `idx_res_paymongo_src` (`paymongo_source_id`),
-  ADD KEY `fk_res_controller` (`controller_id`),
-  ADD KEY `idx_res_console_type` (`console_type_id`);
+  ADD KEY `fk_res_controller` (`controller_id`);
 
 --
 -- Indexes for table `reservation_cancellations`
@@ -831,9 +803,7 @@ ALTER TABLE `reservation_reschedules`
   ADD PRIMARY KEY (`reschedule_id`),
   ADD KEY `idx_rr_reservation` (`reservation_id`),
   ADD KEY `idx_rr_user` (`user_id`),
-  ADD KEY `idx_rr_seen` (`seen_by_user`),
-  ADD KEY `idx_rr_old_ctype` (`old_console_type_id`),
-  ADD KEY `idx_rr_new_ctype` (`new_console_type_id`);
+  ADD KEY `idx_rr_seen` (`seen_by_user`);
 
 --
 -- Indexes for table `session_extensions`
@@ -844,13 +814,6 @@ ALTER TABLE `session_extensions`
   ADD KEY `idx_ext_status` (`status`),
   ADD KEY `idx_ext_requested_by` (`requested_by`),
   ADD KEY `fk_ext_approved_by` (`approved_by`);
-
---
--- Indexes for table `shop_hours_overrides`
---
-ALTER TABLE `shop_hours_overrides`
-  ADD PRIMARY KEY (`override_id`),
-  ADD KEY `idx_created` (`created_at`);
 
 --
 -- Indexes for table `system_settings`
@@ -912,7 +875,7 @@ ALTER TABLE `activity_logs`
 -- AUTO_INCREMENT for table `additional_requests`
 --
 ALTER TABLE `additional_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `blocked_dates`
@@ -924,31 +887,31 @@ ALTER TABLE `blocked_dates`
 -- AUTO_INCREMENT for table `consoles`
 --
 ALTER TABLE `consoles`
-  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3228;
+  MODIFY `console_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3231;
 
 --
 -- AUTO_INCREMENT for table `console_types`
 --
 ALTER TABLE `console_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=151;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=108;
 
 --
 -- AUTO_INCREMENT for table `controllers`
 --
 ALTER TABLE `controllers`
-  MODIFY `controller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `controller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `controller_types`
 --
 ALTER TABLE `controller_types`
-  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=102;
+  MODIFY `type_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=103;
 
 --
 -- AUTO_INCREMENT for table `gaming_sessions`
 --
 ALTER TABLE `gaming_sessions`
-  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `pricing_tiers`
@@ -966,37 +929,31 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
 
 --
 -- AUTO_INCREMENT for table `reservation_cancellations`
 --
 ALTER TABLE `reservation_cancellations`
-  MODIFY `cancel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `cancel_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `reservation_reschedules`
 --
 ALTER TABLE `reservation_reschedules`
-  MODIFY `reschedule_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `reschedule_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `session_extensions`
 --
 ALTER TABLE `session_extensions`
-  MODIFY `extension_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
-
---
--- AUTO_INCREMENT for table `shop_hours_overrides`
---
-ALTER TABLE `shop_hours_overrides`
-  MODIFY `override_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `extension_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `system_settings`
 --
 ALTER TABLE `system_settings`
-  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=442;
+  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=366;
 
 --
 -- AUTO_INCREMENT for table `tournaments`
@@ -1014,13 +971,13 @@ ALTER TABLE `tournament_participants`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=159;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=147;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
 
 --
 -- Constraints for dumped tables
@@ -1033,17 +990,10 @@ ALTER TABLE `additional_requests`
   ADD CONSTRAINT `fk_addreq_session` FOREIGN KEY (`session_id`) REFERENCES `gaming_sessions` (`session_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `consoles`
---
-ALTER TABLE `consoles`
-  ADD CONSTRAINT `fk_consoles_console_type` FOREIGN KEY (`console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
---
 -- Constraints for table `controllers`
 --
 ALTER TABLE `controllers`
-  ADD CONSTRAINT `fk_controllers_ctrlt` FOREIGN KEY (`console_type_id`) REFERENCES `controller_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_controllers_type` FOREIGN KEY (`controller_type_id`) REFERENCES `controller_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_controllers_ctrlt` FOREIGN KEY (`console_type_id`) REFERENCES `controller_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `gaming_sessions`
@@ -1066,8 +1016,7 @@ ALTER TABLE `reservations`
   ADD CONSTRAINT `fk_res_console` FOREIGN KEY (`console_id`) REFERENCES `consoles` (`console_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_res_controller` FOREIGN KEY (`controller_id`) REFERENCES `controllers` (`controller_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_res_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_reservations_console_type` FOREIGN KEY (`console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
 
 --
 -- Constraints for table `reservation_cancellations`
@@ -1075,13 +1024,6 @@ ALTER TABLE `reservations`
 ALTER TABLE `reservation_cancellations`
   ADD CONSTRAINT `fk_rc_reservation` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`reservation_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_rc_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
-
---
--- Constraints for table `reservation_reschedules`
---
-ALTER TABLE `reservation_reschedules`
-  ADD CONSTRAINT `fk_rr_new_console_type` FOREIGN KEY (`new_console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_rr_old_console_type` FOREIGN KEY (`old_console_type_id`) REFERENCES `console_types` (`type_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `tournament_participants`

@@ -1497,11 +1497,12 @@ function getCancelledReservations() {
     global $conn;
     $stmt = $conn->prepare(
         "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
-                c.unit_number, c.console_name,
+                ct.type_name AS console_type, c.unit_number, c.console_name,
                 rc.cancel_reason_type, rc.cancel_reason_detail,
                 rc.cancelled_at
            FROM reservations r
            JOIN users u ON r.user_id = u.user_id
+           LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
           WHERE r.status = 'cancelled'

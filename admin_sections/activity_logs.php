@@ -7,6 +7,77 @@
         </div>
     </div>
 
+    <!-- Export Activity Logs Form -->
+    <div class="card" style="margin-bottom:20px; border-left: 3px solid #f1a83c;">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-file-export" style="color:#f1a83c;margin-right:8px;"></i> Export Activity Logs</h3></div>
+        <div style="padding: 20px;">
+            <form action="export_activity_logs.php" method="GET" target="_blank" style="display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;">
+                <div class="form-group" style="margin:0; flex:1; min-width:180px;">
+                    <label style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Report Type</label>
+                    <select name="type" id="exportLogTypeSelect" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" onchange="updateExportLogDateInput()">
+                        <option value="daily" style="background:#0d1117;">Daily Report</option>
+                        <option value="monthly" style="background:#0d1117;">Monthly Report</option>
+                        <option value="yearly" style="background:#0d1117;">Yearly Report</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0; flex:1; min-width:180px;">
+                    <label id="exportLogDateLabel" style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Select Date</label>
+                    <input type="date" name="date" id="exportLogDateInput" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" required value="<?= getOperatingDay() ?>">
+                </div>
+                <div class="form-group" style="margin:0; flex:1; min-width:180px;">
+                    <label style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block;">Export Format</label>
+                    <select name="format" id="exportLogFormatSelect" style="width:100%;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff;outline:none;" onchange="updateExportLogButton()">
+                        <option value="csv" style="background:#0d1117;">Excel (CSV)</option>
+                        <option value="xls" style="background:#0d1117;">Excel (XLS)</option>
+                        <option value="doc" style="background:#0d1117;">Word (DOC)</option>
+                        <option value="pdf" style="background:#0d1117;">PDF (Printable)</option>
+                        <option value="txt" style="background:#0d1117;">Plain Text</option>
+                    </select>
+                </div>
+                <button type="submit" id="exportLogSubmitBtn" class="btn-prim" style="height:41px; padding:0 24px; background: #217346; border-color: #217346;">
+                    <i class="fas fa-file-excel"></i> Export CSV
+                </button>
+            </form>
+        </div>
+    </div>
+    <script>
+    function updateExportLogButton() {
+        const fmt = document.getElementById('exportLogFormatSelect').value;
+        const btn = document.getElementById('exportLogSubmitBtn');
+        const colors = {
+            'csv': { bg: '#217346', icon: 'fa-file-excel', text: 'Export CSV' },
+            'xls': { bg: '#217346', icon: 'fa-file-excel', text: 'Export XLS' },
+            'doc': { bg: '#2b579a', icon: 'fa-file-word', text: 'Export DOC' },
+            'pdf': { bg: '#e3242b', icon: 'fa-file-pdf', text: 'Generate PDF' },
+            'txt': { bg: '#555555', icon: 'fa-file-alt', text: 'Export TXT' }
+        };
+        if (colors[fmt]) {
+            btn.style.background = colors[fmt].bg;
+            btn.style.borderColor = colors[fmt].bg;
+            btn.innerHTML = `<i class="fas ${colors[fmt].icon}"></i> ${colors[fmt].text}`;
+        }
+    }
+    function updateExportLogDateInput() {
+        const type = document.getElementById('exportLogTypeSelect').value;
+        const input = document.getElementById('exportLogDateInput');
+        const label = document.getElementById('exportLogDateLabel');
+        if (type === 'daily') {
+            input.type = 'date';
+            label.textContent = 'Select Date';
+        } else if (type === 'monthly') {
+            input.type = 'month';
+            label.textContent = 'Select Month';
+        } else if (type === 'yearly') {
+            input.type = 'number';
+            input.min = '2020';
+            input.max = '2100';
+            input.placeholder = 'YYYY';
+            input.value = new Date().getFullYear();
+            label.textContent = 'Select Year';
+        }
+    }
+    </script>
+
     <div class="card">
         <div class="card-header" style="flex-wrap:wrap;gap:15px;padding:20px;">
             <h3 class="card-title"><i class="fas fa-list" style="margin-right:8px;font-size:14px;opacity:.7;"></i>Recent Activity</h3>

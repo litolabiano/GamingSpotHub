@@ -1,0 +1,36 @@
+"Transaction ID","Date & Time",Customer,"Console Unit","Transaction Type","Amount (PHP)","Payment Method",Status,"PayMongo ID",Notes
+159,"May 09, 2026 12:54 AM","Walk-in Customer",PS5-03,Hourly,40.00,Cash,Completed,-,"Balance payment collected at session end"
+158,"May 08, 2026 11:23 PM","Walk-in Customer",PS5-03,Hourly,100.00,Cash,Completed,-,
+157,"May 08, 2026 11:20 PM",helios,-,Reservation,40.00,Gcash,Completed,pay_JuSktbWrLZmL1ZUfHdoFSfTT,"Downpayment for reservation #44"
+156,"May 08, 2026 08:40 PM","Walk-in Customer",PS5-03,Refund,-40.00,,Completed,-,"Early end – refund for unused time: Early end – used 57m (₱100.00), refunding unused time (₱40.00)"
+153,"May 08, 2026 07:42 PM","Walk-in Customer",PS5-03,Hourly,140.00,Cash,Completed,-,
+152,"May 08, 2026 07:23 PM","Walk-in Customer",-,Other,20.00,Cash,Completed,-,"Balance payment collected at session end"
+151,"May 08, 2026 07:23 PM","Walk-in Customer",-,Other,20.00,Cash,Completed,-,"Balance payment collected at session end"
+150,"May 08, 2026 07:23 PM","Walk-in Customer",-,Other,60.00,Cash,Completed,-,
+149,"May 08, 2026 07:22 PM","Walk-in Customer",-,Other,40.00,Cash,Completed,-,
+148,"May 08, 2026 07:21 PM","Walk-in Customer",-,Other,40.00,Cash,Completed,-,
+147,"May 08, 2026 06:53 PM","Walk-in Customer",-,Refund,-60.00,,Completed,-,"Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱60.00)"
+146,"May 08, 2026 06:53 PM","Walk-in Customer",-,Other,60.00,Cash,Completed,-,
+145,"May 08, 2026 06:51 PM","Walk-in Customer",-,Refund,-60.00,,Completed,-,"Early end – refund for unused time: Early end – used 00m (₱20.00), refunding unused time (₱60.00)"
+144,"May 08, 2026 06:51 PM","Walk-in Customer",-,Other,80.00,Cash,Completed,-,
+143,"May 08, 2026 06:49 PM","Walk-in Customer",-,Refund,-60.00,,Completed,-,"Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱60.00)"
+142,"May 08, 2026 06:49 PM","Walk-in Customer",-,Other,60.00,Cash,Completed,-,
+141,"May 08, 2026 06:40 PM","Walk-in Customer",-,Refund,-120.00,,Completed,-,"Early end – refund for unused time: Early end – used 00m (₱0.00), refunding unused time (₱120.00)"
+140,"May 08, 2026 06:40 PM","Walk-in Customer",-,Other,120.00,Cash,Completed,-,
+139,"May 08, 2026 06:24 PM",helios,-,Reservation,24.00,Gcash,Completed,pay_uUPwrLdjMX8TBo3e4EFX8QoA,"Downpayment for reservation #43"
+138,"May 08, 2026 06:19 PM","Walk-in Customer",-,Other,40.00,Cash,Completed,-,"Balance payment collected at session end"
+137,"May 08, 2026 06:19 PM","Sibe Loresco",-,Other,20.00,Cash,Completed,-,"Balance payment collected"
+136,"May 08, 2026 06:19 PM",helios,-,Other,15.00,Cash,Completed,-,"Balance payment collected at session end"
+135,"May 08, 2026 06:05 PM",helios,-,Reservation,24.00,Gcash,Completed,pay_dYN2kJPnV8a6ydcgtCZZZFqi,"Downpayment for reservation #42"
+134,"May 08, 2026 05:58 PM",helios,-,Reservation,24.00,Gcash,Completed,pay_ruaBB7xY2yKdqFnpJ2oNcwo6,"Downpayment for reservation #41"
+133,"May 08, 2026 05:57 PM","Sibe Loresco",-,Other,206.00,Cash,Completed,-,"Balance payment collected"
+132,"May 08, 2026 05:57 PM","Walk-in Customer",-,Other,260.00,Cash,Completed,-,"Balance payment collected"
+131,"May 08, 2026 05:47 PM",helios,-,Reservation,25.00,Cash,Completed,-,"Downpayment transferred from reservation #40"
+130,"May 08, 2026 05:46 PM",helios,-,Other,60.00,Cash,Completed,-,"Balance payment collected at session end"
+129,"May 08, 2026 05:43 PM",helios,-,Reservation,25.00,Cash,Completed,-,"Downpayment for reservation #39"
+128,"May 08, 2026 02:39 PM","Sibe Loresco",-,Reservation,40.00,Gcash,Completed,pay_GmjQcojsJJG5CwGjB8QfgmEc,"Downpayment for reservation #37"
+127,"May 08, 2026 02:24 PM","Sibe Loresco",-,Reservation,34.00,Gcash,Completed,pay_EttvLKi58zJ5WTcVYjKZJNRX,"Downpayment transferred from reservation #36"
+126,"May 08, 2026 02:20 PM","Walk-in Customer",-,Other,400.00,Cash,Completed,-,
+125,"May 08, 2026 02:18 PM","Sibe Loresco",-,Other,6.00,Cash,Completed,-,"Balance payment collected at session end"
+124,"May 08, 2026 01:51 PM","Sibe Loresco",-,Reservation,34.00,Gcash,Completed,pay_Be76ri2h4vWmgKQxuFSADYQk,"Downpayment transferred from reservation #35"
+123,"May 08, 2026 12:01 PM","Sibe Loresco",-,Reservation,34.00,Gcash,Completed,pay_DhnSXceBRGJDFqg38uxEXzPj,"Downpayment for reservation #34"
