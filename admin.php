@@ -1442,6 +1442,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
+    <div class="nav-item" data-tooltip="Activity Logs" onclick="showPage('activity_logs', this)">
+        <i class="fas fa-history"></i><span>Activity Logs</span>
+    </div>
     <div class="nav-item" data-tooltip="Blocked Dates" onclick="showPage('blocked_dates', this)">
         <i class="fas fa-calendar-times"></i><span>Blocked Dates</span>
     </div>
@@ -1556,6 +1559,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
 
+<?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/activity_logs.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/blocked_dates.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
 
@@ -1583,7 +1587,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 function showPage(page, el) {
     // ── Role-Based Access Check ──
     const userRole = '<?= $user['role'] ?>';
-    const restricted = ['consoles', 'tournaments'];
+    const restricted = ['consoles', 'tournaments', 'activity_logs', 'blocked_dates', 'settings'];
     if (userRole === 'shopkeeper' && restricted.includes(page)) {
         console.warn('[GSpot Access] Shopkeeper access denied to:', page);
         // Redirect to dashboard if attempting restricted page
@@ -1619,6 +1623,7 @@ function showPage(page, el) {
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
         settings: 'Settings', tournaments: 'Tournaments',
+        activity_logs: 'Activity Logs',
         blocked_dates: 'Blocked Dates'
     };
 
