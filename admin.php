@@ -3735,6 +3735,76 @@ function _addNotifItems(newItems) {
         setInterval(_checkMidnight, POLL_MS);
     }, 5000);
 })();
+
+// ── Reservation Auto-Start Poller ─────────────────────────────────────────────
+// Checks every 60 s for reservations whose reserved date+time has been reached
+// and automatically converts them to active gaming sessions.
+// Paired with ajax/auto_start_sessions.php on the backend.
+(function () {
+    var POLL_MS = 60000; // every 60 seconds
+
+    function _autoStartSessions() {
+        fetch('ajax/auto_start_sessions.php', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data || !data.success) return;
+                var count = data.started || 0;
+                if (count === 0) return;
+
+                console.log('[GSpot] Auto-start: ' + count + ' session(s) started.', data.sessions);
+
+                // Show admin toast notification
+                var sessionLines = (data.sessions || []).map(function(s) {
+                    return '• Reservation #' + s.reservation_id + ' → Session #' + s.session_id + ' (' + s.console_type + ')';
+                }).join('\n');
+
+                if (window.showToast) {
+                    window.showToast(
+                        count + ' reservation(s) auto-started as active session(s).',
+                        'success'
+                    );
+                } else {
+                    var banner = document.createElement('div');
+                    banner.style.cssText =
+                        'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+                        'z-index:999999;background:linear-gradient(135deg,#0a2218,#0d2e22);' +
+                        'border:1px solid rgba(32,200,161,.5);border-radius:14px;' +
+                        'padding:16px 24px;max-width:500px;width:92%;' +
+                        'box-shadow:0 8px 32px rgba(0,0,0,.6);color:#eee;font-size:13px;';
+                    banner.innerHTML =
+                        '<div style="display:flex;align-items:center;gap:12px;">' +
+                        '<div style="width:36px;height:36px;border-radius:10px;flex-shrink:0;' +
+                        'background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);' +
+                        'display:flex;align-items:center;justify-content:center;font-size:16px;">' +
+                        '<i class="fas fa-play-circle" style="color:#20c8a1;"></i></div>' +
+                        '<div>' +
+                        '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
+                        count + ' Session' + (count > 1 ? 's' : '') + ' Auto-Started</div>' +
+                        '<div style="color:#aaa;font-size:12px;">Reservations converted to active sessions at their scheduled time.</div>' +
+                        '</div>' +
+                        '<button onclick="this.parentElement.parentElement.remove()" ' +
+                        'style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;margin-left:auto;flex-shrink:0;">×</button>' +
+                        '</div>';
+                    document.body.appendChild(banner);
+                    setTimeout(function() {
+                        if (banner.parentNode) banner.parentNode.removeChild(banner);
+                    }, 10000);
+                }
+
+                // Refresh the live section so new sessions appear immediately
+                setTimeout(function() { location.reload(); }, 2000);
+            })
+            .catch(function(err) {
+                console.warn('[GSpot] Auto-start fetch error:', err);
+            });
+    }
+
+    // Run once at page load (after 10s) then every 60s
+    setTimeout(function() {
+        _autoStartSessions();
+        setInterval(_autoStartSessions, POLL_MS);
+    }, 10000);
+})();
 </script>
 </body>
 </html>

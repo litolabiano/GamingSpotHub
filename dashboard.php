@@ -3659,4 +3659,37 @@ document.getElementById('rescheduleConfirmModal').addEventListener('click', func
 });
 </script>
 
+<!-- ── Auto-Start Sessions Poller ─────────────────────────────────────────── -->
+<script>
+(function() {
+    var POLL_MS   = 60000; // every 60 seconds
+    var CURRENT_UID = <?= (int)$user_id ?>;
+
+    function _autoStartSessions() {
+        fetch('ajax/auto_start_sessions.php', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data || !data.success || !data.started) return;
+
+                // Check if any started session belongs to the current user
+                var mySession = (data.sessions || []).find(function(s) {
+                    return parseInt(s.user_id) === CURRENT_UID;
+                });
+
+                if (mySession) {
+                    // Store a toast message for after reload
+                    sessionStorage.setItem('dashToastMsg', 'Your reservation has been automatically started! Your gaming session is now active.');
+                    sessionStorage.setItem('dashToastType', 'success');
+                    setTimeout(function() { location.reload(); }, 500);
+                }
+            })
+            .catch(function() {}); // fail silently — background task
+    }
+
+    // Run once immediately, then poll every 60s
+    _autoStartSessions();
+    setInterval(_autoStartSessions, POLL_MS);
+})();
+</script>
+
 </html>
