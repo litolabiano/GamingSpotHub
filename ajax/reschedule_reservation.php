@@ -123,6 +123,13 @@ try {
         $staff_id
     );
     $log->execute();
+    $log->close();
+
+    // Set the main reservation status to 'pending' immediately
+    $upd = $conn->prepare("UPDATE reservations SET status = 'pending', updated_at = NOW() WHERE reservation_id = ?");
+    $upd->bind_param('i', $reservation_id);
+    $upd->execute();
+    $upd->close();
 
     $conn->commit();
 
@@ -130,8 +137,8 @@ try {
     $fullName = trim($res['full_name']);
     try {
         sendRescheduleProposalEmail($res['email'], $fullName, $old_date, $old_time, $new_date, $new_time);
-    } catch (Exception $e) {
-        // Email failure should not block success response
+    } catch (Throwable $e) {
+        // Email failure or fatal error in mail helper should not block success response
     }
 
     echo json_encode([

@@ -588,7 +588,14 @@ function submitReschedule() {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time, console_type: type, console_id: unitId })
     })
-    .then(r => r.json())
+    .then(async r => {
+        const text = await r.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error('Invalid server response. The request might have succeeded, but we couldn\'t confirm it.');
+        }
+    })
     .then(data => {
         if (data.success) {
             closeRescheduleModal();
@@ -600,8 +607,8 @@ function submitReschedule() {
             btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
         }
     })
-    .catch(() => {
-        alert('Network error. Please try again.');
+    .catch(err => {
+        alert('✕ ' + err.message);
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
     });

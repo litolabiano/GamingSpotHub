@@ -214,7 +214,7 @@ function sendRescheduleNotificationEmail($email, $fullName, $newDate, $newTime) 
         return ['success' => false, 'message' => $mail->ErrorInfo];
     }
 }
-?>
+
 
 /**
  * Notify user that admin has proposed a reschedule (pending their confirmation).

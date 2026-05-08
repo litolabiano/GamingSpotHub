@@ -145,6 +145,12 @@ try {
         $mark->execute();
         $mark->close();
 
+        // Revert reservation status to 'reserved' since user declined the change
+        $upd = $conn->prepare("UPDATE reservations SET status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
+        $upd->bind_param('i', $reservationId);
+        $upd->execute();
+        $upd->close();
+
         $conn->commit();
 
         jsonOut(true, 'You have declined the reschedule. Your reservation remains on its original date. Please contact the shop if you have questions.');
