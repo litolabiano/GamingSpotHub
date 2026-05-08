@@ -39,16 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $message = 'You are already registered for this tournament.';
                 $messageType = 'error';
             } else {
-                // 3. Check if full
-                $countStmt = $conn->prepare("SELECT COUNT(*) as cnt FROM tournament_participants WHERE tournament_id = ?");
-                $countStmt->bind_param('i', $tournament_id);
-                $countStmt->execute();
-                $count = $countStmt->get_result()->fetch_assoc()['cnt'];
-
-                if ($count >= $tournament['max_participants']) {
-                    $message = 'Tournament is already full.';
-                    $messageType = 'error';
-                } else {
                     // 4. Register
                     $regStmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, ign, contact_number, notes, payment_status, registration_date) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
                     $regStmt->bind_param('iisss', $tournament_id, $user['user_id'], $ign, $contact, $notes);
@@ -389,8 +379,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
             <div class="tourn-grid">
                 <?php foreach ($openTournaments as $t): 
                     $isScheduled = $t['status'] === 'scheduled';
-                    $isFull = (int)$t['current_participants'] >= (int)$t['max_participants'];
-                    $canRegister = $isScheduled && !$isFull;
+                    $canRegister = $isScheduled;
                 ?>
                     <div class="tourn-card">
                         <div class="tourn-banner"></div>
@@ -406,7 +395,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                             <div class="tourn-meta">
                                 <div class="meta-item"><i class="fas fa-calendar"></i> <?= date('M d, Y', strtotime($t['start_date'])) ?></div>
                                 <div class="meta-item"><i class="fas fa-clock"></i> <?= date('h:i A', strtotime($t['start_date'])) ?></div>
-                                <div class="meta-item"><i class="fas fa-users"></i> <?= $t['current_participants'] ?> / <?= $t['max_participants'] ?> Players</div>
+                                <div class="meta-item"><i class="fas fa-users"></i> <?= $t['current_participants'] ?> Participants</div>
                                 <div class="meta-item"><i class="fas fa-display"></i> <?= htmlspecialchars($t['console_type']) ?></div>
                             </div>
                             
@@ -429,8 +418,6 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                                 <button class="btn-reg" onclick="openRegModal(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>')">
                                     <i class="fas fa-user-plus"></i> Register Now
                                 </button>
-                            <?php elseif ($isFull): ?>
-                                <button class="btn-reg disabled" disabled>FULL</button>
                             <?php else: ?>
                                 <button class="btn-reg disabled" disabled>WAITING</button>
                             <?php endif; ?>

@@ -6,11 +6,16 @@ require_once __DIR__ . '/../includes/db_config.php';
 
 $success = false;
 $message = '';
-$token = $_GET['token'] ?? '';
+$token = $_GET['token'] ?? $_POST['token'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['manual_token'])) {
+    $token = strtoupper(trim($_POST['manual_token']));
+}
 
 if (empty($token)) {
     $message = 'No verification token provided.';
 } else {
+    // Check if token exists and is not expired
     $stmt = $conn->prepare("SELECT user_id, full_name FROM users WHERE verification_token = ? AND verification_expires > NOW() AND email_verified = 0");
     $stmt->bind_param("s", $token);
     $stmt->execute();
@@ -27,6 +32,7 @@ if (empty($token)) {
             $message = 'Verification failed. Please try again.';
         }
     } else {
+        // Check if already verified
         $stmt = $conn->prepare("SELECT user_id FROM users WHERE verification_token = ? AND email_verified = 1");
         $stmt->bind_param("s", $token);
         $stmt->execute();
@@ -34,7 +40,7 @@ if (empty($token)) {
             $success = true;
             $message = 'Your email was already verified!';
         } else {
-            $message = 'Invalid or expired verification link.';
+            $message = 'Invalid or expired verification token.';
         }
     }
 }
@@ -90,14 +96,32 @@ if (empty($token)) {
                             </div>
                             <h1 class="auth-title">Email Verified!</h1>
                             <p class="auth-subtitle"><?= htmlspecialchars($message) ?></p>
-                            <a href="login.php?verified=1" class="auth-btn">Sign In Now</a>
+                            <div style="margin-top: 30px;">
+                                <a href="login.php?verified=1" class="auth-btn">Sign In Now</a>
+                            </div>
                         <?php else: ?>
                             <div class="auth-result-icon error">
                                 <i class="fas fa-times-circle"></i>
                             </div>
                             <h1 class="auth-title">Verification Failed</h1>
                             <p class="auth-subtitle"><?= htmlspecialchars($message) ?></p>
-                            <a href="register.php" class="auth-btn">Register Again</a>
+
+                            <div class="auth-manual-entry" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 25px;">
+                                <p style="font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 15px;">Link not working? Enter the 8-character code from your email manually:</p>
+                                <form action="verify.php" method="POST" class="auth-form">
+                                    <div class="form-group">
+                                        <div class="input-wrapper">
+                                            <i class="fas fa-key"></i>
+                                            <input type="text" name="manual_token" class="form-control" placeholder="Enter Code (e.g. A1B2C3D4)" maxlength="8" required style="text-transform: uppercase; text-align: center; font-family: monospace; letter-spacing: 2px;">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="auth-btn" style="margin-top: 10px;">Verify Code</button>
+                                </form>
+                            </div>
+
+                            <div class="auth-links" style="margin-top: 20px;">
+                                <p><a href="register.php"><i class="fas fa-arrow-left"></i> Back to Registration</a></p>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>

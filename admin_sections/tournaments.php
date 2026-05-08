@@ -117,7 +117,6 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 <th>Console</th>
                 <th>Date</th>
                 <th>Fee</th>
-                <th>Prize Pool</th>
                 <th>Players</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -133,7 +132,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 'cancelled' => ['#fb566b', 'rgba(251,86,107,.15)'],
             ];
             [$sc, $sbg] = $statusColors[$t['status']] ?? ['#888','rgba(150,150,150,.15)'];
-            $isFull = (int)$t['registered_count'] >= (int)$t['max_participants'];
+            $isFull = false; // Unlimited participants
         ?>
         <tr>
             <td>
@@ -152,15 +151,10 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 <div style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($t['start_date'])) ?></div>
             </td>
             <td style="color:#f1e1aa;font-weight:600;">₱<?= number_format($t['entry_fee'], 0) ?></td>
-            <td style="color:#20c8a1;font-weight:600;">₱<?= number_format($t['prize_pool'], 0) ?></td>
-            <td>
                 <div style="font-size:13px;">
                     <span style="color:#fff;font-weight:700;"><?= $t['registered_count'] ?></span>
-                    <span style="color:#888;"> / <?= $t['max_participants'] ?></span>
+                    <span style="color:#888;"> Participants</span>
                 </div>
-                <?php if ($isFull): ?>
-                <div style="font-size:10px;color:#fb566b;font-weight:700;margin-top:2px;">FULL</div>
-                <?php endif; ?>
             </td>
             <td>
                 <span style="background:<?= $sbg ?>;color:<?= $sc ?>;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">
@@ -372,26 +366,16 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Prize Pool (₱)</label>
-                    <select name="prize_pool">
-                        <option value="0" selected>None</option>
-                        <option value="500">₱500</option>
-                        <option value="1000">₱1,000</option>
-                        <option value="2000">₱2,000</option>
-                        <option value="3000">₱3,000</option>
-                        <option value="5000">₱5,000</option>
-                        <option value="10000">₱10,000</option>
-                    </select>
+                    <label>Prize Pool</label>
+                    <div style="background:rgba(32,200,161,.1); border:1px solid rgba(32,200,161,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#20c8a1; line-height:1.4;">
+                        <i class="fas fa-info-circle"></i> Prize pool is dependent on how many players join.
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Max Participants</label>
-                    <select name="max_participants">
-                        <option value="4">4 players</option>
-                        <option value="8">8 players</option>
-                        <option value="16" selected>16 players</option>
-                        <option value="32">32 players</option>
-                        <option value="64">64 players</option>
-                    </select>
+                    <div style="background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#5f85da; line-height:1.4;">
+                        <i class="fas fa-infinity"></i> Unlimited participants allowed.
+                    </div>
                 </div>
             </div>
             <div class="form-group">
@@ -534,8 +518,8 @@ function viewParticipants(tournamentId, tournamentName) {
                     '<div class="empty-state"><i class="fas fa-users"></i><p>No participants registered yet.</p></div>';
                 return;
             }
-            let html = '<div style="overflow-x:auto;"><table class="table"><thead><tr>' +
-                '<th>#</th><th>Name</th><th>IGN</th><th>Contact</th><th>Registered</th><th>Payment</th><th>Proof</th><th>Action</th>' +
+            let html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+                '<th style="white-space:nowrap;">#</th><th style="white-space:nowrap;">Name</th><th style="white-space:nowrap;">IGN</th><th style="white-space:nowrap;">Contact</th><th style="white-space:nowrap;">Registered</th><th style="white-space:nowrap;">Payment</th><th style="white-space:nowrap;">Proof</th><th style="white-space:nowrap;">Action</th>' +
                 '</tr></thead><tbody>';
             data.participants.forEach((p, i) => {
                 const isPaid    = p.payment_status === 'paid';
