@@ -655,30 +655,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // CONVERT RESERVATION → SESSION
-    elseif ($action === 'convert_reservation') {
-        $res_id     = (int)($_POST['reservation_id'] ?? 0);
-        $console_id = (int)($_POST['console_id'] ?? 0);
-        if ($res_id && $console_id) {
-            $result = convertReservationToSession($res_id, $console_id, $user['user_id']);
-            if ($result['success']) {
-                $message = 'Reservation converted to active session!';
-                $messageType = 'success';
-
-                // Activity Log
-                $conQ = $conn->query("SELECT unit_number FROM consoles WHERE console_id = $console_id");
-                $unit = ($conQ && $conQ->num_rows) ? $conQ->fetch_assoc()['unit_number'] : "ID #$console_id";
-                logActivity($user['user_id'], "Convert Reservation", "Converted Reservation #{$res_id} to Session #{$result['session_id']} on Console: {$unit}");
-            } else {
-                $message = 'Conversion failed: ' . $result['message'];
-                $messageType = 'error';
-            }
-        } else {
-            $message = 'Please select a console unit to assign.';
-            $messageType = 'error';
-        }
-    }
-
     // ADD RESERVATION (admin side)
     elseif ($action === 'add_reservation') {
         $uid          = (int)($_POST['user_id'] ?? 0);
@@ -1127,7 +1103,12 @@ $purStmt = $conn->query(
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
+<<<<<<< Updated upstream
      LEFT JOIN consoles c ON r.console_id = c.console_id
+=======
+     LEFT JOIN consoles c ON rs.console_id = c.console_id
+     LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
+>>>>>>> Stashed changes
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );
@@ -3541,6 +3522,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function updateTimers() {
+    document.querySelectorAll('.no-show-btn[data-start]').forEach(btn => {
+        const start = new Date(btn.dataset.start.replace(' ', 'T') + '+08:00');
+        const now = new Date();
+        if (now >= start) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            btn.title = "No Show";
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+            btn.title = "No Show will be available once the session has started";
+        }
+    });
+
     document.querySelectorAll('.session-timer[data-start]').forEach(el => {
         const start   = new Date(el.dataset.start.replace(' ', 'T') + '+08:00');
         const planned = el.dataset.planned ? parseInt(el.dataset.planned) : null;

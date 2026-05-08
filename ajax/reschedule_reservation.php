@@ -107,6 +107,7 @@ try {
         // Update existing pending proposal
         $log = $conn->prepare(
             "UPDATE reservation_reschedules
+<<<<<<< Updated upstream
                 SET new_date         = ?,
                     new_time         = ?,
                     console_id       = ?,
@@ -118,6 +119,19 @@ try {
                     seen_by_user     = 0,
                     created_at       = NOW()
               WHERE reschedule_id    = ?"
+=======
+                SET new_date              = ?,
+                    new_time              = ?,
+                    console_id            = ?,
+                    new_console_type_id   = ?,
+                    reason                = ?,
+                    reason_detail         = ?,
+                    rescheduled_by        = ?,
+                    initiated_by          = 'admin',
+                    seen_by_user          = 0,
+                    created_at            = NOW()
+              WHERE reschedule_id         = ?"
+>>>>>>> Stashed changes
         );
         $log->bind_param(
             'ssisssii',
@@ -129,13 +143,22 @@ try {
         $log = $conn->prepare(
             "INSERT INTO reservation_reschedules
                 (reservation_id, user_id,
+<<<<<<< Updated upstream
                  old_date, old_time, old_console_id, old_console_type,
                  new_date, new_time, console_id, console_type,
+=======
+                 old_date, old_time, old_console_id, old_console_type_id,
+                 new_date, new_time, console_id, new_console_type_id,
+>>>>>>> Stashed changes
                  reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
         );
         $log->bind_param(
+<<<<<<< Updated upstream
             'iississsisssi',
+=======
+            'iissiisssissi',
+>>>>>>> Stashed changes
             $reservation_id, $user_id,
             $old_date, $old_time, $old_console_id, $old_console_type,
             $new_date, $new_time, $new_console_id, $new_console_type,

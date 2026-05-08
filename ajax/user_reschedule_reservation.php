@@ -147,7 +147,6 @@ if ($avail->get_result()->num_rows > 0) {
 // ── All checks pass — set to pending and create request ───────────────────────
 $old_date         = $res['reserved_date'];
 $old_time         = $res['reserved_time'];
-$old_console_type = $res['console_type'];
 $old_console_id   = $res['console_id'];
 
 $conn->begin_transaction();
@@ -172,13 +171,22 @@ try {
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
             (reservation_id, user_id, 
+<<<<<<< Updated upstream
              old_date, old_time, old_console_id, old_console_type,
              new_date, new_time, console_id, console_type,
+=======
+             old_date, old_time, old_console_id, old_console_type_id,
+             new_date, new_time, console_id, new_console_type_id,
+>>>>>>> Stashed changes
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
+<<<<<<< Updated upstream
         'iississsisssi',
+=======
+        'iissiisssissi',
+>>>>>>> Stashed changes
         $res_id, $uid,
         $old_date, $old_time, $old_console_id, $old_console_type,
         $new_date, $new_time, $new_console_id, $new_console_type,
@@ -186,8 +194,6 @@ try {
         $uid   // rescheduled_by = the customer
     );
     $log->execute();
-
-
 
     $conn->commit();
 

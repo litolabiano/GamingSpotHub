@@ -22,8 +22,13 @@ if (!$reschedule_id || !in_array($action, ['approve', 'reject'])) {
 
 $stmt = $conn->prepare(
     "SELECT rs.reservation_id, rs.status as rs_status, 
+<<<<<<< Updated upstream
              rs.new_date, rs.new_time, rs.console_id, rs.console_type,
              rs.old_date, rs.old_time, rs.old_console_id, rs.old_console_type,
+=======
+             rs.new_date, rs.new_time, rs.console_id, rs.new_console_type_id,
+             rs.old_date, rs.old_time, rs.old_console_id, rs.old_console_type_id,
+>>>>>>> Stashed changes
              r.status as r_status
       FROM reservation_reschedules rs
       JOIN reservations r ON rs.reservation_id = r.reservation_id
@@ -53,8 +58,13 @@ try {
         $upd_rs->bind_param('i', $reschedule_id);
         $upd_rs->execute();
 
+<<<<<<< Updated upstream
         $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type = ?, console_id = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
         $upd_r->bind_param('sssii', $res['new_date'], $res['new_time'], $res['console_type'], $res['console_id'], $reservation_id);
+=======
+        $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
+        $upd_r->bind_param('ssiii', $res['new_date'], $res['new_time'], $res['new_console_type_id'], $res['console_id'], $reservation_id);
+>>>>>>> Stashed changes
         $upd_r->execute();
 
         $message = 'Reschedule request approved. The reservation schedule, console type, and unit assignment have been updated.';

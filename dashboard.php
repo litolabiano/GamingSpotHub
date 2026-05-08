@@ -57,7 +57,12 @@ $rescheduleStmt = $conn->prepare(
             r.console_type, c.unit_number
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
+<<<<<<< Updated upstream
        LEFT JOIN consoles c ON r.console_id = c.console_id
+=======
+       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
+       LEFT JOIN consoles c ON rs.console_id = c.console_id
+>>>>>>> Stashed changes
       WHERE rs.user_id = ? AND rs.seen_by_user = 0
       ORDER BY rs.created_at DESC"
 );
@@ -1206,6 +1211,26 @@ function fmtMins(int $m): string {
                 // Store original proposed values
                 dateInput.dataset.original = minDate;
                 if (timeSelect && preTime) {
+                    // Check if the preTime exists in the select options
+                    let optionExists = false;
+                    for (let i = 0; i < timeSelect.options.length; i++) {
+                        if (timeSelect.options[i].value === preTime) {
+                            optionExists = true;
+                            break;
+                        }
+                    }
+                    // If it doesn't exist, add it
+                    if (!optionExists) {
+                        const newOpt = document.createElement('option');
+                        newOpt.value = preTime;
+                        // Format the time for display (e.g., 14:45 -> 2:45 PM)
+                        let [h, m] = preTime.split(':');
+                        let ampm = h >= 12 ? 'PM' : 'AM';
+                        h = h % 12;
+                        h = h ? h : 12; // the hour '0' should be '12'
+                        newOpt.text = h + ':' + m + ' ' + ampm;
+                        timeSelect.appendChild(newOpt);
+                    }
                     timeSelect.value = preTime;
                     timeSelect.dataset.original = preTime;
                 }

@@ -1436,43 +1436,6 @@ function denyExt(extId) {
     </div>
 </div>
 
-<!-- ════ CONVERT RESERVATION → SESSION MODAL ══════════════════════════ -->
-<div class="modal" id="convertReservationModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title">
-                <i class="fas fa-play-circle" style="color:#20c8a1;margin-right:8px;"></i>Start Session from Reservation
-            </h3>
-            <button class="modal-close" onclick="closeModal('convertReservation')">&times;</button>
-        </div>
-        <div id="convertResInfo" style="background:rgba(32,200,161,.07);border:1px solid rgba(32,200,161,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#aaa;"></div>
-        <form method="POST" id="convertReservationForm">
-            <?= csrfField() ?>
-            <input type="hidden" name="action" value="convert_reservation">
-            <input type="hidden" name="reservation_id" id="convertResId">
-            <div class="form-group">
-                <label>Assign Console Unit *</label>
-                <select name="console_id" id="convertConsoleSelect" required>
-                    <option value="" disabled selected>— Select available console —</option>
-                    <?php foreach ($availableConsoles as $con): ?>
-                    <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
-                        <?= htmlspecialchars($con['unit_number']) ?> — <?= $con['console_type'] ?> (₱<?= $con['hourly_rate'] ?>/hr)
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="modal-banner info" style="margin-top:16px;margin-bottom:0;">
-                <i class="fas fa-info-circle"></i>
-                <span>Double-check the console unit matches the customer's reservation type. This action starts the timer immediately.</span>
-            </div>
-            <hr class="modal-divider">
-            <button type="submit" class="btn-prim btn-full">
-                <i class="fas fa-play"></i> Start Session Now
-            </button>
-
-        </form>
-    </div>
-</div>
 
 <script>
 /* ── Reservation modal helpers ───────────────────────────────────── */
@@ -1521,26 +1484,7 @@ function adminDpChange() {
     document.getElementById('adminDpMethodGroup').style.display = amt > 0 ? 'block' : 'none';
 }
 
-function openConvertModal(res) {
-    document.getElementById('convertResId').value = res.reservation_id;
 
-    const mode   = res.rental_mode === 'open_time' ? 'Open Time' : res.rental_mode.charAt(0).toUpperCase() + res.rental_mode.slice(1);
-    const dur    = res.planned_minutes ? ` — ${res.planned_minutes/60}h` : '';
-    document.getElementById('convertResInfo').innerHTML =
-        `<strong style="color:#fff;">${res.customer_name}</strong><br>` +
-        `${res.console_type} · ${mode}${dur}<br>` +
-        `${new Date(res.reserved_date).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})} at ${res.reserved_time.slice(0,5)}<br>` +
-        (res.downpayment_amount > 0 ? `<span style="color:#20c8a1;">Payment: ₱${parseFloat(res.downpayment_amount).toFixed(2)} (${res.downpayment_method})</span>` : '');
-
-    // Filter console dropdown to matching type
-    const sel = document.getElementById('convertConsoleSelect');
-    Array.from(sel.options).forEach(opt => {
-        if (!opt.value) return;
-        opt.style.display = (opt.dataset.type === res.console_type) ? '' : 'none';
-    });
-
-    openModal('convertReservation');
-}
 </script>
 
 <script>

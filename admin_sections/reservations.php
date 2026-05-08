@@ -236,21 +236,16 @@
                                 </td>
                                 <td>
                                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                                        <button class="btn-prim btn-sm"
-                                            onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
-                                            title="Start Session">
-                                            <i class="fas fa-play"></i> Start
-                                        </button>
-
                                         <button class="btn-prim btn-sm" title="Reschedule"
                                             onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>', '<?= addslashes($r['console_type']) ?>')">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
 
 
-                                         <button class="btn-sec btn-sm" title="No Show" 
+                                         <button class="btn-sec btn-sm no-show-btn" title="No Show" 
+                                            data-start="<?= $r['reserved_date'] . ' ' . $r['reserved_time'] ?>"
                                             onclick="markNoShow(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>')"
-                                            style="background:rgba(251,86,107,.15);border:1.5px solid rgba(251,86,107,.45);color:#fb566b;">
+                                            style="background:rgba(251,86,107,.15);border:1.5px solid rgba(251,86,107,.45);color:#fb566b;transition:all 0.3s;">
                                             <i class="fas fa-user-slash"></i> No Show
                                         </button>
                                     </div>
@@ -348,7 +343,11 @@
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($r['cancelled_by'] === 'user'): ?>
+                                    <?php if ($r['status'] === 'no_show'): ?>
+                                        <span style="background:rgba(251,86,107,.1);color:#fb566b;border:1px solid rgba(251,86,107,.25);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
+                                            <i class="fas fa-user-slash" style="margin-right:3px;"></i>No-Show
+                                        </span>
+                                    <?php elseif ($r['cancelled_by'] === 'user'): ?>
                                         <span style="background:rgba(251,86,107,.1);color:#fb566b;border:1px solid rgba(251,86,107,.25);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
                                             <i class="fas fa-user" style="margin-right:3px;"></i>Customer
                                         </span>
@@ -361,19 +360,22 @@
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php
-                                    $rt = $r['cancel_reason_type'] ?? null;
-                                    $rd = $r['cancel_reason_detail'] ?? null;
-                                    if ($rt): ?>
-                                        <span style="font-size:12px;color:#d0d8f0;font-weight:600;">
-                                            <?= htmlspecialchars($cancelReasonLabels[$rt] ?? ucfirst(str_replace('_', ' ', $rt))) ?>
-                                        </span>
-                                        <?php if ($rd): ?>
-                                            <br><span style="font-size:11px;color:#888;"><?= htmlspecialchars($rd) ?></span>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <span style="color:#555;font-size:12px;">&#8212;</span>
-                                    <?php endif; ?>
+                                    <?php if ($r['status'] === 'no_show'): ?>
+                                        <span style="font-size:12px;color:#fb566b;font-weight:600;">Customer did not arrive</span>
+                                    <?php else: 
+                                        $rt = $r['cancel_reason_type'] ?? null;
+                                        $rd = $r['cancel_reason_detail'] ?? null;
+                                        if ($rt): ?>
+                                            <span style="font-size:12px;color:#d0d8f0;font-weight:600;">
+                                                <?= htmlspecialchars($cancelReasonLabels[$rt] ?? ucfirst(str_replace('_', ' ', $rt))) ?>
+                                            </span>
+                                            <?php if ($rd): ?>
+                                                <br><span style="font-size:11px;color:#888;"><?= htmlspecialchars($rd) ?></span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span style="color:#555;font-size:12px;">&#8212;</span>
+                                        <?php endif; 
+                                    endif; ?>
                                 </td>
                             </tr>
 

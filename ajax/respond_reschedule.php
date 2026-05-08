@@ -125,6 +125,7 @@ try {
 
         // ── DIRECT CONFIRMATION ─────────────────────────────────────────────
         // If the user accepted the admin's exact proposal, finalize it.
+<<<<<<< Updated upstream
         if ($newConsoleId && $newConsoleType) {
             $upd = $conn->prepare(
                 "UPDATE reservations
@@ -152,6 +153,17 @@ try {
             );
             $upd->bind_param('ssi', $finalDate, $finalTime, $reservationId);
         }
+=======
+        $upd = $conn->prepare(
+            "UPDATE reservations
+                SET reserved_date = ?, reserved_time = ?,
+                    console_type_id = IFNULL(?, console_type_id),
+                    console_id    = ?,
+                    status        = 'reserved', updated_at = NOW()
+              WHERE reservation_id = ?"
+        );
+        $upd->bind_param('ssiii', $finalDate, $finalTime, $newConsoleTypeId, $newConsoleId, $reservationId);
+>>>>>>> Stashed changes
         $upd->execute();
         $upd->close();
 
