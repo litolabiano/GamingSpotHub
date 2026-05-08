@@ -1,84 +1,162 @@
 <?php
-require_once __DIR__ . '/../includes/session_helper.php';
-require_once __DIR__ . '/../includes/db_config.php';
-require_once __DIR__ . '/../includes/db_functions.php';
+/**
+ * ajax/respond_reschedule.php
+ * User-facing: confirms or cancels an admin-proposed reschedule.
+ *
+ * POST params:
+ *   reschedule_id  (int)    – ID from reservation_reschedules (admin-initiated, pending)
+ *   action         (string) – 'confirm' or 'cancel'
+ *   chosen_date    (string) – Y-m-d, required when action='confirm' (must be >= admin's proposed date)
+ *   chosen_time    (string) – H:i, required when action='confirm'
+ */
+ob_start();
 
+require_once __DIR__ . '/../includes/session_helper.php';
+requireLogin();
+require_once __DIR__ . '/../includes/db_functions.php';
+require_once __DIR__ . '/../includes/mail_helper.php';
+
+ob_clean();
 header('Content-Type: application/json');
 
-requireLogin();
-$user = getCurrentUser();
-$user_id = (int)$user['user_id'];
-
-$reschedule_id = (int)($_POST['reschedule_id'] ?? 0);
-$action = $_POST['action'] ?? ''; // 'confirm' or 'cancel'
-
-if (!$reschedule_id || !in_array($action, ['confirm', 'cancel'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+function jsonOut(bool $ok, string $msg): void {
+    ob_clean();
+    echo json_encode(['success' => $ok, 'message' => $msg]);
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonOut(false, 'Invalid request method.');
+
+$user         = getCurrentUser();
+$user_id      = (int)$user['user_id'];
+$rescheduleId = (int)($_POST['reschedule_id'] ?? 0);
+$action       = trim($_POST['action'] ?? '');
+$chosenDate   = trim($_POST['chosen_date'] ?? '');
+$chosenTime   = trim($_POST['chosen_time'] ?? '');
+
+if (!$rescheduleId)                                jsonOut(false, 'Invalid reschedule ID.');
+if (!in_array($action, ['confirm', 'cancel'], true)) jsonOut(false, 'Invalid action.');
+
+// Fetch the pending admin-initiated reschedule for THIS user
 $stmt = $conn->prepare(
-    "SELECT rs.reservation_id, rs.status as rs_status, r.status as r_status
-     FROM reservation_reschedules rs
-     JOIN reservations r ON rs.reservation_id = r.reservation_id
-     WHERE rs.reschedule_id = ? AND rs.user_id = ?"
+    "SELECT rs.reschedule_id, rs.reservation_id, rs.user_id,
+            rs.new_date, rs.new_time,
+            rs.console_id   AS new_console_id,
+            rs.console_type AS new_console_type,
+            rs.old_date, rs.old_time,
+            u.email, u.full_name
+       FROM reservation_reschedules rs
+       JOIN users u ON rs.user_id = u.user_id
+      WHERE rs.reschedule_id = ?
+        AND rs.user_id       = ?
+        AND rs.status        = 'pending'
+        AND rs.initiated_by  = 'admin'"
 );
-$stmt->bind_param('ii', $reschedule_id, $user_id);
+$stmt->bind_param('ii', $rescheduleId, $user_id);
 $stmt->execute();
-$res = $stmt->get_result()->fetch_assoc();
+$row = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-if (!$res) {
-    echo json_encode(['success' => false, 'message' => 'Reschedule request not found.']);
-    exit;
-}
+if (!$row) jsonOut(false, 'Reschedule proposal not found or already processed.');
 
-if ($res['rs_status'] !== 'pending') {
-    echo json_encode(['success' => false, 'message' => 'This request has already been processed.']);
-    exit;
-}
-
-$reservation_id = $res['reservation_id'];
+$reservationId  = (int)$row['reservation_id'];
+$proposedDate   = $row['new_date'];    // admin's earliest proposed date
+$proposedTime   = $row['new_time'];
+$newConsoleId   = !empty($row['new_console_id'])  ? (int)$row['new_console_id']  : null;
+$newConsoleType = !empty($row['new_console_type']) ? $row['new_console_type']     : null;
 
 $conn->begin_transaction();
 try {
     if ($action === 'confirm') {
-        // Approve the reschedule
-        $upd_rs = $conn->prepare("UPDATE reservation_reschedules SET status = 'approved', seen_by_user = 1 WHERE reschedule_id = ?");
-        $upd_rs->bind_param('i', $reschedule_id);
-        $upd_rs->execute();
+        // Validate user's chosen date/time
+        if (!$chosenDate || !$chosenTime) jsonOut(false, 'Please select a date and time to confirm.');
 
-        // Reactivate reservation
-        $upd_r = $conn->prepare("UPDATE reservations SET status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
-        $upd_r->bind_param('i', $reservation_id);
-        $upd_r->execute();
+        if ($chosenDate < $proposedDate) {
+            jsonOut(false, 'Your chosen date must be on or after the proposed date (' . date('M d, Y', strtotime($proposedDate)) . ').');
+        }
+        if ($chosenTime < '12:00' || $chosenTime > '23:00') {
+            jsonOut(false, 'Time must be between 12:00 PM and 11:00 PM.');
+        }
 
-        $message = 'Reschedule confirmed! Your reservation has been updated.';
-    } else {
-        // Cancel the reschedule AND forfeit the reservation
-        $upd_rs = $conn->prepare("UPDATE reservation_reschedules SET status = 'cancelled', seen_by_user = 1 WHERE reschedule_id = ?");
-        $upd_rs->bind_param('i', $reschedule_id);
-        $upd_rs->execute();
+        // Apply user's confirmed date to the reservation
+        $finalDate = $chosenDate;
+        $finalTime = $chosenTime;
 
-        $reason = 'User rejected admin reschedule';
-        $upd_r = $conn->prepare("UPDATE reservations SET status = 'cancelled', cancelled_by = 'user', cancellation_reason = ?, refund_issued = 0, updated_at = NOW() WHERE reservation_id = ?");
-        $upd_r->bind_param('si', $reason, $reservation_id);
-        $upd_r->execute();
+        if ($newConsoleId && $newConsoleType) {
+            $upd = $conn->prepare(
+                "UPDATE reservations
+                    SET reserved_date = ?, reserved_time = ?,
+                        console_id    = ?, console_type  = ?,
+                        status        = 'reserved', updated_at = NOW()
+                  WHERE reservation_id = ?"
+            );
+            $upd->bind_param('ssisi', $finalDate, $finalTime, $newConsoleId, $newConsoleType, $reservationId);
+        } elseif ($newConsoleId) {
+            $upd = $conn->prepare(
+                "UPDATE reservations
+                    SET reserved_date = ?, reserved_time = ?,
+                        console_id    = ?,
+                        status        = 'reserved', updated_at = NOW()
+                  WHERE reservation_id = ?"
+            );
+            $upd->bind_param('ssii', $finalDate, $finalTime, $newConsoleId, $reservationId);
+        } else {
+            $upd = $conn->prepare(
+                "UPDATE reservations
+                    SET reserved_date = ?, reserved_time = ?,
+                        status        = 'reserved', updated_at = NOW()
+                  WHERE reservation_id = ?"
+            );
+            $upd->bind_param('ssi', $finalDate, $finalTime, $reservationId);
+        }
+        $upd->execute();
+        $upd->close();
 
-        // Log the cancellation event to reservation_cancellations
-        $logStmt = $conn->prepare(
-            "INSERT INTO reservation_cancellations
-                 (reservation_id, user_id, cancelled_by, cancel_reason_type, cancel_reason_detail, cancelled_at)
-             VALUES (?, ?, 'user', 'schedule_change', 'User rejected admin reschedule', NOW())"
+        // Mark the reschedule log as approved, store the user's final chosen date
+        $mark = $conn->prepare(
+            "UPDATE reservation_reschedules
+                SET status       = 'approved',
+                    new_date     = ?,
+                    new_time     = ?,
+                    seen_by_user = 1
+              WHERE reschedule_id = ?"
         );
-        $logStmt->bind_param('ii', $reservation_id, $user_id);
-        $logStmt->execute();
+        $mark->bind_param('ssi', $finalDate, $finalTime, $rescheduleId);
+        $mark->execute();
+        $mark->close();
 
-        $message = 'Reschedule cancelled. The reservation has been forfeited in accordance with the no-refund policy.';
+        $conn->commit();
+
+        jsonOut(true,
+            'Your reservation #' . $reservationId . ' has been confirmed for '
+            . date('M d, Y', strtotime($finalDate))
+            . ' at ' . date('g:i A', strtotime($finalTime)) . '. See you then!'
+        );
+
+    } else {
+        // action === 'cancel' — user declines, mark seen and leave reservation as-is
+        $mark = $conn->prepare(
+            "UPDATE reservation_reschedules
+                SET status       = 'rejected',
+                    seen_by_user = 1
+              WHERE reschedule_id = ?"
+        );
+        $mark->bind_param('i', $rescheduleId);
+        $mark->execute();
+        $mark->close();
+
+        // Revert reservation status to 'reserved' since user declined the change
+        $upd = $conn->prepare("UPDATE reservations SET status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
+        $upd->bind_param('i', $reservationId);
+        $upd->execute();
+        $upd->close();
+
+        $conn->commit();
+
+        jsonOut(true, 'You have declined the reschedule. Your reservation remains on its original date. Please contact the shop if you have questions.');
     }
 
-    $conn->commit();
-    echo json_encode(['success' => true, 'message' => $message]);
 } catch (Exception $e) {
     $conn->rollback();
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    jsonOut(false, 'Database error: ' . $e->getMessage());
 }

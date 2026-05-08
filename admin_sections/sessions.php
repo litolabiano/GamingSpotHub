@@ -127,7 +127,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
     .end-time-edit-wrap .btn-confirm:hover {
         background: #17a887;
+        filter: brightness(1.1);
     }
+
 
     .end-time-edit-wrap .btn-cancel-edit {
         background: transparent;
@@ -141,8 +143,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     }
 
     .end-time-edit-wrap .btn-cancel-edit:hover {
-        background: rgba(251, 86, 107, .1);
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
     }
+
 
     .saving-indicator {
         font-size: 11px;
@@ -172,9 +176,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             <h2 class="page-title"><i class="fas fa-play-circle" style="color:#5f85da;margin-right:10px;"></i>Session Management</h2>
             <p class="page-subtitle">View, manage, and control all gaming sessions</p>
         </div>
-        <button class="btn btn-primary" onclick="openModal('startSession')">
+        <button class="btn-prim" onclick="openModal('startSession')">
             <i class="fas fa-plus"></i> New Session
         </button>
+
     </div>
 
 
@@ -274,8 +279,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             </td>
                             <td>
                                 <?php if ($psOwed > 0): ?>
-                                    <button class="btn btn-sm" title="Collect Payment"
-                                        style="background:rgba(32,200,161,.18);border:1px solid rgba(32,200,161,.5);color:#20c8a1;font-weight:700;"
+                                    <button class="btn-prim btn-sm" title="Collect Payment"
                                         onclick="openPayModal(
                             <?= $ps['session_id'] ?>,
                             '<?= sessionCustomerLabel($ps, true) ?>',
@@ -288,6 +292,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         )">
                                         <i class="fas fa-peso-sign"></i> Pay
                                     </button>
+
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -311,10 +316,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                 </select>
-                <button class="btn btn-secondary btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first"
-                    style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#888;font-size:12px;">
+                <button class="btn-sec btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first">
                     <i class="fas fa-sort-amount-down"></i>
                 </button>
+
                 <span class="asb-count" id="sessionsCount"></span>
             </div>
         </div>
@@ -360,8 +365,24 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         data-status="<?= $isLive ?>">
                         <td>#<?= $sess['session_id'] ?></td>
                         <td><?= sessionCustomerLabel($sess) ?></td>
-                        <td>
-                            <?= htmlspecialchars($sess['unit_number']) ?>
+                        <td class="console-cell" data-session-id="<?= $sess['session_id'] ?>">
+                            <span class="console-display end-time-display" title="Click to reassign console" style="border-bottom:1px dashed rgba(255, 255, 255, .25);">
+                                <span class="unit-text"><?= htmlspecialchars($sess['unit_number']) ?></span>
+                                <i class="fas fa-pen edit-pen" style="font-size:10px;margin-left:4px;"></i>
+                            </span>
+                            <span class="console-edit-wrap end-time-edit-wrap" style="display:none;align-items:center;gap:6px;">
+                                <select class="console-select" style="background:rgba(10,33,81,.8);border:1px solid #20c8a1;color:#f0f0f0;padding:3px 6px;border-radius:6px;font-size:12px;outline:none;width:80px;">
+                                    <option value="" disabled selected>— Select —</option>
+                                    <?php foreach ($allConsoles as $c): ?>
+                                        <?php if ($sess['status'] === 'completed' || $c['status'] === 'available'): ?>
+                                            <option value="<?= $c['console_id'] ?>"><?= htmlspecialchars($c['unit_number']) ?></option>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn-confirm-console btn-confirm" type="button" style="padding:4px 8px;font-size:11px;">✓</button>
+                                <button class="btn-cancel-console btn-cancel-edit" type="button" style="padding:4px 8px;font-size:11px;">✕</button>
+                            </span>
+
                             <?php if (!empty($ctrlRentalByConsole[$sess['console_id'] ?? 0])): ?>
                                 <?php $cr = $ctrlRentalByConsole[$sess['console_id']]; ?>
                                 <span class="sess-ctrl-badge">
@@ -421,7 +442,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <td>
                             <?php if ($sess['status'] === 'active'): ?>
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;min-width:170px;">
-                                    <button class="btn btn-danger btn-sm" title="End Session"
+                                    <button class="btn-dang btn-sm" title="End Session"
                                         style="justify-content:center;flex:1 1 70px;"
                                         onclick="openEndSessionModal(
                             <?= $sess['session_id'] ?>,
@@ -437,9 +458,10 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
+
                                     <?php if ($sess['rental_mode'] !== 'unlimited'): ?>
-                                    <button class="btn btn-sm" title="Extend Session"
-                                        style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#8aa4e8;justify-content:center;flex:1 1 70px;"
+                                    <button class="btn-sec btn-sm" title="Extend Session"
+                                        style="justify-content:center;flex:1 1 70px;"
                                         onclick="openExtendModal(
                                 <?= $sess['session_id'] ?>,
                                 '<?= sessionCustomerLabel($sess, true) ?>',
@@ -449,6 +471,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             )">
                                         <i class="fas fa-clock"></i> Extend
                                     </button>
+
                                     <?php endif; ?>
                                 </div>
 
@@ -575,6 +598,69 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             void el.offsetWidth; // reflow to restart animation
             el.classList.add('cell-updated');
         }
+
+        /* ── Inline Console Reassignment (Active Sessions) ── */
+        document.querySelectorAll('.console-cell').forEach(function(cell) {
+            const display = cell.querySelector('.console-display');
+            const editWrap = cell.querySelector('.console-edit-wrap');
+            if (!display || !editWrap) return;
+
+            const select = editWrap.querySelector('.console-select');
+            const confirmBtn = editWrap.querySelector('.btn-confirm-console');
+            const cancelBtn = editWrap.querySelector('.btn-cancel-console');
+            const row = cell.closest('tr');
+            const sessionId = cell.dataset.sessionId;
+
+            display.addEventListener('click', function() {
+                display.style.display = 'none';
+                editWrap.style.display = 'inline-flex';
+                select.focus();
+            });
+
+            cancelBtn.addEventListener('click', function() {
+                editWrap.style.display = 'none';
+                display.style.display = 'inline-flex';
+            });
+
+            confirmBtn.addEventListener('click', function() {
+                const newConsoleId = select.value;
+                if (!newConsoleId) return;
+
+                editWrap.style.display = 'none';
+                display.style.display = 'inline-flex';
+                const origHtml = display.innerHTML;
+                display.innerHTML = '<span class="saving-indicator"><i class="fas fa-spinner fa-spin"></i> Saving…</span>';
+
+                const fd = new FormData();
+                fd.append('session_id', sessionId);
+                fd.append('console_id', newConsoleId);
+
+                fetch('ajax/reassign_console.php', { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(r => r.json())
+                    .then(function(data) {
+                        if (!data.success) {
+                            showInlineToast('Could not reassign: ' + data.message, 'error');
+                            display.innerHTML = origHtml;
+                            return;
+                        }
+
+                        // Success update
+                        display.innerHTML = '<span class="unit-text">' + data.unit_number + '</span> <i class="fas fa-pen edit-pen" style="font-size:10px;margin-left:4px;"></i>';
+                        row.dataset.console = data.unit_number.toLowerCase();
+                        showInlineToast(data.message, 'success');
+                        flashCell(cell);
+                        
+                        setTimeout(function() { 
+                            if (typeof updateLiveSection === 'function') updateLiveSection();
+                            else location.reload();
+                        }, 1000);
+                    })
+                    .catch(function() {
+                        showInlineToast('Network error — please check your connection and try again.', 'error');
+                        display.innerHTML = origHtml;
+                    });
+            });
+        });
 
     }); // end DOMContentLoaded
 

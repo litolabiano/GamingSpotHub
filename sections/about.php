@@ -1,5 +1,5 @@
 <!-- ══ ABOUT ══════════════════════════════════════════════════════════════ -->
-<section id="about" style="background:linear-gradient(180deg,#060d1a 0%,#0d1b2a 100%);padding:90px 0 100px;position:relative;overflow:hidden;">
+<section id="about" class="gsh-about">
 
     <!-- BG accent -->
     <div style="position:absolute;top:50%;right:-150px;transform:translateY(-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(32,200,161,.06),transparent 65%);pointer-events:none;"></div>
@@ -13,10 +13,10 @@
                 <span class="section-tag">About Us</span>
                 <h2 class="section-title" style="margin-top:10px;">Welcome to<br><span style="color:#20c8a1;">Good Spot Gaming Hub</span></h2>
 
-                <p style="font-size:1.05rem;color:rgba(255,255,255,.65);line-height:1.85;margin-bottom:16px;">
+                <p class="gsh-about-text">
                     Located in the heart of Dasmariñas, we're more than just a gaming spot — we're a community hub where gamers come together to play, compete, and connect.
                 </p>
-                <p style="font-size:1.05rem;color:rgba(255,255,255,.65);line-height:1.85;margin-bottom:30px;">
+                <p class="gsh-about-text mb-4">
                     Whether you're into competitive esports, casual gaming with friends, or just looking for a cozy spot to enjoy your favourite titles — we've got you covered.
                 </p>
 
@@ -60,6 +60,16 @@
                         <div>
                             <div class="gsh-af-title">Open 12PM – 12AM</div>
                             <div class="gsh-af-desc">Flexible operating hours to fit your schedule — every day</div>
+                        </div>
+                    </div>
+
+                    <div class="gsh-about-feat">
+                        <div class="gsh-af-icon" style="background:linear-gradient(135deg,rgba(251,86,107,.2),rgba(251,86,107,.05));">
+                            <i class="fas fa-layer-group" style="color:#fb566b;"></i>
+                        </div>
+                        <div>
+                            <div class="gsh-af-title">Massive Game Library</div>
+                            <div class="gsh-af-desc">Choose from 957+ titles across PS5, PS4, and Xbox platforms</div>
                         </div>
                     </div>
 
@@ -121,6 +131,21 @@
 </section>
 
 <style>
+.gsh-about {
+    background: linear-gradient(180deg, #060d1a 0%, #0d1b2a 100%);
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+}
+.gsh-about-text {
+    font-size: 1.05rem;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.85;
+    margin-bottom: 20px;
+}
+.gsh-about-text.mb-4 {
+    margin-bottom: 36px;
+}
 .gsh-about-feat {
     display: flex;
     align-items: flex-start;

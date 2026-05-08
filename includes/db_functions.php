@@ -138,6 +138,9 @@ function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null):
     // paidToTotalMinutes(p) === total_minutes.
     for ($p = $total_minutes; $p >= 0; $p--) {
         if ($p + (int)floor($p / $bp) * $bf === $total_minutes) {
+            // Apply the new pricing structure: ₱50 for first 30m, straight hourly rate thereafter
+            if ($p <= 0) return 0.0;
+            if ($p <= 30) return (float)$rules['session_min_charge'];
             return (float)round($p / 60 * $rules['hourly_rate'], 2);
         }
     }
@@ -160,6 +163,7 @@ function getHourlyDurationOptions(?array $rules = null): array {
     for ($paid = 30; $paid <= $max; $paid += 30) {
         $bonus = calcBonusMinutes($paid, $rules);
         $total = $paid + $bonus;
+        // Pricing: ₱50 for first 30 mins, straight hourly rate thereafter
         $cost  = ($paid <= 30) ? $minChg : round($paid / 60 * $rate, 2);
 
         // Human-readable label helpers
@@ -237,17 +241,28 @@ function updateConsoleStatus($console_id, $status) {
 /**
  * Add a new console to the database.
  */
-function addConsole($name, $type, $unit_number, $rate, $compat_ctrl_type = null) {
+function addConsole($name, $type, $unit_number, $rate, $controller_count = 2, $compat_ctrl_type = null) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, status, compatible_controller_type) VALUES (?, ?, ?, ?, 'available', ?)");
-        $stmt->bind_param("sssds", $name, $type, $unit_number, $rate, $compat_ctrl_type);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type, unit_number, hourly_rate, controller_count, status, compatible_controller_type) VALUES (?, ?, ?, ?, ?, 'available', ?)");
+        $stmt->bind_param("sssdis", $name, $type, $unit_number, $rate, $controller_count, $compat_ctrl_type);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         // Return false if duplicate entry or other SQL error
         return false;
     }
 }
+
+/**
+ * Update console controller count.
+ */
+function updateConsoleControllerCount($console_id, $count) {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE consoles SET controller_count = ? WHERE console_id = ?");
+    $stmt->bind_param("ii", $count, $console_id);
+    return $stmt->execute();
+}
+
 
 /**
  * Permanently delete a console. 
@@ -302,6 +317,38 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
         if ($rental_mode === 'hourly' && $planned_minutes !== null) {
             $stored_minutes = paidToTotalMinutes((int)$planned_minutes);
         }
+
+        // ── Reservation Conflict Check ───────────────────────────────────────
+        $tz = new DateTimeZone('Asia/Manila');
+        $now = new DateTime('now', $tz);
+        $nowStr = $now->format('Y-m-d H:i:s');
+        
+        $resStmt = $conn->prepare(
+            "SELECT reserved_date, reserved_time FROM reservations 
+              WHERE console_id = ? AND status IN ('reserved', 'pending') 
+                AND CONCAT(reserved_date, ' ', reserved_time) > ? 
+              ORDER BY reserved_date ASC, reserved_time ASC LIMIT 1"
+        );
+        $resStmt->bind_param("is", $console_id, $nowStr);
+        $resStmt->execute();
+        $nextRes = $resStmt->get_result()->fetch_assoc();
+
+        if ($nextRes) {
+            $resDt = new DateTime($nextRes['reserved_date'] . ' ' . $nextRes['reserved_time'], $tz);
+            $diff = $now->diff($resDt);
+            $minsAway = ($diff->days * 1440) + ($diff->h * 60) + $diff->i;
+
+            if ($rental_mode === 'open_time' || $rental_mode === 'unlimited') {
+                $conn->rollback();
+                return ['success' => false, 'message' => 'Cannot start Open Time or Unlimited session. This console has an upcoming reservation in ' . $minsAway . ' minutes.'];
+            }
+
+            if ($stored_minutes !== null && $stored_minutes > $minsAway) {
+                $conn->rollback();
+                return ['success' => false, 'message' => 'Session duration exceeds the available time window before the next reservation.'];
+            }
+        }
+        // ───────────────────────────────────────────────────────────────────────
 
         // Create session
         $stmt = $conn->prepare(
@@ -731,6 +778,18 @@ function computeTimedCost(int $minutes): float {
 }
 
 /**
+ * Compute the cost for an INITIAL session start (incorporates the ₱50 min charge).
+ * Applies the ₱10 surcharge over the standard ₱80/hr (₱40/30m) rate for the first 30m.
+ */
+function computeInitialSessionCost(int $total_minutes): float {
+    if ($total_minutes <= 0) return 0.0;
+    $rules = getPricingRules();
+    $standardCost = computeTimedCost($total_minutes);
+    // We ensure it's at least the session_min_charge (₱50), but don't arbitrarily add ₱10 for > 30 min
+    return (float) max($rules['session_min_charge'], $standardCost);
+}
+
+/**
  * Compute rental fee based on mode.
  *
  * Hourly  – pre-booked duration; charge base cost + overtime brackets if over.
@@ -754,13 +813,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
 
                 // computeTimedCost handles bonus-free cycles; raw multiplication
                 // incorrectly bills free bonus minutes at full rate.
-                $base_cost = ($planned_minutes <= 30)
-                    ? $rules['session_min_charge']
-                    : (float) computeTimedCost((int)$planned_minutes);
+                $base_cost = computeInitialSessionCost((int)$planned_minutes);
                 return $base_cost + computeTimedCost($overtime);
             }
-            // No pre-booking data: fall back to open-time bracket pricing
-            return computeTimedCost($duration_minutes);
+            // No pre-booking data: fall back to open-time (initial session) pricing
+            return computeInitialSessionCost($duration_minutes);
 
 
         case 'open_time':
@@ -1070,7 +1127,9 @@ function createReservation(
     $reserved_date, $reserved_time, $notes = null,
     $downpayment_amount = 0.0, $downpayment_method = null,
     $preferred_unit_id = null,
-    $payment_proof = null   // uploaded GCash screenshot filename
+    $payment_proof = null,   // uploaded GCash screenshot filename
+    $controller_id = null,   // optional: selected controller FK
+    $controller_fee = 0.0    // fee snapshot from system_settings at booking time
 ) {
     global $conn;
 
@@ -1103,25 +1162,35 @@ function createReservation(
         return ['success' => false, 'message' => 'Cannot reserve a past date.'];
     }
 
+    if (isDateBlocked($reserved_date)) {
+        return ['success' => false, 'message' => 'The selected date is currently blocked for reservations. Please choose another date.'];
+    }
+
+
     // Payment proof is required — payment_proof_status starts as 'pending' (awaiting admin verify)
-    $downpayment_paid  = 0;  // NOT marked paid until admin verifies the GCash proof
+    $downpayment_paid  = 0;
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
     $proof_status      = $payment_proof ? 'pending' : null;
+    $with_controller   = $controller_id ? 1 : 0;
+    $controller_id     = $controller_id ? (int)$controller_id : null;
+    $controller_fee    = (float)$controller_fee;
 
     $stmt = $conn->prepare(
         "INSERT INTO reservations
             (user_id, console_id, console_type, rental_mode, planned_minutes, reserved_date, reserved_time,
-             notes, downpayment_amount, downpayment_method, downpayment_paid,
+             notes, with_controller, controller_id, controller_fee,
+             downpayment_amount, downpayment_method, downpayment_paid,
              payment_proof, payment_proof_status, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
-        'iississsdsissi',
+        'iississsiidssissi',
         $user_id, $preferred_unit_id, $console_type, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
+        $with_controller, $controller_id, $controller_fee,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
         $payment_proof, $proof_status,
-        $user_id   // created_by = the customer themselves
+        $user_id
     );
 
 
@@ -1131,15 +1200,16 @@ function createReservation(
 
         // Record the downpayment as a transaction so it appears in financial reports
         if ($downpayment_amount > 0 && $downpayment_method !== null) {
+            $ctrlNote = $with_controller ? ' (+₱' . number_format($controller_fee,2) . ' controller rental)' : '';
             recordTransaction(
-                null,                   // no session yet
-                $user_id,               // who paid
-                $downpayment_amount,    // amount paid
-                $downpayment_method,    // payment method
-                $user_id,               // processed_by = the customer (self-serve)
-                $downpayment_amount,    // tendered = same as amount (exact)
-                null,                   // no shortfall
-                'Downpayment for reservation #' . $reservation_id
+                null,
+                $user_id,
+                $downpayment_amount,
+                $downpayment_method,
+                $user_id,
+                $downpayment_amount,
+                null,
+                'Downpayment for reservation #' . $reservation_id . $ctrlNote
             );
         }
 
@@ -1429,5 +1499,191 @@ function getOperatingDayBounds($operating_date) {
     $end = $end_dt->format('Y-m-d') . ' 05:59:59';
     return [$start, $end];
 }
-?>
 
+// ============================================================================
+// CONSOLE TYPES (DYNAMIC LIST)
+// ============================================================================
+
+/**
+ * Get all available console types from the database.
+ */
+// ============================================================================
+// CONSOLE TYPE FUNCTIONS  (table: console_types)
+// ============================================================================
+
+/**
+ * Get console types from the console_types table.
+ * $onlyActive = true  → only non-archived rows
+ * $onlyActive = false → all rows (used to build archived list)
+ */
+function getConsoleTypes(bool $onlyActive = true): array {
+    global $conn;
+    $check = $conn->query("SHOW TABLES LIKE 'console_types'");
+    if (!$check || $check->num_rows === 0) return [];
+
+    $where = $onlyActive ? "WHERE is_archived = 0" : "";
+    $res = $conn->query("SELECT * FROM console_types $where ORDER BY type_name ASC");
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Add a new console type.
+ * Returns true on success, false on duplicate or error.
+ */
+function addConsoleType(string $typeName): bool {
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO console_types (type_name) VALUES (?)");
+    $stmt->bind_param("s", $typeName);
+    try { return $stmt->execute(); } catch (Exception $e) { return false; }
+}
+
+/**
+ * Archive a console type AND archive all consoles of that type.
+ */
+function archiveConsoleType(int $typeId): bool {
+    global $conn;
+    $conn->begin_transaction();
+    try {
+        $stmtName = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+        $stmtName->bind_param("i", $typeId);
+        $stmtName->execute();
+        $row = $stmtName->get_result()->fetch_assoc();
+        if (!$row) { $conn->rollback(); return false; }
+
+        $typeName = $row['type_name'];
+        $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type = ?")->execute([$typeName]) ;
+        $s = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
+        $s->bind_param("i", $typeId); $s->execute();
+        $conn->commit(); return true;
+    } catch (Exception $e) { $conn->rollback(); return false; }
+}
+
+/** Restore an archived console type. */
+function restoreConsoleType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/** Permanently delete a console type. */
+function deleteConsoleType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("DELETE FROM console_types WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+// ============================================================================
+// CONTROLLER TYPE FUNCTIONS  (table: controller_types)
+// ============================================================================
+
+/**
+ * Get controller types from the controller_types table.
+ * Joins console_types to expose parent_console_name.
+ * $onlyActive = true  → only non-archived
+ * $consoleTypeId      → optional filter: only controllers for that console
+ */
+function getControllerTypes(bool $onlyActive = true, ?int $consoleTypeId = null): array {
+    global $conn;
+    $check = $conn->query("SHOW TABLES LIKE 'controller_types'");
+    if (!$check || $check->num_rows === 0) return [];
+
+    $conditions = [];
+    if ($onlyActive)            $conditions[] = "ct.is_archived = 0";
+    if ($consoleTypeId !== null) $conditions[] = "ct.console_type_id = " . (int)$consoleTypeId;
+    $where = $conditions ? "WHERE " . implode(" AND ", $conditions) : "";
+
+    $res = $conn->query(
+        "SELECT ct.*, c.type_name AS parent_console_name
+         FROM controller_types ct
+         LEFT JOIN console_types c ON c.type_id = ct.console_type_id
+         $where
+         ORDER BY ct.type_name ASC"
+    );
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Add a new controller type.
+ * $consoleTypeId: optional FK to console_types.type_id (the platform it belongs to).
+ */
+function addControllerType(string $typeName, ?int $consoleTypeId = null): bool {
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO controller_types (type_name, console_type_id) VALUES (?, ?)");
+    $stmt->bind_param("si", $typeName, $consoleTypeId);
+    try { return $stmt->execute(); } catch (Exception $e) { return false; }
+}
+
+/** Archive a controller type. */
+function archiveControllerType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/** Restore an archived controller type. */
+function restoreControllerType(int $typeId): bool {
+    global $conn;
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+/**
+ * Permanently delete a controller type.
+ * Detaches any controllers using it first (sets their console_type_id to NULL).
+ */
+function deleteControllerType(int $typeId): bool {
+    global $conn;
+    $conn->query("UPDATE controllers SET console_type_id = NULL WHERE console_type_id = $typeId");
+    $stmt = $conn->prepare("DELETE FROM controller_types WHERE type_id = ?");
+    $stmt->bind_param("i", $typeId);
+    return $stmt->execute();
+}
+
+// ============================================================================
+// DATE BLOCKING FUNCTIONS
+// ============================================================================
+
+/**
+ * Get all blocked dates.
+ */
+function getBlockedDates() {
+    global $conn;
+    $res = $conn->query("SELECT * FROM blocked_dates ORDER BY blocked_date ASC");
+    return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/**
+ * Block a specific date.
+ */
+function blockDate($date, $reason = '') {
+    global $conn;
+    $stmt = $conn->prepare("INSERT IGNORE INTO blocked_dates (blocked_date, reason) VALUES (?, ?)");
+    $stmt->bind_param("ss", $date, $reason);
+    return $stmt->execute();
+}
+
+/**
+ * Unblock a specific date.
+ */
+function unblockDate($date) {
+    global $conn;
+    $stmt = $conn->prepare("DELETE FROM blocked_dates WHERE blocked_date = ?");
+    $stmt->bind_param("s", $date);
+    return $stmt->execute();
+}
+
+/**
+ * Check if a date is blocked.
+ */
+function isDateBlocked($date) {
+    global $conn;
+    $stmt = $conn->prepare("SELECT id FROM blocked_dates WHERE blocked_date = ? LIMIT 1");
+    $stmt->bind_param("s", $date);
+    $stmt->execute();
+    return $stmt->get_result()->num_rows > 0;
+}
+?>

@@ -13,6 +13,10 @@ header("Pragma: no-cache");
 header("Expires: 0"); 
 
 $user = getCurrentUser();
+$consoleTypes         = getConsoleTypes(true);              // active console types (console_types table)
+$controllerTypes      = getControllerTypes(true);           // active controller types (controller_types table)
+$archivedConsoleTypes = array_filter(getConsoleTypes(false),    fn($ct) => $ct['is_archived'] == 1);
+$archivedCtrlTypes    = array_filter(getControllerTypes(false), fn($ct) => $ct['is_archived'] == 1);
 $message = '';
 $messageType = '';
 
@@ -95,9 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
         $pr           = getPricingRules();
-        $upfront_cost = ($planned_minutes <= 30)
-                        ? $pr['session_min_charge']
-                        : (float)($planned_minutes / 60 * $pr['hourly_rate']);
+        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
         // Add controller rental fee to upfront total if checked
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee     = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
@@ -235,9 +237,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type = $_POST['console_type'] ?? '';
         $unit_number = trim($_POST['unit_number'] ?? '');
         $rate = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
         $compat_ctrl = $_POST['compatible_controller_type'] ?? null;
         
-        if ($name && in_array($type, ['PS5', 'PS4', 'Xbox Series X', 'Xbox Controller']) && $unit_number && $rate >= 0) {
+        if ($name && $type && $unit_number && $rate >= 0) {
             // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
             $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
             $checkStmt->bind_param("s", $unit_number);
@@ -246,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
             } else {
-                if (addConsole($name, $type, $unit_number, $rate, $compat_ctrl)) {
+                if (addConsole($name, $type, $unit_number, $rate, $ctrl_count, $compat_ctrl)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                 } else {
@@ -265,8 +268,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $type       = $_POST['console_type'] ?? '';
         $unit       = trim($_POST['unit_number'] ?? '');
         $rate       = (float)($_POST['hourly_rate'] ?? 0);
+        $ctrl_count = (int)($_POST['controller_count'] ?? 2);
     
-        if ($console_id && $name && in_array($type, ['PS5', 'PS4', 'Xbox Series X']) && $unit && $rate >= 0) {
+        if ($console_id && $name && $type && $unit && $rate >= 0) {
             // Check for duplicate unit number (exclude current console)
             $dupCheck = $conn->prepare(
                 "SELECT console_id FROM consoles WHERE unit_number = ? AND console_id != ?"
@@ -278,10 +282,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?
+                    "UPDATE consoles SET console_name = ?, console_type = ?, unit_number = ?, hourly_rate = ?, controller_count = ?
                       WHERE console_id = ?"
                 );
-                $stmt->bind_param('sssdi', $name, $type, $unit, $rate, $console_id);
+                $stmt->bind_param('sssdi i', $name, $type, $unit, $rate, $ctrl_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
@@ -295,6 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         }
     }
+
     elseif ($action === 'delete_console') {
         $console_id = (int)($_POST['console_id'] ?? 0);
         if ($console_id) {
@@ -309,26 +314,141 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── CONTROLLER ACTIONS ────────────────────────────────────────────────────
+    // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
+    // ADD CONSOLE TYPE
+    elseif ($action === 'add_console_type') {
+        $typeName = trim($_POST['type_name'] ?? '');
+        if ($typeName) {
+            if (addConsoleType($typeName)) {
+                $message = 'Console type "' . htmlspecialchars($typeName) . '" added successfully.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to add console type. It might already exist.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // ARCHIVE CONSOLE TYPE
+    elseif ($action === 'archive_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && archiveConsoleType($typeId)) {
+            $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive console type.';
+            $messageType = 'error';
+        }
+    }
+
+    // RESTORE CONSOLE TYPE
+    elseif ($action === 'restore_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && restoreConsoleType($typeId)) {
+            $message = 'Console type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore console type.';
+            $messageType = 'error';
+        }
+    }
+
+    // PERMANENTLY DELETE CONSOLE TYPE
+    elseif ($action === 'delete_console_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && deleteConsoleType($typeId)) {
+            $message = 'Console type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete console type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER TYPE ACTIONS ───────────────────────────────────────────────
+    // ADD CONTROLLER TYPE
+    elseif ($action === 'add_controller_type') {
+        $typeName      = trim($_POST['type_name'] ?? '');
+        $consoleTypeId = !empty($_POST['console_type_id']) ? (int)$_POST['console_type_id'] : null;
+        if ($typeName) {
+            if (addControllerType($typeName, $consoleTypeId)) {
+                $parentNote = '';
+                if ($consoleTypeId) {
+                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+                    $pRes->bind_param('i', $consoleTypeId); $pRes->execute();
+                    $pRow = $pRes->get_result()->fetch_assoc();
+                    if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
+                }
+                $message = 'Controller type "' . htmlspecialchars($typeName) . '"' . $parentNote . ' added.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to add controller type. It might already exist.';
+                $messageType = 'error';
+            }
+        }
+    }
+
+    // ARCHIVE CONTROLLER TYPE
+    elseif ($action === 'archive_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && archiveControllerType($typeId)) {
+            $message = 'Controller type archived successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to archive controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // RESTORE CONTROLLER TYPE
+    elseif ($action === 'restore_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && restoreControllerType($typeId)) {
+            $message = 'Controller type restored successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to restore controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // PERMANENTLY DELETE CONTROLLER TYPE
+    elseif ($action === 'delete_controller_type') {
+        $typeId = (int)($_POST['type_id'] ?? 0);
+        if ($typeId && deleteControllerType($typeId)) {
+            $message = 'Controller type permanently removed.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to permanently delete controller type.';
+            $messageType = 'error';
+        }
+    }
+
+    // ── CONTROLLER (UNIT) ACTIONS ─────────────────────────────────────────────
     elseif ($action === 'add_controller') {
-        $ctrl_name  = trim($_POST['controller_name'] ?? '');
-        $ctrl_type  = $_POST['controller_type'] ?? '';
-        $ctrl_unit  = trim($_POST['ctrl_unit_number'] ?? '');
-        $ctrl_notes = trim($_POST['controller_notes'] ?? '');
-        $valid_types = ['DualSense', 'DualShock 4', 'Xbox Controller', 'Other'];
-        if ($ctrl_name && in_array($ctrl_type, $valid_types) && $ctrl_unit) {
-            // Check for duplicate unit number first
+        $ctrl_name   = trim($_POST['controller_name'] ?? '');
+        $ctrl_type   = trim($_POST['controller_type'] ?? '');  // legacy text field
+        $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
+        $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes  = trim($_POST['controller_notes'] ?? '');
+
+        // Validate: must match a real controller type by ID
+        $validTypeIds = array_column(getControllerTypes(true), 'type_id');
+        if ($ctrl_name && $ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
+            // Also get the type name for the legacy column
+            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['type_id'] === $ctrl_typeId))[0] ?? null;
+            $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
+
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
-            $dupCheck->bind_param('s', $ctrl_unit);
-            $dupCheck->execute();
+            $dupCheck->bind_param('s', $ctrl_unit); $dupCheck->execute();
             if ($dupCheck->get_result()->num_rows > 0) {
-                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists. Please use a different unit number (e.g. CTRL-02, CTRL-03).';
+                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists.';
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type, unit_number, notes) VALUES (?,?,?,?)"
+                    "INSERT INTO controllers (controller_name, controller_type, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('ssss', $ctrl_name, $ctrl_type, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('ssiss', $ctrl_name, $ctrl_type, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
@@ -340,7 +460,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $dupCheck->close();
         } else {
-            $message = 'Invalid input for new controller.';
+            $message = 'Invalid input for new controller. Ensure all fields are filled and a valid controller type is selected.';
             $messageType = 'error';
         }
     }
@@ -385,8 +505,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
         $keys = ['ps5_hourly_rate','xbox_hourly_rate','unlimited_rate','controller_rental_fee',
-                 'business_hours_open','business_hours_close','shop_phone',
-                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge'];
+                 'business_hours_open','business_hours_close','shop_phone','contact_email',
+                 'bonus_paid_minutes','bonus_free_minutes','max_hourly_minutes','session_min_charge',
+                 'brevo_api_key','sender_email'];
         foreach ($keys as $key) {
             if (isset($_POST[$key])) {
                 updateSetting($key, trim($_POST[$key]));
@@ -529,7 +650,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // BLOCK DATE
+    elseif ($action === 'block_date') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can block dates.';
+            $messageType = 'error';
+        } else {
+            $date   = $_POST['blocked_date'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+            if ($date) {
+                if (blockDate($date, $reason)) {
+                    $message     = 'Date blocked: ' . date('M d, Y', strtotime($date));
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Failed to block date or date already blocked.';
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
+    // UNBLOCK DATE
+    elseif ($action === 'unblock_date') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can unblock dates.';
+            $messageType = 'error';
+        } else {
+            $date = $_POST['blocked_date'] ?? '';
+            if ($date) {
+                if (unblockDate($date)) {
+                    $message     = 'Date unblocked: ' . date('M d, Y', strtotime($date));
+                    $messageType = 'success';
+                } else {
+                    $message     = 'Failed to unblock date.';
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
+
     // COLLECT PAYMENT (mid-session, does NOT end the session)
+
     elseif ($action === 'collect_payment') {
         $session_id     = (int)($_POST['session_id'] ?? 0);
         $payment_method = $_POST['payment_method'] ?? 'cash';
@@ -1328,10 +1488,14 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
+    <div class="nav-item" data-tooltip="Blocked Dates" onclick="showPage('blocked_dates', this)">
+        <i class="fas fa-calendar-times"></i><span>Blocked Dates</span>
+    </div>
     <div class="nav-item" onclick="showPage('settings', this)">
         <i class="fas fa-cog"></i><span>Settings</span>
     </div>
     <?php endif; ?>
+
 </div>
 
 <!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
@@ -1391,15 +1555,12 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
                 <!-- Footer -->
                 <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.07);text-align:center;">
-                    <button onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();"
-                            style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.35);color:#20c8a1;
-                                   border-radius:8px;padding:6px 18px;font-size:12px;font-weight:700;cursor:pointer;
-                                   font-family:inherit;width:100%;transition:background .2s;"
-                            onmouseover="this.style.background='rgba(32,200,161,.25)'"
-                            onmouseout="this.style.background='rgba(32,200,161,.15)'">
+                    <button class="btn-prim" style="width:100%;font-size:12px;padding:8px 18px;"
+                            onclick="showPage('reservations', document.querySelector('.nav-item[onclick*=\'reservations\']')); closeNotifDropdown();">
                         <i class="fas fa-list" style="margin-right:5px;"></i> View All Reservations
                     </button>
                 </div>
+
             </div>
         </div>
 
@@ -1441,7 +1602,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
 <?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
 
+<?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/blocked_dates.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/settings.php'; endif; ?>
+
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
@@ -1501,8 +1664,10 @@ function showPage(page, el) {
         dashboard: 'Dashboard', consoles: 'Console Management', reservations: 'Reservations',
         sessions: 'Session Management', transactions: 'Transactions',
         financial: 'Financial', reports: 'Analytics & Reports',
-        settings: 'Settings', tournaments: 'Tournaments'
+        settings: 'Settings', tournaments: 'Tournaments',
+        blocked_dates: 'Blocked Dates'
     };
+
     document.getElementById('pageTitle').textContent = titles[page] || page;
 
     // Persist active page in URL hash so reloads stay on the same section
@@ -1524,7 +1689,8 @@ var _currentSection = 'dashboard';
 (function () {
     var REFRESH_MS = 12000;
     // Sections we can safely auto-refresh (exclude settings to avoid mid-edit disruption)
-    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments'];
+    var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments','blocked_dates'];
+
     // CSS flash keyframe for subtle update feedback
     var styleEl = document.createElement('style');
     styleEl.textContent = '@keyframes liveFlash{0%{opacity:.6}50%{opacity:.9}100%{opacity:1}} .live-refreshing{animation:liveFlash .4s ease;}';
@@ -1742,12 +1908,42 @@ function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
     const type   = opt ? (opt.dataset.type || '') : '';
-    const isXbox = type.toLowerCase().includes('xbox');
     const group  = document.getElementById('controllerRentalGroup');
     const toggle = document.getElementById('controllerRentalToggle');
+    const label  = document.getElementById('controllerRentalLabel');
+    const icon   = document.getElementById('ctrlRentalIcon');
+    const text   = document.getElementById('ctrlAvailText');
     if (!group) return;
-    if (isXbox) {
+
+    // Look up availability for this console type
+    const info      = (typeof CTRL_AVAIL_BY_TYPE !== 'undefined' && type) ? (CTRL_AVAIL_BY_TYPE[type] || null) : null;
+    const hasCtrl   = info && info.total > 0;
+    const available = info ? info.available : 0;
+    const total     = info ? info.total : 0;
+
+    if (hasCtrl) {
         group.style.display = 'block';
+        const hasAvail = available > 0;
+        if (toggle) {
+            toggle.disabled = !hasAvail;
+            if (!hasAvail && toggle.checked) {
+                toggle.checked = false;
+                if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+            }
+        }
+        if (label) label.style.cursor = hasAvail ? 'pointer' : 'not-allowed';
+        if (icon)  icon.style.color   = hasAvail ? 'var(--clr-mint)' : '#666';
+        if (text) {
+            if (hasAvail) {
+                text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
+                               + `<strong style="color:#20c8a1;">${available}</strong>`
+                               + ` of ${total} controller${total !== 1 ? 's' : ''} available`;
+                text.style.color = '#888';
+            } else {
+                text.innerHTML = `<i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>No controllers available right now`;
+                text.style.color = '#fb566b';
+            }
+        }
     } else {
         group.style.display = 'none';
         if (toggle && toggle.checked) {
@@ -2005,13 +2201,13 @@ function _showStartShortError(msg) {
         banner.id = 'startShortErrorBanner';
         banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(251,86,107,.13);border:1.5px solid rgba(251,86,107,.45);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:13px;font-weight:600;color:#fb566b;animation:shakeX .35s;';
         // inject before the submit button
-        const btn = document.querySelector('#startSessionForm .btn-primary');
+        const btn = document.querySelector('#startSessionForm .btn-prim');
         if (btn) btn.parentNode.insertBefore(banner, btn);
     }
     banner.innerHTML = '<i class="fas fa-circle-exclamation"></i><span>' + msg + '</span>';
     banner.style.display = 'flex';
     // Disable submit button briefly
-    const btn = document.querySelector('#startSessionForm .btn-primary');
+    const btn = document.querySelector('#startSessionForm .btn-prim');
     if (btn) {
         btn.disabled = true;
         btn.style.opacity = '0.5';
@@ -2023,7 +2219,7 @@ function _showStartShortError(msg) {
 function _clearStartShortError() {
     const banner = document.getElementById('startShortErrorBanner');
     if (banner) banner.style.display = 'none';
-    const btn = document.querySelector('#startSessionForm .btn-primary');
+    const btn = document.querySelector('#startSessionForm .btn-prim');
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
 }
 
@@ -2034,7 +2230,7 @@ function _clearStartShortError() {
 function _syncStartBtn() {
     const mode = document.getElementById('rentalModeSelect') ?
                  document.getElementById('rentalModeSelect').value : '';
-    const btn  = document.querySelector('#startSessionForm .btn-primary');
+    const btn  = document.querySelector('#startSessionForm .btn-prim');
     if (!btn) return;
 
     let isShort  = false;

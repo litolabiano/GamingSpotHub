@@ -43,16 +43,121 @@ foreach ($allConsoles as $c) {
         'name'        => $c['console_name'],
         'status'      => $c['status'],
         'maintenance' => ($c['status'] === 'maintenance'),
+        'controllers' => (int)($c['controller_count'] ?? 2),
     ];
 }
 
-$unlimitedRate = getSetting('unlimited_rate') ?? 300;
-$gcashNumber   = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
+$blockedDatesList = array_column(getBlockedDates(), 'blocked_date');
+
+
+$unlimitedRate       = (float)(getSetting('unlimited_rate')      ?? 300);
+$gcashNumber         = getSetting('gcash_number')   ?? '09XX-XXX-XXXX';
+$controllerRentalFee = (float)(getSetting('controller_rental_fee') ?? 20.0);
+
+// ── Load available controllers for rental (status=available) ─────────────────
+$availableControllers = [];
+$ctrlRes = $conn->query(
+    "SELECT c.controller_id, c.controller_name, c.unit_number,
+            ct.type_name AS type_name, ct.console_type_id,
+            cs.type_name AS console_type_name
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types cs    ON cs.type_id = ct.console_type_id
+      WHERE c.status = 'available'
+      ORDER BY cs.type_name, ct.type_name, c.unit_number"
+);
+if ($ctrlRes) {
+    while ($row = $ctrlRes->fetch_assoc()) {
+        $availableControllers[] = $row;
+    }
+}
+// JSON-encode for JS use
+$controllersJson = json_encode($availableControllers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+// ── Controller stats per console type (available vs total) ────────────────────
+$controllerStatsByType = [];
+$ctrlStats = $conn->query(
+    "SELECT cs.type_name AS console_type,
+            COUNT(*) AS total,
+            SUM(c.status = 'available') AS available
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types    cs ON cs.type_id  = ct.console_type_id
+      GROUP BY cs.type_name"
+);
+if ($ctrlStats) {
+    while ($row = $ctrlStats->fetch_assoc()) {
+        $controllerStatsByType[$row['console_type']] = [
+            'available' => (int)$row['available'],
+            'total'     => (int)$row['total'],
+        ];
+    }
+}
+$controllerStatsJson = json_encode($controllerStatsByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STALE PENDING SESSION CLEANUP
+// If the user previously initiated a PayMongo checkout but navigated away
+// without completing it (and without hitting ?paymongo=failed), the session
+// will still hold a pending_reservation with an old checkout session ID.
+// Detect this on every page load and silently clean it up so a new reservation
+// can be started without any blockage.
+// ══════════════════════════════════════════════════════════════════════════════
+if (!empty($_SESSION['pending_reservation']) && empty($_GET['paymongo'])) {
+    $stalePending = $_SESSION['pending_reservation'];
+    $staleAge     = time() - ($stalePending['created_at'] ?? 0);
+    $staleId      = $stalePending['session_id'] ?? '';
+
+    // If the pending session is older than 30 minutes, it has certainly expired.
+    // For younger sessions (but at least 60 s old), verify with PayMongo.
+    // Sessions < 60 s old are left alone — the user may still be mid-checkout.
+    $shouldClean = false;
+
+    if ($staleAge > 1800) {
+        // Session is >30 min old — PayMongo checkout sessions expire in 1 hr;
+        // safe to clean up without an API call.
+        $shouldClean = true;
+        error_log('[Reserve] Cleaning stale pending_reservation (age=' . $staleAge . 's, cs=' . $staleId . ')');
+    } elseif ($staleAge > 60 && $staleId) {
+        // At least 60 s have passed — verify the checkout session status with PayMongo.
+        // 'unpaid' means the user never completed the payment flow.
+        // 'expired' means the session timed out.
+        $staleCs = PayMongoService::getCheckoutSession($staleId);
+        if ($staleCs['success'] && in_array($staleCs['payment_status'], ['unpaid', 'expired'])) {
+            // Checkout was not completed — clean up
+            $shouldClean = true;
+            error_log('[Reserve] Cleaning abandoned pending_reservation (status=' . $staleCs['payment_status'] . ', cs=' . $staleId . ')');
+        }
+        // If the API call failed or status is 'paid', do NOT clean up — let PATH B handle it.
+    }
+
+    if ($shouldClean) {
+        unset($_SESSION['pending_reservation']);
+        // Show a polite info message only if NOT coming from a ?paymongo= redirect
+        // (that redirect has its own message). We use a separate session key so
+        // it doesn't overwrite genuine errors set later in this request.
+        $_SESSION['paymongo_abandoned_notice'] = true;
+    }
+}
+
+// Surface the abandoned-session notice (set above or on a previous request)
+if (!empty($_SESSION['paymongo_abandoned_notice'])) {
+    unset($_SESSION['paymongo_abandoned_notice']);
+    // $info is rendered separately from $error so the form stays usable
+    $info = 'Your previous payment session was not completed. No charge was made — please fill in the form below to try again.';
+}
+
+$info = $info ?? '';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PATH B — PayMongo Checkout Session redirect-back handler
+// IMPORTANT: Only runs on GET requests. When the user fills the reservation form
+// while the URL still has ?paymongo=failed in it (because the form has no explicit
+// action) the POST goes to the same URL. Without this guard, PATH B would set
+// $error and block PATH A (the form handler) from running at all.
 // ══════════════════════════════════════════════════════════════════════════════
-if (!empty($_GET['paymongo'])) {
+if (!empty($_GET['paymongo']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $pm_result = $_GET['paymongo'];        // 'success' or 'failed'
     $pending   = $_SESSION['pending_reservation'] ?? null;
     // session_id is stored in the session when we created the checkout session
@@ -100,7 +205,9 @@ if (!empty($_GET['paymongo'])) {
                 (float)$pending['dp_amount'],
                 'gcash',
                 $pending['preferred_unit_id'] ?? null,
-                null   // no screenshot — PayMongo handled it
+                null,   // no screenshot — PayMongo handled it
+                $pending['controller_id']  ?? null,
+                $pending['controller_fee'] ?? 0.0
             );
 
             if ($result['success']) {
@@ -127,22 +234,39 @@ if (!empty($_GET['paymongo'])) {
                 header('Location: reserve.php');
                 exit;
             } else {
+                // Payment received but DB save failed — clear the pending session
+                // so the user is not permanently blocked from making a new reservation.
+                unset($_SESSION['pending_reservation']);
                 $error = 'Payment was received but we could not save your reservation: ' .
                          htmlspecialchars($result['message']) .
-                         ' — Please contact the shop with your GCash reference.';
+                         ' — Please contact the shop with your GCash reference (' . htmlspecialchars($session_id) . ').';
             }
 
         } elseif ($cs['success'] && $cs['payment_status'] === 'unpaid') {
-            // Session exists but customer hasn't paid yet
-            $error = 'Your payment has not been completed yet. Please try again or contact the shop.';
+            // Session exists but customer did not complete payment — clean up the pending session
+            unset($_SESSION['pending_reservation']);
+            $error = 'Your payment was not completed. No charge was made — please try again below.';
         } elseif ($cs['success'] && $cs['payment_status'] === 'expired') {
-            $error = 'Your checkout session expired. Please go back and try again.';
+            unset($_SESSION['pending_reservation']);
+            $error = 'Your checkout session has expired. No charge was made — please fill in the form below to try again.';
         } else {
-            $error = 'We could not verify your payment. Please try again or use the manual screenshot option below.';
+            // API call itself failed (network error, bad key, etc.) — do not clear
+            // the pending session here; let the user retry without losing their data.
+            $error = 'We could not verify your payment status at this time. If you completed the payment, please contact the shop with your GCash reference. Otherwise, please try again.';
         }
 
     } elseif ($pm_result === 'failed') {
-        $error = 'Payment was cancelled or failed. Please try again below.';
+        // PayMongo redirected to cancel_url — user explicitly cancelled or was rejected.
+        // Always clear the pending session so the form is immediately usable again.
+        unset($_SESSION['pending_reservation']);
+        $error = 'Payment was cancelled or failed. No charge was made — please try again below.';
+    } elseif ($pm_result === 'success' && !$pending) {
+        // Edge case: ?paymongo=success arrived but no pending session exists.
+        // This can happen if the user refreshes the success URL after the session
+        // was already processed and cleared (e.g. double-tab / F5).
+        // Redirect cleanly to the reserve page to avoid confusing the user.
+        header('Location: reserve.php');
+        exit;
     }
 }
 
@@ -160,6 +284,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $preferred_unit_id = (int)($_POST['preferred_console_id'] ?? 0) ?: null;
     $dp_amount         = (float)($_POST['downpayment_amount']  ?? 0);
     $pay_via           = $_POST['pay_via'] ?? 'paymongo';   // 'paymongo' or 'screenshot'
+    // Controller add-on
+    $with_ctrl         = !empty($_POST['with_controller']) && $_POST['with_controller'] === '1';
+    $ctrl_id           = $with_ctrl ? ((int)($_POST['selected_controller_id'] ?? 0) ?: null) : null;
+    $ctrl_fee          = $with_ctrl && $ctrl_id ? $controllerRentalFee : 0.0;
 
     // ── Reservation ban check ─────────────────────────────────────────────────
     $banStmt = $conn->prepare(
@@ -258,8 +386,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'notes'             => $notes,
                     'dp_amount'         => $dp_amount,
                     'preferred_unit_id' => $preferred_unit_id,
-                    'session_id'        => $pm['session_id'],   // Checkout Session ID
+                    'session_id'        => $pm['session_id'],
                     'created_at'        => time(),
+                    // Controller add-on
+                    'controller_id'     => $ctrl_id,
+                    'controller_fee'    => $ctrl_fee,
                 ];
 
                 // Redirect to PayMongo hosted checkout page
@@ -312,7 +443,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $notes ?: null,
                     $dp_amount, 'gcash',
                     $preferred_unit_id,
-                    $payment_proof_file
+                    $payment_proof_file,
+                    $ctrl_id,
+                    $ctrl_fee
                 );
 
                 if ($result['success']) {
@@ -749,13 +882,9 @@ if (!empty($_GET['console'])) {
 
     /* ── Submit button ──────────────────────────────────── */
     .res-submit-btn {
-        width: 100%; padding: 16px;
-        background: linear-gradient(135deg, #20c8a1, #17a887);
-        border: none; border-radius: 12px;
-        color: #0a0f1c; font-weight: 800; font-size: 16px;
-        cursor: pointer; transition: all .2s;
-        display: flex; align-items: center; justify-content: center; gap: 10px;
+        width: 100%; margin-top: 10px;
     }
+
     .res-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(32,200,161,.35); }
     .res-submit-btn:active { transform: translateY(0); }
 
@@ -1028,13 +1157,8 @@ if (!empty($_GET['console'])) {
     .ur-alert { background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.3); color:#fb566b; padding:12px; border-radius:8px; font-size:12px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start; }
     .ur-alert i { margin-top:2px; }
     .ur-btn-row { display: flex; justify-content: flex-end; gap: 10px; }
-    .ur-btn { padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; transition: all .2s; }
-    .ur-btn.sec { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #ddd; }
-    .ur-btn.sec:hover { background: rgba(255,255,255,.1); }
-    .ur-btn.dang { background: #fb566b; color: #fff; }
-    .ur-btn.dang:hover { filter: brightness(1.1); }
-    .ur-btn.prim { background: #20c8a1; color: #000; }
-    .ur-btn.prim:hover { filter: brightness(1.1); }
+    </style>
+
     </style>
 
 </head>
@@ -1131,6 +1255,16 @@ if (!empty($_GET['console'])) {
         </div>
         <?php endif; ?>
 
+        <?php if (!empty($info)): ?>
+        <div style="background:rgba(95,133,218,.12);border:1px solid rgba(95,133,218,.4);border-radius:14px;padding:20px 24px;margin-bottom:30px;display:flex;gap:14px;align-items:flex-start;" data-aos="fade-down">
+            <i class="fas fa-info-circle" style="color:#5f85da;font-size:1.5rem;margin-top:2px;flex-shrink:0;"></i>
+            <div>
+                <div style="font-weight:700;color:#5f85da;font-size:15px;margin-bottom:4px;">Previous Payment Not Completed</div>
+                <div style="color:#bbb;font-size:14px;"><?= htmlspecialchars($info) ?></div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($error): ?>
         <div style="background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.4);border-radius:14px;padding:20px 24px;margin-bottom:30px;display:flex;gap:14px;align-items:flex-start;" data-aos="fade-down">
             <i class="fas fa-exclamation-circle" style="color:#fb566b;font-size:1.5rem;margin-top:2px;flex-shrink:0;"></i>
@@ -1180,7 +1314,7 @@ if (!empty($_GET['console'])) {
                         </div>
                     </div>
                 <?php endif; ?>
-                <form method="POST" id="reserveForm" enctype="multipart/form-data"
+                <form method="POST" action="reserve.php" id="reserveForm" enctype="multipart/form-data"
                     <?= ($activeReservation && !$success) ? 'style="pointer-events:none;user-select:none;"' : '' ?>>
                     <input type="hidden" name="console_type"         id="hiddenConsoleType">
                     <input type="hidden" name="rental_mode"          id="hiddenRentalMode">
@@ -1335,8 +1469,8 @@ if (!empty($_GET['console'])) {
                             Availability shown is based on your chosen date &amp; time.
                         </p>
                         <div id="unitPickerGrid"
-                             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px;"></div>
-                        <div id="unitPickerAny" onclick="selectUnit(null)"
+                             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:12px;"></div>
+        <div id="unitPickerAny" onclick="selectUnit(null)"
                              style="padding:10px 16px;border-radius:10px;border:2px solid rgba(32,200,161,.35);
                                     background:rgba(32,200,161,.06);color:#20c8a1;font-size:13px;font-weight:700;
                                     cursor:pointer;text-align:center;transition:.2s;"
@@ -1394,6 +1528,28 @@ if (!empty($_GET['console'])) {
                                 <span>Bonus: every <strong style="color:#20c8a1;"><?= $pr['bonus_paid_minutes'] / 60 ?> paid hours</strong> = <strong style="color:#20c8a1;"><?= $pr['bonus_free_minutes'] ?> min free</strong> added to your session.</span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- ── Step 3b: Add-ons ── -->
+                    <div class="reserve-card" style="margin-bottom:24px;" id="addonsCard">
+                        <h2><i class="fas fa-plus-circle"></i> Step 3b &mdash; Add-ons
+                            <span style="font-size:12px;font-weight:500;color:#888;margin-left:6px;">(Optional)</span>
+                        </h2>
+                        
+                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.02);transition:.2s;" id="ctrlLabel" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='rgba(255,255,255,.02)'">
+                            <input type="checkbox" name="with_controller" id="withControllerCheck" value="1" onchange="onExtraControllerToggle()" style="margin-top:4px;width:16px;height:16px;accent-color:#20c8a1;">
+                            <div style="flex:1;">
+                                <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Rent an Extra Controller</div>
+                                <div style="font-size:11px;color:#888;">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> and will be added to your reservation fee.</div>
+                                
+                                <div id="controllerSelectorBlock" style="display:none;margin-top:12px;">
+                                    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Controller</div>
+                                    <select name="selected_controller_id" id="selectedControllerId" class="res-input" style="margin-bottom:0;padding:10px;font-size:13px;" onchange="recalcFee()">
+                                        <!-- Populated via JS based on selected console type -->
+                                    </select>
+                                </div>
+                            </div>
+                        </label>
                     </div>
 
                     <!-- ── Step 4: Reservation Fee / GCash Payment ── -->
@@ -1581,11 +1737,12 @@ if (!empty($_GET['console'])) {
                     </div>
 
                     <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
-                    <button type="submit" class="res-submit-btn" id="submitBtn" disabled>
+                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn" disabled>
                         <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
                         <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
                         <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
                     </button>
+
                     <div style="text-align:center;margin-top:10px;font-size:11px;color:#555;">
                         <i class="fas fa-lock" style="margin-right:4px;"></i>
                         You will be redirected to GCash to complete payment. Your reservation is saved only after payment succeeds.
@@ -1653,8 +1810,8 @@ if (!empty($_GET['console'])) {
                         No reservations yet
                     </div>
                     <?php else: ?>
-                    <div class="my-res-table-wrap">
-                        <table class="my-res-table" style="min-width:520px;">
+                    <div class="my-res-table-wrap" id="myReservationsTableWrap">
+                        <table class="my-res-table" id="myReservationsTable" style="min-width:520px;">
                             <thead>
                                 <tr>
                                     <th>Date &amp; Time</th>
@@ -1863,6 +2020,9 @@ function selectConsoleType(type) {
     // Reset unit selection; show picker only if date+time already chosen
     selectUnit(null, true);
     refreshUnitPicker();
+    
+    // Update Add-ons controller dropdown
+    updateControllerDropdown();
 
     updateSummary();
     checkAvailability();
@@ -1990,17 +2150,23 @@ function renderUnitCards(units, extraHtml = '') {
             ? `title="Reserved at ${u.conflict.reserved_time} by ${u.conflict.reserved_by}"`
             : '';
 
+        const controllers = u.controllers || 2;
+
         return `<div id="unit-${u.id}" data-unit-id="${u.id}" ${tooltip}
                      onclick="${clickable ? `selectUnit(${u.id}, false, '${u.unit}')` : ''}"
                      style="border:2px solid ${border};border-radius:12px;padding:14px 8px;
                             cursor:${clickable ? 'pointer' : 'not-allowed'};transition:all .2s;
                             text-align:center;background:rgba(255,255,255,${bgAlpha});
                             user-select:none;opacity:${clickable ? '1' : '.65'};">
-                    <div style="font-size:1.2rem;margin-bottom:6px;">${statusIcon}</div>
-                    <div style="font-weight:700;font-size:13px;color:#fff;margin-bottom:4px;">${u.unit}</div>
-                    <div style="font-size:10px;color:${colour};font-weight:700;">${statusLabel}</div>
+                    <div style="font-size:1.2rem;margin-bottom:4px;">${statusIcon}</div>
+                    <div style="font-weight:700;font-size:14px;color:#fff;margin-bottom:2px;">#${u.unit}</div>
+                    <div style="font-size:10px;color:${colour};font-weight:700;margin-bottom:6px;">${statusLabel}</div>
+                    <div style="font-size:9px;color:${isAvail ? '#20c8a1' : '#555'};font-weight:700;background:rgba(255,255,255,.05);padding:3px;border-radius:6px;">
+                        <i class="fas fa-gamepad"></i> ${controllers} Controllers
+                    </div>
                 </div>`;
     }).join('');
+
 
     // Restore "any" button
     const anyBtn = document.getElementById('unitPickerAny');
@@ -2070,10 +2236,7 @@ function selectMode(mode) {
 
     if (mode === 'unlimited') {
         // Fee is deterministic for unlimited — show panel immediately
-        const pct = Math.round(unlimitedRate * 0.05);
-        const fee = 20 + pct;
-        setGcashFee(unlimitedRate, pct, fee);
-        showGcashPanel();
+        recalcFee();
     } else {
         // Hourly — wait for duration pick
         document.getElementById('dpAmount').value = '0';
@@ -2162,18 +2325,58 @@ function selectDuration(mins) {
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
     const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
-    const fullCost = mins <= 30 ? PRICING.session_min_charge : _timedCost(mins);
+    recalcFee();
+}
 
-    // Reservation fee = \u20b120 + 5% of session cost
-    const pct = Math.round(fullCost * 0.05);
-    const fee = 20 + pct;
+function recalcFee() {
+    let baseCost = 0;
+    if (selectedMode === 'unlimited') {
+        baseCost = PRICING.unlimited_rate;
+    } else if (selectedMode === 'hourly') {
+        if (!selectedDuration) return; // not ready
+        baseCost = selectedDuration <= 30 ? PRICING.session_min_charge : _timedCost(selectedDuration);
+    } else {
+        return;
+    }
 
-    setGcashFee(fullCost, pct, fee);
+    const withCtrl = document.getElementById('withControllerCheck')?.checked;
+    const ctrlFee = withCtrl ? PRICING.controller_rental_fee : 0;
+    
+    // Reservation fee = \u20b120 + 5% of session cost + controller fee (if any)
+    const pct = Math.round(baseCost * 0.05);
+    const fee = 20 + pct + ctrlFee;
+
+    setGcashFee(baseCost, pct, fee, ctrlFee);
     showGcashPanel();
-
     updateSummary();
 }
 
+function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
+    document.getElementById('dpAmount').value = fee;
+    document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
+    document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
+    
+    // Add extra controller line item if needed
+    let extraLine = document.getElementById('feeCtrlLine');
+    if (ctrlFee > 0) {
+        if (!extraLine) {
+            extraLine = document.createElement('div');
+            extraLine.id = 'feeCtrlLine';
+            extraLine.style = 'display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;';
+            document.getElementById('feePctAmount').parentNode.after(extraLine);
+        }
+        extraLine.innerHTML = `<span>Extra Controller</span><span>₱${ctrlFee.toFixed(2)}</span>`;
+        extraLine.style.display = 'flex';
+    } else if (extraLine) {
+        extraLine.style.display = 'none';
+    }
+
+    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee;
+    const gcashDisp = document.getElementById('gcashAmountDisplay');
+    if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee;
+    const pmBtn = document.getElementById('pmBtnAmount');
+    if (pmBtn) pmBtn.textContent = '\u20b1' + fee;
+}
 
 /* ── Downpayment ────────────────────────────────────── */
 /* Read-only field — driven entirely by selectDuration(). No manual input needed. */
@@ -2283,9 +2486,29 @@ document.addEventListener('DOMContentLoaded', function () {
     updateDtBanner();
     updateSummary();
     checkAvailability();
+    // Blocked dates from PHP
+    const blockedDates = <?= json_encode($blockedDatesList) ?>;
+
+    // Check if the current date is blocked
+    function checkIfDateBlocked(dateVal) {
+        if (blockedDates.includes(dateVal)) {
+            alert('\u26a0\ufe0f This date is currently blocked by the owner for maintenance or holiday. Please choose a different date.');
+            dateEl.value = '';
+            onDateTimeChange();
+            return true;
+        }
+        return false;
+    }
+
+    dateEl.addEventListener('change', function() {
+        if (checkIfDateBlocked(this.value)) return;
+        onDateTimeChange();
+    });
+
     // If a console was pre-selected (e.g. via URL ?console=PS5), refresh the unit picker
     refreshUnitPicker();
 });
+
 
 
 function checkAvailability() {
@@ -2580,8 +2803,14 @@ function submitUserCancel(e) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            window.location.reload();
+            closeUserCancelModal();
+            fetch(location.href).then(r => r.text()).then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTable = doc.getElementById('myReservationsTableWrap');
+                const oldTable = document.getElementById('myReservationsTableWrap');
+                if (newTable && oldTable) oldTable.innerHTML = newTable.innerHTML;
+                alert(data.message);
+            });
         } else {
             err.textContent = data.message;
             err.style.display = 'block';
@@ -2606,7 +2835,12 @@ function openUserRescheduleModal(id, date, time, consoleType) {
     // Build time slots for the currently selected date
     buildReschedTimeSelect();
     
+    // Set console type
+    const cSel = document.getElementById('reschedConsoleType');
+    if (cSel) cSel.value = consoleType;
+
     // Set the previous time if still valid
+
     const sel = document.getElementById('reschedTime');
     const tVal = time.length === 5 ? time : time.substr(0,5);
     for(let i=0; i<sel.options.length; i++){
@@ -2638,7 +2872,46 @@ function buildReschedTimeSelect() {
         }
         sel.appendChild(opt);
     });
+    refreshReschedUnits();
 }
+
+function refreshReschedUnits() {
+    const date = document.getElementById('reschedDate').value;
+    const time = document.getElementById('reschedTime').value;
+    const type = document.getElementById('reschedConsoleType').value;
+    const sel  = document.getElementById('reschedUnit');
+    const stat = document.getElementById('reschedUnitStatus');
+
+    if (!date || !time || !type) {
+        sel.innerHTML = '<option value="">-- Let staff assign --</option>';
+        return;
+    }
+
+    stat.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking units...';
+    sel.disabled = true;
+
+    fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(type)}`)
+    .then(r => r.json())
+    .then(data => {
+        sel.disabled = false;
+        if (!data.success) {
+            stat.textContent = 'Error checking units';
+            return;
+        }
+        let html = '<option value="">-- Let staff assign --</option>';
+        data.units.forEach(u => {
+            const ok = u.status === 'available';
+            html += `<option value="${u.id}" ${ok ? '' : 'disabled'}>#${u.unit} - ${u.name} ${ok ? '(Available)' : '(' + u.status + ')'}</option>`;
+        });
+        sel.innerHTML = html;
+        stat.textContent = data.units.filter(u => u.status === 'available').length + ' units available';
+    })
+    .catch(() => {
+        sel.disabled = false;
+        stat.textContent = 'Network error';
+    });
+}
+
 
 function submitUserReschedule(e) {
     e.preventDefault();
@@ -2648,6 +2921,8 @@ function submitUserReschedule(e) {
     const rid  = document.getElementById('reschedResId').value;
     const date = document.getElementById('reschedDate').value;
     const time = document.getElementById('reschedTime').value;
+    const type = document.getElementById('reschedConsoleType').value;
+    const unit = document.getElementById('reschedUnit').value;
 
     if (!rid || !date || !time) {
         err.textContent = 'Please fill out all required fields.';
@@ -2663,13 +2938,21 @@ function submitUserReschedule(e) {
     fd.append('reservation_id', rid);
     fd.append('new_date', date);
     fd.append('new_time', time);
+    fd.append('console_type', type);
+    fd.append('console_id', unit);
 
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            window.location.reload();
+            closeUserRescheduleModal();
+            fetch(location.href).then(r => r.text()).then(html => {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const newTable = doc.getElementById('myReservationsTableWrap');
+                const oldTable = document.getElementById('myReservationsTableWrap');
+                if (newTable && oldTable) oldTable.innerHTML = newTable.innerHTML;
+                alert(data.message);
+            });
         } else {
             err.textContent = data.message;
             err.style.display = 'block';
@@ -2719,9 +3002,10 @@ function submitUserReschedule(e) {
                 <div id="cancelError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
 
                 <div style="margin-top:20px;" class="ur-btn-row">
-                    <button type="button" class="ur-btn sec" onclick="closeUserCancelModal()">Keep Reservation</button>
-                    <button type="submit" class="ur-btn dang" id="cancelSubmitBtn">Yes, Cancel It</button>
+                    <button type="button" class="btn-sec" onclick="closeUserCancelModal()">Keep Reservation</button>
+                    <button type="submit" class="btn-dang" id="cancelSubmitBtn">Yes, Cancel It</button>
                 </div>
+
             </form>
         </div>
     </div>
@@ -2742,10 +3026,7 @@ function submitUserReschedule(e) {
             <form id="userRescheduleForm" onsubmit="submitUserReschedule(event)">
                 <input type="hidden" id="reschedResId">
                 
-                <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
-                    <div style="background:rgba(255,255,255,.05);padding:10px 12px;border-radius:8px;color:#fff;font-weight:600;" id="reschedConsoleLbl"></div>
-                </div>
+
 
                 <div class="date-time-row" style="display:flex;gap:12px;margin-bottom:20px;">
                     <div style="flex:1;">
@@ -2756,18 +3037,37 @@ function submitUserReschedule(e) {
                     </div>
                     <div style="flex:1;">
                         <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Time</label>
-                        <select id="reschedTime" class="res-input" style="margin-bottom:0;" required>
+                        <select id="reschedTime" class="res-input" style="margin-bottom:0;" required onchange="refreshReschedUnits()">
                             <!-- options built via js -->
                         </select>
                     </div>
                 </div>
 
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Type</label>
+                    <select id="reschedConsoleType" class="res-input" style="margin-bottom:0;" required onchange="refreshReschedUnits()">
+                        <option value="PS5">PlayStation 5</option>
+                        <option value="PS4">PlayStation 4</option>
+                        <option value="Xbox Series X">Xbox Series X</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Preferred Unit (Optional)</label>
+                    <select id="reschedUnit" class="res-input" style="margin-bottom:0;">
+                        <option value="">-- Let staff assign --</option>
+                    </select>
+                    <div id="reschedUnitStatus" style="font-size:10px;color:#666;margin-top:4px;">Checking availability...</div>
+                </div>
+
+
                 <div id="reschedError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);"></div>
 
                 <div class="ur-btn-row">
-                    <button type="button" class="ur-btn sec" onclick="closeUserRescheduleModal()">Cancel</button>
-                    <button type="submit" class="ur-btn prim" id="reschedSubmitBtn">Confirm Reschedule</button>
+                    <button type="button" class="btn-sec" onclick="closeUserRescheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-prim" id="reschedSubmitBtn">Confirm Reschedule</button>
                 </div>
+
             </form>
         </div>
     </div>

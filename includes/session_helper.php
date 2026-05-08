@@ -43,7 +43,20 @@ function requireRole($roles) {
  * Get current user session data.
  */
 function getCurrentUser() {
+    global $conn;
     if (!isLoggedIn()) return null;
+
+    // Fetch fresh data from DB if connection is available
+    if (isset($conn)) {
+        $stmt = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
+        $uid = $_SESSION['user_id'];
+        $stmt->bind_param("i", $uid);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        if ($user) return $user;
+    }
+
+    // Fallback to session data
     return [
         'user_id'   => $_SESSION['user_id'],
         'full_name' => $_SESSION['full_name'],
