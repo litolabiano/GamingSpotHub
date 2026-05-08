@@ -112,6 +112,8 @@ try {
 
     $conn->commit();
 
+    logActivity($_SESSION['user_id'], "Reassign Console", "Reassigned Session #{$session_id} from Unit {$session['old_unit']} to Unit {$newConsole['unit_number']}");
+
     echo json_encode([
         'success'      => true,
         'message'      => 'Console reassigned from ' . $session['old_unit'] . ' to ' . $newConsole['unit_number'] . '.',

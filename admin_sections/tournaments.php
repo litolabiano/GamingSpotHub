@@ -151,6 +151,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                 <div style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($t['start_date'])) ?></div>
             </td>
             <td style="color:#f1e1aa;font-weight:600;">₱<?= number_format($t['entry_fee'], 0) ?></td>
+            <td>
                 <div style="font-size:13px;">
                     <span style="color:#fff;font-weight:700;"><?= $t['registered_count'] ?></span>
                     <span style="color:#888;"> Participants</span>
@@ -168,6 +169,13 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         onclick="viewParticipants(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>')"
                         title="View Registrants">
                         <i class="fas fa-users"></i>
+                    </button>
+
+                    <!-- Edit Tournament -->
+                    <button class="btn-sec btn-sm"
+                        onclick='openEditTournament(<?= json_encode($t) ?>)'
+                        title="Edit Tournament">
+                        <i class="fas fa-edit"></i>
                     </button>
 
 
@@ -396,6 +404,118 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
     </div>
 </div>
 
+<!-- ── EDIT TOURNAMENT MODAL ─────────────────────────────────────────────────── -->
+<div class="modal" id="editTournamentModal">
+    <div class="modal-content" style="max-width:600px;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-edit" style="color:#f1a83c;margin-right:8px;"></i> Edit Tournament</h3>
+            <button class="modal-close" onclick="closeModal('editTournament')">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="edit_tournament">
+            <?= csrfField() ?>
+            <input type="hidden" name="tournament_id" id="editTournId">
+
+            <div class="form-group">
+                <label>Tournament Name *</label>
+                <input type="text" name="tournament_name" id="editTournName" required placeholder="e.g. Tekken 8 Summer Bash">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Game Name *</label>
+                    <input type="text" name="game_name" id="editTournGame" required placeholder="e.g. Tekken 8">
+                </div>
+                <div class="form-group">
+                    <label>Console *</label>
+                    <select name="console_type" id="editTournConsole" required>
+                        <option value="" disabled selected>Select Console</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Start Date & Time -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Start Date *</label>
+                    <input type="date" id="editTournStartDatePart" required onchange="syncTournDateTime('edit_start')"
+                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f0f0f0;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>Start Time *</label>
+                    <select id="editTournStartTimePart" onchange="syncTournDateTime('edit_start')" required>
+                        <?php for ($h = 8; $h <= 22; $h++): foreach (['00','30'] as $m): ?>
+                            <?php $val = sprintf('%02d:%s',$h,$m); $disp = date('g:i A', strtotime("2000-01-01 $val")); ?>
+                            <option value="<?= $val ?>"><?= $disp ?></option>
+                        <?php endforeach; endfor; ?>
+                    </select>
+                </div>
+            </div>
+            <input type="hidden" name="start_date" id="editTournStartDateHidden">
+
+            <!-- End Date & Time -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>End Date *</label>
+                    <input type="date" id="editTournEndDatePart" required onchange="syncTournDateTime('edit_end')"
+                           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f0f0f0;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>End Time *</label>
+                    <select id="editTournEndTimePart" onchange="syncTournDateTime('edit_end')" required>
+                        <?php for ($h = 8; $h <= 23; $h++): foreach (['00','30'] as $m): ?>
+                            <?php $val = sprintf('%02d:%s',$h,$m); $disp = date('g:i A', strtotime("2000-01-01 $val")); ?>
+                            <option value="<?= $val ?>"><?= $disp ?></option>
+                        <?php endforeach; endfor; ?>
+                    </select>
+                </div>
+            </div>
+            <input type="hidden" name="end_date" id="editTournEndDateHidden">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Entry Fee (₱)</label>
+                    <select name="entry_fee" id="editTournEntryFee">
+                        <option value="0">Free</option>
+                        <option value="50">₱50</option>
+                        <option value="100">₱100</option>
+                        <option value="150">₱150</option>
+                        <option value="200">₱200</option>
+                        <option value="250">₱250</option>
+                        <option value="300">₱300</option>
+                        <option value="500">₱500</option>
+                        <option value="1000">₱1,000</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Prize Pool</label>
+                    <div style="background:rgba(32,200,161,.1); border:1px solid rgba(32,200,161,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#20c8a1; line-height:1.4;">
+                        <i class="fas fa-info-circle"></i> Prize pool is dependent on how many players join.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Max Participants</label>
+                    <div style="background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#5f85da; line-height:1.4;">
+                        <i class="fas fa-infinity"></i> Unlimited participants allowed.
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Announcement / Description</label>
+                <textarea name="announcement" id="editTournAnnouncement" rows="3" placeholder="Optional details…"></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
+                <button type="button" class="btn-sec" onclick="closeModal('editTournament')">Cancel</button>
+                <button type="submit" class="btn-prim"><i class="fas fa-save"></i> Save Changes</button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
 <!-- ── ADD PARTICIPANT MODAL ──────────────────────────────────────────────────── -->
 <div class="modal" id="addParticipantModal">
     <div class="modal-content" style="max-width:480px;">
@@ -485,21 +605,59 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 const _CSRF = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>';
 
 function syncTournDateTime(which) {
-    const prefix   = which === 'start' ? 'Start' : 'End';
-    const datePart = document.getElementById('tourn' + prefix + 'DatePart');
-    const timePart = document.getElementById('tourn' + prefix + 'TimePart');
-    const hidden   = document.getElementById('tourn' + prefix + 'DateHidden');
+    let prefix, datePart, timePart, hidden;
+    if (which === 'start' || which === 'end') {
+        const p   = which === 'start' ? 'Start' : 'End';
+        datePart = document.getElementById('tourn' + p + 'DatePart');
+        timePart = document.getElementById('tourn' + p + 'TimePart');
+        hidden   = document.getElementById('tourn' + p + 'DateHidden');
+    } else if (which === 'edit_start' || which === 'edit_end') {
+        const p   = which === 'edit_start' ? 'StartDate' : 'EndDate';
+        const t   = which === 'edit_start' ? 'StartTime' : 'EndTime';
+        datePart = document.getElementById('editTourn' + p + 'Part');
+        timePart = document.getElementById('editTourn' + t + 'Part');
+        hidden   = document.getElementById('editTourn' + p + 'Hidden');
+    }
+    
     if (!datePart || !timePart || !hidden) return;
     if (datePart.value && timePart.value) {
         hidden.value = datePart.value + 'T' + timePart.value;
     }
-    if (which === 'start' && datePart.value) {
-        const endDate = document.getElementById('tournEndDatePart');
+    
+    // Min date enforcement
+    if ((which === 'start' || which === 'edit_start') && datePart.value) {
+        const endPrefix = which === 'start' ? 'tourn' : 'editTourn';
+        const endDate = document.getElementById(endPrefix + 'EndDatePart');
         if (endDate) {
             endDate.min = datePart.value;
             if (endDate.value && endDate.value < datePart.value) endDate.value = '';
         }
     }
+}
+
+function openEditTournament(t) {
+    document.getElementById('editTournId').value = t.tournament_id;
+    document.getElementById('editTournName').value = t.tournament_name;
+    document.getElementById('editTournGame').value = t.game_name || '';
+    document.getElementById('editTournConsole').value = t.console_type || 'PS5';
+    document.getElementById('editTournEntryFee').value = parseFloat(t.entry_fee) || 0;
+    document.getElementById('editTournAnnouncement').value = t.announcement || '';
+
+    // Parse MySQL DATETIME to local date/time strings
+    if (t.start_date) {
+        const start = t.start_date.split(' '); // [YYYY-MM-DD, HH:mm:ss]
+        document.getElementById('editTournStartDatePart').value = start[0];
+        document.getElementById('editTournStartTimePart').value = start[1].substring(0, 5);
+        syncTournDateTime('edit_start');
+    }
+    if (t.end_date) {
+        const end = t.end_date.split(' ');
+        document.getElementById('editTournEndDatePart').value = end[0];
+        document.getElementById('editTournEndTimePart').value = end[1].substring(0, 5);
+        syncTournDateTime('edit_end');
+    }
+
+    openModal('editTournament');
 }
 
 function viewParticipants(tournamentId, tournamentName) {

@@ -168,6 +168,8 @@ foreach ($sessions as $session) {
             'end_time'         => $midnightStr,
         ];
 
+        logActivity($_SESSION['user_id'], "Auto-End Session", "Auto-ended Unlimited Session #{$sessionId} for {$session['customer_name']} on Console: {$session['unit_number']} at 12:00 AM");
+
     } catch (Exception $e) {
         $conn->rollback();
         $errors[] = 'Session #' . $sessionId . ': ' . $e->getMessage();
