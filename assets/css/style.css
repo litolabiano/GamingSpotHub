@@ -227,42 +227,78 @@ img {
 }
 
 
-/* Buttons */
-.btn {
-  font-weight: 600;
-  padding: 0.75rem 1.8rem;
-  border-radius: 50px;
-  transition: var(--transition);
+/* Unified Button System */
+.btn-prim {
+  background: linear-gradient(135deg, var(--color-mint), #17a887);
+  color: #0a0f1c !important;
+  font-weight: 700;
+  border-radius: 10px;
   border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
 }
+.btn-prim:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(32, 200, 161, 0.35);
+  filter: brightness(1.1);
+}
+.btn-prim:active { transform: translateY(0); }
+
+.btn-sec {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #aaa !important;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.btn-sec:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-dang {
+  background: linear-gradient(135deg, #fb566b, #d44758);
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 10px;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.btn-dang:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(251, 86, 107, 0.35);
+  filter: brightness(1.1);
+}
+.btn-dang:active { transform: translateY(0); }
 
 .btn-sm {
-  padding: 0.45rem 1.1rem;
-  font-size: 0.85rem;
-  border-radius: 50px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--color-mint), var(--color-blue));
-  color: black;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 20px rgba(78, 205, 196, 0.4);
-  color: #000;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1.5px solid var(--color-mint);
-  color: var(--color-mint);
-}
-
-.btn-secondary:hover {
-  background: var(--color-mint);
-  color: white;
-}
 
 /* ── Navbar CTA buttons (desktop) ─────────────────────── */
 .nav-cta {

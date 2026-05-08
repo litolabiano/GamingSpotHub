@@ -4,13 +4,13 @@ $hourlyRate    = (float)(getSetting('ps5_hourly_rate') ?? 80);
 $unlimitedRate = (float)(getSetting('unlimited_rate') ?? 400);
 ?>
 <!-- ══ SERVICES / PRICING ═══════════════════════════════════════════════════ -->
-<section id="gaming" style="background:linear-gradient(180deg,#0d1b2a 0%,#07101f 100%);padding:90px 0 100px;position:relative;overflow:hidden;">
+<section id="gaming" class="gsh-services">
 
     <!-- Decorative background blobs -->
-    <div style="position:absolute;top:-100px;left:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(95,133,218,.07),transparent 70%);pointer-events:none;"></div>
-    <div style="position:absolute;bottom:-80px;right:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(179,123,236,.07),transparent 70%);pointer-events:none;"></div>
+    <div class="gsh-blob blob-1"></div>
+    <div class="gsh-blob blob-2"></div>
 
-    <div class="container" style="position:relative;z-index:2;">
+    <div class="container gsh-services-container">
 
         <!-- Header -->
         <div class="text-center mb-5" data-aos="fade-up">
@@ -90,10 +90,10 @@ $unlimitedRate = (float)(getSetting('unlimited_rate') ?? 400);
 
         <!-- Bonus info strip -->
         <div class="text-center mt-5" data-aos="fade-up">
-            <div style="display:inline-flex;align-items:center;gap:12px;background:rgba(241,225,170,.06);border:1px solid rgba(241,225,170,.2);border-radius:14px;padding:14px 24px;">
-                <i class="fas fa-gift" style="color:#f1e1aa;font-size:1.2rem;"></i>
-                <span style="color:rgba(255,255,255,.7);font-size:14px;">
-                    <strong style="color:#f1e1aa;">Free 30 min</strong> bonus every 2 hours on Hourly &amp; Open Time — no sign-up required.
+            <div class="gsh-bonus-strip">
+                <i class="fas fa-gift"></i>
+                <span class="gsh-bonus-text">
+                    <strong>Free 30 min</strong> bonus every 2 hours on Hourly &amp; Open Time — no sign-up required.
                 </span>
             </div>
         </div>
@@ -102,6 +102,51 @@ $unlimitedRate = (float)(getSetting('unlimited_rate') ?? 400);
 </section>
 
 <style>
+.gsh-services {
+    background: linear-gradient(180deg, #0d1b2a 0%, #07101f 100%);
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+}
+.gsh-blob {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+.blob-1 {
+    top: -100px; left: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(95, 133, 218, 0.07), transparent 70%);
+}
+.blob-2 {
+    bottom: -80px; right: -80px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(179, 123, 236, 0.07), transparent 70%);
+}
+.gsh-services-container {
+    position: relative;
+    z-index: 2;
+}
+.gsh-bonus-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(241, 225, 170, 0.06);
+    border: 1px solid rgba(241, 225, 170, 0.2);
+    border-radius: 14px;
+    padding: 14px 24px;
+}
+.gsh-bonus-strip i {
+    color: #f1e1aa;
+    font-size: 1.2rem;
+}
+.gsh-bonus-text {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+}
+.gsh-bonus-text strong {
+    color: #f1e1aa;
+}
 .gsh-price-card {
     background: rgba(10,18,40,.75);
     border: 1px solid rgba(255,255,255,.07);

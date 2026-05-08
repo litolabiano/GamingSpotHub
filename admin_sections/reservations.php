@@ -1,5 +1,6 @@
 <!-- ════ RESERVATIONS ════════════════════════════════════════════════════ -->
 <div class="page" id="reservations">
+    <div id="reservationsContent">
 
     <!-- Page Header -->
     <div class="page-header">
@@ -7,9 +8,10 @@
             <h2 class="page-title"><i class="fas fa-calendar-check" style="color:#20c8a1;margin-right:10px;"></i>Reservations</h2>
             <p class="page-subtitle">Manage upcoming reservations — paid via PayMongo</p>
         </div>
-        <button class="btn btn-primary" onclick="openModal('addReservation')">
+        <button class="btn-prim" onclick="openModal('addReservation')">
             <i class="fas fa-plus"></i> Add Reservation
         </button>
+
     </div>
 
     <!-- Stats summary -->
@@ -112,15 +114,16 @@
                             </td>
                             <td>
                                 <div style="display:flex;gap:6px;">
-                                    <button class="btn btn-success btn-sm" title="Approve"
+                                    <button class="btn-prim btn-sm" title="Approve"
                                         onclick="adminRespondReschedule(<?= $pr['reschedule_id'] ?>, 'approve')">
                                         <i class="fas fa-check"></i> Approve
                                     </button>
-                                    <button class="btn btn-sm" title="Reject"
-                                        style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.4);"
+
+                                    <button class="btn-dang btn-sm" title="Reject"
                                         onclick="adminRespondReschedule(<?= $pr['reschedule_id'] ?>, 'reject')">
                                         <i class="fas fa-times"></i> Reject
                                     </button>
+
                                 </div>
                             </td>
                         </tr>
@@ -232,16 +235,18 @@
                                 </td>
                                 <td>
                                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                                        <button class="btn btn-success btn-sm"
+                                        <button class="btn-prim btn-sm"
                                             onclick="openConvertModal(<?= htmlspecialchars(json_encode($r)) ?>)"
                                             title="Start Session">
                                             <i class="fas fa-play"></i> Start
                                         </button>
-                                        <button class="btn btn-primary btn-sm" title="Reschedule"
-                                            onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>')"
-                                            style="background:linear-gradient(135deg,#20c8a1,#17a887);border-color:transparent;">
+
+                                        <button class="btn-prim btn-sm" title="Reschedule"
+                                            onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>', '<?= addslashes($r['console_type']) ?>')">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
+
+
                                     </div>
                                 </td>
                             </tr>
@@ -374,11 +379,11 @@
             </div>
         </div>
     <?php endif; ?>
-</div>
 
+    </div> <!-- end #reservationsContent -->
+</div><!-- /.page#reservations -->
 
-
-<!-- ── Reschedule Reservation Modal ── -->
+<!-- ── Reschedule Reservation Modal (outside .page to avoid transform stacking context) ── -->
 <div id="rescheduleResModal" style="display:none;position:fixed;inset:0;z-index:9999;
      background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
      align-items:center;justify-content:center;">
@@ -460,26 +465,48 @@
             </select>
         </div>
 
+        <!-- Console Type -->
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Console Type *</label>
+            <select id="rescheduleConsoleType" required style="
+                width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;" onchange="refreshRescheduleUnits()">
+                <?php foreach ($consoleTypes as $ct): ?>
+                    <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <!-- New Unit (Dynamic) -->
+        <div style="margin-bottom:20px;">
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Unit (Optional)</label>
+            <select id="rescheduleUnit" style="
+                width:100%;background:rgba(10,33,81,.7);
+                border:1px solid rgba(95,133,218,.3);
+                color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;">
+                <option value="">-- Assign any available --</option>
+            </select>
+            <div id="rescheduleUnitStatus" style="font-size:11px;color:#888;margin-top:4px;">Select date & time to check unit availability</div>
+        </div>
+
         <!-- Buttons -->
         <div style="display:flex;gap:10px;">
-            <button type="button" id="rescheduleSubmitBtn" onclick="submitReschedule()"
-                style="flex:1;padding:11px;border-radius:10px;border:none;
-                       background:linear-gradient(135deg,#20c8a1,#17a887);color:#0a0f1c;
-                       font-weight:700;font-size:13px;cursor:pointer;">
+            <button type="button" class="btn-prim" id="rescheduleSubmitBtn" onclick="submitReschedule()" style="flex:1;">
                 <i class="fas fa-calendar-check"></i> Confirm Reschedule
             </button>
-            <button type="button" onclick="closeRescheduleModal()"
-                style="flex:1;padding:11px;border-radius:10px;
-                       border:1px solid rgba(255,255,255,.15);background:transparent;
-                       color:#aaa;font-weight:700;font-size:13px;cursor:pointer;">
+            <button type="button" class="btn-sec" onclick="closeRescheduleModal()" style="flex:1;">
                 Cancel
             </button>
         </div>
+
     </div>
 </div>
 
 <script>
-function openRescheduleModal(resId, customerName, oldDate, oldTime) {
+function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType) {
     document.getElementById('rescheduleResId').value = resId;
     document.getElementById('rescheduleResSubtitle').textContent =
         'Reservation #' + resId + ' — ' + customerName;
@@ -487,10 +514,14 @@ function openRescheduleModal(resId, customerName, oldDate, oldTime) {
     document.getElementById('rescheduleDetail').value  = '';
     document.getElementById('rescheduleDate').dataset.oldDate = oldDate;
     document.getElementById('rescheduleTime').dataset.oldTime = oldTime.substring(0,5);
-    document.getElementById('rescheduleDate').value    = oldDate;  // pre-fill with current date
+    document.getElementById('rescheduleDate').dataset.consoleType = consoleType;
+    document.getElementById('rescheduleConsoleType').value = consoleType;
+    document.getElementById('rescheduleDate').value    = oldDate;
     document.getElementById('rescheduleTime').value    = oldTime.substring(0,5);
     document.getElementById('rescheduleResModal').style.display = 'flex';
+    refreshRescheduleUnits();
 }
+
 function closeRescheduleModal() {
     document.getElementById('rescheduleResModal').style.display = 'none';
 }
@@ -502,53 +533,82 @@ document.getElementById('rescheduleReason')?.addEventListener('change', function
     document.getElementById('rescheduleDetailLabel').textContent =
         isOther ? 'Please describe the reason *' : 'Additional Notes (Optional)';
 });
+document.getElementById('rescheduleDate')?.addEventListener('change', refreshRescheduleUnits);
+document.getElementById('rescheduleTime')?.addEventListener('change', refreshRescheduleUnits);
+
+function refreshRescheduleUnits() {
+    const date = document.getElementById('rescheduleDate').value;
+    const time = document.getElementById('rescheduleTime').value;
+    const type = document.getElementById('rescheduleConsoleType').value;
+    const sel  = document.getElementById('rescheduleUnit');
+    const stat = document.getElementById('rescheduleUnitStatus');
+    if (!date || !time || !type) return;
+    stat.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking units...';
+    sel.disabled = true;
+    fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(type)}`)
+    .then(r => r.json())
+    .then(data => {
+        sel.disabled = false;
+        if (!data.success) { stat.textContent = 'Error checking units'; return; }
+        let html = '<option value="">-- Assign any available --</option>';
+        data.units.forEach(u => {
+            const ok = u.status === 'available';
+            html += `<option value="${u.id}" ${ok ? '' : 'disabled'}>#${u.unit} - ${u.name} ${ok ? '(Available)' : '(' + u.status + ')'}</option>`;
+        });
+        sel.innerHTML = html;
+        stat.textContent = data.units.filter(u => u.status === 'available').length + ' units available for this slot';
+    })
+    .catch(() => { sel.disabled = false; stat.textContent = 'Network error'; });
+}
+
 function submitReschedule() {
     const resId  = document.getElementById('rescheduleResId').value;
     const reason = document.getElementById('rescheduleReason').value;
     const detail = document.getElementById('rescheduleDetail').value.trim();
     const date   = document.getElementById('rescheduleDate').value;
     const time   = document.getElementById('rescheduleTime').value;
-
+    const type   = document.getElementById('rescheduleConsoleType').value;
+    const unitId = document.getElementById('rescheduleUnit').value;
     if (!reason) { alert('Please select a reason.'); return; }
     if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
     if (!date)   { alert('Please select a new date.'); return; }
     if (!time)   { alert('Please select a new time.'); return; }
-
+    if (!type)   { alert('Please select a console type.'); return; }
     const oldDate = document.getElementById('rescheduleDate').dataset.oldDate;
     const oldTime = document.getElementById('rescheduleTime').dataset.oldTime;
-    if (date === oldDate && time === oldTime) {
-        alert('New date and time cannot be the same as the current reservation schedule.');
+    if (date === oldDate && time === oldTime && !unitId && type === document.getElementById('rescheduleDate').dataset.consoleType) {
+        alert('Please change the date, time, console type, or assign a specific unit.');
         return;
     }
-
     const btn = document.getElementById('rescheduleSubmitBtn');
     btn.disabled = true;
     btn.textContent = 'Rescheduling...';
-
     fetch('ajax/reschedule_reservation.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time })
+        body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time, console_type: type, console_id: unitId })
     })
-    .then(r => r.json())
+    .then(async r => {
+        const text = await r.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error('Invalid server response. The request might have succeeded, but we couldn\'t confirm it.');
+        }
+    })
     .then(data => {
         if (data.success) {
             closeRescheduleModal();
-            // Show success toast if available, else alert
-            if (typeof showAdminToast === 'function') {
-                showAdminToast(data.message, 'success');
-            } else {
-                alert('✓ ' + data.message);
-            }
-            setTimeout(() => location.reload(), 1800);
+            if (typeof showAdminToast === 'function') { showAdminToast(data.message, 'success'); } else { alert('✓ ' + data.message); }
+            refreshReservationsUI();
         } else {
             alert('✕ ' + (data.message || 'Failed to reschedule.'));
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
         }
     })
-    .catch(() => {
-        alert('Network error. Please try again.');
+    .catch(err => {
+        alert('✕ ' + err.message);
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
     });
@@ -556,15 +616,15 @@ function submitReschedule() {
 </script>
 
 <script>
-/* ── Reservations search + pagination ─────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', function() {
+let resPag, cancelPag;
 
+function initReservationsHandlers() {
     /* ── Upcoming Reservations ── */
     const resSearch = document.getElementById('resSearch');
     const resStatus = document.getElementById('resStatusFilter');
     const resTable  = document.getElementById('resTable');
 
-    const resPag = new AdminPaginator('resTable', {
+    resPag = new AdminPaginator('resTable', {
         pageSize:      10,
         pageSizes:     [10, 25, 50],
         paginationSel: '#resPagination',
@@ -597,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelSearch = document.getElementById('cancelResSearch');
     const cancelTable  = document.getElementById('cancelResTable');
 
-    const cancelPag = new AdminPaginator('cancelResTable', {
+    cancelPag = new AdminPaginator('cancelResTable', {
         pageSize:      10,
         pageSizes:     [10, 25, 50],
         paginationSel: '#cancelResPagination',
@@ -621,7 +681,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (cancelClear) cancelClear.addEventListener('click', () => { cancelSearch.value = ''; filterCancel(); cancelSearch.focus(); });
 
     cancelPag.apply();
-});
+}
+
+function refreshReservationsUI() {
+    fetch(location.href)
+        .then(r => r.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const newContent = doc.getElementById('reservationsContent');
+            const oldContent = document.getElementById('reservationsContent');
+            if (newContent && oldContent) {
+                oldContent.innerHTML = newContent.innerHTML;
+                initReservationsHandlers();
+            }
+        });
+}
+
+document.addEventListener('DOMContentLoaded', initReservationsHandlers);
 
 function adminRespondReschedule(rescheduleId, action) {
     if (!confirm('Are you sure you want to ' + action + ' this request?')) return;
@@ -635,9 +711,10 @@ function adminRespondReschedule(rescheduleId, action) {
         } else {
             alert((d.success ? '✓ ' : '✕ ') + d.message);
         }
-        if (d.success) setTimeout(() => location.reload(), 1500);
+        if (d.success) refreshReservationsUI();
     }).catch(e => {
         alert('Network error. Please try again.');
     });
 }
+
 </script>

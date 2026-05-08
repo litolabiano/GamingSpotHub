@@ -33,23 +33,14 @@
         "></p>
         <!-- Buttons -->
         <div style="display:flex;gap:10px;">
-            <button id="gspotConfirmNo" style="
-                flex:1;padding:11px;border-radius:10px;
-                background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
-                color:#aaa;font-size:14px;font-weight:600;cursor:pointer;
-                transition:.18s;font-family:inherit;
-            " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">
+            <button id="gspotConfirmNo" class="btn-sec" style="flex:1;">
                 <i class="fas fa-times" style="margin-right:6px"></i>Cancel
             </button>
-            <button id="gspotConfirmYes" style="
-                flex:1;padding:11px;border-radius:10px;
-                background:linear-gradient(135deg,#20c8a1,#5f85da);
-                border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
-                box-shadow:0 4px 16px rgba(32,200,161,0.3);transition:.18s;font-family:inherit;
-            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+            <button id="gspotConfirmYes" class="btn-prim" style="flex:1;">
                 <i class="fas fa-check" style="margin-right:6px"></i>Confirm
             </button>
         </div>
+
     </div>
 </div>
 <style>
@@ -201,12 +192,13 @@
     80%     { transform:translateX(5px); }
 }
 /* Start Session button disabled state */
-#startSessionForm .btn-primary:disabled {
+#startSessionForm .btn-prim:disabled {
     background:rgba(100,100,120,.3)!important;
     box-shadow:none!important;
     cursor:not-allowed!important;
     opacity:.55!important;
 }
+
 </style>
 
 <!-- ════ CUSTOMER SEARCH WIDGET — shared CSS ═══════════════════════════ -->
@@ -338,7 +330,6 @@
                 <label>Customer <span style="color:#888;font-size:11px;font-weight:400;">(optional — leave blank for walk-in)</span></label>
                 <div class="cs-wrap" id="ssWrap">
                     <div class="cs-input-row">
-                        <i class="fas fa-search cs-icon"></i>
                         <input type="text" id="ssQuery" class="cs-input"
                                placeholder="Search customer by name or email…"
                                autocomplete="off"
@@ -399,9 +390,9 @@
                     <?php endforeach; ?>
                 </select>
                 <?php $pr = getPricingRules(); ?>
-                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:center;gap:5px;">
-                    <i class="fas fa-info-circle"></i>
-                    Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly. For longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).
+                <div style="margin-top:7px;font-size:12px;color:rgba(241,168,60,.85);display:flex;align-items:flex-start;gap:6px;">
+                    <i class="fas fa-info-circle" style="margin-top:2px;"></i>
+                    <span>Max <?= $pr['max_hourly_minutes'] / 60 ?> hrs for hourly; for longer play, use <strong style="color:#f1a83c;">Unlimited</strong> mode (flat &#8369;<?= number_format(getSetting('unlimited_rate'), 0) ?>).</span>
                 </div>
             </div>
 
@@ -423,50 +414,62 @@
             </div>
 
 <?php
-$ctrlAvailCount = $conn->query(
-    "SELECT COUNT(*) AS n FROM controllers WHERE status = 'available' AND controller_type = 'Xbox Controller'"
-)->fetch_assoc()['n'] ?? 0;
-$ctrlTotal = $conn->query(
-    "SELECT COUNT(*) AS n FROM controllers WHERE controller_type = 'Xbox Controller'"
-)->fetch_assoc()['n'] ?? 0;
+// Load controller availability grouped by console type (joins through controller_types → console_types)
+$ctrlAvailByType = [];
+$ctrlRes = $conn->query(
+    "SELECT cs.type_name AS console_type,
+            COUNT(*) AS total,
+            SUM(c.status = 'available') AS available
+       FROM controllers c
+       JOIN controller_types ct ON ct.type_id = c.console_type_id
+       JOIN console_types    cs ON cs.type_id  = ct.console_type_id
+      GROUP BY cs.type_name"
+);
+if ($ctrlRes) {
+    while ($row = $ctrlRes->fetch_assoc()) {
+        $ctrlAvailByType[$row['console_type']] = [
+            'available' => (int)$row['available'],
+            'total'     => (int)$row['total'],
+        ];
+    }
+}
+$ctrlAvailJson = json_encode($ctrlAvailByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>
+<script>
+/* Controller availability per console type — used by onConsoleChange() */
+const CTRL_AVAIL_BY_TYPE = <?= $ctrlAvailJson ?>;
+</script>
+
 <div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
     <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
                 border-radius:12px;padding:14px 16px;">
         <div class="form-check" style="margin:0;">
             <input type="checkbox" id="controllerRentalToggle"
                    name="controller_rental" value="1"
-                   onchange="recalcSessionPreview()"
-                   <?= $ctrlAvailCount === 0 ? 'disabled' : '' ?>>
+                   onchange="recalcSessionPreview()">
             <input type="hidden" name="controller_rental_fee_amt"
                    id="controllerFeeAmt"
                    value="<?= htmlspecialchars(getSetting('controller_rental_fee') ?? 20) ?>">
-            <label for="controllerRentalToggle" style="display:flex;align-items:center;gap:10px;cursor:<?= $ctrlAvailCount === 0 ? 'not-allowed' : 'pointer' ?>;">
-                <i class="fas fa-gamepad" style="color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;font-size:16px;"></i>
+            <label for="controllerRentalToggle" id="controllerRentalLabel"
+                   style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <i class="fas fa-gamepad" id="ctrlRentalIcon" style="color:var(--clr-mint);font-size:16px;"></i>
                 <div>
                     <div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;
-                                color:<?= $ctrlAvailCount > 0 ? 'var(--clr-mint)' : '#666' ?>;">
+                                color:var(--clr-mint);">
                         Controller Rental
                         <span style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
-                            +₱<?= getSetting('controller_rental_fee') ?? 20 ?>/session
+                            +&#8369;<?= getSetting('controller_rental_fee') ?? 20 ?>/session
                         </span>
                     </div>
-                    <div style="font-size:11px;margin-top:3px;
-                                color:<?= $ctrlAvailCount > 0 ? '#888' : '#fb566b' ?>;">
-                        <?php if ($ctrlAvailCount > 0): ?>
-                            <i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>
-                            <strong style="color:#20c8a1;"><?= $ctrlAvailCount ?></strong>
-                            of <?= $ctrlTotal ?> controller<?= $ctrlTotal !== 1 ? 's' : '' ?> available
-                        <?php else: ?>
-                            <i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>
-                            No controllers available right now
-                        <?php endif; ?>
+                    <div id="ctrlAvailText" style="font-size:11px;margin-top:3px;color:#888;">
+                        <!-- Populated by onConsoleChange() -->
                     </div>
                 </div>
             </label>
         </div>
     </div>
 </div>
+
 
             <!-- ── Optional upfront payment (hourly only) ── -->
             <div id="startPaymentGroup" style="display:none;">
@@ -560,9 +563,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-clock"></i> <strong>Open Time</strong> — no upfront payment needed. Cost is calculated and collected when the session ends.
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-play"></i> Start Session
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -657,18 +661,11 @@ $ctrlTotal = $conn->query(
             </div>
 
             <!-- Refund & End action -->
-            <button type="button" id="endEarlyRefundBtn"
-                    style="width:100%;padding:12px;border-radius:10px;
-                           background:linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15));
-                           border:1px solid rgba(241,168,60,.5);color:#f1e1aa;
-                           font-size:14px;font-weight:700;cursor:pointer;
-                           display:flex;align-items:center;justify-content:center;gap:8px;
-                           transition:.2s;"
-                    onmouseover="this.style.background='linear-gradient(135deg,rgba(241,168,60,.35),rgba(251,86,107,.25))'"
-                    onmouseout="this.style.background='linear-gradient(135deg,rgba(241,168,60,.25),rgba(251,86,107,.15))'">
+            <button type="button" id="endEarlyRefundBtn" class="btn-dang btn-full" style="padding:12px;">
                 <i class="fas fa-undo-alt"></i>
                 <span>Refund <span id="endEarlyRefundBtnAmt">—</span> &amp; End Session Early</span>
             </button>
+
         </div>
 
 
@@ -753,9 +750,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-check-circle"></i> <strong>Payment already collected at session start.</strong> No additional charge at end.
             </div>
 
-            <button type="submit" class="btn btn-danger btn-full" id="endSessionConfirmBtn" style="margin-top:4px;">
+            <button type="submit" class="btn-dang btn-full" id="endSessionConfirmBtn" style="margin-top:4px;">
                 <i class="fas fa-check-circle"></i> <span id="endSessionConfirmLabel">Confirm End &amp; Record Payment</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -834,9 +832,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>
                 <strong>Short payment</strong> — the remaining shortfall will be recorded.
             </div>
-            <button type="submit" id="payConfirmBtn" class="btn btn-primary btn-full">
+            <button type="submit" id="payConfirmBtn" class="btn-prim btn-full">
                 <i class="fas fa-check-circle"></i> <span id="payConfirmLabel">Record Payment</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -899,10 +898,11 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
                 <span id="refundErrorText"></span>
             </div>
-            <button type="button" id="refundConfirmBtn" class="btn btn-danger btn-full"
+            <button type="button" id="refundConfirmBtn" class="btn-dang btn-full"
                     onclick="_submitRefundAjax()">
                 <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -971,9 +971,10 @@ $ctrlTotal = $conn->query(
                 <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
                 <span id="extendErrorText"></span>
             </div>
-            <button type="submit" id="extendConfirmBtn" class="btn btn-primary" style="width:100%;justify-content:center;background:rgba(95,133,218,.25);border:1px solid #5f85da;color:#8aa4e8;">
+            <button type="submit" id="extendConfirmBtn" class="btn-prim btn-full">
                 <i class="fas fa-clock"></i> <span id="extendConfirmLabel">Extend Session</span>
             </button>
+
         </form>
         
     </div>
@@ -994,9 +995,17 @@ function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, ren
     // Reset fields
     document.getElementById('extendMinutes').value = '';
     document.getElementById('extendCostPreview').style.display = 'none';
-    document.getElementById('extendPaymentFields').style.display = 'none';
-    document.getElementById('extendTendered').value = '';
-    document.getElementById('extendChangeDisplay').style.display = 'none';
+    if(document.getElementById('extendPaymentFields')) document.getElementById('extendPaymentFields').style.display = 'none';
+    if(document.getElementById('extendTendered')) document.getElementById('extendTendered').value = '';
+    if(document.getElementById('extendChangeDisplay')) document.getElementById('extendChangeDisplay').style.display = 'none';
+    
+    // Reset error state and button
+    document.getElementById('extendErrorMsg').style.display = 'none';
+    const btn = document.getElementById('extendConfirmBtn');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+
     // Reset the tendered toggle to locked state
     const toggle = document.getElementById('extendTenderedToggle');
     if (toggle) { toggle.checked = false; _lockExtendTendered(); }
@@ -1040,35 +1049,72 @@ function loadPendingExtensions(sessionId) {
 function updateExtendCost() {
     const mins    = parseInt(document.getElementById('extendMinutes').value) || 0;
     const mode    = document.getElementById('extendSessionMode').value;
+    const sessionId = document.getElementById('extendSessionId').value;
     const preview = document.getElementById('extendCostPreview');
     const payFlds = document.getElementById('extendPaymentFields');
     const freeNote = document.getElementById('extendFreeNote');
     const costEl  = document.getElementById('extendCostAmt');
     const holder  = document.getElementById('extendCostHolder');
+    const errorMsg = document.getElementById('extendErrorMsg');
+    const errorText = document.getElementById('extendErrorText');
+    const btn = document.getElementById('extendConfirmBtn');
 
-    if (!mins) { preview.style.display = 'none'; payFlds.style.display = 'none'; return; }
-    preview.style.display = 'block';
-
-    if (mode === 'open_time' || mode === 'unlimited') {
-        costEl.textContent = '₱0';
-        freeNote.style.display = 'block';
-        payFlds.style.display  = 'none';
-        holder.value = '0';
-    } else {
-        // Hourly: straight ₱80/hr
-        const cost = computeExtCost(mins);
-        costEl.textContent = '₱' + cost;
-        freeNote.style.display = 'none';
-        payFlds.style.display  = 'block';
-        holder.value = cost;
-        // Pre-fill tendered with the exact cost; keep it locked
-        const tendInput = document.getElementById('extendTendered');
-        tendInput.value = cost;
-        // Reset the toggle checkbox so the field stays locked
-        const toggle = document.getElementById('extendTenderedToggle');
-        if (toggle) { toggle.checked = false; _lockExtendTendered(); }
-        document.getElementById('extendChangeDisplay').style.display = 'none';
+    if (!mins) { 
+        preview.style.display = 'none'; 
+        if(payFlds) payFlds.style.display = 'none'; 
+        errorMsg.style.display = 'none';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        return; 
     }
+
+    // Check for conflict first
+    fetch(`ajax/check_extend_conflict.php?session_id=${sessionId}&extra_minutes=${mins}`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.conflict) {
+                // Show conflict error, hide preview, disable button
+                errorText.textContent = data.message;
+                errorMsg.style.display = 'block';
+                preview.style.display = 'none';
+                if(payFlds) payFlds.style.display = 'none';
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            } else {
+                // No conflict, proceed
+                errorMsg.style.display = 'none';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                preview.style.display = 'block';
+
+                if (mode === 'open_time' || mode === 'unlimited') {
+                    costEl.textContent = '₱0';
+                    freeNote.style.display = 'inline-block';
+                    if(payFlds) payFlds.style.display  = 'none';
+                    holder.value = '0';
+                } else {
+                    // Hourly: straight ₱80/hr
+                    const cost = computeExtCost(mins);
+                    costEl.textContent = '₱' + cost;
+                    freeNote.style.display = 'none';
+                    if(payFlds) payFlds.style.display  = 'block';
+                    holder.value = cost;
+                    // Pre-fill tendered
+                    const tendInput = document.getElementById('extendTendered');
+                    if(tendInput) tendInput.value = cost;
+                    const toggle = document.getElementById('extendTenderedToggle');
+                    if (toggle) { toggle.checked = false; _lockExtendTendered(); }
+                    const changeDisp = document.getElementById('extendChangeDisplay');
+                    if(changeDisp) changeDisp.style.display = 'none';
+                }
+            }
+        })
+        .catch(err => {
+            console.warn('[GSpot] Conflict check error:', err);
+        });
 }
 
 // JS mirror of extension pricing: straight ₱80/hr, no session-start minimum
@@ -1315,9 +1361,9 @@ function denyExt(extId) {
                     <label>Console Type <span class="req">*</span></label>
                     <select name="console_type" required>
                         <option value="" disabled selected>— Select —</option>
-                        <option value="PS4">PS4</option>
-                        <option value="PS5">PS5</option>
-                        <option value="Xbox Series X">Xbox Series X</option>
+                        <?php foreach ($consoleTypes as $ct): ?>
+                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1380,9 +1426,10 @@ function denyExt(extId) {
                 <label>Notes</label>
                 <textarea name="notes" rows="2" placeholder="Any notes…"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-calendar-check"></i> Save Reservation
             </button>
+
         </form>
         </div><!-- /.modal-body -->
     </div>
@@ -1418,9 +1465,10 @@ function denyExt(extId) {
                 <span>Double-check the console unit matches the customer's reservation type. This action starts the timer immediately.</span>
             </div>
             <hr class="modal-divider">
-            <button type="submit" class="btn btn-success btn-full">
+            <button type="submit" class="btn-prim btn-full">
                 <i class="fas fa-play"></i> Start Session Now
             </button>
+
         </form>
     </div>
 </div>
@@ -1742,7 +1790,7 @@ function openConvertModal(res) {
 <div class="modal" id="addControllerModal">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3><i class="fas fa-gamepad" style="color:var(--clr-mint);margin-right:8px;"></i>Add Xbox Controller</h3>
+            <h3><i class="fas fa-gamepad" style="color:var(--clr-mint);margin-right:8px;"></i>Add Controller</h3>
             <button class="modal-close" onclick="closeModal('addController')">
                 <i class="fas fa-times"></i>
             </button>
@@ -1750,15 +1798,14 @@ function openConvertModal(res) {
         <form method="POST">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add_controller">
-            <input type="hidden" name="controller_type" value="Xbox Controller">
+
 
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Controller Name *</label>
                         <input type="text" name="controller_name" required
-                               placeholder="e.g. Xbox Controller"
-                               value="Xbox Controller">
+                               placeholder="e.g. DualSense Controller">
                     </div>
                     <div class="form-group">
                         <label>Unit Number *</label>
@@ -1769,7 +1816,26 @@ function openConvertModal(res) {
                 </div>
 
                 <div class="form-group">
-                    <label>Notes <span style="color:#666;font-weight:400;">(optional)</span></label>
+                    <label>Controller Type *</label>
+                    <select name="controller_type_id" required
+                            onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
+                        <option value="" disabled selected>— Select Type —</option>
+                        <?php foreach ($controllerTypes as $ct): ?>
+                            <option value="<?= $ct['type_id'] ?>"
+                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>">
+                                <?= htmlspecialchars($ct['type_name']) ?>
+                                <?php if (!empty($ct['parent_console_name'])): ?>
+                                    (<?= htmlspecialchars($ct['parent_console_name']) ?>)
+                                <?php endif; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <!-- Hidden: keeps the type name in sync for the legacy controller_type text column -->
+                    <input type="hidden" name="controller_type" value="">
+                </div>
+
+
+                <div class="form-group">
                     <textarea name="controller_notes" rows="2"
                               placeholder="e.g. Minor stick drift, Cable-only..."></textarea>
                 </div>
@@ -1792,13 +1858,14 @@ function openConvertModal(res) {
             </div>
 
             <div class="modal-footer">
-                <button type="button" onclick="closeModal('addController')" class="btn btn-secondary">
+                <button type="button" onclick="closeModal('addController')" class="btn-sec">
                     Cancel
                 </button>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn-prim">
                     <i class="fas fa-plus"></i> Add Controller
                 </button>
             </div>
+
         </form>
     </div>
 </div>

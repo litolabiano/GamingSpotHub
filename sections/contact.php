@@ -46,7 +46,7 @@
                         </div>
                         <div>
                             <div class="gsh-ci-label">Email</div>
-                            <div class="gsh-ci-val">gspotgaminghub@gmail.com</div>
+                            <div class="gsh-ci-val">goodspotgaminghub@gmail.com</div>
                         </div>
                     </div>
 
@@ -81,28 +81,29 @@
             <!-- Right: contact form -->
             <div class="col-lg-7" data-aos="fade-left" data-aos-delay="100">
                 <div class="gsh-contact-form-wrap">
-                    <div style="margin-bottom:22px;">
-                        <div style="font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:4px;">Send Us a Message</div>
-                        <div style="font-size:13px;color:rgba(255,255,255,.4);">We'll get back to you as soon as possible.</div>
+                    <div class="gsh-form-header">
+                        <h3 class="gsh-form-title">Send Us a Message</h3>
+                        <p class="gsh-form-subtitle">We'll get back to you as soon as possible.</p>
                     </div>
 
-                    <form id="contactForm">
+                    <form id="contactForm" method="POST">
+                        <?= csrfField() ?>
                         <div class="row g-3">
                             <div class="col-sm-6">
                                 <label class="gsh-form-label">Your Name</label>
-                                <input type="text" id="contactName" class="gsh-form-input" placeholder="Juan dela Cruz" required>
+                                <input type="text" name="name" id="contactName" class="gsh-form-input" placeholder="Juan dela Cruz" required>
                             </div>
                             <div class="col-sm-6">
                                 <label class="gsh-form-label">Email Address</label>
-                                <input type="email" id="contactEmail" class="gsh-form-input" placeholder="juan@email.com" required>
+                                <input type="email" name="email" id="contactEmail" class="gsh-form-input" placeholder="juan@email.com" required>
                             </div>
                             <div class="col-12">
                                 <label class="gsh-form-label">Phone <span style="color:rgba(255,255,255,.3);font-weight:500;">(optional)</span></label>
-                                <input type="tel" id="contactPhone" class="gsh-form-input" placeholder="09XX XXX XXXX">
+                                <input type="tel" name="phone" id="contactPhone" class="gsh-form-input" placeholder="09XX XXX XXXX">
                             </div>
                             <div class="col-12">
                                 <label class="gsh-form-label">Message</label>
-                                <textarea id="contactMessage" class="gsh-form-input" rows="5" placeholder="Hi! I'd like to ask about..." required style="resize:vertical;min-height:120px;"></textarea>
+                                <textarea name="message" id="contactMessage" class="gsh-form-input" rows="5" placeholder="Hi! I'd like to ask about..." required style="resize:vertical;min-height:120px;"></textarea>
                             </div>
                             <div class="col-12">
                                 <button type="submit" id="contactSubmitBtn" class="gsh-contact-submit">
@@ -157,12 +158,28 @@
     font-weight: 600;
     line-height: 1.5;
 }
+.gsh-form-header {
+    margin-bottom: 24px;
+}
+.gsh-form-title {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+}
+.gsh-form-subtitle {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 0;
+}
 .gsh-contact-form-wrap {
-    background: rgba(10,18,40,.75);
-    border: 1px solid rgba(255,255,255,.08);
-    border-radius: 22px;
-    padding: 32px;
-    backdrop-filter: blur(10px);
+    background: rgba(10, 18, 40, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 36px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 .gsh-form-label {
     display: block;
@@ -218,15 +235,35 @@ document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     const btn = document.getElementById('contactSubmitBtn');
     const fb  = document.getElementById('contactFeedback');
+    const form = this;
+    const formData = new FormData(form);
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Sending…</span>';
-    // Simulated send (no backend endpoint yet)
-    setTimeout(() => {
+    fb.style.display = 'none';
+
+    fetch('ajax/send_contact.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Send Message</span>';
         fb.style.display = 'block';
-        fb.innerHTML = '<div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.3);border-radius:12px;padding:14px 18px;color:#20c8a1;font-size:14px;font-weight:700;">✓ Message sent! We\'ll get back to you soon.</div>';
-        document.getElementById('contactForm').reset();
-    }, 1200);
+        if (data.success) {
+            fb.innerHTML = `<div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.3);border-radius:12px;padding:14px 18px;color:#20c8a1;font-size:14px;font-weight:700;">✓ ${data.message}</div>`;
+            form.reset();
+        } else {
+            fb.innerHTML = `<div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.3);border-radius:12px;padding:14px 18px;color:#fb566b;font-size:14px;font-weight:700;">✗ Error: ${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> <span>Send Message</span>';
+        fb.style.display = 'block';
+        fb.innerHTML = '<div style="background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.3);border-radius:12px;padding:14px 18px;color:#fb566b;font-size:14px;font-weight:700;">✗ An error occurred. Please try again later.</div>';
+    });
 });
 </script>

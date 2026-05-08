@@ -35,7 +35,7 @@ if ($date < $today) {
 
 // ── 1. Get all non-maintenance consoles of this type ─────
 $stmt = $conn->prepare(
-    "SELECT console_id, unit_number, console_name, status
+    "SELECT console_id, unit_number, console_name, status, controller_count
        FROM consoles
       WHERE console_type = ? AND status != 'maintenance'
       ORDER BY unit_number"
@@ -102,13 +102,15 @@ foreach ($consoles as $c) {
     }
 
     $units[] = [
-        'id'       => $cid,
-        'unit'     => $c['unit_number'],
-        'name'     => $c['console_name'],
-        'status'   => $status,
-        'conflict' => $conflict,
+        'id'          => $cid,
+        'unit'        => $c['unit_number'],
+        'name'        => $c['console_name'],
+        'status'      => $status,
+        'controllers' => (int)$c['controller_count'],
+        'conflict'    => $conflict,
     ];
 }
+
 
 echo json_encode([
     'success'                 => true,

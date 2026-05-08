@@ -28,9 +28,13 @@ $user   = getCurrentUser();
 $uid    = (int)$user['user_id'];
 
 // ── Input ─────────────────────────────────────────────────────────────────────
-$res_id   = (int)trim($_POST['reservation_id'] ?? 0);
-$new_date = trim($_POST['new_date'] ?? '');
-$new_time = trim($_POST['new_time'] ?? '');
+$res_id           = (int)trim($_POST['reservation_id'] ?? 0);
+$new_date         = trim($_POST['new_date'] ?? '');
+$new_time         = trim($_POST['new_time'] ?? '');
+$new_console_type = trim($_POST['console_type'] ?? '');
+$new_console_id   = (int)($_POST['console_id'] ?? 0) ?: null;
+
+
 
 // Basic presence check
 if (!$res_id || !$new_date || !$new_time) {
@@ -71,7 +75,7 @@ if (!$newDT || $newDT->getTimestamp() < ($now->getTimestamp() + 3600)) {
 
 // ── Fetch reservation — must belong to this user ──────────────────────────────
 $stmt = $conn->prepare(
-    "SELECT reservation_id, user_id, console_type, rental_mode, planned_minutes,
+    "SELECT reservation_id, user_id, console_type, console_id, rental_mode, planned_minutes,
             reserved_date, reserved_time, status, downpayment_amount
        FROM reservations
       WHERE reservation_id = ? AND user_id = ?"
@@ -96,7 +100,7 @@ if (!in_array($res['status'], ['pending', 'reserved'])) {
 // reservation_id was created by the customer themselves.
 $chk = $conn->prepare(
     "SELECT reschedule_id FROM reservation_reschedules
-      WHERE reservation_id = ? AND rescheduled_by = ?
+      WHERE reservation_id = ? AND rescheduled_by = ? AND status != 'rejected'
       LIMIT 1"
 );
 $chk->bind_param('ii', $res_id, $uid);
@@ -107,7 +111,7 @@ if ($chk->get_result()->num_rows > 0) {
 }
 
 // ── Availability check — ensure the new slot is not already taken ─────────────
-// We check for any pending/confirmed reservation on the same console_type
+// We check for any pending/confirmed reservation on the NEW requested console_type
 // whose time window overlaps the new slot (using planned_minutes for hourly,
 // or a 2-hour window for open_time/unlimited).
 $newSlotStart = $newDT->getTimestamp();
@@ -132,25 +136,34 @@ $avail = $conn->prepare(
             )
       LIMIT 1"
 );
-$avail->bind_param('ssidd', $res['console_type'], $new_date, $res_id, $newSlotStart, $newSlotEnd);
+$avail->bind_param('ssidd', $new_console_type, $new_date, $res_id, $newSlotStart, $newSlotEnd);
 $avail->execute();
 if ($avail->get_result()->num_rows > 0) {
-    echo json_encode(['success' => false, 'message' => 'That time slot already has a reservation for the same console type. Please choose a different time.']);
+    echo json_encode(['success' => false, 'message' => "The selected time slot already has a reservation for $new_console_type. Please choose a different time or platform."]);
     exit;
 }
 
+
 // ── All checks pass — set to pending and create request ───────────────────────
-$old_date = $res['reserved_date'];
-$old_time = $res['reserved_time'];
+$old_date         = $res['reserved_date'];
+$old_time         = $res['reserved_time'];
+$old_console_type = $res['console_type'];
+$old_console_id   = $res['console_id'];
 
 $conn->begin_transaction();
 try {
-    // 1. Set the reservation to pending (do not change date/time yet)
+    // 1. Update the reservation with the new details and set status to pending
     $upd = $conn->prepare(
-        "UPDATE reservations SET status = 'pending', updated_at = NOW()
+        "UPDATE reservations 
+            SET reserved_date = ?, 
+                reserved_time = ?, 
+                console_type  = ?, 
+                console_id    = ?, 
+                status        = 'pending', 
+                updated_at    = NOW()
           WHERE reservation_id = ?"
     );
-    $upd->bind_param('i', $res_id);
+    $upd->bind_param('sssii', $new_date, $new_time, $new_console_type, $new_console_id, $res_id);
     $upd->execute();
 
     // 2. Log the reschedule request — initiated_by = 'user', status = 'pending'
@@ -158,19 +171,23 @@ try {
     $reason_detail = 'Customer self-reschedule request.';
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
-            (reservation_id, user_id, old_date, old_time, new_date, new_time,
+            (reservation_id, user_id, 
+             old_date, old_time, old_console_id, old_console_type,
+             new_date, new_time, console_id, console_type,
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-        'iissssssi',
+        'iississsisssi',
         $res_id, $uid,
-        $old_date, $old_time,
-        $new_date, $new_time,
+        $old_date, $old_time, $old_console_id, $old_console_type,
+        $new_date, $new_time, $new_console_id, $new_console_type,
         $reason, $reason_detail,
         $uid   // rescheduled_by = the customer
     );
     $log->execute();
+
+
 
     $conn->commit();
 
