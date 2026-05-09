@@ -2582,7 +2582,7 @@ function fmtMins(int $m): string {
                         <td><span class="cd-badge blue"><?= ucfirst($pay['payment_method']) ?></span></td>
                         <td style="font-weight:700;white-space:nowrap;
                             <?= $isRefund ? 'color:var(--coral);' : 'color:var(--mint);' ?>">
-                            <?= $isRefund ? 'âˆ’' : '+' ?>₱ <?= number_format(abs((float)$pay['amount']), 2) ?>
+                            <?= $isRefund ? '-' : '+' ?>₱ <?= number_format(abs((float)$pay['amount']), 2) ?>
                         </td>
                         <td style="font-size:11px;font-family:monospace;">
                             <?php if ($refDisplay): ?>
