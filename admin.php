@@ -1137,11 +1137,12 @@ $transResult = $conn->query(
             COALESCE(c.unit_number, '-') AS unit_number,
             CASE
              WHEN t.payment_note LIKE 'Downpayment%' THEN 'reservation'
+             WHEN t.payment_note LIKE 'Tournament registration%' THEN 'tournament'
              WHEN t.amount < 0 THEN 'refund'
              ELSE COALESCE(gs.rental_mode, 'other')
            END AS rental_mode,
-            r.paymongo_payment_id,
-            r.paymongo_source_id
+            COALESCE(tp.paymongo_payment_id, r.paymongo_payment_id) AS paymongo_payment_id,
+            COALESCE(tp.paymongo_source_id, r.paymongo_source_id) AS paymongo_source_id
      FROM transactions t
      JOIN users u ON t.user_id = u.user_id
      LEFT JOIN gaming_sessions gs ON t.session_id = gs.session_id
@@ -1149,6 +1150,11 @@ $transResult = $conn->query(
      LEFT JOIN reservations r
            ON t.payment_note LIKE '%reservation #%'
           AND r.reservation_id = CAST(
+                SUBSTRING_INDEX(SUBSTRING_INDEX(t.payment_note, '#', -1), ' ', 1)
+              AS UNSIGNED)
+     LEFT JOIN tournament_participants tp
+           ON t.payment_note LIKE '%Reg #%'
+          AND tp.participant_id = CAST(
                 SUBSTRING_INDEX(SUBSTRING_INDEX(t.payment_note, '#', -1), ' ', 1)
               AS UNSIGNED)
      ORDER BY t.transaction_date DESC LIMIT 30"

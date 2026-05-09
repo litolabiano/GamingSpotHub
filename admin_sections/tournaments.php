@@ -261,15 +261,26 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 <!-- Participants Panel (inline, toggleable) -->
 <div id="participantsDrawer" style="display:none;margin-top:20px;">
     <div class="card">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-            <h3 class="card-title">
-                <i class="fas fa-users"></i> Registrants:
-                <span id="drawerTournamentName" style="color:#f1a83c;">—</span>
-            </h3>
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;">
+            <div style="display:flex;align-items:center;gap:15px;">
+                <h3 class="card-title" style="margin-bottom:0;">
+                    <i class="fas fa-users"></i> Registrants:
+                    <span id="drawerTournamentName" style="color:#f1a83c;">—</span>
+                </h3>
+                <div class="asb-tab-group" style="display:flex;background:rgba(0,0,0,.2);padding:3px;border-radius:8px;border:1px solid rgba(255,255,255,.05);">
+                    <button type="button" id="btnTabActive" onclick="viewParticipants(currentTid, currentTname, 'active')" 
+                            style="background:var(--clr-mint);color:#0a0f1c;border:none;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;transition:.2s;">
+                        Active
+                    </button>
+                    <button type="button" id="btnTabArchived" onclick="viewParticipants(currentTid, currentTname, 'archived')"
+                            style="background:transparent;color:#888;border:none;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;transition:.2s;">
+                        Archived
+                    </button>
+                </div>
+            </div>
             <button class="btn-sec btn-sm" onclick="closeDrawer()">
                 <i class="fas fa-times"></i> Close
             </button>
-
         </div>
         <div id="drawerContent">
             <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>
@@ -660,20 +671,41 @@ function openEditTournament(t) {
     openModal('editTournament');
 }
 
-function viewParticipants(tournamentId, tournamentName) {
-    if (tournamentName) document.getElementById('drawerTournamentName').textContent = tournamentName;
+let currentTid = 0;
+let currentTname = '';
+
+function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
+    currentTid = tournamentId;
+    if (tournamentName) currentTname = tournamentName;
+    
+    const btnActive   = document.getElementById('btnTabActive');
+    const btnArchived = document.getElementById('btnTabArchived');
+    
+    if (viewType === 'active') {
+        btnActive.style.background = 'var(--clr-mint)';
+        btnActive.style.color = '#0a0f1c';
+        btnArchived.style.background = 'transparent';
+        btnArchived.style.color = '#888';
+    } else {
+        btnArchived.style.background = 'var(--clr-gold)';
+        btnArchived.style.color = '#0a0f1c';
+        btnActive.style.background = 'transparent';
+        btnActive.style.color = '#888';
+    }
+
+    if (currentTname) document.getElementById('drawerTournamentName').textContent = currentTname;
     document.getElementById('drawerContent').innerHTML =
         '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>';
     const drawer = document.getElementById('participantsDrawer');
     drawer.style.display = 'block';
     drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    fetch('ajax/get_tournament_participants.php?tournament_id=' + tournamentId)
+    fetch(`ajax/get_tournament_participants.php?tournament_id=${tournamentId}&status=${viewType}`)
         .then(r => r.json())
         .then(data => {
             if (!data.participants || data.participants.length === 0) {
                 document.getElementById('drawerContent').innerHTML =
-                    '<div class="empty-state"><i class="fas fa-users"></i><p>No participants registered yet.</p></div>';
+                    `<div class="empty-state"><i class="fas fa-users"></i><p>No ${viewType} participants found.</p></div>`;
                 return;
             }
             let html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
@@ -681,11 +713,42 @@ function viewParticipants(tournamentId, tournamentName) {
                 '</tr></thead><tbody>';
             data.participants.forEach((p, i) => {
                 const isPaid    = p.payment_status === 'paid';
-                const fid       = 'rmPart_' + p.participant_id;
                 const dispName  = p.walkin_name ? `${escHtml(p.full_name)} <span style="font-size:10px;color:#f1a83c;background:rgba(241,168,60,.12);padding:2px 6px;border-radius:10px;margin-left:4px;">Walk-in: ${escHtml(p.walkin_name)}</span>` : escHtml(p.full_name);
+                const feePaid   = p.entry_fee > 0 ? '₱' + parseFloat(p.entry_fee).toLocaleString() : 'FREE';
                 const proofHtml = p.paymongo_source_id
-                    ? `<span style="color:#20c8a1;font-size:11px;font-weight:700;"><i class="fas fa-check-circle"></i> GCash Paid</span><br><span style="font-size:10px;color:#444;">${escHtml(p.paymongo_source_id)}</span>`
-                    : '<span style="color:#555;font-size:11px;">—</span>';
+                    ? `<span style="color:#20c8a1;font-size:11px;font-weight:700;"><i class="fas fa-check-circle"></i> GCash Paid (${feePaid})</span><br><span style="font-size:10px;color:#444;">${escHtml(p.paymongo_source_id)}</span>`
+                    : `<span style="color:#888;font-size:11px;">${feePaid}</span>`;
+                
+                let actionBtns = '';
+                if (viewType === 'active') {
+                    actionBtns = `
+                        <button type="button"
+                                onclick="gspotConfirm('Archive this registrant? They will be moved to the Archived list.', function(){ archiveParticipant(${p.participant_id}, ${tournamentId}); }, {yesLabel:'Archive'})"
+                                style="background:rgba(241,168,60,.12);color:#f1a83c;
+                                       border:1px solid rgba(241,168,60,.3);
+                                       padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;" title="Archive Participant">
+                            <i class="fas fa-box-archive"></i>
+                        </button>`;
+                } else {
+                    actionBtns = `
+                        <div style="display:flex;gap:5px;">
+                            <button type="button"
+                                    onclick="gspotConfirm('Restore this registrant to the active list?', function(){ restoreParticipant(${p.participant_id}, ${tournamentId}); }, {yesLabel:'Restore'})"
+                                    style="background:rgba(32,200,161,.12);color:#20c8a1;
+                                           border:1px solid rgba(32,200,161,.3);
+                                           padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;" title="Restore Participant">
+                                <i class="fas fa-rotate-left"></i>
+                            </button>
+                            <button type="button"
+                                    onclick="gspotConfirm('PERMANENTLY DELETE this registrant? This action is irreversible!', function(){ deleteParticipantPermanently(${p.participant_id}, ${tournamentId}); }, {danger:true, yesLabel:'Delete Permanently'})"
+                                    style="background:rgba(251,86,107,.12);color:#fb566b;
+                                           border:1px solid rgba(251,86,107,.3);
+                                           padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;" title="Permanently Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>`;
+                }
+
                 html += `<tr>
                     <td style="color:#888">${i + 1}</td>
                     <td style="font-weight:600;color:#fff">${dispName}<br><span style="font-size:11px;color:#555;">${escHtml(p.email)}</span></td>
@@ -694,7 +757,7 @@ function viewParticipants(tournamentId, tournamentName) {
                     <td style="color:#888;font-size:12px;">${p.registration_date}</td>
                     <td>
                         <button type="button"
-                                onclick="updateParticipantPayment(${p.participant_id}, '${isPaid ? 'pending' : 'paid'}', ${tournamentId})"
+                                onclick="updateParticipantPayment(${p.participant_id}, '${isPaid ? 'pending' : 'paid'}', ${tournamentId}, '${viewType}')"
                                 style="background:${isPaid ? 'rgba(32,200,161,.15)' : 'rgba(241,168,60,.15)'};
                                        color:${isPaid ? '#20c8a1' : '#f1a83c'};
                                        border:1px solid ${isPaid ? 'rgba(32,200,161,.3)' : 'rgba(241,168,60,.3)'};
@@ -703,15 +766,7 @@ function viewParticipants(tournamentId, tournamentName) {
                         </button>
                     </td>
                     <td>${proofHtml}</td>
-                    <td>
-                        <button type="button"
-                                onclick="gspotConfirm('Remove this participant?', function(){ removeParticipant(${p.participant_id}, ${tournamentId}); }, {danger:true, yesLabel:'Remove'})"
-                                style="background:rgba(251,86,107,.12);color:#fb566b;
-                                       border:1px solid rgba(251,86,107,.3);
-                                       padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
+                    <td>${actionBtns}</td>
                 </tr>`;
             });
             html += '</tbody></table></div>';
@@ -722,6 +777,66 @@ function viewParticipants(tournamentId, tournamentName) {
                 '<div class="empty-state"><i class="fas fa-exclamation-triangle" style="color:#fb566b;"></i><p>Failed to load participants.</p></div>';
         });
 }
+
+window.archiveParticipant = function(pid, tournamentId) {
+    const formData = new FormData();
+    formData.append('participant_id', pid);
+    formData.append('csrf_token', _CSRF);
+
+    fetch('ajax/archive_tournament_participant.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (window.showToast) window.showToast(data.message, 'success');
+            viewParticipants(tournamentId, '', 'archived');
+        } else {
+            if (window.showToast) window.showToast(data.message, 'error');
+        }
+    });
+};
+
+window.restoreParticipant = function(pid, tournamentId) {
+    const formData = new FormData();
+    formData.append('participant_id', pid);
+    formData.append('csrf_token', _CSRF);
+
+    fetch('ajax/restore_tournament_participant.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (window.showToast) window.showToast(data.message, 'success');
+            viewParticipants(tournamentId, '', 'active');
+        } else {
+            if (window.showToast) window.showToast(data.message, 'error');
+        }
+    });
+};
+
+window.deleteParticipantPermanently = function(pid, tournamentId) {
+    const formData = new FormData();
+    formData.append('participant_id', pid);
+    formData.append('csrf_token', _CSRF);
+
+    fetch('ajax/delete_tournament_participant_permanently.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (window.showToast) window.showToast(data.message, 'success');
+            viewParticipants(tournamentId, '', 'archived');
+        } else {
+            if (window.showToast) window.showToast(data.message, 'error');
+        }
+    });
+};
 
 function closeDrawer() {
     document.getElementById('participantsDrawer').style.display = 'none';
@@ -795,7 +910,7 @@ function escHtml(str) {
     pag.apply();
 })();
 
-window.updateParticipantPayment = function(pid, status, tournamentId) {
+window.updateParticipantPayment = function(pid, status, tournamentId, viewType = 'active') {
     const formData = new FormData();
     formData.append('participant_id', pid);
     formData.append('payment_status', status);
@@ -809,7 +924,7 @@ window.updateParticipantPayment = function(pid, status, tournamentId) {
     .then(data => {
         if (data.success) {
             if (window.showToast) window.showToast(data.message, 'success');
-            viewParticipants(tournamentId, '');
+            viewParticipants(tournamentId, '', viewType);
         } else {
             if (window.showToast) window.showToast(data.message, 'error');
         }
@@ -817,31 +932,6 @@ window.updateParticipantPayment = function(pid, status, tournamentId) {
     .catch(err => {
         console.error(err);
         if (window.showToast) window.showToast('Failed to update payment status.', 'error');
-    });
-};
-
-window.removeParticipant = function(pid, tournamentId) {
-    const formData = new FormData();
-    formData.append('participant_id', pid);
-    formData.append('csrf_token', _CSRF);
-
-    fetch('ajax/remove_tournament_participant.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            if (window.showToast) window.showToast(data.message, 'success');
-            // Refresh the list immediately
-            viewParticipants(tournamentId, '');
-        } else {
-            if (window.showToast) window.showToast(data.message, 'error');
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        if (window.showToast) window.showToast('Failed to remove participant.', 'error');
     });
 };
 </script>

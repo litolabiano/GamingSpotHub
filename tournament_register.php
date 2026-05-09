@@ -6,15 +6,139 @@
 require_once __DIR__ . '/includes/session_helper.php';
 requireLogin(); // Must be logged in to register
 require_once __DIR__ . '/includes/db_functions.php';
+require_once __DIR__ . '/includes/PayMongoService.php';
 
 $user = getCurrentUser();
 $message = '';
 $messageType = '';
 
-// Handle Registration POST
+// ══════════════════════════════════════════════════════════════════════════════
+// STALE PENDING SESSION CLEANUP
+// ══════════════════════════════════════════════════════════════════════════════
+if (!empty($_SESSION['pending_tournament_reg']) && empty($_GET['paymongo'])) {
+    $stalePending = $_SESSION['pending_tournament_reg'];
+    $staleAge     = time() - ($stalePending['created_at'] ?? 0);
+    $staleId      = $stalePending['session_id'] ?? '';
+
+    $shouldClean = false;
+    if ($staleAge > 1800) {
+        $shouldClean = true;
+    } elseif ($staleAge > 60 && $staleId) {
+        $staleCs = PayMongoService::getCheckoutSession($staleId);
+        if ($staleCs['success'] && in_array($staleCs['payment_status'], ['unpaid', 'expired'])) {
+            $shouldClean = true;
+        }
+    }
+
+    if ($shouldClean) {
+        unset($_SESSION['pending_tournament_reg']);
+        $_SESSION['paymongo_abandoned_notice'] = true;
+    }
+}
+
+if (!empty($_SESSION['paymongo_abandoned_notice'])) {
+    unset($_SESSION['paymongo_abandoned_notice']);
+    $message = 'Your previous payment session was not completed. No charge was made — please try again.';
+    $messageType = 'error';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PATH B — PayMongo Checkout Session redirect-back handler
+// ══════════════════════════════════════════════════════════════════════════════
+if (!empty($_GET['paymongo']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $pm_result = $_GET['paymongo'];        // 'success' or 'failed'
+    $pending   = $_SESSION['pending_tournament_reg'] ?? null;
+    $session_id = $pending['session_id'] ?? trim($_GET['session_id'] ?? '');
+
+    if ($pm_result === 'success' && $session_id && $pending) {
+        // Verify payment
+        $cs = [];
+        $maxRetries = 4;
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $cs = PayMongoService::getCheckoutSession($session_id);
+            if (!empty($cs['success']) && $cs['payment_status'] === 'paid') {
+                break;
+            }
+            if ($attempt < $maxRetries) sleep(1);
+        }
+
+        if ($cs['success'] && $cs['payment_status'] === 'paid') {
+            $payment_id = $cs['payment_id'] ?? null;
+            $stored_ref = $payment_id ?: $session_id;
+
+            // ── Double Check duplicate registration ──
+            $checkStmt = $conn->prepare("SELECT participant_id FROM tournament_participants WHERE tournament_id = ? AND user_id = ?");
+            $checkStmt->bind_param('ii', $pending['tournament_id'], $user['user_id']);
+            $checkStmt->execute();
+            if ($checkStmt->get_result()->num_rows > 0) {
+                unset($_SESSION['pending_tournament_reg']);
+                $_SESSION['reg_success'] = 'You are already registered for this tournament.';
+                header('Location: tournament_register.php');
+                exit;
+            }
+
+            // Finalize registration
+            $regStmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, ign, contact_number, notes, payment_status, registration_date, paymongo_source_id, paymongo_payment_id, paymongo_status) VALUES (?, ?, ?, ?, ?, 'paid', NOW(), ?, ?, 'paid')");
+            $regStmt->bind_param('iisssss', $pending['tournament_id'], $user['user_id'], $pending['ign'], $pending['contact'], $pending['notes'], $session_id, $stored_ref);
+            
+            if ($regStmt->execute()) {
+                $reg_id = $conn->insert_id;
+                // Record transaction
+                if ($pending['entry_fee'] > 0) {
+                    recordTransaction(
+                        null,
+                        $user['user_id'],
+                        $pending['entry_fee'],
+                        'gcash',
+                        $user['user_id'],
+                        $pending['entry_fee'],
+                        null,
+                        'Tournament registration fee for ' . $pending['tournament_name'] . ' (Reg #' . $reg_id . ')'
+                    );
+                }
+
+                logActivity($user['user_id'], 'Tournament Registration', 'Registered and paid for tournament: ' . $pending['tournament_name']);
+                
+                unset($_SESSION['pending_tournament_reg']);
+                $_SESSION['reg_success'] = 'Registration successful! Your payment has been received and your spot is confirmed.';
+                header('Location: tournament_register.php');
+                exit;
+            } else {
+                unset($_SESSION['pending_tournament_reg']);
+                $message = 'Payment was received but we could not save your registration. Please contact the shop with your GCash reference (' . htmlspecialchars($session_id) . ').';
+                $messageType = 'error';
+            }
+        } elseif ($cs['success'] && $cs['payment_status'] === 'unpaid') {
+            unset($_SESSION['pending_tournament_reg']);
+            $message = 'Your payment was not completed. No charge was made — please try again.';
+            $messageType = 'error';
+        } elseif ($cs['success'] && $cs['payment_status'] === 'expired') {
+            unset($_SESSION['pending_tournament_reg']);
+            $message = 'Your checkout session has expired. No charge was made — please try again.';
+            $messageType = 'error';
+        } else {
+            $message = 'We could not verify your payment status at this time. If you completed the payment, please contact the shop with your GCash reference. Otherwise, please try again.';
+            $messageType = 'error';
+        }
+    } elseif ($pm_result === 'failed') {
+        unset($_SESSION['pending_tournament_reg']);
+        $message = 'Payment was cancelled or failed. No charge was made — please try again.';
+        $messageType = 'error';
+    } elseif ($pm_result === 'success' && !$pending) {
+        header('Location: tournament_register.php');
+        exit;
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PATH A — Handle Registration POST
+// ══════════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
     if (!verifyCsrf($message, $messageType)) {
         // CSRF failed
+    } elseif (empty($_POST['no_refund_agreed'])) {
+        $message = 'You must agree to the Terms and Conditions before registering.';
+        $messageType = 'error';
     } else {
         $tournament_id = (int)($_POST['tournament_id'] ?? 0);
         $ign           = trim($_POST['ign'] ?? '');
@@ -39,12 +163,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $message = 'You are already registered for this tournament.';
                 $messageType = 'error';
             } else {
-                    // 4. Register
-                    $regStmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, ign, contact_number, notes, payment_status, registration_date) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
+                $entry_fee = (float)$tournament['entry_fee'];
+                
+                if ($entry_fee > 0) {
+                    // Create PayMongo Checkout Session
+                    $base        = ((!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')?'https':'http').'://'.$_SERVER['HTTP_HOST'];
+                    $script_dir  = rtrim(dirname($_SERVER['PHP_SELF']),'/');
+                    $success_url = $base . $script_dir . '/tournament_register.php?paymongo=success';
+                    $cancel_url  = $base . $script_dir . '/tournament_register.php?paymongo=failed';
+
+                    $centavos = PayMongoService::pesosToCentavos($entry_fee);
+                    $desc = 'Registration fee for ' . $tournament['tournament_name'];
+
+                    $pm = PayMongoService::createCheckoutSession(
+                        $centavos,
+                        $desc,
+                        $success_url,
+                        $cancel_url,
+                        $user['email'] ?? '',
+                        $user['full_name'] ?? 'Customer'
+                    );
+
+                    if ($pm['success'] && !empty($pm['checkout_url'])) {
+                        $_SESSION['pending_tournament_reg'] = [
+                            'tournament_id'   => $tournament_id,
+                            'tournament_name' => $tournament['tournament_name'],
+                            'ign'             => $ign,
+                            'contact'         => $contact,
+                            'notes'           => $notes,
+                            'entry_fee'       => $entry_fee,
+                            'session_id'      => $pm['session_id'],
+                            'created_at'      => time(),
+                        ];
+                        header('Location: ' . $pm['checkout_url']);
+                        exit;
+                    } else {
+                        $message = 'Could not connect to GCash payment gateway: ' . htmlspecialchars($pm['message'] ?? 'Unknown error');
+                        $messageType = 'error';
+                    }
+                } else {
+                    // Free tournament - register directly
+                    $regStmt = $conn->prepare("INSERT INTO tournament_participants (tournament_id, user_id, ign, contact_number, notes, payment_status, registration_date) VALUES (?, ?, ?, ?, ?, 'paid', NOW())");
                     $regStmt->bind_param('iisss', $tournament_id, $user['user_id'], $ign, $contact, $notes);
                     
                     if ($regStmt->execute()) {
-                        $message = 'Registration successful! Please proceed to the shop to pay the entry fee.';
+                        logActivity($user['user_id'], 'Tournament Registration', 'Registered for free tournament: ' . $tournament['tournament_name']);
+                        $message = 'Registration successful! Your spot is confirmed.';
                         $messageType = 'success';
                     } else {
                         $message = 'Registration failed. Please try again.';
@@ -54,6 +218,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     }
+}
+
+if (!empty($_SESSION['reg_success'])) {
+    $message = $_SESSION['reg_success'];
+    $messageType = 'success';
+    unset($_SESSION['reg_success']);
+}
 
 
 // Fetch open tournaments
@@ -415,7 +586,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                                 <?= (float)$t['entry_fee'] > 0 ? '₱' . number_format($t['entry_fee'], 0) : 'FREE' ?>
                             </div>
                             <?php if ($canRegister): ?>
-                                <button class="btn-reg" onclick="openRegModal(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>')">
+                                <button class="btn-reg" onclick="openRegModal(<?= $t['tournament_id'] ?>, '<?= htmlspecialchars(addslashes($t['tournament_name'])) ?>', <?= (float)$t['entry_fee'] ?>)">
                                     <i class="fas fa-user-plus"></i> Register Now
                                 </button>
                             <?php else: ?>
@@ -456,14 +627,22 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                         <input type="tel" name="contact_number" class="form-control" placeholder="09171234567" required pattern="[0-9]{10,11}">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom:10px;">
                         <label>Notes / Team Name</label>
                         <textarea name="notes" class="form-control" style="resize:none;" rows="2" placeholder="Optional..."></textarea>
                     </div>
 
-                    <div style="background:rgba(241,168,60,0.06); border-radius:12px; padding:12px; font-size:11px; color:var(--text-dim); line-height:1.5; margin-bottom:20px;">
-                        <i class="fas fa-info-circle" style="color:var(--accent); margin-right:6px;"></i>
-                        By registering, you agree to show up at the hub 30 minutes before the start time. Entry fees are non-refundable.
+                    <div style="margin-bottom: 20px; font-weight: 800; color: var(--accent); font-size: 14px; padding: 12px; background: rgba(241,168,60,0.1); border-radius: 12px;">
+                        Registration Fee: <span id="modal_fee_display"></span>
+                    </div>
+
+                    <div class="form-group" style="margin-top:20px; background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; margin:0; text-transform:none;">
+                            <input type="checkbox" name="no_refund_agreed" value="1" required style="margin-top:4px; width:16px; height:16px; accent-color:var(--mint);">
+                            <span style="font-size:12px; line-height:1.5; color:var(--text-dim); font-weight:500;">
+                                I agree to the <a href="terms.php" target="_blank" style="color:var(--mint); text-decoration:none;">Terms & Conditions</a>. Entry fees are non-refundable. By registering, you agree to show up at the hub 30 minutes before the start time.
+                            </span>
+                        </label>
                     </div>
 
                     <button type="submit" class="btn-reg" style="width:100%; justify-content:center; padding:14px;">
@@ -491,9 +670,10 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
             document.getElementById('mainNav').classList.add('scrolled');
         }
 
-        function openRegModal(id, name) {
+        function openRegModal(id, name, fee) {
             document.getElementById('modal_t_id').value = id;
             document.getElementById('modal_t_name').textContent = name;
+            document.getElementById('modal_fee_display').textContent = fee > 0 ? '₱' + fee.toLocaleString() : 'FREE';
             document.getElementById('regModal').classList.add('active');
         }
         function closeRegModal() {
