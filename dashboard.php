@@ -596,6 +596,58 @@ function fmtMins(int $m): string {
             min-width: 0;
         }
 
+        /* Centered content column (prevents "unfinished" wide empty space) */
+        .cd-container {
+            width: 100%;
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        /* Responsive form grids (avoid cramped 2-col on mobile) */
+        .cd-form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 720px) {
+            .cd-form-grid-2 { grid-template-columns: 1fr; }
+        }
+
+        /* Large empty-state (consistent + centered) */
+        .cd-empty-lg {
+            padding: 44px 22px;
+            text-align: center;
+        }
+        .cd-empty-lg .cd-empty-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(241,168,60,0.12);
+            border: 2px solid rgba(241,168,60,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+            font-size: 28px;
+            color: #f1a83c;
+        }
+        .cd-empty-lg .cd-empty-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 8px;
+        }
+        .cd-empty-lg .cd-empty-sub {
+            font-size: 13px;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        @media (max-width: 520px) {
+            .cd-empty-lg { padding: 36px 18px; }
+            .cd-empty-lg .cd-empty-icon { width: 64px; height: 64px; font-size: 24px; }
+        }
+
         /*  Account page: two-column layout  */
         .cd-account-grid {
             display: grid;
@@ -1162,6 +1214,7 @@ function fmtMins(int $m): string {
     <!-- Mobile nav placeholder (hidden on desktop) -->
     <div class="cd-mobile-nav"></div>
 
+    <div class="cd-container">
 
         <!-- == PAGE: OVERVIEW ============================================= -->
         <div class="cd-page active" id="page-overview">
@@ -2532,13 +2585,10 @@ function fmtMins(int $m): string {
             <?php if (empty($myTournaments)): ?>
             <!-- Empty state -->
             <div class="cd-card" style="border-color:rgba(241,168,60,0.3);">
-                <div class="cd-empty" style="padding:50px 20px;">
-                    <div style="width:70px;height:70px;border-radius:50%;background:rgba(241,168,60,0.12);border:2px solid rgba(241,168,60,0.3);
-                                display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px;color:#f1a83c;">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <p style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px;">No Tournament Registrations Yet</p>
-                    <p style="font-size:13px;margin-bottom:20px;">Join a tournament to compete for prizes and glory!</p>
+                <div class="cd-empty-lg">
+                    <div class="cd-empty-icon"><i class="fas fa-trophy"></i></div>
+                    <div class="cd-empty-title">No Tournament Registrations Yet</div>
+                    <div class="cd-empty-sub">Join a tournament to compete for prizes and glory.</div>
                     <a href="tournament_register.php" class="cd-btn cd-btn-primary" style="display:inline-flex;">
                         <i class="fas fa-gamepad"></i> View Open Tournaments
                     </a>
@@ -2922,7 +2972,7 @@ function fmtMins(int $m): string {
                             </div>
                         </div>
 
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+                        <div class="cd-form-grid-2">
                             <div class="pf-field-group">
                                 <label class="pf-label" for="pw_new" style="color:rgba(255,255,255,0.7); font-size:12px; margin-bottom:8px;">
                                     <i class="fas fa-plus-circle" style="color:var(--mint);width:14px;"></i> NEW PASSWORD
@@ -2965,6 +3015,7 @@ function fmtMins(int $m): string {
             </div><!-- /cd-account-grid -->
         </div><!-- /page-account -->
 
+    </div><!-- /cd-container -->
     </main>
 
 <!-- == MOBILE BOTTOM NAVIGATION BAR ====================================== -->

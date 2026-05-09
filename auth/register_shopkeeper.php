@@ -1,9 +1,11 @@
 <?php
 /**
- * Good Spot Gaming Hub - Shopkeeper Registration Page
+ * Good Spot Gaming Hub - Shopkeeper Account Creation Page
  */
-session_start();
+require_once __DIR__ . '/../includes/session_helper.php';
+requireRole(['owner']); // Restricted to Admin (Owner) only
 require_once __DIR__ . '/../includes/db_config.php';
+require_once __DIR__ . '/../includes/db_functions.php'; // For logActivity
 require_once __DIR__ . '/../includes/mail_helper.php';
 
 $error = '';
@@ -29,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } elseif (!$agreed) {
-        $error = 'You must agree to the Staff Terms and Conditions to register.';
+        $error = 'You must agree to the Staff Terms and Conditions to create the account.';
     } else {
         $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
@@ -37,28 +39,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->get_result()->num_rows > 0) {
             $error = 'An account with this email already exists.';
         } else {
-            // Generate a shorter 8-character alphanumeric token for easier manual entry
-            $token = strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
-            $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
             $password_hash = password_hash($password, PASSWORD_BCRYPT);
-
             $display_name = $full_name;
 
             $stmt = $conn->prepare(
-                "INSERT INTO users (email, password_hash, full_name, phone, role, status, email_verified, verification_token, verification_expires)
-                 VALUES (?, ?, ?, ?, 'shopkeeper', 'active', 0, ?, ?)"
+                "INSERT INTO users (email, password_hash, full_name, phone, role, status, email_verified)
+                 VALUES (?, ?, ?, ?, 'shopkeeper', 'active', 1)"
             );
-            $stmt->bind_param("ssssss", $email, $password_hash, $display_name, $phone, $token, $expires);
+            $stmt->bind_param("ssss", $email, $password_hash, $display_name, $phone);
 
             if ($stmt->execute()) {
-                $mailResult = sendVerificationEmail($email, $full_name, $token);
-                if ($mailResult['success']) {
-                    $success = 'Shopkeeper account registered! Please check your email to verify your account.';
-                } else {
-                    $success = 'Account created! However, we couldn\'t send the verification email. Please contact the administrator.';
-                }
+                logActivity($_SESSION['user_id'], 'Shopkeeper Account Creation', "Created new Shopkeeper account for $full_name ($email)");
+                $success = 'Shopkeeper account successfully created and is now active!';
             } else {
-                $error = 'Registration failed. Please try again.';
+                $error = 'Account creation failed. Please try again.';
             }
         }
     }
@@ -69,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shopkeeper Registration - Good Spot Gaming Hub</title>
+    <title>Shopkeeper Account Creation - Good Spot Gaming Hub</title>
     <link href="../assets/fonts/inter/inter.css" rel="stylesheet">
     <link href="../assets/fonts/outfit/outfit.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/libs/fontawesome/css/all.min.css">
@@ -141,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <span class="logo-text">GAMING HUB</span>
                     </a>
                 </div>
-                <h2 class="brand-title">Join as a <span class="highlight">Shopkeeper</span></h2>
-                <p class="brand-description">Register as a member of our management team. You'll be able to manage sessions, handle payments, and maintain the hub's operations.</p>
+                <h2 class="brand-title">Create <span class="highlight">Shopkeeper</span> Account</h2>
+                <p class="brand-description">Add a new member to our management team. They will be able to manage sessions, handle payments, and maintain the hub's operations.</p>
                 <ul class="brand-features">
                     <li><i class="fas fa-desktop"></i> Access Admin Dashboard</li>
                     <li><i class="fas fa-cash-register"></i> Manage Real-time Sessions</li>
@@ -155,8 +149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-form-panel">
             <div class="auth-container">
                 <div class="auth-card">
-                    <h1 class="auth-title">Shopkeeper Setup</h1>
-                    <p class="auth-subtitle">Create your administrative staff account</p>
+                    <h1 class="auth-title">Account Creation</h1>
+                    <p class="auth-subtitle">Setup a new administrative staff account</p>
 
                     <?php if ($error): ?>
                         <div class="auth-alert auth-alert-error">
@@ -170,8 +164,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <i class="fas fa-check-circle"></i>
                             <span><?= htmlspecialchars($success) ?></span>
                         </div>
+                        
+                        <div class="account-summary-card" style="background: rgba(32,200,161,0.05); border: 1px solid rgba(32,200,161,0.2); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+                            <h3 style="color: var(--clr-mint); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 800;">Account Details</h3>
+                            <div style="display: grid; gap: 12px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                                    <span style="color: rgba(255,255,255,0.5);">Full Name:</span>
+                                    <span style="color: white; font-weight: 600;"><?= htmlspecialchars($full_name) ?></span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                                    <span style="color: rgba(255,255,255,0.5);">Email Address:</span>
+                                    <span style="color: white; font-weight: 600;"><?= htmlspecialchars($email) ?></span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                                    <span style="color: rgba(255,255,255,0.5);">Password:</span>
+                                    <span style="color: var(--sk-accent); font-weight: 600;"><?= htmlspecialchars($password) ?></span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                                    <span style="color: rgba(255,255,255,0.5);">Status:</span>
+                                    <span style="color: var(--clr-mint); font-weight: 700; text-transform: uppercase; font-size: 11px;">Active</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="auth-links">
-                            <p><a href="login.php"><i class="fas fa-arrow-left"></i> Go to Sign In</a></p>
+                            <p><a href="../admin.php"><i class="fas fa-arrow-left"></i> Return to Admin Panel</a></p>
+                            <p style="margin-top: 15px;"><a href="register_shopkeeper.php" style="color: var(--sk-accent);"><i class="fas fa-plus"></i> Create Another Account</a></p>
                         </div>
                     <?php else: ?>
 
@@ -235,12 +253,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <button type="submit" class="auth-btn" id="submitBtn" disabled>
-                            <span class="btn-text">Register as Shopkeeper</span>
+                            <span class="btn-text">Create Shopkeeper Account</span>
                         </button>
                     </form>
 
                     <div class="auth-links">
-                        <p>Already have an account? <a href="login.php">Sign in</a></p>
+                        <p><a href="../admin.php">Cancel and return to Admin</a></p>
                     </div>
                     <?php endif; ?>
                 </div>

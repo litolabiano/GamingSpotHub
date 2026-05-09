@@ -1606,7 +1606,7 @@ if (!empty($_GET['console'])) {
                                          box-shadow:0 0 0 3px rgba(32,200,161,.2);"></span>
                             <span style="font-size:12px;color:#888;">
                                 Reservation hours &nbsp;<strong style="color:#20c8a1;">12:00 PM</strong> to
-                                <strong style="color:#20c8a1;">11:00 PM</strong>
+                                <strong style="color:#20c8a1;">11:30 PM</strong>
                                 &nbsp;&middot;&nbsp; Requires <strong style="color:#ccc;">1 hr lead time</strong>
                             </span>
                         </div>
@@ -1675,6 +1675,9 @@ if (!empty($_GET['console'])) {
                                 <div class="mc-icon">♾️</div>
                                 <div class="mc-name">Unlimited</div>
                                 <div class="mc-desc">Flat ₱<?= $unlimitedRate ?> for unlimited play. Pay reservation fee now.</div>
+                                <div class="mc-restricted-msg" style="display:none;font-size:10px;color:#fb566b;margin-top:6px;font-weight:600;">
+                                    <i class="fas fa-clock"></i> Not available at 7:00 PM or later
+                                </div>
                             </div>
                         </div>
 
@@ -2166,15 +2169,31 @@ function updateDurationLabels() {
     if (!container) return;
     
     const rate = getConsoleRate();
-    const maxMins = PRICING.max_hourly_minutes || 240;
+    const timeVal = document.getElementById('reservedTime').value;
+    
+    // Calculate max minutes until midnight (12:00 AM)
+    let maxMinsUntilMidnight = 240; 
+    if (timeVal) {
+        const [h, m] = timeVal.split(':').map(Number);
+        const currentTotalMins = h * 60 + m;
+        const midnightMins = 24 * 60;
+        maxMinsUntilMidnight = midnightMins - currentTotalMins;
+    }
+    
+    const maxMins = Math.min(PRICING.max_hourly_minutes || 240, maxMinsUntilMidnight);
     const bp = PRICING.bonus_paid_minutes || 120;
     const bf = PRICING.bonus_free_minutes || 30;
     
     let html = '';
-    for (let paid = 30; paid <= maxMins; paid += 30) {
-        let cost = paid <= 30 ? PRICING.session_min_charge : _timedCost(paid);
+    let visibleCount = 0;
+    for (let paid = 30; paid <= (PRICING.max_hourly_minutes || 240); paid += 30) {
         let bonus = Math.floor(paid / bp) * bf;
         let total = paid + bonus;
+
+        // If total duration (paid + bonus) exceeds the closing time (12:00 AM), skip it
+        if (total > maxMins) continue;
+
+        let cost = paid <= 30 ? PRICING.session_min_charge : _timedCost(paid);
         
         const fmtMin = (m) => {
             let h = Math.floor(m / 60); let r = m % 60;
@@ -2187,12 +2206,26 @@ function updateDurationLabels() {
         let labelBonus = bonus > 0 ? `+${fmtMin(bonus)} free` : '';
         let labelTotal = fmtMin(total);
         
+        visibleCount++;
         html += `<div class="dur-btn ${selectedDuration === paid ? 'selected' : ''}" data-mins="${paid}" data-cost="${cost}" data-bonus="${bonus}" data-total="${total}" onclick="selectDuration(${paid})">
             ${labelPaid}
             <span class="dur-price">&#8369;${cost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span>
             ${bonus > 0 ? `<span style="display:block;font-size:9px;color:#20c8a1;font-weight:700;margin-top:3px;letter-spacing:.3px;">${labelBonus}</span><span style="display:block;font-size:9px;color:#888;font-weight:600;margin-top:1px;">&rarr; ${labelTotal} total</span>` : ''}
         </div>`;
     }
+
+    if (visibleCount === 0 && timeVal) {
+        html = `<div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: #fb566b; background: rgba(251,86,107,0.1); border: 1px solid rgba(251,86,107,0.2); border-radius: 12px;">
+                    <i class="fas fa-exclamation-triangle"></i> No duration options available. Closing time is 12:00 AM.
+                </div>`;
+    } else if (timeVal && maxMinsUntilMidnight < 240) {
+        const h = Math.floor(maxMinsUntilMidnight / 60), m = maxMinsUntilMidnight % 60;
+        const durStr = (h ? h + 'h ' : '') + (m ? m + 'm ' : '');
+        html += `<div style="grid-column: 1 / -1; margin-top: 10px; font-size: 11px; color: #fb566b; font-weight: 600;">
+                    <i class="fas fa-info-circle"></i> Maximum duration for this time slot is ${durStr} to comply with 12:00 AM closing.
+                 </div>`;
+    }
+
     container.innerHTML = html;
 }
 
@@ -2368,7 +2401,7 @@ const TIME_SLOTS = (function () {
     const s = [];
     for (let h = 12; h <= 23; h++) {
         s.push(String(h).padStart(2,'0') + ':00');
-        if (h < 23) s.push(String(h).padStart(2,'00') + ':30');
+        s.push(String(h).padStart(2,'0') + ':30');
     }
     return s;
 })();
@@ -2696,6 +2729,15 @@ function selectUnit(id, silent = false, label = '') {
 
 /* ── Rental mode ────────────────────────────────────── */
 function selectMode(mode) {
+    const timeVal = document.getElementById('reservedTime').value;
+    if (mode === 'unlimited' && timeVal) {
+        const [h] = timeVal.split(':').map(Number);
+        if (h >= 19) {
+            alert('Unlimited mode is not available for bookings at 7:00 PM or later.');
+            return;
+        }
+    }
+
     selectedMode = mode;
     document.getElementById('hiddenRentalMode').value = mode;
     document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
@@ -2919,7 +2961,7 @@ function handleNoRefundCheck() { handlePolicyChecks(); }
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour
 const OPEN_TIME        = '12:00'; // noon
-const CLOSE_TIME       = '23:00'; // last bookable slot (11 PM)
+const CLOSE_TIME       = '23:30'; // last bookable slot (11:30 PM)
 
 function getMinTimeForDate(dateStr) {
     const today    = new Date();
@@ -2940,6 +2982,34 @@ function enforceMinTime() {
     // Rebuild the <select> options to reflect the current date's lead time.
     // Invalid slots are automatically greyed out (disabled) in the dropdown.
     buildTimeSelect();
+    
+    // Also re-evaluate mode and duration restrictions based on current selected time
+    const timeVal = document.getElementById('reservedTime').value;
+    if (timeVal) {
+        const [h] = timeVal.split(':').map(Number);
+        const unlimCard = document.getElementById('mode-unlimited');
+        const restrictedMsg = unlimCard ? unlimCard.querySelector('.mc-restricted-msg') : null;
+        
+        if (h >= 19) {
+            if (unlimCard) {
+                unlimCard.classList.add('mode-restricted');
+                unlimCard.style.opacity = '0.5';
+                unlimCard.style.cursor = 'not-allowed';
+                if (restrictedMsg) restrictedMsg.style.display = 'block';
+            }
+            if (selectedMode === 'unlimited') {
+                selectMode('hourly'); // Switch back to hourly if now restricted
+            }
+        } else {
+            if (unlimCard) {
+                unlimCard.classList.remove('mode-restricted');
+                unlimCard.style.opacity = '1';
+                unlimCard.style.cursor = 'pointer';
+                if (restrictedMsg) restrictedMsg.style.display = 'none';
+            }
+        }
+        updateDurationLabels();
+    }
 }
 
 /* ── Availability check ─────────────────────────────── */
@@ -3242,12 +3312,12 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     // Operating hours check
     if (timeVal < OPEN_TIME) {
         e.preventDefault();
-        alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:00 PM.');
+        alert('\u26a0\ufe0f Reservations are only accepted from 12:00 PM (noon). Please pick a time between 12:00 PM and 11:30 PM.');
         return;
     }
     if (timeVal > CLOSE_TIME) {
         e.preventDefault();
-        alert('\u26a0\ufe0f The last bookable time slot is 11:00 PM. Please pick a time at or before 11:00 PM.');
+        alert('\u26a0\ufe0f The last bookable time slot is 11:30 PM. Please pick a time at or before 11:30 PM.');
         return;
     }
 
