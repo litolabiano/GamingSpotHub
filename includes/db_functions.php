@@ -1216,6 +1216,7 @@ function createReservation(
     $preferred_unit_id = null,
     $payment_proof = null,   // uploaded GCash screenshot filename
     $controller_id = null,   // optional: selected controller FK
+    $controller_id_2 = null, // optional: 2nd selected controller FK
     $controller_fee = 0.0    // fee snapshot from system_settings at booking time
 ) {
     global $conn;
@@ -1259,7 +1260,8 @@ function createReservation(
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
     $proof_status      = $payment_proof ? 'pending' : null;
     $controller_id     = $controller_id ? (int)$controller_id : null;
-    $with_controller   = $controller_id ? 1 : 0;
+    $controller_id_2   = $controller_id_2 ? (int)$controller_id_2 : null;
+    $with_controller   = ($controller_id || $controller_id_2) ? 1 : 0;
     $controller_fee    = $with_controller ? (float)$controller_fee : 0.0;
 
     // Lookup console_type_id
@@ -1275,16 +1277,16 @@ function createReservation(
     $stmt = $conn->prepare(
         "INSERT INTO reservations
             (user_id, console_id, console_type_id, rental_mode, planned_minutes, reserved_date, reserved_time,
-             notes, with_controller, controller_id, controller_fee,
+             notes, with_controller, controller_id, controller_id_2, controller_fee,
              downpayment_amount, downpayment_method, downpayment_paid,
              payment_proof, payment_proof_status, status, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?)"
     );
     $stmt->bind_param(
-        'iiisisssiiddsissi',
+        'iiisisssiiiddsissi',
         $user_id, $preferred_unit_id, $console_type_id, $rental_mode, $planned_minutes,
         $reserved_date, $reserved_time, $notes,
-        $with_controller, $controller_id, $controller_fee,
+        $with_controller, $controller_id, $controller_id_2, $controller_fee,
         $downpayment_amount, $downpayment_method, $downpayment_paid,
         $payment_proof, $proof_status,
         $user_id

@@ -134,9 +134,6 @@ foreach ($allConsoles as $c) {
     }
 
     if (!$isAvailable) {
-        // Skip or mark as unavailable? User wants "only display", but for Step 2b (Grid) we might show as unavailable.
-        // But for Admin dropdown, we should just exclude.
-        // Actually, let's include all but with a flag.
         $units[] = [
             'id' => $cid,
             'unit' => $c['unit_number'],
@@ -173,7 +170,73 @@ foreach ($allConsoles as $c) {
     ];
 }
 
+// 5. Fetch all controllers and filter availability
+$sqlCtrl = "SELECT c.controller_id, c.unit_number,
+                   ct.type_name AS type_name, ct.console_type_id, c.hourly_rate,
+                   cs.type_name AS console_type_name
+              FROM controllers c
+              JOIN controller_types ct ON ct.type_id = c.controller_type_id
+              JOIN console_types cs    ON cs.type_id = ct.console_type_id
+             WHERE c.status = 'available'
+             ORDER BY cs.type_name, ct.type_name, c.unit_number";
+$ctrlRes = $conn->query($sqlCtrl);
+$allControllers = $ctrlRes ? $ctrlRes->fetch_all(MYSQLI_ASSOC) : [];
+
+$sqlResCtrl = "SELECT reservation_id, controller_id, controller_id_2, reserved_time, planned_minutes, rental_mode
+               FROM reservations r
+               WHERE r.reserved_date = '$date' 
+                 AND r.status IN ('pending', 'reserved')
+                 AND (r.controller_id IS NOT NULL OR r.controller_id_2 IS NOT NULL)";
+if ($exclude_res_id) {
+    $sqlResCtrl .= " AND r.reservation_id != $exclude_res_id";
+}
+$resQC = $conn->query($sqlResCtrl);
+$reservedControllers = [];
+if ($resQC) {
+    while ($r = $resQC->fetch_assoc()) {
+        $start = new DateTime("$date {$r['reserved_time']}");
+        $mins  = $r['rental_mode'] === 'hourly' ? (int)$r['planned_minutes'] : 60;
+        $end   = clone $start;
+        $end->modify("+$mins minutes");
+        
+        if (!empty($r['controller_id'])) {
+            $reservedControllers[] = [
+                'controller_id' => (int)$r['controller_id'],
+                'start'         => $start,
+                'end'           => $end,
+            ];
+        }
+        if (!empty($r['controller_id_2'])) {
+            $reservedControllers[] = [
+                'controller_id' => (int)$r['controller_id_2'],
+                'start'         => $start,
+                'end'           => $end,
+            ];
+        }
+    }
+}
+
+$controllers = [];
+foreach ($allControllers as $c) {
+    $cid = (int)$c['controller_id'];
+    $isAvailable = true;
+
+    foreach ($reservedControllers as $res) {
+        if ($res['controller_id'] === $cid) {
+            if ($requestedStart < $res['end'] && $requestedEnd > $res['start']) {
+                $isAvailable = false;
+                break;
+            }
+        }
+    }
+
+    if ($isAvailable) {
+        $controllers[] = $c;
+    }
+}
+
 echo json_encode([
     'success' => true,
-    'units' => $units
+    'units' => $units,
+    'controllers' => $controllers
 ]);

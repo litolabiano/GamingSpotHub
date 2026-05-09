@@ -482,6 +482,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
         $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
         $ctrl_notes  = trim($_POST['controller_notes'] ?? '');
+        $hourly_rate = (float)($_POST['hourly_rate'] ?? 20.00);
 
         // Validate: must match a real controller type by ID
         $validTypeIds = array_column(getControllerTypes(true), 'type_id');
@@ -497,9 +498,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_type_id, console_type_id, unit_number, notes) VALUES (?,?,?,?)"
+                    "INSERT INTO controllers (controller_type_id, console_type_id, unit_number, hourly_rate, notes) VALUES (?,?,?,?,?)"
                 );
-                $stmt->bind_param('iiss', $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('iisds', $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $hourly_rate, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
@@ -513,6 +514,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dupCheck->close();
         } else {
             $message = 'Invalid input for new controller. Ensure all fields are filled and a valid controller type is selected.';
+            $messageType = 'error';
+        }
+    }
+    elseif ($action === 'edit_controller') {
+        $ctrl_id     = (int)($_POST['controller_id'] ?? 0);
+        $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
+        $ctrl_notes  = trim($_POST['controller_notes'] ?? '');
+        $hourly_rate = (float)($_POST['hourly_rate'] ?? 20.00);
+
+        if ($ctrl_id && $ctrl_unit) {
+            $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ? AND controller_id != ?");
+            $dupCheck->bind_param('si', $ctrl_unit, $ctrl_id); 
+            $dupCheck->execute();
+            if ($dupCheck->get_result()->num_rows > 0) {
+                $message = 'Unit number "' . htmlspecialchars($ctrl_unit) . '" already exists.';
+                $messageType = 'error';
+            } else {
+                $stmt = $conn->prepare(
+                    "UPDATE controllers SET unit_number=?, hourly_rate=?, notes=? WHERE controller_id=?"
+                );
+                $stmt->bind_param('sdsi', $ctrl_unit, $hourly_rate, $ctrl_notes, $ctrl_id);
+                if ($stmt->execute()) {
+                    $message = 'Controller updated successfully.';
+                    $messageType = 'success';
+                    logActivity($user['user_id'], "Controller unit", "Edited controller ID #{$ctrl_id}");
+                } else {
+                    $message = 'Failed to update controller: ' . $conn->error;
+                    $messageType = 'error';
+                }
+                $stmt->close();
+            }
+            $dupCheck->close();
+        } else {
+            $message = 'Invalid input for controller update.';
             $messageType = 'error';
         }
     }

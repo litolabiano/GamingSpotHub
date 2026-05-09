@@ -1898,6 +1898,12 @@ function adminDpChange() {
 
 
                 <div class="form-group">
+                    <label>Hourly Rate *</label>
+                    <input type="number" step="0.01" name="hourly_rate" required value="20.00"
+                           placeholder="e.g. 20.00">
+                </div>
+
+                <div class="form-group">
                     <textarea name="controller_notes" rows="2"
                               placeholder="e.g. Minor stick drift, Cable-only..."></textarea>
                 </div>
@@ -1931,3 +1937,56 @@ function adminDpChange() {
         </form>
     </div>
 </div>
+
+<!-- ── Edit Controller Modal ──────────────────────────────────────────── -->
+<div class="modal" id="editControllerModal">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit" style="color:#8aa4e8;margin-right:8px;"></i>Edit Controller</h3>
+            <button class="modal-close" onclick="closeModal('editController')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="edit_controller">
+            <input type="hidden" name="controller_id" id="editCtrlId">
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Unit Number *</label>
+                    <input type="text" name="ctrl_unit_number" id="editCtrlUnit" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Hourly Rate *</label>
+                    <input type="number" step="0.01" name="hourly_rate" id="editCtrlRate" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="controller_notes" id="editCtrlNotes" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('editController')" class="btn-sec">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-prim">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditControllerModal(id, unit, rate, notes) {
+    document.getElementById('editCtrlId').value = id;
+    document.getElementById('editCtrlUnit').value = unit;
+    document.getElementById('editCtrlRate').value = parseFloat(rate).toFixed(2);
+    document.getElementById('editCtrlNotes').value = notes;
+    openModal('editController');
+}
+</script>

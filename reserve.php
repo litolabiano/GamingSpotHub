@@ -237,6 +237,7 @@ if (!empty($_GET['paymongo']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                 $pending['preferred_unit_id'] ?? null,
                 null,   // no screenshot — PayMongo handled it
                 $pending['controller_id']  ?? null,
+                $pending['controller_id_2']?? null,
                 $pending['controller_fee'] ?? 0.0
             );
 
@@ -316,21 +317,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // pay_via removed; we only use paymongo now.
     // Controller add-on
     $with_ctrl         = !empty($_POST['with_controller']) && $_POST['with_controller'] === '1';
+    $ctrl_count        = $with_ctrl ? (int)($_POST['controller_count'] ?? 1) : 0;
     $ctrl_id           = ($with_ctrl && !empty($_POST['controller_id'])) ? (int)$_POST['controller_id'] : null;
-    $ctrl_fee          = $with_ctrl ? $controllerRentalFee : 0.0;
+    $ctrl_id_2         = ($with_ctrl && $ctrl_count === 2 && !empty($_POST['controller_id_2'])) ? (int)$_POST['controller_id_2'] : null;
+    
+    $ctrl_fee = 0.0;
+    if ($with_ctrl) {
+        $getFee = $conn->prepare("SELECT ct.hourly_rate FROM controllers c JOIN controller_types ct ON c.controller_type_id = ct.type_id WHERE c.controller_id = ?");
+        if ($ctrl_id) {
+            $getFee->bind_param('i', $ctrl_id);
+            $getFee->execute();
+            $row = $getFee->get_result()->fetch_assoc();
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0);
+        }
+        if ($ctrl_id_2) {
+            $getFee->bind_param('i', $ctrl_id_2);
+            $getFee->execute();
+            $row = $getFee->get_result()->fetch_assoc();
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0);
+        }
+    }
+
+    // ── Validation ────────────────────────────────────────────────────────────
+    $error = null;
+    if ($with_ctrl && $ctrl_count === 2 && $ctrl_id === $ctrl_id_2 && $ctrl_id !== null) {
+        $error = 'You cannot select the same controller twice.';
+    }
 
     // ── Reservation ban check ─────────────────────────────────────────────────
-    $banStmt = $conn->prepare(
-        "SELECT reservation_banned_until, consecutive_cancellations FROM users WHERE user_id = ?"
-    );
-    $banStmt->bind_param('i', $user['user_id']);
-    $banStmt->execute();
-    $banRow = $banStmt->get_result()->fetch_assoc();
-    if (!empty($banRow['reservation_banned_until']) && strtotime($banRow['reservation_banned_until']) > time()) {
-        $banExpiry = date('F j, Y \a\t g:i A', strtotime($banRow['reservation_banned_until']));
-        $error = 'Your account is temporarily suspended from making online reservations due to 3 consecutive cancellations. '
-               . 'This restriction is automatically lifted on <strong>' . $banExpiry . '</strong>. '
-               . 'You are still welcome to walk in and use any available unit.';
+    if (!$error) {
+        $banStmt = $conn->prepare(
+            "SELECT reservation_banned_until, consecutive_cancellations FROM users WHERE user_id = ?"
+        );
+        $banStmt->bind_param('i', $user['user_id']);
+        $banStmt->execute();
+        $banRow = $banStmt->get_result()->fetch_assoc();
+        if (!empty($banRow['reservation_banned_until']) && strtotime($banRow['reservation_banned_until']) > time()) {
+            $banExpiry = date('F j, Y \a\t g:i A', strtotime($banRow['reservation_banned_until']));
+            $error = 'Your account is temporarily suspended from making online reservations due to 3 consecutive cancellations. '
+                   . 'This restriction is automatically lifted on <strong>' . $banExpiry . '</strong>. '
+                   . 'You are still welcome to walk in and use any available unit.';
+        }
     }
 
     // ── One active reservation limit ──────────────────────────────────────────
@@ -419,6 +446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'created_at'        => time(),
                 // Controller add-on
                 'controller_id'     => $ctrl_id,
+                'controller_id_2'   => $ctrl_id_2,
                 'controller_fee'    => $ctrl_fee,
             ];
 
@@ -1672,20 +1700,31 @@ if (!empty($_GET['console'])) {
                         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.02);transition:.2s;" id="ctrlLabel" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background='rgba(255,255,255,.02)'">
                             <input type="checkbox" name="with_controller" id="withControllerCheck" value="1" onchange="onExtraControllerToggle()" style="margin-top:4px;width:16px;height:16px;accent-color:#20c8a1;">
                             <div style="flex:1;">
-                                <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Rent an Extra Controller</div>
-                                <div style="font-size:11px;color:#888;" id="ctrlDesc">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> and will be added to your reservation fee.</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                    <div style="font-weight:700;color:#fff;font-size:14px;">Rent Extra Controller(s)</div>
+                                    <select name="controller_count" id="controllerCount" onchange="onExtraControllerToggle()" style="background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 8px;outline:none;font-size:12px;" disabled>
+                                        <option value="1">1 Controller</option>
+                                        <option value="2">2 Controllers</option>
+                                    </select>
+                                </div>
+                                <div style="font-size:11px;color:#888;" id="ctrlDesc">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> each and will be added to your reservation fee.</div>
                             </div>
                         </label>
                         <div id="controllerSelectorBlock" style="display:none;margin-top:14px;background:rgba(0,0,0,.2);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,.06);">
                             <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Specific Controller *</label>
                             <style>
-                                #selectedControllerId option {
+                                #selectedControllerId option, #selectedControllerId2 option {
                                     background-color: #0d1a35;
                                     color: #e8eaf6;
                                 }
                             </style>
-                            <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;" onchange="recalcFee()">
+                            <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:8px;" onchange="recalcFee()">
                                 <option value="">Select a controller...</option>
+                            </select>
+                            
+                            <label id="lblControllerId2" style="display:none;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:.5px;">Select 2nd Controller *</label>
+                            <select name="controller_id_2" id="selectedControllerId2" style="display:none;width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;" onchange="recalcFee()">
+                                <option value="">Select 2nd controller...</option>
                             </select>
                         </div>
                     </div>
@@ -2027,10 +2066,10 @@ let selectedUnitId      = null;
 let selectedUnitLabel   = '';
 
 const unlimitedRate    = <?= (int)$unlimitedRate ?>;
-const controllerRentalFee = <?= (float)$controllerRentalFee ?>;
+let controllerRentalFee = <?= (float)$controllerRentalFee ?>;
 const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
-const AVAILABLE_CONTROLLERS = <?= $controllersJson ?>;
+let AVAILABLE_CONTROLLERS = <?= $controllersJson ?>;
 
 function getConsoleRate() {
     // Primary: read data-rate from the selected card element (set from console_types.hourly_rate)
@@ -2111,26 +2150,46 @@ function updateDurationLabels() {
 
 function onExtraControllerToggle() {
     const chk = document.getElementById('withControllerCheck');
+    const countSel = document.getElementById('controllerCount');
     const block = document.getElementById('controllerSelectorBlock');
+    const sel2 = document.getElementById('selectedControllerId2');
+    const lbl2 = document.getElementById('lblControllerId2');
+    
     if (chk && chk.checked) {
-        block.style.display = 'block';
+        if(countSel) countSel.disabled = false;
+        if(block) block.style.display = 'block';
+        if (countSel && countSel.value === '2') {
+            if(sel2) sel2.style.display = 'block';
+            if(lbl2) lbl2.style.display = 'block';
+        } else {
+            if(sel2) { sel2.style.display = 'none'; sel2.value = ''; }
+            if(lbl2) lbl2.style.display = 'none';
+        }
     } else {
-        if (block) block.style.display = 'none';
+        if(countSel) countSel.disabled = true;
+        if(block) block.style.display = 'none';
         const sel = document.getElementById('selectedControllerId');
         if (sel) sel.value = '';
+        if (sel2) { sel2.style.display = 'none'; sel2.value = ''; }
+        if (lbl2) lbl2.style.display = 'none';
     }
     if (typeof recalcFee === 'function') recalcFee();
 }
 
 function updateControllerDropdown() {
     const sel = document.getElementById('selectedControllerId');
+    const sel2 = document.getElementById('selectedControllerId2');
     if (!sel) return;
     
     sel.innerHTML = '<option value="">Select a controller...</option>';
+    if (sel2) sel2.innerHTML = '<option value="">Select 2nd controller...</option>';
     
+    const countDropdown = document.getElementById('controllerCount');
+
     if (!selectedConsoleType) {
         const chk = document.getElementById('withControllerCheck');
         if (chk) { chk.disabled = true; chk.checked = false; }
+        if (countDropdown) countDropdown.disabled = true;
         onExtraControllerToggle();
         return;
     }
@@ -2138,24 +2197,47 @@ function updateControllerDropdown() {
     if (typeof AVAILABLE_CONTROLLERS === 'undefined') return;
     const matching = AVAILABLE_CONTROLLERS.filter(c => c.console_type_name === selectedConsoleType);
     
+    if (matching.length > 0) {
+        controllerRentalFee = parseFloat(matching[0].hourly_rate || 20);
+    }
+    
     const chk = document.getElementById('withControllerCheck');
     const desc = document.getElementById('ctrlDesc');
-    const defaultDesc = `Adding an extra controller costs <strong style="color:#20c8a1;">₱${controllerRentalFee.toFixed(2)}</strong> and will be added to your reservation fee.`;
+    const defaultDesc = `Select a controller below to see its hourly rate. This rate will be multiplied by your session duration.`;
 
     if (matching.length === 0) {
         sel.innerHTML = '<option value="">No controllers available for this type</option>';
         if (chk) { chk.disabled = true; chk.checked = false; }
+        if (countDropdown) countDropdown.disabled = true;
         if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> No extra controllers are currently available for this console.</span>';
+        onExtraControllerToggle();
+    } else if (selectedMode === 'unlimited') {
+        sel.innerHTML = '<option value="">Not available in unlimited mode</option>';
+        if (chk) { chk.disabled = true; chk.checked = false; }
+        if (countDropdown) countDropdown.disabled = true;
+        if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Extra controllers are not available for Unlimited sessions.</span>';
         onExtraControllerToggle();
     } else {
         if (chk) chk.disabled = false;
+        if (countDropdown) countDropdown.disabled = chk.checked ? false : true;
         if (desc) desc.innerHTML = defaultDesc;
-        sel.innerHTML = '';
+        sel.innerHTML = '<option value="">Select a controller...</option>';
+        if (sel2) sel2.innerHTML = '<option value="">Select 2nd controller...</option>';
         matching.forEach(c => {
+            const hr = parseFloat(c.hourly_rate || 20);
             const opt = document.createElement('option');
             opt.value = c.controller_id;
-            opt.textContent = `${c.type_name} #${c.unit_number}`;
+            opt.dataset.rate = hr;
+            opt.textContent = `${c.type_name} #${c.unit_number} (₱${hr.toFixed(2)})`;
             sel.appendChild(opt);
+            
+            if (sel2) {
+                const opt2 = document.createElement('option');
+                opt2.value = c.controller_id;
+                opt2.dataset.rate = hr;
+                opt2.textContent = `${c.type_name} #${c.unit_number} (₱${hr.toFixed(2)})`;
+                sel2.appendChild(opt2);
+            }
         });
     }
     if (typeof recalcFee === 'function') recalcFee();
@@ -2304,6 +2386,11 @@ function fetchUnitAvailability(dateV, timeV) {
                 document.getElementById('unitPickerLocked').style.display = 'block';
                 document.getElementById('unitPickerLocked').textContent = 'Error checking availability.';
                 return;
+            }
+
+            if (data.controllers) {
+                AVAILABLE_CONTROLLERS = data.controllers;
+                updateControllerDropdown();
             }
 
             const grid = document.getElementById('unitCardGrid');
@@ -2462,6 +2549,20 @@ function selectMode(mode) {
         document.getElementById('hiddenPlannedMinutes').value = '';
         document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     }
+    
+    // Disable Add-ons for Unlimited Mode
+    const addonsCard = document.getElementById('addonsCard');
+    if (mode === 'unlimited') {
+        if (addonsCard) addonsCard.style.opacity = '0.5';
+        const chk = document.getElementById('withControllerCheck');
+        if (chk) { chk.checked = false; chk.disabled = true; }
+        const desc = document.getElementById('ctrlDesc');
+        if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Extra controllers are not available for Unlimited sessions.</span>';
+        onExtraControllerToggle();
+    } else {
+        if (addonsCard) addonsCard.style.opacity = '1';
+        updateControllerDropdown();
+    }
 
     if (mode === 'unlimited') {
         // Fee is deterministic for unlimited — show panel immediately
@@ -2509,7 +2610,33 @@ function selectDuration(mins) {
     recalcFee();
 }
 
+function syncControllerDropdowns() {
+    const sel1 = document.getElementById('selectedControllerId');
+    const sel2 = document.getElementById('selectedControllerId2');
+    if (!sel1 || !sel2) return;
+    
+    const val1 = sel1.value;
+    const val2 = sel2.value;
+    
+    Array.from(sel1.options).forEach(opt => {
+        if (opt.value !== "" && opt.value === val2) {
+            opt.style.display = "none";
+        } else {
+            opt.style.display = "";
+        }
+    });
+    
+    Array.from(sel2.options).forEach(opt => {
+        if (opt.value !== "" && opt.value === val1) {
+            opt.style.display = "none";
+        } else {
+            opt.style.display = "";
+        }
+    });
+}
+
 function recalcFee() {
+    syncControllerDropdowns();
     let baseCost = 0;
     if (selectedMode === 'unlimited') {
         baseCost = unlimitedRate;
@@ -2521,13 +2648,29 @@ function recalcFee() {
     }
 
     const withCtrl = document.getElementById('withControllerCheck')?.checked;
-    const ctrlFee = withCtrl ? controllerRentalFee : 0;
+    const countSel = document.getElementById('controllerCount');
+    const count = withCtrl && countSel ? parseInt(countSel.value) : (withCtrl ? 1 : 0);
     
-    // Reservation fee = \u20b120 + 5% of session cost + controller fee (if any)
-    const pct = Math.round(baseCost * 0.05);
-    const fee = 20 + pct + ctrlFee;
+    let ctrlFee = 0;
+    if (withCtrl && selectedMode === 'hourly' && selectedDuration > 0) {
+        let baseCtrlFee = 0;
+        const sel1 = document.getElementById('selectedControllerId');
+        const sel2 = document.getElementById('selectedControllerId2');
+        if (sel1 && sel1.selectedIndex > 0) {
+            baseCtrlFee += parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0);
+        }
+        if (count > 1 && sel2 && sel2.selectedIndex > 0) {
+            baseCtrlFee += parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0);
+        }
+        ctrlFee = baseCtrlFee * (selectedDuration / 60);
+    }
+    const totalSessionCost = baseCost + ctrlFee;
+    
+    // Reservation fee = \u20b120 + 5% of (session cost + controller fee)
+    const pct = totalSessionCost * 0.05;
+    const fee = 20 + pct;
 
-    setGcashFee(baseCost, pct, fee, ctrlFee);
+    setGcashFee(totalSessionCost, pct, fee, ctrlFee);
     showGcashPanel();
     updateSummary();
 }
@@ -2537,7 +2680,6 @@ function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
     document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
     document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
     
-    // Add extra controller line item if needed
     let extraLine = document.getElementById('feeCtrlLine');
     if (ctrlFee > 0) {
         if (!extraLine) {
@@ -2546,17 +2688,17 @@ function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
             extraLine.style = 'display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;';
             document.getElementById('feePctAmount').parentNode.after(extraLine);
         }
-        extraLine.innerHTML = `<span>Extra Controller</span><span>₱${ctrlFee.toFixed(2)}</span>`;
+        extraLine.innerHTML = `<span>Extra Controller (Added to session cost)</span><span>₱${ctrlFee.toFixed(2)}</span>`;
         extraLine.style.display = 'flex';
     } else if (extraLine) {
         extraLine.style.display = 'none';
     }
 
-    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee;
+    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee.toFixed(2);
     const gcashDisp = document.getElementById('gcashAmountDisplay');
-    if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee;
+    if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee.toFixed(2);
     const pmBtn = document.getElementById('pmBtnAmount');
-    if (pmBtn) pmBtn.textContent = '\u20b1' + fee;
+    if (pmBtn) pmBtn.textContent = '\u20b1' + fee.toFixed(2);
 }
 
 /* ── Downpayment ────────────────────────────────────── */
