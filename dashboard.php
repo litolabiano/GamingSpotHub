@@ -2486,11 +2486,15 @@ function fmtMins(int $m): string {
             </div>
             <div style="display:grid;gap:16px;margin-bottom:28px;">
             <?php foreach ($upcomingTournaments as $tr):
-                $isRemoved = $tr['status'] === 'removed';
+                $isRemoved  = $tr['status'] === 'removed';
+                $isArchived = $tr['status'] === 'archived';
+                $isRestricted = $isRemoved || $isArchived;
+
                 $tsm = $tournamentStatusMap[$tr['tournament_status']] ?? ['gray','circle',ucfirst($tr['tournament_status'] ?? '')];
-                if ($isRemoved) $tsm = ['coral', 'ban', 'Removed by Admin'];
+                if ($isRemoved)  $tsm = ['coral', 'ban', 'Removed by Admin'];
+                if ($isArchived) $tsm = ['gold', 'box-archive', 'Archived by Admin'];
             ?>
-            <div class="cd-card" style="<?= $isRemoved ? 'opacity:0.65; filter:grayscale(0.8);' : 'border-color:rgba(32,200,161,0.3);' ?> background:linear-gradient(135deg,rgba(10,33,81,0.7),rgba(8,14,26,0.8));padding:0;overflow:hidden;">
+            <div class="cd-card" style="<?= $isRestricted ? 'opacity:0.65; filter:grayscale(0.8);' : 'border-color:rgba(32,200,161,0.3);' ?> background:linear-gradient(135deg,rgba(10,33,81,0.7),rgba(8,14,26,0.8));padding:0;overflow:hidden;">
                 <!-- Gold accent top bar -->
                 <div style="height:3px;background:linear-gradient(90deg,#f1a83c,#fb566b,#b37bec);"></div>
                 <div style="padding:20px 22px;">
@@ -2547,9 +2551,9 @@ function fmtMins(int $m): string {
                                     <div style="font-size:13px;font-weight:700;color:#b37bec;"><?= date('M d, Y', strtotime($tr['registration_date'])) ?></div>
                                 </div>
                             </div>
-                            <?php if ($isRemoved && $tr['removed_at']): ?>
-                            <div style="margin-top:14px; padding:10px 14px; background:rgba(251,86,107,0.1); border:1px solid rgba(251,86,107,0.2); border-radius:10px; font-size:12px; color:#fb566b; font-weight:600;">
-                                <i class="fas fa-info-circle" style="margin-right:6px;"></i> This entry was removed by admin on <?= date('M d, Y h:i A', strtotime($tr['removed_at'])) ?>
+                            <?php if ($isRestricted && $tr['removed_at']): ?>
+                            <div style="margin-top:14px; padding:10px 14px; background:<?= $isArchived ? 'rgba(241,168,60,0.1)' : 'rgba(251,86,107,0.1)' ?>; border:1px solid <?= $isArchived ? 'rgba(241,168,60,0.2)' : 'rgba(251,86,107,0.2)' ?>; border-radius:10px; font-size:12px; color:<?= $isArchived ? '#f1a83c' : '#fb566b' ?>; font-weight:600;">
+                                <i class="fas fa-info-circle" style="margin-right:6px;"></i> This entry was <?= $isArchived ? 'archived' : 'removed' ?> by admin on <?= date('M d, Y h:i A', strtotime($tr['removed_at'])) ?>
                             </div>
                             <?php endif; ?>
                         </div>

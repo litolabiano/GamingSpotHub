@@ -201,6 +201,7 @@
                 <td><?= match($t['rental_mode']) {
                     'open_time'   => 'Open Time',
                     'reservation' => '<span style="color:#20c8a1;font-weight:700;">Reservation</span>',
+                    'tournament'  => '<span style="color:#f1a83c;font-weight:700;">Tournament</span>',
                     'refund'      => '<span style="color:#fb566b;">Refund</span>',
                     default       => ucfirst($t['rental_mode'])
                 } ?></td>

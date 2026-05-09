@@ -41,7 +41,7 @@ $query = "SELECT t.transaction_id, t.transaction_date, u.full_name AS customer_n
                      ELSE COALESCE(gs.rental_mode, 'other')
                  END AS rental_mode,
                  t.amount, t.payment_method, t.payment_status,
-                 COALESCE(r.paymongo_payment_id, r.paymongo_source_id, '-') AS paymongo_id,
+                 COALESCE(tp.paymongo_payment_id, tp.paymongo_source_id, r.paymongo_payment_id, r.paymongo_source_id, '-') AS paymongo_id,
                  t.payment_note
           FROM transactions t
           JOIN users u ON t.user_id = u.user_id
@@ -50,6 +50,11 @@ $query = "SELECT t.transaction_id, t.transaction_date, u.full_name AS customer_n
           LEFT JOIN reservations r
                 ON t.payment_note LIKE '%reservation #%'
                AND r.reservation_id = CAST(
+                     SUBSTRING_INDEX(SUBSTRING_INDEX(t.payment_note, '#', -1), ' ', 1)
+                   AS UNSIGNED)
+          LEFT JOIN tournament_participants tp
+                ON t.payment_note LIKE '%Reg #%'
+               AND tp.participant_id = CAST(
                      SUBSTRING_INDEX(SUBSTRING_INDEX(t.payment_note, '#', -1), ' ', 1)
                    AS UNSIGNED)
           WHERE $txWhere
