@@ -96,6 +96,9 @@ $isLoggedIn  = isLoggedIn();
     <?php $delay += 60; endforeach; ?>
     </div>
 
+    <!-- Pagination Container -->
+    <div id="unitsPagination" style="display:none; justify-content:center; align-items:center; gap:12px; margin-top:32px;"></div>
+
     <!-- Legend -->
     <div class="gsh-legend" data-aos="fade-up">
         <span class="gsh-legend-item">
@@ -309,17 +312,79 @@ $isLoggedIn  = isLoggedIn();
 </style>
 
 <script>
+let currentUnitPage = 0;
+const UNITS_PER_PAGE = 6;
+let currentFilter = 'all';
+
+function renderUnitsPagination() {
+    const allCols = document.querySelectorAll('#unitsGrid > [data-status]');
+    const visibleCols = [];
+    
+    allCols.forEach(col => {
+        if (currentFilter === 'all' || col.dataset.status === currentFilter) {
+            visibleCols.push(col);
+        } else {
+            col.style.display = 'none';
+        }
+    });
+    
+    const totalPages = Math.ceil(visibleCols.length / UNITS_PER_PAGE);
+    
+    if (currentUnitPage >= totalPages && totalPages > 0) {
+        currentUnitPage = totalPages - 1;
+    } else if (totalPages === 0) {
+        currentUnitPage = 0;
+    }
+    
+    visibleCols.forEach((col, index) => {
+        const pageIdx = Math.floor(index / UNITS_PER_PAGE);
+        col.style.display = (pageIdx === currentUnitPage) ? '' : 'none';
+    });
+    
+    const pagContainer = document.getElementById('unitsPagination');
+    if (!pagContainer) return;
+    
+    if (totalPages > 1) {
+        pagContainer.style.display = 'flex';
+        let pagHtml = `<i class="fas fa-chevron-left" onclick="goToIdxPage('prev', ${totalPages})" style="cursor:pointer;color:#888;transition:color .3s;padding:8px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
+        pagHtml += `<div style="display:flex; gap:8px;">`;
+        for (let p = 0; p < totalPages; p++) {
+            const bg = p === currentUnitPage ? '#20c8a1' : 'rgba(255,255,255,.15)';
+            pagHtml += `<div class="idx-page-dot" onclick="goToIdxPage(${p}, ${totalPages})" style="width:24px;height:6px;border-radius:10px;background:${bg};cursor:pointer;transition:background .3s;"></div>`;
+        }
+        pagHtml += `</div>`;
+        pagHtml += `<i class="fas fa-chevron-right" onclick="goToIdxPage('next', ${totalPages})" style="cursor:pointer;color:#888;transition:color .3s;padding:8px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
+        pagContainer.innerHTML = pagHtml;
+    } else {
+        pagContainer.style.display = 'none';
+        pagContainer.innerHTML = '';
+    }
+}
+
+function goToIdxPage(pageNum, totalPages) {
+    if (pageNum === 'prev') {
+        currentUnitPage = Math.max(0, currentUnitPage - 1);
+    } else if (pageNum === 'next') {
+        currentUnitPage = Math.min(totalPages - 1, currentUnitPage + 1);
+    } else {
+        currentUnitPage = pageNum;
+    }
+    renderUnitsPagination();
+}
+
 // Filter tabs
 document.querySelectorAll('.uf-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         document.querySelectorAll('.uf-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
-        const f = this.dataset.filter;
-        document.querySelectorAll('#unitsGrid > [data-status]').forEach(col => {
-            col.style.display = (f === 'all' || col.dataset.status === f) ? '' : 'none';
-        });
+        currentFilter = this.dataset.filter;
+        currentUnitPage = 0; // Reset to first page
+        renderUnitsPagination();
     });
 });
+
+// Initialize pagination on load
+renderUnitsPagination();
 
 // ── Real-time console status polling ──────────────────────────────────────────
 (function() {
@@ -327,19 +392,27 @@ document.querySelectorAll('.uf-btn').forEach(btn => {
         fetch('/GamingSpotHub/api/console_status.php')
             .then(r => r.json())
             .then(data => {
+                let statusChanged = false;
                 data.consoles.forEach(c => {
                     const card = document.querySelector(`[data-console-id="${c.id}"]`);
                     if (!card) return;
+                    
                     const col = card.parentElement;
-                    col.dataset.status = c.status;
+                    if (col.dataset.status !== c.status) {
+                        col.dataset.status = c.status;
+                        statusChanged = true;
+                    }
+                    
                     const colors = { available:'#20c8a1', in_use:'#fb566b', maintenance:'#f1a83c' };
                     const labels = { available:'Available', in_use:'In Use', maintenance:'Under Maintenance' };
-                    const dot = card.querySelector('.gsh-status-dot');
-                    if (dot) {
+                    
+                    const pill = card.querySelector('.gsh-status-pill');
+                    if (pill) {
                         const clr = colors[c.status] || '#888';
-                        dot.style.color = clr;
-                        dot.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${clr};margin-right:5px;${c.status==='available'?'box-shadow:0 0 0 3px rgba(32,200,161,.25);animation:pulse 2s infinite;':''}"></span>${labels[c.status]||c.status}`;
+                        pill.style.color = clr;
+                        pill.innerHTML = `<span class="gsh-status-indicator" style="background:${clr};${c.status==='available'?'box-shadow:0 0 0 3px rgba(32,200,161,.25);animation:pulse 2s infinite;':''}"></span> ${labels[c.status]||c.status}`;
                     }
+                    
                     const btn = card.querySelector('.gsh-unit-btn');
                     if (btn) {
                         if (c.status === 'available') {
@@ -360,6 +433,11 @@ document.querySelectorAll('.uf-btn').forEach(btn => {
                         }
                     }
                 });
+                
+                // Re-run pagination if any status changed (so filters update accurately)
+                if (statusChanged) {
+                    renderUnitsPagination();
+                }
             }).catch(() => {});
     }
     setInterval(updateUnits, 10000);
