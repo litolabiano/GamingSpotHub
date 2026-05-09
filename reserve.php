@@ -1152,6 +1152,107 @@ if (!empty($_GET['console'])) {
         20%, 60% { transform: translateX(-5px); }
         40%, 80% { transform: translateX(5px); }
     }
+    /* ── Unit Cards ─────────────────────────────────────── */
+    .unit-card-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .unit-card {
+        border: 2px solid rgba(255,255,255,.1);
+        border-radius: 12px;
+        padding: 16px 10px;
+        text-align: center;
+        background: rgba(255,255,255,.03);
+        cursor: pointer;
+        transition: all .2s;
+        user-select: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .unit-card.available:hover {
+        border-color: rgba(32,200,161,.5);
+        background: rgba(32,200,161,.05);
+    }
+    .unit-card.selected {
+        border-color: #20c8a1;
+        background: rgba(32,200,161,.1);
+    }
+    .unit-card.unavailable {
+        opacity: 0.5;
+        cursor: not-allowed;
+        border-color: rgba(255,255,255,.05);
+    }
+    .unit-card .uc-icon {
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+    }
+    .unit-card.available .uc-icon { color: #20c8a1; }
+    .unit-card.unavailable .uc-icon { color: #fb566b; }
+    
+    .unit-card .uc-name {
+        font-weight: 800;
+        color: #fff;
+        font-size: 15px;
+        margin-bottom: 4px;
+    }
+    .unit-card .uc-status {
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .unit-card.available .uc-status { color: #20c8a1; }
+    .unit-card.unavailable .uc-status { color: #fb566b; }
+    
+    .unit-card .uc-controllers {
+        display: inline-block;
+        background: rgba(32,200,161,.15);
+        color: #20c8a1;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+    .unit-card.unavailable .uc-controllers {
+        background: rgba(251,86,107,.15);
+        color: #fb566b;
+    }
+    
+    .no-pref-btn {
+        width: 100%;
+        background: rgba(32,200,161,.1);
+        border: 1px solid rgba(32,200,161,.4);
+        color: #20c8a1;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all .2s;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+    .no-pref-btn:hover {
+        background: rgba(32,200,161,.2);
+    }
+    .no-pref-btn.selected {
+        background: #20c8a1;
+        color: #0d1b3e;
+    }
+
+    @media (max-width: 576px) {
+        .unit-card-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 577px) and (max-width: 768px) {
+        .unit-card-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
     .shake-animation { animation: shake 0.4s ease-in-out; }
     </style>
 
@@ -1497,14 +1598,35 @@ if (!empty($_GET['console'])) {
                             <span style="font-size:12px;font-weight:500;color:#888;margin-left:6px;">(Optional)</span>
                         </h2>
                         <p style="color:#888;font-size:13px;margin-bottom:14px;">
-                            Only units available for your selected date &amp; time are displayed below.
+                            Availability shown is based on your chosen date &amp; time.
                         </p>
-                        <select name="preferred_console_id" id="userUnitSelect" 
-                                style="width:100%; padding:14px; border-radius:12px; border:1.5px solid rgba(255,255,255,.1); 
-                                       background:rgba(8,16,38,.8); color:#fff; font-size:14px; outline:none; cursor:pointer;"
-                                onchange="selectUnit(this.value, false, this.options[this.selectedIndex].text)" disabled>
-                            <option value="" selected>No preference — let staff assign</option>
-                        </select>
+                        
+                        <div id="unitGridContainer" style="display:none; margin-bottom:16px;">
+                            <div class="unit-card-grid" id="unitCardGrid">
+                                <!-- Cards injected here via JS -->
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <div class="unit-pagination" id="unitPagination" style="display:none; justify-content:center; align-items:center; gap:12px; margin-top: 16px;">
+                                <i class="fas fa-chevron-left" onclick="goToUnitPage('prev')" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>
+                                <div id="unitPaginationDots" style="display:flex; gap:8px;">
+                                    <!-- Dots injected via JS -->
+                                </div>
+                                <i class="fas fa-chevron-right" onclick="goToUnitPage('next')" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>
+                            </div>
+                        </div>
+                        
+                        <div id="unitPickerLoading" style="text-align:center; padding:20px; color:#888; font-size:13px; display:none;">
+                            <i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Checking availability...
+                        </div>
+                        
+                        <div id="unitPickerLocked" style="text-align:center; padding:20px; color:#555; font-size:13px; border: 1.5px solid rgba(255,255,255,.05); border-radius: 12px;">
+                            — Select Date & Time first —
+                        </div>
+                        
+                        <div class="no-pref-btn selected" id="noPrefBtn" onclick="selectUnit('', false, '')" style="display:none; margin-top: 16px;">
+                            <i class="fas fa-random"></i> No preference — let staff assign
+                        </div>
                     </div>
 
                     <!-- ── Step 3: Rental Mode ── -->
@@ -2154,57 +2276,147 @@ function refreshUnitPicker() {
 }
 
 function renderUnitPickerLocked() {
-    const sel = document.getElementById('userUnitSelect');
-    if (!sel) return;
-    sel.disabled = true;
-    sel.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
+    document.getElementById('unitGridContainer').style.display = 'none';
+    document.getElementById('unitPickerLoading').style.display = 'none';
+    document.getElementById('noPrefBtn').style.display = 'none';
+    document.getElementById('unitPickerLocked').style.display = 'block';
+    document.getElementById('unitPickerLocked').textContent = '— Select Date & Time first —';
 }
 
-function fetchUnitAvailability(dateV, timeV) {
-    const sel = document.getElementById('userUnitSelect');
-    if (!sel) return;
+let currentUnitPage = 0;
+let totalUnitPages = 0;
 
-    // Loading state
-    sel.disabled = true;
-    const originalValue = sel.value;
-    sel.innerHTML = '<option value="" disabled selected>Checking availability...</option>';
+function fetchUnitAvailability(dateV, timeV) {
+    document.getElementById('unitGridContainer').style.display = 'none';
+    document.getElementById('unitPickerLocked').style.display = 'none';
+    document.getElementById('noPrefBtn').style.display = 'none';
+    document.getElementById('unitPickerLoading').style.display = 'block';
 
     const mins = selectedDuration || 60;
+    const originalValue = selectedUnitId;
 
     fetch(`ajax/check_unit_availability.php?date=${encodeURIComponent(dateV)}&time=${encodeURIComponent(timeV)}&console_type=${encodeURIComponent(selectedConsoleType)}&planned_minutes=${mins}`)
         .then(r => r.json())
         .then(data => {
+            document.getElementById('unitPickerLoading').style.display = 'none';
+            
             if (!data.success) {
-                sel.innerHTML = '<option value="" disabled selected>Error checking availability.</option>';
+                document.getElementById('unitPickerLocked').style.display = 'block';
+                document.getElementById('unitPickerLocked').textContent = 'Error checking availability.';
                 return;
             }
 
-            sel.disabled = false;
-            sel.innerHTML = '<option value="">No preference — let staff assign</option>';
+            const grid = document.getElementById('unitCardGrid');
+            grid.innerHTML = '';
             
             let stillAvailable = false;
-            data.units.forEach(u => {
-                if (u.status === 'available') {
-                    const opt = document.createElement('option');
-                    opt.value = u.id;
-                    opt.textContent = `Unit #${u.unit} (${u.controllers} Controllers)`;
-                    if (u.id == originalValue) {
-                        opt.selected = true;
-                        stillAvailable = true;
-                    }
-                    sel.appendChild(opt);
+            let availableUnits = [];
+            
+            // Collect all units and build cards
+            data.units.forEach((u, idx) => {
+                const isAvail = u.status === 'available';
+                const iconClass = isAvail ? 'fas fa-check-square' : 'fas fa-times-circle';
+                const statusText = isAvail ? 'Available' : 'Unavailable';
+                const cardClass = isAvail ? 'available' : 'unavailable';
+                
+                // Keep selected state if it matches original value
+                let selectedClass = '';
+                if (originalValue && originalValue == u.id && isAvail) {
+                    selectedClass = 'selected';
+                    stillAvailable = true;
                 }
+                
+                const pageIdx = Math.floor(idx / 4);
+                
+                const card = document.createElement('div');
+                card.className = `unit-card ${cardClass} ${selectedClass}`;
+                card.setAttribute('data-unit-page', pageIdx);
+                card.setAttribute('data-unit-id', u.id);
+                if (isAvail) {
+                    card.onclick = () => selectUnit(u.id, false, u.unit);
+                } else {
+                    card.title = u.conflict || 'Unavailable';
+                }
+                
+                card.innerHTML = `
+                    <div class="uc-icon"><i class="${iconClass}"></i></div>
+                    <div class="uc-name">#${u.name || u.type + '-' + u.unit}</div>
+                    <div class="uc-status">${statusText}</div>
+                    <div class="uc-controllers"><i class="fas fa-gamepad"></i> ${u.controllers} Controllers</div>
+                `;
+                
+                grid.appendChild(card);
             });
+            
+            totalUnitPages = Math.ceil(data.units.length / 4);
+            currentUnitPage = 0;
+            
+            document.getElementById('unitGridContainer').style.display = 'block';
+            document.getElementById('noPrefBtn').style.display = 'flex';
+            
+            updateUnitPagination();
+            goToUnitPage(0);
 
             // If selected unit is no longer available, warn user
             if (originalValue && !stillAvailable) {
                 alert('The console unit you previously selected (# ' + selectedUnitLabel + ') is no longer available for this new date/time slot. Please choose another unit or use staff assignment.');
                 selectUnit('', false, '');
+            } else if (!originalValue) {
+                // Ensure no preference is highlighted visually
+                document.getElementById('noPrefBtn').classList.add('selected');
             }
         })
         .catch(() => {
-            sel.innerHTML = '<option value="" disabled selected>Could not check availability.</option>';
+            document.getElementById('unitPickerLoading').style.display = 'none';
+            document.getElementById('unitPickerLocked').style.display = 'block';
+            document.getElementById('unitPickerLocked').textContent = 'Could not check availability.';
         });
+}
+
+function updateUnitPagination() {
+    const pag = document.getElementById('unitPagination');
+    const dotsContainer = document.getElementById('unitPaginationDots');
+    
+    if (totalUnitPages > 1) {
+        pag.style.display = 'flex';
+        dotsContainer.innerHTML = '';
+        for (let p = 0; p < totalUnitPages; p++) {
+            const dot = document.createElement('div');
+            dot.className = 'unit-page-dot';
+            dot.style.cssText = `width:24px;height:6px;border-radius:10px;background:${p === 0 ? '#20c8a1' : 'rgba(255,255,255,.15)'};cursor:pointer;transition:background .3s;`;
+            dot.onclick = () => goToUnitPage(p);
+            dotsContainer.appendChild(dot);
+        }
+    } else {
+        pag.style.display = 'none';
+    }
+}
+
+function goToUnitPage(pageNum) {
+    if (pageNum === 'prev') {
+        currentUnitPage = Math.max(0, currentUnitPage - 1);
+    } else if (pageNum === 'next') {
+        currentUnitPage = Math.min(totalUnitPages - 1, currentUnitPage + 1);
+    } else {
+        currentUnitPage = pageNum;
+    }
+    
+    document.querySelectorAll('.unit-card').forEach(card => {
+        if (card.hasAttribute('data-unit-page')) {
+            if (parseInt(card.getAttribute('data-unit-page')) === currentUnitPage) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+    });
+    
+    const dots = document.getElementById('unitPaginationDots');
+    if (dots) {
+        Array.from(dots.children).forEach((dot, idx) => {
+            dot.style.background = idx === currentUnitPage ? '#20c8a1' : 'rgba(255,255,255,.15)';
+        });
+    }
 }
 
 // Obsolete grid-picker functions removed
@@ -2221,8 +2433,18 @@ function selectUnit(id, silent = false, label = '') {
     selectedUnitLabel = label;
     document.getElementById('hiddenPreferredUnit').value = id || '';
 
-    const sel = document.getElementById('userUnitSelect');
-    if (sel) sel.value = id || '';
+    // Update UI highlights
+    const btn = document.getElementById('noPrefBtn');
+    if (btn) btn.classList.remove('selected');
+    
+    document.querySelectorAll('.unit-card').forEach(card => card.classList.remove('selected'));
+    
+    if (id) {
+        const card = document.querySelector(`.unit-card[data-unit-id="${id}"]`);
+        if (card) card.classList.add('selected');
+    } else {
+        if (btn) btn.classList.add('selected');
+    }
 
     if (!silent) updateSummary();
 }
