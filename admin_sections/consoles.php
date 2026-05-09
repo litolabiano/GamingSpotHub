@@ -307,6 +307,7 @@
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Unit #</th>
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Name</th>
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Type</th>
+                        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Rate</th>
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Status</th>
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Notes</th>
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Actions</th>
@@ -331,6 +332,7 @@
                                 <i class="fa-solid fa-gamepad"></i> <?= htmlspecialchars($ctrl['console_type'] ?? 'Unknown') ?>
                             </span>
                         </td>
+                        <td style="padding:12px 16px;color:#20c8a1;">₱<?= number_format($ctrl['hourly_rate'], 2) ?>/hr</td>
                         <td style="padding:12px 16px;">
                             <span class="status-dot <?= $ctrl['status'] ?>"></span>
                             <?= ucfirst(str_replace('_',' ',$ctrl['status'])) ?>
@@ -338,6 +340,10 @@
                         <td style="padding:12px 16px;color:#888;font-size:13px;"><?= htmlspecialchars($ctrl['notes'] ?? '-') ?></td>
                         <td style="padding:12px 16px;">
                             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                <button type="button" class="btn-sec btn-sm" style="padding:5px 10px;font-size:12px;" 
+                                        onclick="openEditControllerModal(<?= $ctrl['controller_id'] ?>, '<?= htmlspecialchars($ctrl['unit_number'], ENT_QUOTES) ?>', <?= $ctrl['hourly_rate'] ?>, '<?= htmlspecialchars($ctrl['notes'], ENT_QUOTES) ?>')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                                 <form method="POST" action="admin.php#consoles" style="display:flex;gap:6px;align-items:center;">
                                     <input type="hidden" name="action" value="update_controller_status">
                                     <?= csrfField() ?>
@@ -407,6 +413,7 @@
                         <tr style="background:rgba(10,33,81,.6);">
                             <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Unit #</th>
                             <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Name</th>
+                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Rate</th>
                             <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Actions</th>
                         </tr>
                     </thead>
@@ -415,6 +422,7 @@
                         <tr style="border-top:1px solid rgba(255,255,255,.05);">
                             <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
                             <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_type'] ?? 'Unknown') ?></td>
+                            <td style="padding:12px 16px;color:#20c8a1;">₱<?= number_format($ctrl['hourly_rate'], 2) ?>/hr</td>
                             <td style="padding:12px 16px;">
                                 <div style="display:flex;gap:6px;">
                                     <form method="POST" action="admin.php#consoles" style="display:inline;">
