@@ -70,6 +70,8 @@ if ($duration <= 0) {
     exit;
 }
 
+resyncOpenTimeControllerRentalExtras($session_id, $duration);
+
 // Recalculate cost with the same billing engine used in endSession()
 $total_cost = computeRentalFee(
     $session['rental_mode'],

@@ -501,6 +501,8 @@ function endSession($session_id) {
     $end = new DateTime($end_time);
     $duration = (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60);
 
+    resyncOpenTimeControllerRentalExtras($session_id, $duration);
+
     // Calculate cost based on rental mode
     $total_cost = computeRentalFee($session['rental_mode'], $duration, $session['hourly_rate'], $session['unlimited_rate'] ?? 300, $session['planned_minutes'] ?? null);
 
@@ -876,6 +878,330 @@ function computeTimedCost(int $minutes): float {
     }
 
     return (float) $cost;
+}
+
+/**
+ * Controller add-on for Open Time: same bonus/bracket *timing* as computeTimedCost with *amounts*
+ * driven by the controller's hourly rate (matches admin.js _controllerOpenTimeFee).
+ */
+function computeControllerOpenTimeFeeForDuration(int $total_minutes, float $controller_hourly_rate): float {
+    $total_minutes = max(0, $total_minutes);
+    if ($total_minutes === 0 || $controller_hourly_rate <= 0) {
+        return 0.0;
+    }
+    $rules  = getPricingRules();
+    $bp     = (int) $rules['bonus_paid_minutes'];
+    $bf     = (int) $rules['bonus_free_minutes'];
+    $ref    = (float) ($rules['hourly_rate'] ?? 0);
+    $brScale = $ref > 0.00001 ? ($controller_hourly_rate / $ref) : 1.0;
+    $ctrlR  = $controller_hourly_rate;
+
+    $cyclePay = $bp / 60 * $ctrlR;
+    $cycleLen = $bp + $bf;
+    $full     = intdiv($total_minutes, $cycleLen);
+    $cost     = $full * $cyclePay;
+    $rem      = $total_minutes % $cycleLen;
+
+    if ($rem > $bp) {
+        $cost += $cyclePay;
+    } else {
+        $sub = computePartialPeriodCost($rem % 60) * $brScale;
+        $cost += (int) floor($rem / 60) * $ctrlR + $sub;
+    }
+
+    return round((float) $cost, 2);
+}
+
+/**
+ * Controller rows tagged as Open Time (per-controller) need extra_cost set from elapsed session minutes.
+ * Fixed upfront portions ([FIX:...]) are kept; OT portion uses the same bonus/bracket clock as console.
+ * Runs whenever a session end duration is known (any console rental_mode if OT controller lines exist).
+ */
+function resyncOpenTimeControllerRentalExtras(int $session_id, int $duration_minutes): void {
+    global $conn;
+    if ($session_id <= 0 || $duration_minutes < 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT request_id, description FROM additional_requests
+         WHERE session_id = ? AND request_type = 'controller_rental' AND status = 'approved'"
+    );
+    $stmt->bind_param('i', $session_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    foreach ($rows as $row) {
+        $desc = (string) $row['description'];
+
+        $fixed_total = 0.0;
+        if (preg_match('/\[FIX:([^\]]+)\]/', $desc, $fm)) {
+            foreach (explode('|', $fm[1]) as $pair) {
+                $pair = trim($pair);
+                if ($pair === '') {
+                    continue;
+                }
+                $parts = explode(':', $pair, 2);
+                if (count($parts) === 2) {
+                    $fixed_total += (float) $parts[1];
+                }
+            }
+        }
+
+        $ot_ids = [];
+        if (preg_match('/\[OT_IDS:([^\]]*)\]/', $desc, $om)) {
+            $s = trim((string) $om[1]);
+            if ($s !== '') {
+                $ot_ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', $s))));
+            }
+        } elseif (strpos($desc, 'Open Time run-the-clock') !== false && preg_match('/IDs:\s*([\d,\s]+)/', $desc, $im)) {
+            // Legacy: entire line was Open Time; upfront was 0 until session end
+            $ot_ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($im[1])))));
+            $fixed_total = 0.0;
+        }
+
+        if ($ot_ids === []) {
+            continue;
+        }
+
+        $ot_sum = 0.0;
+        foreach ($ot_ids as $cid) {
+            if ($cid <= 0) {
+                continue;
+            }
+            $rStmt = $conn->prepare('SELECT hourly_rate FROM controllers WHERE controller_id = ?');
+            $rStmt->bind_param('i', $cid);
+            $rStmt->execute();
+            $rateRow = $rStmt->get_result()->fetch_assoc();
+            if (!$rateRow) {
+                continue;
+            }
+            $ot_sum += computeControllerOpenTimeFeeForDuration($duration_minutes, (float) $rateRow['hourly_rate']);
+        }
+
+        $new_extra = round($fixed_total + $ot_sum, 2);
+        $upd = $conn->prepare('UPDATE additional_requests SET extra_cost = ? WHERE request_id = ?');
+        $rid = (int) $row['request_id'];
+        $upd->bind_param('di', $new_extra, $rid);
+        $upd->execute();
+    }
+}
+
+/**
+ * Rebuild a controller_rental line for early hardware return: charge only through elapsed
+ * session minutes, freeze open-time style fees at elapsed, remove [OT_IDS] so
+ * resyncOpenTimeControllerRentalExtras() does not add again at session end.
+ *
+ * @return array{description:string,extra_cost:float,controller_ids:int[]}|null
+ */
+function rebuildControllerRentalLineForEarlyEnd(string $description, float $previous_cost, int $elapsed_minutes, mysqli $conn): ?array {
+    $elapsed_minutes = max(0, $elapsed_minutes);
+    $desc            = trim($description);
+
+    $ids = [];
+    if (preg_match('/IDs:\s*([\d,\s]+)/', $desc, $m)) {
+        $ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($m[1])))));
+    }
+    if ($ids === []) {
+        return null;
+    }
+
+    $fix_parts = [];
+    if (preg_match('/\[FIX:([^\]]+)\]/', $desc, $fm)) {
+        foreach (explode('|', $fm[1]) as $pair) {
+            $pair = trim($pair);
+            if ($pair === '') {
+                continue;
+            }
+            $parts = explode(':', $pair, 2);
+            if (count($parts) === 2) {
+                $fix_parts[(int) $parts[0]] = (float) $parts[1];
+            }
+        }
+    }
+
+    $ot_ids = [];
+    if (preg_match('/\[OT_IDS:([^\]]*)\]/', $desc, $om)) {
+        $s = trim((string) $om[1]);
+        if ($s !== '') {
+            $ot_ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', $s))));
+        }
+    }
+
+    $mins_map = [];
+    if (preg_match('/\[Mins:\s*([\d,\s]+)\]/', $desc, $mm)) {
+        $mins_map = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($mm[1])))));
+    }
+
+    if ($ot_ids === [] && strpos($desc, 'Open Time run-the-clock') !== false) {
+        foreach ($ids as $cid) {
+            if (!isset($fix_parts[$cid])) {
+                $ot_ids[] = $cid;
+            }
+        }
+        $ot_ids = array_values(array_unique($ot_ids));
+    }
+
+    $per_controller = [];
+
+    foreach ($ids as $i => $cid) {
+        if ($cid <= 0) {
+            continue;
+        }
+        $rStmt = $conn->prepare('SELECT hourly_rate FROM controllers WHERE controller_id = ?');
+        $rStmt->bind_param('i', $cid);
+        $rStmt->execute();
+        $rateRow = $rStmt->get_result()->fetch_assoc();
+        if (!$rateRow) {
+            return null;
+        }
+        $rate = (float) ($rateRow['hourly_rate'] ?? 0);
+        if ($rate <= 0.00001) {
+            return null;
+        }
+
+        $amt = 0.0;
+
+        if (isset($fix_parts[$cid])) {
+            $orig      = $fix_parts[$cid];
+            $orig_mins = (int) round(($orig / $rate) * 60);
+            $bill_mins = min($orig_mins, $elapsed_minutes);
+            $amt       = round($rate * ($bill_mins / 60), 2);
+        } elseif (in_array($cid, $ot_ids, true)) {
+            $amt = computeControllerOpenTimeFeeForDuration($elapsed_minutes, $rate);
+        } elseif ($mins_map !== []) {
+            $book      = $mins_map[$i] ?? $mins_map[0];
+            $bill_mins = min($book, $elapsed_minutes);
+            $amt       = round($rate * ($bill_mins / 60), 2);
+        } elseif (count($ids) === 1 && $previous_cost > 0 && $fix_parts === [] && $ot_ids === []) {
+            $orig_mins = (int) round(($previous_cost / $rate) * 60);
+            $bill_mins = min(max(0, $orig_mins), $elapsed_minutes);
+            $amt       = round($rate * ($bill_mins / 60), 2);
+        } else {
+            return null;
+        }
+
+        $per_controller[$cid] = $amt;
+    }
+
+    if (count($per_controller) !== count($ids)) {
+        return null;
+    }
+
+    $pairs = [];
+    foreach ($ids as $cid) {
+        $pairs[] = $cid . ':' . number_format($per_controller[$cid], 2, '.', '');
+    }
+
+    $new_desc  = 'Controller rental (IDs: ' . implode(', ', $ids) . ') [FIX:' . implode('|', $pairs) . ']';
+    $new_total = round(array_sum($per_controller), 2);
+
+    return [
+        'description'     => $new_desc,
+        'extra_cost'      => $new_total,
+        'controller_ids'  => $ids,
+    ];
+}
+
+/**
+ * Staff: end controller add-on early on an active session — re-rate and release hardware.
+ *
+ * @return array{success:bool,message?:string,extras_total?:float,elapsed_minutes?:int}
+ */
+function endControllerRentalEarly(int $session_id, int $staff_user_id): array {
+    global $conn;
+
+    if ($session_id <= 0) {
+        return ['success' => false, 'message' => 'Invalid session.'];
+    }
+
+    $conn->begin_transaction();
+    try {
+        $sessStmt = $conn->prepare(
+            "SELECT session_id, start_time, status FROM gaming_sessions WHERE session_id = ? AND status = 'active'"
+        );
+        $sessStmt->bind_param('i', $session_id);
+        $sessStmt->execute();
+        $session = $sessStmt->get_result()->fetch_assoc();
+
+        if (!$session) {
+            $conn->rollback();
+
+            return ['success' => false, 'message' => 'Session is not active.'];
+        }
+
+        $start   = new DateTime($session['start_time'], new DateTimeZone('Asia/Manila'));
+        $now     = new DateTime('now', new DateTimeZone('Asia/Manila'));
+        $elapsed = max(0, (int) floor(($now->getTimestamp() - $start->getTimestamp()) / 60));
+
+        $arStmt = $conn->prepare(
+            "SELECT request_id, description, extra_cost FROM additional_requests
+              WHERE session_id = ? AND request_type = 'controller_rental' AND status = 'approved'"
+        );
+        $arStmt->bind_param('i', $session_id);
+        $arStmt->execute();
+        $rows = $arStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        if ($rows === []) {
+            $conn->rollback();
+
+            return ['success' => false, 'message' => 'No controller rental on this session.'];
+        }
+
+        foreach ($rows as $row) {
+            $reb = rebuildControllerRentalLineForEarlyEnd(
+                (string) $row['description'],
+                (float) $row['extra_cost'],
+                $elapsed,
+                $conn
+            );
+            if ($reb === null) {
+                $conn->rollback();
+
+                return ['success' => false, 'message' => 'Could not parse controller rental line. Update the record or end the session normally.'];
+            }
+
+            $upd = $conn->prepare('UPDATE additional_requests SET description = ?, extra_cost = ? WHERE request_id = ?');
+            $rid = (int) $row['request_id'];
+            $upd->bind_param('sdi', $reb['description'], $reb['extra_cost'], $rid);
+            $upd->execute();
+
+            foreach ($reb['controller_ids'] as $cid) {
+                if ($cid <= 0) {
+                    continue;
+                }
+                $cu = $conn->prepare("UPDATE controllers SET status = 'available' WHERE controller_id = ?");
+                $cu->bind_param('i', $cid);
+                $cu->execute();
+            }
+        }
+
+        $conn->commit();
+
+        $sumStmt = $conn->prepare(
+            'SELECT COALESCE(SUM(extra_cost), 0) AS t FROM additional_requests WHERE session_id = ? AND status = \'approved\''
+        );
+        $sumStmt->bind_param('i', $session_id);
+        $sumStmt->execute();
+        $new_tot = (float) $sumStmt->get_result()->fetch_assoc()['t'];
+
+        logActivity(
+            $staff_user_id,
+            'Controller rental',
+            "Ended controller rental early for session #{$session_id} (elapsed {$elapsed} min). Approved extras now ₱" . number_format($new_tot, 2) . '.'
+        );
+
+        return [
+            'success'          => true,
+            'message'          => 'Controller rental ended early. Fees recalculated to time used; units marked available.',
+            'extras_total'     => $new_tot,
+            'elapsed_minutes'  => $elapsed,
+        ];
+    } catch (Throwable $e) {
+        $conn->rollback();
+
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
 }
 
 /**
@@ -1590,18 +1916,34 @@ function getMyReservations($user_id) {
     global $conn;
     $stmt = $conn->prepare(
         "SELECT r.*, ct.type_name AS console_type, c.unit_number, c.console_name,
-                ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type
+                ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type,
+                ctrl2.unit_number AS ctrl2_unit, ctrl2_t.type_name AS ctrl2_type
            FROM reservations r
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
            LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
            LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
+           LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
           WHERE r.user_id = ?
           ORDER BY r.reserved_date DESC, r.reserved_time DESC"
     );
     $stmt->bind_param('i', $user_id);
     $stmt->execute();
     return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
+ * Strip internal/system lines from reservation notes for customer-facing UI
+ * (e.g. "[Controller rental modes: ...]" appended at booking).
+ */
+function reservationNotesForCustomerDisplay(?string $notes): string {
+    if ($notes === null || trim($notes) === '') {
+        return '';
+    }
+    $clean = preg_replace('/\R?\s*\[Controller rental modes:\s*[^\]]+\]\s*/iu', "\n", $notes);
+    $clean = preg_replace('/\n{3,}/', "\n\n", $clean);
+    return trim($clean);
 }
 
 /**

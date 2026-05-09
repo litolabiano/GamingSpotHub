@@ -54,33 +54,125 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
+            $skip_start_session = false;
+            if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] === '1') {
+                $cm1 = $_POST['controller_rental_mode_1'] ?? 'hourly';
+                $cm2 = $_POST['controller_rental_mode_2'] ?? 'hourly';
+                foreach (['m1' => $cm1, 'm2' => $cm2] as $k => $cm) {
+                    if (!in_array($cm, ['hourly', 'open_time'], true)) {
+                        $message = 'Invalid controller rental mode.';
+                        $messageType = 'error';
+                        $skip_start_session = true;
+                        break;
+                    }
+                }
+                if (!$skip_start_session) {
+                    $ctrl_1_mins_chk = (int)($_POST['controller_rental_minutes'] ?? 0);
+                    $ctrl_2_mins_chk = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+                    $r1_chk = (int)($_POST['rented_controller_id'] ?? 0);
+                    $r2_chk = (int)($_POST['rented_controller_id_2'] ?? 0);
+                    $cc_chk = (int)($_POST['controller_count'] ?? 1);
+                    $admin_ctrl_cap = 720;
+                    /* Hourly: cap controller add-on at the selected console duration (paid slot in the picker), not longer. */
+                    $max_controller_minutes = ($rental_mode === 'hourly')
+                        ? (int)$planned_minutes
+                        : $admin_ctrl_cap;
+                    if ($r1_chk > 0 && $cm1 !== 'open_time') {
+                        if ($ctrl_1_mins_chk <= 0) {
+                            $message = 'Controller 1: choose a duration (or set rental mode to Open Time).';
+                            $messageType = 'error';
+                            $skip_start_session = true;
+                        } elseif ($ctrl_1_mins_chk > $max_controller_minutes) {
+                            $message = ($rental_mode === 'hourly')
+                                ? 'Controller 1 rental cannot exceed the selected session duration.'
+                                : 'Controller 1 rental cannot exceed 12 hours.';
+                            $messageType = 'error';
+                            $skip_start_session = true;
+                        }
+                    }
+                    if (!$skip_start_session && $cc_chk > 1 && $r2_chk > 0 && $cm2 !== 'open_time') {
+                        if ($ctrl_2_mins_chk <= 0) {
+                            $message = 'Controller 2: choose a duration (or set rental mode to Open Time).';
+                            $messageType = 'error';
+                            $skip_start_session = true;
+                        } elseif ($ctrl_2_mins_chk > $max_controller_minutes) {
+                            $message = ($rental_mode === 'hourly')
+                                ? 'Controller 2 rental cannot exceed the selected session duration.'
+                                : 'Controller 2 rental cannot exceed 12 hours.';
+                            $messageType = 'error';
+                            $skip_start_session = true;
+                        }
+                    }
+                }
+            }
+            if (!$skip_start_session) {
             $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
       if ($result['success']) {
+        $controller_upfront_addon = 0.0;
 
         // ── Persist controller rental fee to additional_requests (always, ──────
         // ── regardless of whether upfront was collected). endSession()    ──────
         // ── and the End Session modal both read from this table.          ──────
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
-            $ctrl_count = (int)($_POST['controller_count'] ?? 1);
-            $rented_1 = (int)($_POST['rented_controller_id'] ?? 0);
-            $rented_2 = (int)($_POST['rented_controller_id_2'] ?? 0);
+            $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
+            $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
+            $rented_2    = (int)($_POST['rented_controller_id_2'] ?? 0);
+            $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
+            $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+            $cm1         = $_POST['controller_rental_mode_1'] ?? 'hourly';
+            $cm2         = $_POST['controller_rental_mode_2'] ?? 'hourly';
 
-            if ($ctrl_fee > 0) {
-                $desc = 'Controller rental fee';
-                $ids = [];
-                $mins = [];
-                $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
-                $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+            $ids      = [];
+            $ot_ids   = [];
+            $fix_meta = [];
+            $fix_sum  = 0.0;
 
-                if ($rented_1 > 0) { $ids[] = $rented_1; $mins[] = $ctrl_1_mins; }
-                if ($ctrl_count > 1 && $rented_2 > 0) { $ids[] = $rented_2; $mins[] = $ctrl_2_mins; }
-                
-                if (!empty($ids)) {
-                    $desc .= " (IDs: " . implode(', ', $ids) . ")";
-                    $desc .= " [Mins: " . implode(', ', $mins) . "]";
+            $accum_controller_line = static function (mysqli $conn, int $cid, int $mins, string $cm) use (&$ids, &$ot_ids, &$fix_meta, &$fix_sum): void {
+                if ($cid <= 0 || !in_array($cm, ['hourly', 'open_time'], true)) {
+                    return;
                 }
+                $ids[] = $cid;
+                if ($cm === 'open_time') {
+                    $ot_ids[] = $cid;
 
+                    return;
+                }
+                $st = $conn->prepare('SELECT hourly_rate FROM controllers WHERE controller_id = ?');
+                $st->bind_param('i', $cid);
+                $st->execute();
+                $rw = $st->get_result()->fetch_assoc();
+                if (!$rw) {
+                    return;
+                }
+                $rate = (float) $rw['hourly_rate'];
+                $amt  = round($rate * ($mins / 60), 2);
+                $fix_sum += $amt;
+                $fix_meta[] = $cid . ':' . number_format($amt, 2, '.', '');
+            };
+
+            if ($rented_1 > 0) {
+                $accum_controller_line($conn, $rented_1, $ctrl_1_mins, $cm1);
+            }
+            if ($ctrl_count > 1 && $rented_2 > 0) {
+                $accum_controller_line($conn, $rented_2, $ctrl_2_mins, $cm2);
+            }
+
+            $insert_ar = false;
+            $desc      = '';
+            $ctrl_fee  = round($fix_sum, 2);
+            $controller_upfront_addon = $ctrl_fee;
+            if (!empty($ids)) {
+                $insert_ar = true;
+                $desc = 'Controller rental (IDs: ' . implode(', ', $ids) . ')';
+                if (!empty($ot_ids)) {
+                    $desc .= ' [OT_IDS:' . implode(',', $ot_ids) . ']';
+                }
+                if (!empty($fix_meta)) {
+                    $desc .= ' [FIX:' . implode('|', $fix_meta) . ']';
+                }
+            }
+
+            if ($insert_ar) {
                 $arStmt = $conn->prepare(
                     "INSERT INTO additional_requests
                         (session_id, request_type, description, extra_cost, status)
@@ -89,7 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrl_fee);
                 $arStmt->execute();
 
-                // Mark the specific rented controllers as in_use
                 foreach ($ids as $cid) {
                     $ctrlUpd = $conn->prepare(
                         "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
@@ -104,8 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
         $upfront_cost      = $unlim_rate;
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
-            $upfront_cost += $ctrl_fee;
+            $upfront_cost += $controller_upfront_addon;
         }
         $tendered          = (float)$_POST['unlimited_tendered'];
 
@@ -121,10 +211,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
         $pr           = getPricingRules();
         $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
-        // Add controller rental fee to upfront total if checked
+        // Add controller rental fee to upfront total if checked (fixed-rate controllers only; Open Time billed at end)
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $ctrl_fee     = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
-            $upfront_cost += $ctrl_fee;
+            $upfront_cost += $controller_upfront_addon;
         }
         $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
         $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
@@ -166,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   else {
                 $message = 'Could not start session: ' . $result['message'];
                 $messageType = 'error';
+            }
             }
         }
     }
@@ -1414,6 +1504,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <link rel="stylesheet" href="assets/css/admin.css?v=<?= time() ?>">
     <script src="assets/libs/chartjs/chart.min.js"></script>
     <script src="assets/js/admin_search.js"></script>
+    <script>window.GSPOT_CSRF = <?= json_encode(csrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;</script>
     <style>
         /* ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ 
            ADMIN DESIGN SYSTEM - CSS Custom Properties
@@ -2189,6 +2280,11 @@ function onRentalModeChange() {
         document.getElementById('unlimChangeDisplay').style.display = 'none';
     }
 
+    if (typeof syncControllerRentalModesFromSession === 'function') syncControllerRentalModesFromSession();
+    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
+    if (typeof applyTwelveHourForUnlimitedConsoleSession === 'function') {
+        applyTwelveHourForUnlimitedConsoleSession(true);
+    }
     // Re-evaluate Start button for the new mode
     if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
@@ -2224,6 +2320,253 @@ function restrictStartSessionDuration() {
         sel.value = firstValid || "";
         updateSessionPreview();
     }
+}
+
+/** Paid minutes to total play (paid + bonus) — mirrors PHP paidToTotalMinutes; requires global PRICING. */
+function jsPaidToTotalMinutes(paid) {
+    if (typeof PRICING === 'undefined') return paid;
+    const p = parseInt(paid, 10) || 0;
+    if (p <= 0) return p;
+    const bp = parseInt(PRICING.bonus_paid_minutes, 10) || 120;
+    const bf = parseInt(PRICING.bonus_free_minutes, 10) || 0;
+    if (bp <= 0) return p;
+    return p + Math.floor(p / bp) * bf;
+}
+
+/** Open Time / Unlimited: max selectable controller rental (minutes) in Start Session. */
+var ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI = 720;
+
+/**
+ * Same bonus/bracket timing as console open-time (_timedCost): use controller ₱/hr on paid blocks
+ * and scale tier/bracket peso amounts vs the selected console reference rate.
+ */
+function _controllerOpenTimeFee(totalMin, controllerHourlyRate) {
+    if (totalMin <= 0) return 0;
+    const ctrlR = parseFloat(controllerHourlyRate) || 0;
+    if (ctrlR <= 0) return 0;
+    if (typeof PRICING === 'undefined') return ctrlR * (totalMin / 60);
+
+    const bp = PRICING.bonus_paid_minutes;
+    const bf = PRICING.bonus_free_minutes;
+    const consoleR = typeof getConsoleRate === 'function' ? getConsoleRate() : 0;
+    const ref = consoleR > 0 ? consoleR : parseFloat(PRICING.hourly_rate || 0);
+    const brScale = ref > 0 ? (ctrlR / ref) : 1;
+
+    const cyclePay = bp / 60 * ctrlR;
+    const cycleLen = bp + bf;
+    const full = Math.floor(totalMin / cycleLen);
+    let cost = full * cyclePay;
+    const rem = totalMin % cycleLen;
+
+    if (rem > bp) {
+        cost += cyclePay;
+    } else {
+        const sub = typeof _bracketCost === 'function' ? _bracketCost(rem % 60) * brScale : 0;
+        cost += Math.floor(rem / 60) * ctrlR + sub;
+    }
+    return cost;
+}
+
+/** Rental mode for a specific controller add-on (independent of console session mode). */
+function getControllerRentalMode(ctrl) {
+    const sel = document.getElementById('adminCtrlModeSelect' + ctrl);
+    return sel ? (sel.value || 'hourly') : 'hourly';
+}
+
+/** Show/hide duration per controller: Open Time (controller) = no duration picker. */
+function refreshAdminCtrlRentalModeUi() {
+    const group = document.getElementById('controllerRentalGroup');
+    const togOn = !!document.getElementById('controllerRentalToggle')?.checked;
+    let anyOt = false;
+    [1, 2].forEach(function (ctrl) {
+        const wrap = document.getElementById('adminCtrlDurWrap' + ctrl);
+        const cm = getControllerRentalMode(ctrl);
+        if (cm === 'open_time') anyOt = true;
+        if (wrap) {
+            wrap.style.display = cm === 'open_time' ? 'none' : '';
+        }
+        if (cm === 'open_time') {
+            const s = document.getElementById('adminCtrlDurationSelect' + ctrl);
+            if (s) s.value = '0';
+        }
+        if (typeof _adminCtrlCostPreview === 'function') {
+            _adminCtrlCostPreview(ctrl, parseInt(document.getElementById('adminCtrlDurationSelect' + ctrl)?.value || '0', 10) || 0);
+        }
+    });
+    const runNote = document.getElementById('adminCtrlOpenTimeRunClockNote');
+    if (runNote) {
+        runNote.style.display = (anyOt && togOn && group && group.style.display !== 'none') ? 'block' : 'none';
+    }
+    if (typeof recalcAdminControllerFee === 'function') recalcAdminControllerFee();
+}
+
+function onAdminCtrlRentalModeChange(ctrl) {
+    refreshAdminCtrlRentalModeUi();
+    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
+}
+
+/** Sync controller rental mode to console mode: Unlimited console → hourly add-on (+ 12h default elsewhere); OT → OT. */
+function syncControllerRentalModesFromSession() {
+    const m = document.getElementById('rentalModeSelect')?.value || 'hourly';
+    ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(function (id) {
+        const s = document.getElementById(id);
+        if (!s) return;
+        if (m === 'open_time') {
+            s.value = 'open_time';
+        } else {
+            s.value = 'hourly';
+        }
+    });
+}
+
+/** Unlimited console sessions: preset non–Open-Time controller durations to 12h (until staff changes). */
+function applyTwelveHourForUnlimitedConsoleSession(force) {
+    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
+    const tog      = document.getElementById('controllerRentalToggle');
+    if (sessMode !== 'unlimited' || !tog?.checked) {
+        return;
+    }
+    const cap   = ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
+    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10);
+    let did     = false;
+    [1, 2].forEach(function (ctrl) {
+        if (ctrl === 2 && count < 2) return;
+        if (getControllerRentalMode(ctrl) === 'open_time') return;
+        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
+        if (!sel) return;
+        const cur = parseInt(sel.value, 10) || 0;
+        if (!force && cur > 0) return;
+        const opt = sel.querySelector('option[value="' + cap + '"]');
+        if (!opt || opt.disabled) return;
+        sel.value = String(cap);
+        did = true;
+        if (typeof _adminCtrlCostPreview === 'function') {
+            _adminCtrlCostPreview(ctrl, cap);
+        }
+    });
+    if (did && typeof recalcAdminControllerFee === 'function') {
+        recalcAdminControllerFee();
+    }
+}
+
+/** Max controller rental minutes (hourly: same as selected console duration/paid slot; unlimited/open_time: 12h cap). */
+function getStartSessionMaxControllerMinutes() {
+    const modeEl = document.getElementById('rentalModeSelect');
+    if (!modeEl || typeof PRICING === 'undefined') return 0;
+    if (modeEl.value === 'hourly') {
+        const sel = document.getElementById('durationSelect');
+        if (!sel || !sel.value) return 0;
+        const paid = parseInt(sel.value, 10);
+        return isNaN(paid) || paid <= 0 ? 0 : paid;
+    }
+    if (modeEl.value === 'unlimited' || modeEl.value === 'open_time') {
+        return ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
+    }
+    return 0;
+}
+
+function applyAdminCtrlDurationSelectCaps(maxMins) {
+    let changed = false;
+    [1, 2].forEach(function (ctrl) {
+        if (getControllerRentalMode(ctrl) === 'open_time') return;
+        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
+        if (!sel) return;
+        Array.from(sel.options).forEach(function (opt) {
+            const v = parseInt(opt.value, 10) || 0;
+            if (v === 0) {
+                opt.disabled = false;
+                return;
+            }
+            opt.disabled = (maxMins <= 0 && v > 0) || (maxMins > 0 && v > maxMins);
+        });
+        const cur = parseInt(sel.value, 10) || 0;
+        if ((maxMins <= 0 && cur > 0) || (maxMins > 0 && cur > maxMins)) {
+            sel.value = '0';
+            changed = true;
+            if (typeof _adminCtrlCostPreview === 'function') {
+                _adminCtrlCostPreview(ctrl, 0);
+            }
+        }
+    });
+    if (changed && typeof recalcAdminControllerFee === 'function') {
+        recalcAdminControllerFee();
+    }
+}
+
+let _syncAdminControllerDurationCapsBusy = false;
+function syncAdminControllerDurationCaps() {
+    if (_syncAdminControllerDurationCapsBusy) {
+        return;
+    }
+    _syncAdminControllerDurationCapsBusy = true;
+    try {
+        refreshAdminCtrlRentalModeUi();
+        const max = getStartSessionMaxControllerMinutes();
+        applyAdminCtrlDurationSelectCaps(max);
+
+    const hint = document.getElementById('ctrlDurationCapHint');
+    const mode = document.getElementById('rentalModeSelect')?.value || '';
+    const ctrlGroup = document.getElementById('controllerRentalGroup');
+    if (hint && ctrlGroup && ctrlGroup.style.display !== 'none') {
+        const togChecked = !!document.getElementById('controllerRentalToggle')?.checked;
+        if (mode === 'unlimited' && togChecked) {
+            const capH = Math.floor(ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60);
+            hint.textContent = `Unlimited console: hourly controller add-ons default to ${capH} hours (adjust as needed); charged at controller rate, separate from flat console unlimited fee.`;
+            hint.style.display = 'block';
+        } else if (mode === 'hourly' && togChecked) {
+            hint.textContent = 'Controller rental cannot exceed the selected session duration (same as the Duration field above). Longer options are disabled.';
+            hint.style.display = 'block';
+        } else {
+            hint.style.display = 'none';
+        }
+    }
+    applyTwelveHourForUnlimitedConsoleSession(false);
+    } finally {
+        _syncAdminControllerDurationCapsBusy = false;
+    }
+}
+
+/** Start Session: blocking message if controller rentals exceed rental window (empty if OK). */
+function getStartSessionControllerDurationError() {
+    const toggle = document.getElementById('controllerRentalToggle');
+    if (!toggle || !toggle.checked) return '';
+
+    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
+        ? getStartSessionMaxControllerMinutes() : 0;
+    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
+    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10) || 1;
+    const r1 = parseInt(document.getElementById('controllerSelect')?.value || '0', 10) || 0;
+    const r2 = parseInt(document.getElementById('controllerSelect2')?.value || '0', 10) || 0;
+    const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || '0', 10) || 0;
+    const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || '0', 10) || 0;
+    const cm1 = getControllerRentalMode(1);
+    const cm2 = getControllerRentalMode(2);
+
+    if (sessMode === 'hourly' && maxCm <= 0) {
+        if (r1 > 0 && cm1 !== 'open_time' && mins1 > 0) {
+            return 'Select a session duration before choosing controller rental length.';
+        }
+        if (count > 1 && r2 > 0 && cm2 !== 'open_time' && mins2 > 0) {
+            return 'Select a session duration before choosing controller rental length.';
+        }
+    }
+    if (r1 > 0 && cm1 !== 'open_time') {
+        if (mins1 <= 0) return 'Select a rental duration for Controller 1 (or set its rental mode to Open Time).';
+        if (mins1 > maxCm) {
+            return sessMode === 'unlimited'
+                ? ('Controller 1 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
+                : 'Controller 1 rental cannot exceed the selected session duration.';
+        }
+    }
+    if (count > 1 && r2 > 0 && cm2 !== 'open_time') {
+        if (mins2 <= 0) return 'Select a rental duration for Controller 2 (or set its rental mode to Open Time).';
+        if (mins2 > maxCm) {
+            return sessMode === 'unlimited'
+                ? ('Controller 2 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
+                : 'Controller 2 rental cannot exceed the selected session duration.';
+        }
+    }
+    return '';
 }
 
 /* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
@@ -2302,6 +2645,7 @@ function onConsoleChange() {
 
     // Refresh duration option labels to reflect this console's per-type rate
     if (typeof _refreshDurationLabels === 'function') _refreshDurationLabels();
+    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
 }
 
 function onControllerToggle() {
@@ -2317,6 +2661,7 @@ function onControllerToggle() {
             if (qtyWrap)  qtyWrap.style.display  = 'block';
             if (countSel) countSel.disabled = false;
             if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
+            if (typeof syncControllerRentalModesFromSession === 'function') syncControllerRentalModesFromSession();
         } else {
             container.style.display = 'none';
             if (qtyWrap)  qtyWrap.style.display  = 'none';
@@ -2326,18 +2671,22 @@ function onControllerToggle() {
             ['controllerSelect','controllerSelect2'].forEach(id => {
                 const s = document.getElementById(id); if (s) s.value = '';
             });
-            document.querySelectorAll('.admin-ctrl-dur-btn').forEach(b => {
-                b.style.background  = 'rgba(95,133,218,.1)';
-                b.style.borderColor = 'rgba(95,133,218,.2)';
-                b.style.color       = '#c8d5f5';
-                b.style.boxShadow   = 'none';
+            ['adminCtrlDurationSelect1', 'adminCtrlDurationSelect2'].forEach(id => {
+                const i = document.getElementById(id);
+                if (i) i.value = '0';
             });
-            ['adminCtrlRentalMinutes','adminCtrlRentalMinutes2'].forEach(id => {
-                const i = document.getElementById(id); if (i) i.value = '0';
+            ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(id => {
+                const m = document.getElementById(id);
+                if (m) m.value = 'hourly';
             });
             ['adminCtrlCostPreview1','adminCtrlCostPreview2'].forEach(id => {
                 const d = document.getElementById(id); if (d) d.style.display = 'none';
             });
+        }
+        if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
+        if (toggle.checked && document.getElementById('rentalModeSelect')?.value === 'unlimited'
+            && typeof applyTwelveHourForUnlimitedConsoleSession === 'function') {
+            applyTwelveHourForUnlimitedConsoleSession(true);
         }
         recalcAdminControllerFee();
     }
@@ -2351,15 +2700,11 @@ function onAdminControllerToggle() {
     // If ctrl2 hidden, clear its values
     if (countSel?.value !== '2') {
         const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
-        document.querySelectorAll('.admin-ctrl-dur-btn[data-ctrl="2"]').forEach(b => {
-            b.style.background = 'rgba(95,133,218,.08)';
-            b.style.borderColor = 'rgba(95,133,218,.2)';
-            b.style.color = '#c8d5f5';
-            b.style.boxShadow = 'none';
-        });
-        const m2 = document.getElementById('adminCtrlRentalMinutes2'); if (m2) m2.value = '0';
+        const d2 = document.getElementById('adminCtrlDurationSelect2');
+        if (d2) d2.value = '0';
         const p2 = document.getElementById('adminCtrlCostPreview2'); if (p2) p2.style.display = 'none';
     }
+    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
     recalcAdminControllerFee();
 }
 
@@ -2375,6 +2720,15 @@ function _adminCtrlCostPreview(ctrl, mins) {
     const h = Math.floor(mins/60), r = mins%60;
     const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
     
+    if (getControllerRentalMode(ctrl) === 'open_time') {
+        if (rate > 0) {
+            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(225,225,245,.92);">Open Time controller: charged at session end for full elapsed time (&#8369;${rate.toFixed(2)}/hr), same timing structure as console open time.</span>`;
+            prev.style.display = 'block';
+        } else {
+            prev.style.display = 'none';
+        }
+        return;
+    }
     if (rate > 0 && mins > 0) {
         prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${lbl} = <strong>&#8369;${(rate*mins/60).toFixed(2)}</strong>`;
         prev.style.display = 'block';
@@ -2386,33 +2740,46 @@ function _adminCtrlCostPreview(ctrl, mins) {
     }
 }
 
-function onAdminCtrlDurationSelect(mins, ctrl) {
-    const minsId = ctrl === 1 ? 'adminCtrlRentalMinutes' : 'adminCtrlRentalMinutes2';
-
-    document.querySelectorAll(`.admin-ctrl-dur-btn[data-ctrl="${ctrl}"]`).forEach(b => {
-        b.classList.toggle('active', parseInt(b.dataset.mins) === mins);
-    });
-
-    const minsIn = document.getElementById(minsId);
-    if (minsIn) minsIn.value = mins;
-
+function onAdminCtrlDurationChange(ctrl) {
+    if (getControllerRentalMode(ctrl) === 'open_time') return;
+    const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
+    if (!sel) return;
+    let mins = parseInt(sel.value, 10) || 0;
+    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
+        ? getStartSessionMaxControllerMinutes() : 0;
+    if ((maxCm <= 0 && mins > 0) || (maxCm > 0 && mins > maxCm)) {
+        if (typeof showInlineToast === 'function') {
+            if (maxCm <= 0 && mins > 0) {
+                showInlineToast('Select an hourly duration before choosing controller rental length.', 'error');
+            } else {
+                const mode = document.getElementById('rentalModeSelect')?.value || '';
+                const msg = (mode === 'unlimited')
+                    ? ('Controller rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours for this mode.')
+                    : 'Controller rental cannot exceed the selected session duration.';
+                showInlineToast(msg, 'error');
+            }
+        }
+        sel.value = '0';
+        mins = 0;
+    }
     _adminCtrlCostPreview(ctrl, mins);
     recalcAdminControllerFee();
 }
 
 function onControllerSelectChange() {
     onAdminCtrl1Change();
+    onAdminCtrl2Change();
 }
 
 function onAdminCtrl1Change() {
-    const mins = parseInt(document.getElementById('adminCtrlRentalMinutes')?.value || 0);
+    const mins = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
     _adminCtrlCostPreview(1, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
 }
 
 function onAdminCtrl2Change() {
-    const mins = parseInt(document.getElementById('adminCtrlRentalMinutes2')?.value || 0);
+    const mins = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
     _adminCtrlCostPreview(2, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
@@ -2449,17 +2816,22 @@ function recalcAdminControllerFee() {
         const count = countSel ? parseInt(countSel.value) : 1;
         const sel1 = document.getElementById('controllerSelect');
         const sel2 = document.getElementById('controllerSelect2');
-        const mins1 = parseInt(document.getElementById('adminCtrlRentalMinutes')?.value || 0);
-        const mins2 = parseInt(document.getElementById('adminCtrlRentalMinutes2')?.value || 0);
-        
+        const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
+        const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
+        const cm1 = getControllerRentalMode(1);
+        const cm2 = getControllerRentalMode(2);
+
         if (sel1 && sel1.selectedIndex > 0) {
             rate1 = parseFloat(sel1.options[sel1.selectedIndex].dataset.rate) || 0;
-            if (mins1 > 0) totalFee += rate1 * (mins1 / 60);
+            if (cm1 !== 'open_time' && mins1 > 0) {
+                totalFee += rate1 * (mins1 / 60);
+            }
         }
-        
         if (count > 1 && sel2 && sel2.selectedIndex > 0) {
             const rate2 = parseFloat(sel2.options[sel2.selectedIndex].dataset.rate) || 0;
-            if (mins2 > 0) totalFee += rate2 * (mins2 / 60);
+            if (cm2 !== 'open_time' && mins2 > 0) {
+                totalFee += rate2 * (mins2 / 60);
+            }
         }
     }
     
@@ -2486,6 +2858,8 @@ function _refreshDurationLabels() {
         const paid = parseInt(opt.value);
         if (!paid) return;
         const bonus = Math.floor(paid / bp) * bf;
+        const total = paid + bonus;
+        opt.dataset.total = String(total);
         const cost  = paid <= 30 ? minChg : paid / 60 * rate;
         opt.dataset.cost = cost.toFixed(2);
         // Update visible label text: "Xh Ym — ₱NNN"
@@ -2658,7 +3032,12 @@ function updateSessionPreview() {
     const paid    = parseInt(sel.value);
     const input   = document.getElementById('plannedMinutesInput');
     const preview = document.getElementById('sessionPreview');
-    if (!paid) { preview.style.display = 'none'; input.value = ''; return; }
+    if (!paid) {
+        preview.style.display = 'none';
+        input.value = '';
+        if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
+        return;
+    }
 
     input.value = paid;
 
@@ -2685,6 +3064,7 @@ function updateSessionPreview() {
     document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
+    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
     // Re-evaluate Start button whenever cost changes
     if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
@@ -2733,6 +3113,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 _showStartShortError('Flat rate of \u20b1' + due.toFixed(2) + ' must be collected in full before starting.');
                 return;
             }
+        }
+
+        const ctrlDurErr = typeof getStartSessionControllerDurationError === 'function'
+            ? getStartSessionControllerDurationError() : '';
+        if (ctrlDurErr) {
+            e.preventDefault();
+            if (typeof showInlineToast === 'function') {
+                showInlineToast(ctrlDurErr, 'error');
+            } else {
+                alert(ctrlDurErr);
+            }
+            return;
         }
     });
 
@@ -2809,6 +3201,13 @@ function _syncStartBtn() {
                 ? 'Flat rate of \u20b1' + due.toFixed(2) + ' must be collected before starting.'
                 : 'Short by \u20b1' + (due - tendered).toFixed(2) + ' \u2014 flat rate must be paid in full.';
         }
+    }
+
+    const ctrlErr = typeof getStartSessionControllerDurationError === 'function'
+        ? getStartSessionControllerDurationError() : '';
+    if (!isShort && ctrlErr) {
+        isShort = true;
+        shortMsg = ctrlErr;
     }
 
     if (isShort) {
@@ -3418,7 +3817,118 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         confirmLbl.textContent = 'Confirm End & Record Payment';
     }
 
+    /* ── Controller add-on: end early (re-rate + release hardware) ─────── */
+    const ctrlEarlyPanel = document.getElementById('endCtrlRentalEarlyPanel');
+    const ctrlEarlyBtn   = document.getElementById('endCtrlRentalEarlyBtn');
+    const ctrlEarlyMsg   = document.getElementById('endCtrlRentalEarlyMsg');
+    const endModalEl     = document.getElementById('endSessionModal');
+    if (endModalEl) {
+        endModalEl.dataset.endSessionCtx = JSON.stringify({
+            sessionId: sessionId,
+            customerName: customerName,
+            unitNumber: unitNumber,
+            mode: mode,
+            startTs: startTs,
+            plannedMinutes: plannedMinutes,
+            upfrontPaid: upfrontPaid,
+            reservationDownpayment: reservationDownpayment,
+            unlimitedRate: unlimitedRate,
+            sourceReservationId: sourceReservationId
+        });
+    }
+    const hasCtrlExtra = (extraItems || []).some(function (it) {
+        return /controller\s*rental/i.test(it.description || '');
+    });
+    if (ctrlEarlyPanel && ctrlEarlyBtn && ctrlEarlyMsg) {
+        if (hasCtrlExtra) {
+            ctrlEarlyPanel.style.display = 'block';
+            ctrlEarlyMsg.textContent = '';
+            ctrlEarlyMsg.style.color = '#888';
+            ctrlEarlyBtn.disabled = false;
+            ctrlEarlyBtn.onclick = function () {
+                if (!confirm('End controller add-on now? Fees will be recalculated to elapsed session time and controllers returned to available.')) {
+                    return;
+                }
+                ctrlEarlyBtn.disabled = true;
+                ctrlEarlyMsg.style.color = '#888';
+                ctrlEarlyMsg.textContent = 'Processing...';
+                const fd = new FormData();
+                fd.append('csrf_token', window.GSPOT_CSRF || '');
+                fd.append('session_id', String(sessionId));
+                fetch('ajax/end_controller_rental_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        ctrlEarlyBtn.disabled = false;
+                        if (data.success) {
+                            ctrlEarlyMsg.style.color = '#20c8a1';
+                            ctrlEarlyMsg.textContent = data.message || 'Updated.';
+                            let ctx = {};
+                            try { ctx = JSON.parse(endModalEl.dataset.endSessionCtx || '{}'); } catch (e) {}
+                            setTimeout(function () {
+                                openEndSessionModal(
+                                    ctx.sessionId,
+                                    ctx.customerName,
+                                    ctx.unitNumber,
+                                    ctx.mode,
+                                    ctx.startTs,
+                                    ctx.plannedMinutes,
+                                    ctx.upfrontPaid,
+                                    ctx.reservationDownpayment,
+                                    ctx.unlimitedRate,
+                                    ctx.sourceReservationId
+                                );
+                            }, 400);
+                        } else {
+                            ctrlEarlyMsg.style.color = '#fb566b';
+                            ctrlEarlyMsg.textContent = data.message || 'Failed.';
+                        }
+                    })
+                    .catch(function () {
+                        ctrlEarlyBtn.disabled = false;
+                        ctrlEarlyMsg.style.color = '#fb566b';
+                        ctrlEarlyMsg.textContent = 'Network error.';
+                    });
+            };
+        } else {
+            ctrlEarlyPanel.style.display = 'none';
+            ctrlEarlyBtn.onclick = null;
+        }
+    }
+
     openModal('endSession');
+}
+
+/** Active Controller Rentals table + quick actions */
+function gspotEndControllerRentalEarly(sid) {
+    const id = parseInt(sid, 10) || 0;
+    if (!id) return;
+    if (!confirm('End controller add-on for this session now? Re-rates to elapsed time and returns controllers to available.')) {
+        return;
+    }
+    const fd = new FormData();
+    fd.append('csrf_token', window.GSPOT_CSRF || '');
+    fd.append('session_id', String(id));
+    fetch('ajax/end_controller_rental_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                if (typeof showInlineToast === 'function') {
+                    showInlineToast(data.message || 'Controller add-on ended.', 'success');
+                } else {
+                    alert(data.message || 'Done.');
+                }
+                location.reload();
+            } else {
+                if (typeof showInlineToast === 'function') {
+                    showInlineToast(data.message || 'Failed.', 'error');
+                } else {
+                    alert(data.message || 'Failed.');
+                }
+            }
+        })
+        .catch(function () {
+            alert('Network error.');
+        });
 }
 
 /* ── Pay Modal (collect outstanding balance, session continues) ──────── */

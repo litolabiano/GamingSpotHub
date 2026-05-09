@@ -841,6 +841,31 @@ function fmtMins(int $m): string {
         /*  Reservation row glow  */
         tr.res-today td { background: rgba(32,200,161,0.04) !important; }
 
+        /*  My Reservations — controller add-on explainer  */
+        .cd-res-ctrl-hint {
+            margin-top: 10px;
+            padding: 9px 11px;
+            border-radius: 9px;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .cd-res-ctrl-hint > i { margin-right: 5px; opacity: .95; }
+        .cd-res-ctrl-hint--gold {
+            background: rgba(241,168,60,.1);
+            border: 1px solid rgba(241,168,60,.28);
+            color: rgba(255,235,210,.95);
+        }
+        .cd-res-ctrl-hint--mint {
+            background: rgba(32,200,161,.08);
+            border: 1px solid rgba(32,200,161,.22);
+            color: rgba(200,245,230,.92);
+        }
+        .cd-res-ctrl-hint--blue {
+            background: rgba(95,133,218,.1);
+            border: 1px solid rgba(95,133,218,.25);
+            color: rgba(210,220,255,.92);
+        }
+
         /*  Chart container  */
         .cd-chart-wrap { position: relative; height: 180px; }
 
@@ -1078,6 +1103,416 @@ function fmtMins(int $m): string {
             box-shadow: 0 0 0 3px rgba(32, 200, 161, 0.15) !important;
             outline: none !important;
         }
+
+        /* ═══════════════════════════════════════════════════════
+           ENHANCED UI/UX IMPROVEMENTS
+           ═══════════════════════════════════════════════════════ */
+
+        /* ── Stat cards: accent left border + shimmer glow on hover ── */
+        .cd-stat-card {
+            border-left: 3px solid transparent !important;
+            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease !important;
+        }
+        .cd-stat-card:hover {
+            transform: translateY(-5px) !important;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(32,200,161,0.15) !important;
+            border-left-color: var(--mint) !important;
+            border-color: rgba(32,200,161,0.25) !important;
+        }
+        .cd-stat-card:hover .cd-stat-icon.mint   { box-shadow: 0 0 18px rgba(32,200,161,0.3); }
+        .cd-stat-card:hover .cd-stat-icon.blue   { box-shadow: 0 0 18px rgba(95,133,218,0.3); }
+        .cd-stat-card:hover .cd-stat-icon.coral  { box-shadow: 0 0 18px rgba(251,86,107,0.3); }
+        .cd-stat-card:hover .cd-stat-icon.purple { box-shadow: 0 0 18px rgba(179,123,236,0.3); }
+        .cd-stat-card:hover .cd-stat-icon.gold   { box-shadow: 0 0 18px rgba(241,168,60,0.3); }
+        .cd-stat-icon { transition: box-shadow .22s ease; border-radius: 12px !important; }
+        .cd-stat-value { letter-spacing: -0.5px; }
+
+        /* ── Enhanced badges with border ── */
+        .cd-badge {
+            border: 1px solid transparent;
+            letter-spacing: 0.2px;
+        }
+        .cd-badge.mint   { border-color: rgba(32,200,161,0.3); }
+        .cd-badge.blue   { border-color: rgba(95,133,218,0.3); }
+        .cd-badge.coral  { border-color: rgba(251,86,107,0.3); }
+        .cd-badge.purple { border-color: rgba(179,123,236,0.3); }
+        .cd-badge.gold   { border-color: rgba(241,168,60,0.3); }
+        .cd-badge.gray   { border-color: rgba(150,150,150,0.2); }
+
+        /* ── Cards: smooth hover elevation ── */
+        .cd-card {
+            transition: box-shadow .25s ease, border-color .25s ease !important;
+        }
+        .cd-card:hover {
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25) !important;
+            border-color: rgba(95,133,218,0.22) !important;
+        }
+
+        /* ── Table: stronger row hover + sticky headers ── */
+        .cd-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            backdrop-filter: blur(8px);
+        }
+        .cd-table tr:hover td {
+            background: rgba(32,200,161,0.06) !important;
+        }
+        .cd-table td {
+            vertical-align: middle;
+        }
+
+        /* ── Upcoming Reservation Cards (replaces table for upcoming section) ── */
+        .res-card {
+            background: rgba(10,33,81,0.5);
+            border: 1px solid rgba(95,133,218,0.15);
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin-bottom: 12px;
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 18px;
+            align-items: center;
+            transition: box-shadow .22s, border-color .22s, transform .22s;
+            position: relative;
+            overflow: hidden;
+        }
+        .res-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg, var(--mint), var(--blue));
+            border-radius: 4px 0 0 4px;
+        }
+        .res-card.res-card--today::before {
+            background: linear-gradient(180deg, var(--gold), var(--coral));
+            box-shadow: 0 0 12px rgba(241,168,60,0.4);
+        }
+        .res-card.res-card--pending::before {
+            background: linear-gradient(180deg, var(--gold), #f1a83c88);
+        }
+        .res-card:hover {
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border-color: rgba(32,200,161,0.3);
+            transform: translateY(-2px);
+        }
+        .res-card__date {
+            min-width: 80px;
+            text-align: center;
+            background: rgba(32,200,161,0.08);
+            border: 1px solid rgba(32,200,161,0.18);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+        .res-card__date-today-label {
+            font-size: 9px;
+            font-weight: 800;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+            display: block;
+        }
+        .res-card__date-day {
+            font-size: 26px;
+            font-weight: 900;
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
+            line-height: 1;
+        }
+        .res-card__date-month {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 3px;
+        }
+        .res-card__date-time {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--mint);
+            margin-top: 4px;
+        }
+        .res-card__body { min-width: 0; }
+        .res-card__console {
+            font-weight: 700;
+            font-size: 15px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        .res-card__unit {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--mint);
+            background: rgba(32,200,161,0.1);
+            border: 1px solid rgba(32,200,161,0.25);
+            border-radius: 6px;
+            padding: 1px 7px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .res-card__meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            align-items: center;
+        }
+        .res-card__pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            border: 1px solid transparent;
+        }
+        .res-card__pill--mode {
+            background: rgba(95,133,218,0.12);
+            border-color: rgba(95,133,218,0.25);
+            color: var(--blue);
+        }
+        .res-card__pill--ctrl {
+            background: rgba(95,133,218,0.1);
+            border-color: rgba(95,133,218,0.22);
+            color: #8faae8;
+        }
+        .res-card__pill--pay {
+            background: rgba(32,200,161,0.1);
+            border-color: rgba(32,200,161,0.22);
+            color: var(--mint);
+            font-weight: 700;
+        }
+        .res-card__status { flex-shrink: 0; }
+        .res-card__actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+            .res-card {
+                grid-template-columns: auto 1fr;
+                grid-template-rows: auto auto;
+            }
+            .res-card__status { display: none; }
+            .res-card__actions { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
+        }
+
+        /* ── Past reservation row enhancements ── */
+        .res-past-row td { transition: background .15s ease; }
+        .res-past-row:hover td { background: rgba(32,200,161,0.05) !important; }
+
+        /* ── Action buttons: pill style with icon ── */
+        .cd-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            text-decoration: none;
+            transition: all .2s ease;
+            white-space: nowrap;
+            letter-spacing: 0.1px;
+        }
+        .cd-btn-primary {
+            background: linear-gradient(135deg, var(--mint), #18a087);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(32,200,161,0.3);
+        }
+        .cd-btn-primary:hover {
+            background: linear-gradient(135deg, #27d9b0, var(--mint));
+            box-shadow: 0 6px 20px rgba(32,200,161,0.45);
+            transform: translateY(-1px);
+            color: #fff;
+            text-decoration: none;
+        }
+        .cd-btn-ghost {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.65);
+        }
+        .cd-btn-ghost:hover {
+            background: rgba(255,255,255,0.09);
+            border-color: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        .cd-btn-blue {
+            background: rgba(95,133,218,0.15);
+            border: 1px solid rgba(95,133,218,0.35);
+            color: var(--blue);
+        }
+        .cd-btn-blue:hover {
+            background: rgba(95,133,218,0.25);
+            border-color: rgba(95,133,218,0.55);
+            color: #88aaff;
+        }
+        .cd-btn-danger {
+            background: rgba(251,86,107,0.12);
+            border: 1px solid rgba(251,86,107,0.3);
+            color: var(--coral);
+        }
+        .cd-btn-danger:hover {
+            background: rgba(251,86,107,0.2);
+            border-color: rgba(251,86,107,0.5);
+            color: #ff7a8a;
+        }
+        .cd-btn-gold {
+            background: rgba(241,168,60,0.12);
+            border: 1px solid rgba(241,168,60,0.3);
+            color: var(--gold);
+        }
+        .cd-btn-gold:hover {
+            background: rgba(241,168,60,0.22);
+            border-color: rgba(241,168,60,0.5);
+            color: #f8c768;
+        }
+
+        /* ── Active session card: enhanced glow ── */
+        .cd-live-card {
+            background: linear-gradient(135deg, rgba(32,200,161,0.12), rgba(95,133,218,0.06)) !important;
+            border: 1px solid rgba(32,200,161,0.3) !important;
+            box-shadow: 0 0 0 1px rgba(32,200,161,0.08), 0 8px 32px rgba(32,200,161,0.1) !important;
+        }
+        .cd-live-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--mint), var(--blue), var(--purple));
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        /* ── Progress bar enhancements ── */
+        .cd-progress-bar {
+            height: 7px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .cd-progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+        .cd-progress-fill[style*="100%"] {
+            animation: progressGlow 2s ease-in-out infinite;
+        }
+        @keyframes progressGlow {
+            0%, 100% { box-shadow: 0 0 6px rgba(32,200,161,0.4); }
+            50%       { box-shadow: 0 0 14px rgba(32,200,161,0.8); }
+        }
+
+        /* ── Section titles: gradient underline ── */
+        .cd-section-title::after {
+            content: '';
+            display: block;
+            height: 2px;
+            flex: 1;
+            background: linear-gradient(90deg, rgba(32,200,161,0.25), transparent);
+            border-radius: 2px;
+            margin-left: 12px;
+        }
+
+        /* ── Card header divider line ── */
+        .cd-card-header {
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(95,133,218,0.1);
+            margin-bottom: 16px !important;
+        }
+
+        /* ── Chart cards subtle top bar ── */
+        .cd-charts-grid .cd-card {
+            position: relative;
+            overflow: hidden;
+        }
+        .cd-charts-grid .cd-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--blue), var(--purple));
+            opacity: 0.5;
+        }
+
+        /* ── Upcoming section header ── */
+        .res-section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .res-section-label {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ── Topbar breadcrumb ── */
+        .cd-topbar-page-name {
+            font-size: 12px;
+            color: rgba(255,255,255,0.3);
+            font-weight: 500;
+            padding: 3px 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 20px;
+        }
+
+        /* ── Sidebar nav active indicator enhancement ── */
+        .cd-nav-btn.active {
+            position: relative;
+        }
+        .cd-nav-btn.active::after {
+            content: '';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 5px;
+            height: 5px;
+            background: var(--mint);
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(32,200,161,0.6);
+        }
+
+        /* ── Today reservation highlight ── */
+        .res-card.res-card--today {
+            border-color: rgba(241,168,60,0.35) !important;
+            background: rgba(241,168,60,0.05) !important;
+        }
+        .res-card.res-card--today .res-card__date {
+            background: rgba(241,168,60,0.1);
+            border-color: rgba(241,168,60,0.3);
+        }
+        .res-card.res-card--today .res-card__date-day { color: var(--gold); }
+
+        /* ── Controller pill in card ── */
+        .ctrl-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(95,133,218,0.1);
+            border: 1px solid rgba(95,133,218,0.25);
+            color: #8faae8;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+        .ctrl-pill i { font-size: 10px; }
     </style>
 </head>
 <?php
@@ -1668,7 +2103,12 @@ function fmtMins(int $m): string {
                             <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                         </td>
                         <td><?= htmlspecialchars($r['console_type']) ?><?= $r['unit_number'] ? ' - <span style="color:var(--mint)">' . htmlspecialchars($r['unit_number']) . '</span>' : '' ?></td>
-                        <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
+                        <td>
+                            <?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?>
+                            <?php if (!empty($r['with_controller'])): ?>
+                            <span style="display:block;margin-top:4px;font-size:10px;color:#5f85da;font-weight:600;"><i class="fas fa-gamepad" style="margin-right:3px;"></i>Extra controllers</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php $statusMap = ['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sm=$statusMap[$r['status']]??['gray','circle']; ?>
                             <span class="cd-badge <?= $sm[0] ?>"><i class="fas fa-<?= $sm[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
@@ -1898,116 +2338,166 @@ function fmtMins(int $m): string {
                 }
             ?>
             <?php if (!empty($upcoming)): ?>
-            <div class="cd-card" style="border-color:rgba(32,200,161,0.35)">
+            <div class="cd-card" style="border-color:rgba(32,200,161,0.35); padding: 22px 22px 10px;">
                 <div class="cd-card-header">
                     <div class="cd-card-title"><i class="fas fa-hourglass-half"></i> Upcoming</div>
+                    <span class="cd-badge mint"><?= count($upcoming) ?> reservation<?= count($upcoming) !== 1 ? 's' : '' ?></span>
                 </div>
-                <div style="overflow-x:auto">
-                <table class="cd-table">
-                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Extra Controller</th><th>Mode</th><th>Payment</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-                    <tbody>
-                    <?php foreach ($upcoming as $r):
-                        $isToday = ($r['reserved_date'] === date('Y-m-d'));
-                        $rid = (int)$r['reservation_id'];
-                        $pendingAdminResched = $adminReschedReqs[$rid] ?? null;
-                    ?>
-                    <tr class="<?= $isToday ? 'res-today' : '' ?>">
-                        <td>
-                            <?php if ($isToday && !$pendingAdminResched): ?>
-                            <span style="color:var(--mint);font-size:10px;font-weight:700;display:block;">TODAY</span>
-                            <?php endif; ?>
-                            <?php if ($pendingAdminResched): ?>
-                                <div style="text-decoration:line-through;color:var(--muted);font-size:11px;margin-bottom:4px;">
-                                    <?= date('M d, Y', strtotime($pendingAdminResched['old_date'])) ?> at <?= date('h:i A', strtotime($pendingAdminResched['old_time'])) ?>
-                                </div>
-                                <div style="color:var(--gold);">
-                                    <strong><?= date('M d, Y', strtotime($pendingAdminResched['new_date'])) ?></strong><br>
-                                    <span style="font-size:11px;"><?= date('h:i A', strtotime($pendingAdminResched['new_time'])) ?></span>
-                                </div>
-                            <?php else: ?>
-                                <strong><?= date('M d, Y', strtotime($r['reserved_date'])) ?></strong><br>
-                                <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
+                <!-- Upcoming reservation cards -->
+                <?php foreach ($upcoming as $r):
+                    $isToday = ($r['reserved_date'] === date('Y-m-d'));
+                    $rid = (int)$r['reservation_id'];
+                    $pendingAdminResched = $adminReschedReqs[$rid] ?? null;
+                    $dashHasCtrl = !empty($r['with_controller']) && (!empty($r['ctrl_type']) || !empty($r['ctrl2_type']));
+                    $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle'];
+                    $rDate = htmlspecialchars($r['reserved_date']);
+                    $rTime = substr($r['reserved_time'], 0, 5);
+                    $rConsole = htmlspecialchars($r['console_type']);
+                    $rConsoleId = (int)($r['console_id'] ?? 0);
+                    $alreadyResched = !empty($userRescheduledIds[$rid]);
+                    $modeLabel = match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') };
+                    // Determine display date
+                    if ($pendingAdminResched) {
+                        $displayDate = $pendingAdminResched['new_date'];
+                        $displayTime = $pendingAdminResched['new_time'];
+                    } else {
+                        $displayDate = $r['reserved_date'];
+                        $displayTime = $r['reserved_time'];
+                    }
+                ?>
+                <div class="res-card <?= $isToday ? 'res-card--today' : '' ?> <?= $r['status'] === 'pending' ? 'res-card--pending' : '' ?>">
+                    <!-- Date block -->
+                    <div class="res-card__date">
+                        <?php if ($isToday && !$pendingAdminResched): ?>
+                        <span class="res-card__date-today-label">Today</span>
+                        <?php elseif ($pendingAdminResched): ?>
+                        <span class="res-card__date-today-label" style="color:var(--gold);">Proposed</span>
+                        <?php endif; ?>
+                        <div class="res-card__date-day"><?= date('d', strtotime($displayDate)) ?></div>
+                        <div class="res-card__date-month"><?= date('M Y', strtotime($displayDate)) ?></div>
+                        <div class="res-card__date-time"><?= date('g:i A', strtotime($displayTime)) ?></div>
+                        <?php if ($pendingAdminResched): ?>
+                        <div style="font-size:9px;margin-top:4px;color:var(--muted);text-decoration:line-through;">
+                            <?= date('M d', strtotime($pendingAdminResched['old_date'])) ?> <?= date('g:i A', strtotime($pendingAdminResched['old_time'])) ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="res-card__body">
+                        <div class="res-card__console">
                             <?= htmlspecialchars($r['console_type']) ?>
                             <?php if ($r['unit_number']): ?>
-                            <br><span style="color:var(--mint);font-size:11px;font-weight:700"><?= htmlspecialchars($r['unit_number']) ?></span>
+                            <span class="res-card__unit"><?= htmlspecialchars($r['unit_number']) ?></span>
                             <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if (!empty($r['with_controller']) && !empty($r['ctrl_type'])): ?>
-                            <div style="font-size:12px;">
-                                <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
-                                <?php if (!empty($r['ctrl_unit'])): ?>
-                                <br><span style="color:#5f85da;font-weight:700;font-size:11px;"><?= htmlspecialchars($r['ctrl_unit']) ?></span>
+                        </div>
+                        <div class="res-card__meta">
+                            <!-- Mode pill -->
+                            <span class="res-card__pill res-card__pill--mode">
+                                <i class="fas fa-tag"></i> <?= $modeLabel ?>
+                            </span>
+                            <!-- Payment pill -->
+                            <?php if ($r['downpayment_amount'] > 0): ?>
+                            <span class="res-card__pill res-card__pill--pay">
+                                <i class="fas fa-peso-sign"></i> ₱ <?= number_format($r['downpayment_amount'], 2) ?>
+                            </span>
+                            <?php endif; ?>
+                            <!-- Controller pills -->
+                            <?php if ($dashHasCtrl): ?>
+                                <?php if (!empty($r['ctrl_type'])): ?>
+                                <span class="ctrl-pill">
+                                    <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
+                                    <?php if (!empty($r['ctrl_unit'])): ?><span style="opacity:.6;margin-left:2px;"><?= htmlspecialchars($r['ctrl_unit']) ?></span><?php endif; ?>
+                                </span>
                                 <?php endif; ?>
+                                <?php if (!empty($r['ctrl2_type'])): ?>
+                                <span class="ctrl-pill">
+                                    <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl2_type']) ?>
+                                    <?php if (!empty($r['ctrl2_unit'])): ?><span style="opacity:.6;margin-left:2px;"><?= htmlspecialchars($r['ctrl2_unit']) ?></span><?php endif; ?>
+                                </span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                        <!-- Controller add-on hint -->
+                        <?php if ($dashHasCtrl): ?>
+                            <?php if ($r['rental_mode'] === 'unlimited'): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--gold" style="margin-top:8px;">
+                                <i class="fas fa-info-circle"></i>
+                                Add-ons are <strong>hourly</strong> (not unlimited). Up to <strong>12 h</strong> each at the controller rate from your booking—separate from the flat console fee.
                             </div>
-                            <?php else: ?>
-                            <span style="color:var(--muted);font-size:12px;">None</span>
+                            <?php elseif ($r['rental_mode'] === 'hourly' && !empty($r['planned_minutes'])): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--mint" style="margin-top:8px;">
+                                <i class="fas fa-info-circle"></i>
+                                Add-on time cannot exceed your <strong><?= (int) $r['planned_minutes'] / 60 ?> h</strong> booked session.
+                            </div>
+                            <?php elseif ($r['rental_mode'] === 'open_time'): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--blue" style="margin-top:8px;">
+                                <i class="fas fa-info-circle"></i>
+                                Extra controller use is settled at the shop when you finish.
+                            </div>
                             <?php endif; ?>
-                        </td>
-                        <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
-                        <td><?= $r['downpayment_amount'] > 0 ? '<span style="color:var(--mint);font-weight:700">₱ '.number_format($r['downpayment_amount'],2).'</span>' : '<span style="color:var(--muted)">-</span>' ?></td>
-                        <td>
-                            <?php $sm=['pending'=>['gold','clock'],'reserved'=>['mint','check-circle']]; $sc=$sm[$r['status']]??['gray','circle']; ?>
-                            <span class="cd-badge <?= $sc[0] ?>"><i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?></span>
-                        </td>
-                        <td style="color:var(--muted)">
-                            <?php if ($pendingAdminResched): ?>
-                                <span style="color:var(--gold);font-weight:700;font-size:11px;display:block;margin-bottom:2px;">Admin Reschedule</span>
-                                <span style="font-size:10px;"><?= $rescheduleReasonLabels[$pendingAdminResched['reason']] ?? ucfirst($pendingAdminResched['reason']) ?></span>
-                                <?php if ($pendingAdminResched['reason_detail']): ?>
-                                    <br><span style="font-size:10px;color:var(--muted);">- <?= htmlspecialchars($pendingAdminResched['reason_detail']) ?></span>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <?= $r['notes'] ? htmlspecialchars($r['notes']) : '-' ?>
+                        <?php endif; ?>
+                        <!-- Notes / admin reschedule reason -->
+                        <?php if ($pendingAdminResched): ?>
+                        <div style="margin-top:8px;font-size:11px;color:var(--gold);font-weight:600;">
+                            <i class="fas fa-calendar-edit" style="margin-right:4px;"></i>
+                            Admin Reschedule — <?= $rescheduleReasonLabels[$pendingAdminResched['reason']] ?? ucfirst($pendingAdminResched['reason']) ?>
+                            <?php if ($pendingAdminResched['reason_detail']): ?>
+                            <span style="color:var(--muted);font-weight:400;"> — <?= htmlspecialchars(mb_strimwidth($pendingAdminResched['reason_detail'], 0, 60, '…')) ?></span>
                             <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php 
-                                $rDate        = htmlspecialchars($r['reserved_date']);
-                                $rTime        = substr($r['reserved_time'], 0, 5);
-                                $rConsole     = htmlspecialchars($r['console_type']);
-                                $rConsoleId   = (int)($r['console_id'] ?? 0);
-                                $alreadyResched = !empty($userRescheduledIds[$rid]);
+                        </div>
+                        <?php else: ?>
+                            <?php
+                            $custNotes = reservationNotesForCustomerDisplay($r['notes'] ?? null);
+                            if ($custNotes !== ''):
                             ?>
-                            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                                <?php if ($pendingAdminResched): ?>
-                                    <button onclick="openRescheduleConfirmModal(<?= $pendingAdminResched['reschedule_id'] ?>, '<?= $pendingAdminResched['new_date'] ?>', '<?= substr($pendingAdminResched['new_time'],0,5) ?>', '<?= addslashes($pendingAdminResched['console_type']) ?>', '<?= addslashes($pendingAdminResched['unit_number'] ?? '') ?>')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;">
-                                        <i class="fas fa-calendar-check"></i> Confirm
-                                    </button>
-                                    <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
-                                        <i class="fas fa-times"></i> Decline
-                                    </button>
-                                <?php elseif ($r['status'] === 'reserved'): ?>
-                                    <?php if (!$alreadyResched): ?>
-                                        <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
-                                            <i class="fas fa-calendar-alt"></i> Reschedule
-                                        </button>
-                                    <?php endif; ?>
-                                    <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
-                                        <i class="fas fa-times"></i> Cancel
-                                    </button>
-                                <?php else: ?>
-                                    <?php if (!$alreadyResched): ?>
-                                <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-calendar-alt"></i> Reschedule
-                                </button>
-                                <?php else: ?>
-                                <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
-                                <?php endif; ?>
-                                <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
-                                    <i class="fas fa-times"></i> Cancel
-                                </button>
-                            <?php endif; ?>
+                            <div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.45);font-style:italic;">
+                                <i class="fas fa-sticky-note" style="margin-right:4px;opacity:.6;"></i><?= htmlspecialchars(mb_strimwidth($custNotes, 0, 80, '…')) ?>
                             </div>
-                        
-                    </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Status badge -->
+                    <div class="res-card__status">
+                        <span class="cd-badge <?= $sc[0] ?>">
+                            <i class="fas fa-<?= $sc[1] ?>" style="margin-right:4px"></i><?= ucfirst($r['status']) ?>
+                        </span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="res-card__actions">
+                        <?php if ($pendingAdminResched): ?>
+                            <button onclick="openRescheduleConfirmModal(<?= $pendingAdminResched['reschedule_id'] ?>, '<?= $pendingAdminResched['new_date'] ?>', '<?= substr($pendingAdminResched['new_time'],0,5) ?>', '<?= addslashes($pendingAdminResched['console_type']) ?>', '<?= addslashes($pendingAdminResched['unit_number'] ?? '') ?>')" class="cd-btn cd-btn-gold" style="font-size:11px;">
+                                <i class="fas fa-calendar-check"></i> Confirm
+                            </button>
+                            <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn cd-btn-danger" style="font-size:11px;">
+                                <i class="fas fa-times"></i> Decline
+                            </button>
+                        <?php elseif ($r['status'] === 'reserved'): ?>
+                            <?php if (!$alreadyResched): ?>
+                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn cd-btn-blue" style="font-size:11px;">
+                                <i class="fas fa-calendar-alt"></i> Reschedule
+                            </button>
+                            <?php endif; ?>
+                            <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" class="cd-btn cd-btn-danger" style="font-size:11px;">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        <?php else: ?>
+                            <?php if (!$alreadyResched): ?>
+                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn cd-btn-blue" style="font-size:11px;">
+                                <i class="fas fa-calendar-alt"></i> Reschedule
+                            </button>
+                            <?php else: ?>
+                            <span style="font-size:10px;color:var(--muted);font-style:italic;white-space:nowrap;"><i class="fas fa-info-circle"></i> Rescheduled</span>
+                            <?php endif; ?>
+                            <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" data-type="<?= addslashes($rConsole) ?>" data-date="<?= $rDate ?>" data-time="<?= $rTime ?>" class="cd-btn cd-btn-danger" style="font-size:11px;">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
 
@@ -2019,7 +2509,7 @@ function fmtMins(int $m): string {
                 </div>
                 <div style="overflow-x:auto">
                 <table class="cd-table">
-                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Extra Controller</th><th>Mode</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Extra controllers</th><th>Mode</th><th>Status</th></tr></thead>
                     <tbody>
                     <?php foreach ($past as $r): ?>
                     <tr>
@@ -2029,15 +2519,53 @@ function fmtMins(int $m): string {
                         </td>
                         <td><?= htmlspecialchars($r['console_type']) ?></td>
                         <td>
-                            <?php if (!empty($r['with_controller']) && !empty($r['ctrl_type'])): ?>
+                            <?php
+                            $dashHasCtrlPast = !empty($r['with_controller'])
+                                && (!empty($r['ctrl_type']) || !empty($r['ctrl2_type']));
+                            ?>
+                            <?php if ($dashHasCtrlPast): ?>
                             <div style="font-size:12px;">
-                                <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
+                                <?php if (!empty($r['ctrl_type'])): ?>
+                                <div><i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
+                                <?php if (!empty($r['ctrl_unit'])): ?>
+                                <br><span style="color:#5f85da;font-weight:700;font-size:11px;"><?= htmlspecialchars($r['ctrl_unit']) ?></span>
+                                <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+                                <?php if (!empty($r['ctrl2_type'])): ?>
+                                <div style="margin-top:6px;"><i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl2_type']) ?>
+                                <?php if (!empty($r['ctrl2_unit'])): ?>
+                                <br><span style="color:#5f85da;font-weight:700;font-size:11px;"><?= htmlspecialchars($r['ctrl2_unit']) ?></span>
+                                <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                             </div>
+                            <?php if ($r['rental_mode'] === 'unlimited'): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--gold">
+                                <i class="fas fa-info-circle"></i>
+                                Add-ons billed <strong>hourly</strong> (up to 12 h each), separate from flat Unlimited.
+                            </div>
+                            <?php elseif ($r['rental_mode'] === 'hourly' && !empty($r['planned_minutes'])): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--mint">
+                                <i class="fas fa-info-circle"></i>
+                                Add-on capped at your <strong><?= (int) $r['planned_minutes'] / 60 ?> h</strong> booking.
+                            </div>
+                            <?php elseif ($r['rental_mode'] === 'open_time'): ?>
+                            <div class="cd-res-ctrl-hint cd-res-ctrl-hint--blue">
+                                <i class="fas fa-info-circle"></i>
+                                Controller add-on: settle at shop (open time).
+                            </div>
+                            <?php endif; ?>
                             <?php else: ?>
                             <span style="color:var(--muted);font-size:12px;">None</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
+                        <td>
+                            <?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?>
+                            <?php if (!empty($r['with_controller']) && $r['rental_mode'] === 'unlimited'): ?>
+                            <div style="margin-top:4px;font-size:10px;color:#5f85da;font-weight:600;"><i class="fas fa-gamepad" style="margin-right:3px;"></i>Hourly add-ons</div>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php
                               $stMap2 = [

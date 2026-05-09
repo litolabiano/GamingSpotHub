@@ -200,19 +200,19 @@
     cursor:not-allowed!important;
     opacity:.55!important;
 }
-/* Controller duration pill — active / selected state */
-.admin-ctrl-dur-btn.active,
-.admin-ctrl-dur-btn[data-active="1"] {
-    background:rgba(95,133,218,.3)!important;
-    border-color:rgba(95,133,218,.7)!important;
-    color:#fff!important;
-    box-shadow:0 0 0 2px rgba(95,133,218,.25);
+/* Controller rental duration dropdown (Start Session) */
+.admin-ctrl-dur-select {
+    width:100%;
+    background:rgba(10,33,81,.6);
+    border:1px solid rgba(95,133,218,.25);
+    color:#e8eaf6;
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:13px;
+    outline:none;
+    cursor:pointer;
 }
-.admin-ctrl-dur-btn:hover {
-    background:rgba(95,133,218,.2)!important;
-    border-color:rgba(95,133,218,.5)!important;
-    color:#fff!important;
-}
+.admin-ctrl-dur-select:disabled { opacity:0.5; cursor:not-allowed; }
 /* Two-column controller grid responsive collapse */
 @media(max-width:520px){
     #controllerSelectContainer > div[style*="grid-template-columns"] {
@@ -502,6 +502,11 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
             <!-- Two-column grid: ctrl 1 | ctrl 2 -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid rgba(95,133,218,.1);">
 
+                <div id="adminCtrlOpenTimeRunClockNote" style="display:none;grid-column:1/-1;padding:12px 18px;background:rgba(95,133,218,.09);border-bottom:1px solid rgba(95,133,218,.1);font-size:12px;color:rgba(215,220,245,.95);line-height:1.5;">
+                    <i class="fas fa-clock" style="color:#5f85da;margin-right:8px;"></i>
+                    <strong>Open Time (controller)</strong> — For any controller set to <em>Open Time</em>, there is no duration pick: cost uses the same open-time structure as the console, run for the full session, priced at that controller’s hourly rate when you end the session.
+                </div>
+
                 <!-- Controller 1 -->
                 <div id="adminCtrl1Block" style="padding:16px 18px;border-right:1px solid rgba(95,133,218,.1);">
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#5f85da;margin-bottom:10px;">
@@ -512,26 +517,46 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
                             onchange="onControllerSelectChange()">
                         <!-- Populated by onConsoleChange() -->
                     </select>
+                    <div class="admin-ctrl-mode-wrap">
+                        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+                            <i class="fas fa-sliders-h" style="margin-right:3px;"></i> Rental mode
+                        </div>
+                        <select name="controller_rental_mode_1" id="adminCtrlModeSelect1" class="admin-ctrl-dur-select"
+                                onchange="onAdminCtrlRentalModeChange(1)" style="margin-bottom:12px;">
+                            <option value="hourly">Hourly (set duration)</option>
+                            <option value="open_time">Open Time (session clock)</option>
+                        </select>
+                    </div>
+                    <div id="adminCtrlDurWrap1" class="admin-ctrl-dur-wrap">
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
                         <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
                     </div>
-                    <div id="adminCtrlDurationBtns1" style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <?php
-                        $durations = [30, 60, 90, 120, 150, 180, 210, 240];
-                        foreach ($durations as $mins):
-                            $h = floor($mins / 60); $r = $mins % 60;
-                            $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1hr' : "{$h}hrs") : "{$mins}m");
-                        ?>
-                        <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn"
-                                data-mins="<?= $mins ?>" data-ctrl="1"
-                                onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 1)"
-                                style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.2);color:#c8d5f5;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;">
-                            <?= $lbl ?>
-                        </button>
+                    <?php
+                    $admin_ctrl_duration_opts = [];
+                    for ($__m = 30; $__m <= 720; $__m += 30) {
+                        $admin_ctrl_duration_opts[] = $__m;
+                    }
+                    $admin_ctrl_dur_lbl = function (int $mins): string {
+                        $h = intdiv($mins, 60);
+                        $r = $mins % 60;
+                        if ($h > 0 && $r > 0) {
+                            return "{$h}h {$r}m";
+                        }
+                        if ($h > 0) {
+                            return $h === 1 ? '1 hr' : "{$h} hrs";
+                        }
+                        return "{$mins} min";
+                    };
+                    ?>
+                    <select name="controller_rental_minutes" id="adminCtrlDurationSelect1" class="admin-ctrl-dur-select"
+                            onchange="onAdminCtrlDurationChange(1)">
+                        <option value="0">— Select duration —</option>
+                        <?php foreach ($admin_ctrl_duration_opts as $mins): ?>
+                        <option value="<?= $mins ?>"><?= $admin_ctrl_dur_lbl($mins) ?></option>
                         <?php endforeach; ?>
+                    </select>
                     </div>
                     <div id="adminCtrlCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
-                    <input type="hidden" name="controller_rental_minutes" id="adminCtrlRentalMinutes" value="0">
                 </div>
 
                 <!-- Controller 2 (hidden by default) -->
@@ -544,29 +569,36 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
                             onchange="onControllerSelectChange()">
                         <!-- Populated by onConsoleChange() -->
                     </select>
+                    <div class="admin-ctrl-mode-wrap">
+                        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+                            <i class="fas fa-sliders-h" style="margin-right:3px;"></i> Rental mode
+                        </div>
+                        <select name="controller_rental_mode_2" id="adminCtrlModeSelect2" class="admin-ctrl-dur-select"
+                                onchange="onAdminCtrlRentalModeChange(2)" style="margin-bottom:12px;">
+                            <option value="hourly">Hourly (set duration)</option>
+                            <option value="open_time">Open Time (session clock)</option>
+                        </select>
+                    </div>
+                    <div id="adminCtrlDurWrap2" class="admin-ctrl-dur-wrap">
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
                         <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
                     </div>
-                    <div id="adminCtrlDurationBtns2" style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <?php foreach ($durations as $mins):
-                            $h = floor($mins / 60); $r = $mins % 60;
-                            $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1hr' : "{$h}hrs") : "{$mins}m");
-                        ?>
-                        <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn"
-                                data-mins="<?= $mins ?>" data-ctrl="2"
-                                onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 2)"
-                                style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.2);color:#c8d5f5;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;">
-                            <?= $lbl ?>
-                        </button>
+                    <select name="controller_rental_minutes_2" id="adminCtrlDurationSelect2" class="admin-ctrl-dur-select"
+                            onchange="onAdminCtrlDurationChange(2)">
+                        <option value="0">— Select duration —</option>
+                        <?php foreach ($admin_ctrl_duration_opts as $mins): ?>
+                        <option value="<?= $mins ?>"><?= $admin_ctrl_dur_lbl($mins) ?></option>
                         <?php endforeach; ?>
+                    </select>
                     </div>
                     <div id="adminCtrlCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
-                    <input type="hidden" name="controller_rental_minutes_2" id="adminCtrlRentalMinutes2" value="0">
                 </div>
 
             </div><!-- /grid -->
 
             <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt" value="0">
+
+            <div id="ctrlDurationCapHint" style="display:none;font-size:11px;color:rgba(200,205,230,.88);padding:10px 18px 14px;border-top:1px solid rgba(95,133,218,.12);line-height:1.45;"></div>
         </div><!-- /controllerSelectContainer -->
     </div>
 </div>
@@ -699,6 +731,26 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
                 <span class="res-notice-id" style="font-weight:700;color:#20c8a1;margin-left:4px;"></span>
                 — upfront payment includes the reservation downpayment.
                 <span class="res-nonrefundable-note" style="display:block;margin-top:3px;font-size:11px;color:#fb566b;font-weight:600;"></span>
+            </div>
+        </div>
+
+        <!-- End controller add-on early (session continues) -->
+        <div id="endCtrlRentalEarlyPanel" style="display:none;background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.35);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-weight:700;color:#8aa4e8;font-size:13px;margin-bottom:4px;">
+                        <i class="fas fa-gamepad" style="margin-right:6px;"></i> Controller add-on
+                    </div>
+                    <div style="font-size:12px;color:#aaa;line-height:1.45;">
+                        Customer returned extra controller(s) before this session ends. Re-rate the add-on to <strong style="color:#f1e1aa;">elapsed time now</strong>, reduce the line in Additional Requests, and mark units available. Totals in this modal refresh automatically.
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:160px;">
+                    <button type="button" id="endCtrlRentalEarlyBtn" class="btn-sec" style="white-space:nowrap;padding:10px 14px;font-size:12px;">
+                        <i class="fas fa-hand-holding"></i> End add-on &amp; recalculate
+                    </button>
+                    <span id="endCtrlRentalEarlyMsg" style="font-size:11px;color:#888;min-height:16px;"></span>
+                </div>
             </div>
         </div>
 

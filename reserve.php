@@ -321,25 +321,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ctrl_id           = ($with_ctrl && !empty($_POST['controller_id'])) ? (int)$_POST['controller_id'] : null;
     $ctrl_id_2         = ($with_ctrl && $ctrl_count === 2 && !empty($_POST['controller_id_2'])) ? (int)$_POST['controller_id_2'] : null;
     
+    $cm1 = $_POST['controller_rental_mode_1'] ?? 'hourly';
+    $cm2 = $_POST['controller_rental_mode_2'] ?? 'hourly';
+    // Align with form field names controller_rental_minutes_1 / _2
+    $ctrl_1_mins = (int)($_POST['controller_rental_minutes_1'] ?? $_POST['controller_rental_minutes'] ?? 0);
+    $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+
     $ctrl_fee = 0.0;
     if ($with_ctrl) {
         $getFee = $conn->prepare("SELECT c.hourly_rate FROM controllers c WHERE c.controller_id = ?");
-        
-        // Use granular minutes passed from the frontend via POST
-        $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
-        $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
-        
-        if ($ctrl_id && $ctrl_1_mins > 0) {
-            $getFee->bind_param('i', $ctrl_id);
+
+        $addLine = static function (?int $cid, int $mins, string $cm) use ($conn, $getFee): float {
+            if (!$cid || $cid <= 0 || !in_array($cm, ['hourly', 'open_time'], true)) {
+                return 0.0;
+            }
+            if ($cm === 'open_time') {
+                return 0.0;
+            }
+            if ($mins <= 0) {
+                return 0.0;
+            }
+            $getFee->bind_param('i', $cid);
             $getFee->execute();
             $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * ($ctrl_1_mins / 60);
-        }
-        if ($ctrl_id_2 && $ctrl_2_mins > 0) {
-            $getFee->bind_param('i', $ctrl_id_2);
-            $getFee->execute();
-            $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * ($ctrl_2_mins / 60);
+            if (!$row) {
+                return 0.0;
+            }
+
+            return (float) ($row['hourly_rate'] ?? 20.0) * ($mins / 60);
+        };
+
+        $ctrl_fee += $addLine($ctrl_id, $ctrl_1_mins, $cm1);
+        if ($ctrl_count === 2) {
+            $ctrl_fee += $addLine($ctrl_id_2, $ctrl_2_mins, $cm2);
         }
     }
 
@@ -347,6 +361,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = null;
     if ($with_ctrl && $ctrl_count === 2 && $ctrl_id === $ctrl_id_2 && $ctrl_id !== null) {
         $error = 'You cannot select the same controller twice.';
+    }
+    if (!$error && $with_ctrl) {
+        foreach (['controller_rental_mode_1' => $cm1, 'controller_rental_mode_2' => $cm2] as $k => $cm) {
+            if (!in_array($cm, ['hourly', 'open_time'], true)) {
+                $error = 'Invalid controller rental mode.';
+                break;
+            }
+        }
+    }
+    if (!$error && $with_ctrl) {
+        $rules               = getPricingRules();
+        $max_ctrl_mins_slot = ($rental_mode === 'hourly' && $planned_minutes)
+            ? paidToTotalMinutes((int) $planned_minutes, $rules)
+            : 720;
+        if ($ctrl_id && $cm1 !== 'open_time') {
+            if ($ctrl_1_mins <= 0) {
+                $error = 'Controller 1: choose a rental duration (or set rental mode to Open Time).';
+            } elseif ($ctrl_1_mins > $max_ctrl_mins_slot) {
+                $error = $rental_mode === 'unlimited'
+                    ? 'Controller 1 rental cannot exceed 12 hours for unlimited sessions.'
+                    : 'Controller 1 rental cannot exceed your reserved session window.';
+            }
+        }
+        if (!$error && $ctrl_count === 2 && $ctrl_id_2 && $cm2 !== 'open_time') {
+            if ($ctrl_2_mins <= 0) {
+                $error = 'Controller 2: choose a rental duration (or set rental mode to Open Time).';
+            } elseif ($ctrl_2_mins > $max_ctrl_mins_slot) {
+                $error = $rental_mode === 'unlimited'
+                    ? 'Controller 2 rental cannot exceed 12 hours for unlimited sessions.'
+                    : 'Controller 2 rental cannot exceed your reserved session window.';
+            }
+        }
     }
 
     // ── Reservation ban check ─────────────────────────────────────────────────
@@ -437,6 +483,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($pm['success'] && !empty($pm['checkout_url'])) {
+            $notes_stash = $notes;
+            if ($with_ctrl) {
+                $mode_parts = [];
+                if ($ctrl_id) {
+                    $mode_parts[] = 'Ctrl1:' . $cm1;
+                }
+                if ($ctrl_id_2) {
+                    $mode_parts[] = 'Ctrl2:' . $cm2;
+                }
+                if ($mode_parts) {
+                    $notes_stash .= ($notes_stash !== '' ? "\n\n" : '') . '[Controller rental modes: ' . implode(', ', $mode_parts) . ']';
+                }
+            }
             // Stash reservation data in session so PATH B can pick it up
             $_SESSION['pending_reservation'] = [
                 'console_type'      => $console_type,
@@ -444,7 +503,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'planned_minutes'   => $planned_minutes,
                 'reserved_date'     => $reserved_date,
                 'reserved_time'     => $reserved_time,
-                'notes'             => $notes,
+                'notes'             => $notes_stash,
                 'dp_amount'         => $dp_amount,
                 'preferred_unit_id' => $preferred_unit_id,
                 'session_id'        => $pm['session_id'],
@@ -1681,11 +1740,12 @@ if (!empty($_GET['console'])) {
                             </div>
                         </div>
 
-                        <!-- Duration picker (hourly only) — max 4 hrs -->
+                        <!-- Duration picker (hourly only) — max paid hours from pricing rules -->
                         <div id="durationSection" style="display:none;margin-top:20px;">
+                            <?php $bookingDurPr = getPricingRules(); $maxPaidHrs = max(1, (int)($bookingDurPr['max_hourly_minutes'] ?? 240) / 60); ?>
                             <div class="sec-label" style="display:flex;align-items:center;gap:8px;">Duration *
                                 <span style="font-size:10px;background:rgba(32,200,161,.15);color:#20c8a1;border:1px solid rgba(32,200,161,.3);border-radius:20px;padding:2px 8px;font-weight:700;">
-                                    Max 4 hrs
+                                    Up to <?= (int)$maxPaidHrs ?>h paid (+ bonus time)
                                 </span>
                             </div>
                             <div class="duration-grid" id="durationGridContainer">
@@ -1733,33 +1793,29 @@ if (!empty($_GET['console'])) {
                                 }
                                 .ctrl-res-dur-btn:hover { background: rgba(95,133,218,.2); border-color: rgba(95,133,218,.5); }
                                 .ctrl-res-dur-btn.selected { background: rgba(95,133,218,.35); border-color: #5f85da; color: #fff; box-shadow: 0 0 0 2px rgba(95,133,218,.3); }
+                                .res-ctrl-dur-select option { background-color: #0d1a35; color: #e8eaf6; }
                             </style>
-
-                            <?php
-                            // Reusable duration button HTML generator
-                            function ctrlDurationBtns(string $idx): string {
-                                $html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;" id="ctrlResDurationBtns' . $idx . '">';
-                                for ($m = 30; $m <= 240; $m += 30) {
-                                    $h = intdiv($m, 60); $r = $m % 60;
-                                    if ($h && $r)  $lbl = "{$h}h {$r}m";
-                                    elseif ($h)    $lbl = $h === 1 ? '1 hr' : "{$h} hrs";
-                                    else           $lbl = "{$r} min";
-                                    $html .= "<button type=\"button\" class=\"ctrl-res-dur-btn\" data-mins=\"{$m}\" data-ctrl=\"{$idx}\" onclick=\"onResCtrlDurationSelect({$m},{$idx})\">{$lbl}</button>";
-                                }
-                                $html .= '</div>';
-                                return $html;
-                            }
-                            ?>
 
                             <!-- ── Controller 1 ── -->
                             <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Specific Controller *</label>
                             <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;" onchange="onCtrl1Change()">
                                 <option value="">Select a controller...</option>
                             </select>
+                            <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Rental mode</label>
+                            <select name="controller_rental_mode_1" id="resCtrlModeSelect1" onchange="onResCtrlRentalModeChange(1)" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;">
+                                <option value="hourly">Hourly (choose duration below)</option>
+                                <option value="open_time">Open Time (billed at session end)</option>
+                            </select>
+                            <div id="resCtrlDurWrap1" class="res-ctrl-dur-wrap">
                             <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
                                 <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 1 — Rental Duration
                             </label>
-                            <?= ctrlDurationBtns('1') ?>
+                            <div class="res-ctrl-dur-hint" id="resCtrlDurHint1" style="display:none;font-size:10px;color:#7a8bb0;margin:-4px 0 8px;line-height:1.35;"></div>
+                            <div id="resCtrlDurBtnsHost1"></div>
+                            <div id="resCtrlDurSelectHost1" style="display:none;">
+                                <select id="resCtrlDurSelect1" class="res-ctrl-dur-select" onchange="onResCtrlDurSelectChange(1,this)" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;"></select>
+                            </div>
+                            </div>
                             <div id="ctrlResCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;padding:7px 10px;background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);border-radius:8px;"></div>
                             <input type="hidden" name="controller_rental_minutes_1" id="resCtrlMins1" value="0">
 
@@ -1769,10 +1825,21 @@ if (!empty($_GET['console'])) {
                                 <select name="controller_id_2" id="selectedControllerId2" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;" onchange="onCtrl2Change()">
                                     <option value="">Select 2nd controller...</option>
                                 </select>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Rental mode</label>
+                                <select name="controller_rental_mode_2" id="resCtrlModeSelect2" onchange="onResCtrlRentalModeChange(2)" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;">
+                                    <option value="hourly">Hourly (choose duration below)</option>
+                                    <option value="open_time">Open Time (billed at session end)</option>
+                                </select>
+                                <div id="resCtrlDurWrap2" class="res-ctrl-dur-wrap">
                                 <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
                                     <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 2 — Rental Duration
                                 </label>
-                                <?= ctrlDurationBtns('2') ?>
+                                <div class="res-ctrl-dur-hint" id="resCtrlDurHint2" style="display:none;font-size:10px;color:#7a8bb0;margin:-4px 0 8px;line-height:1.35;"></div>
+                                <div id="resCtrlDurBtnsHost2"></div>
+                                <div id="resCtrlDurSelectHost2" style="display:none;">
+                                    <select id="resCtrlDurSelect2" class="res-ctrl-dur-select" onchange="onResCtrlDurSelectChange(2,this)" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;"></select>
+                                </div>
+                                </div>
                                 <div id="ctrlResCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;padding:7px 10px;background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);border-radius:8px;"></div>
                                 <input type="hidden" name="controller_rental_minutes_2" id="resCtrlMins2" value="0">
                             </div><!-- /ctrl2Block -->
@@ -2122,6 +2189,281 @@ const PRICING          = <?= json_encode(getPricingRules()) ?>;
 const CONSOLES_BY_TYPE = <?= json_encode($consolesByType, JSON_UNESCAPED_UNICODE) ?>;
 let AVAILABLE_CONTROLLERS = <?= $controllersJson ?>;
 
+/** Max controller rental minutes when session is hourly unlimited-style cap (addons normally hourly-only). */
+const RES_CTRL_MAX_OPEN_OR_UNLI = 720;
+
+function getReserveCtrlRentalMode(ctrl) {
+    const el = document.getElementById(ctrl === 1 ? 'resCtrlModeSelect1' : 'resCtrlModeSelect2');
+    return el ? (el.value || 'hourly') : 'hourly';
+}
+
+/** Normalize legacy/off-DOM controller mode values before session-type sync. */
+function syncReserveModesFromReservation() {
+    ['resCtrlModeSelect1', 'resCtrlModeSelect2'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.value === 'unlimited') el.value = 'hourly';
+    });
+}
+
+/** When console booking is Unlimited, hourly controller add-ons default to 12h (still adjustable). */
+function applyReserveTwelveHourForUnlimitedSession(force) {
+    if (selectedMode !== 'unlimited') return;
+    const tog = document.getElementById('withControllerCheck');
+    if (!tog || !tog.checked) return;
+    const cap = RES_CTRL_MAX_OPEN_OR_UNLI;
+    const cnt = parseInt(document.getElementById('controllerCount')?.value || '1', 10);
+    let changed = false;
+    [1, 2].forEach(function(ctrl) {
+        if (ctrl === 2 && cnt < 2) return;
+        if (getReserveCtrlRentalMode(ctrl) === 'open_time') return;
+        const maxM = getReserveControllerMaxMins(ctrl);
+        if (maxM < 30) return;
+        const hidden = document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2');
+        const cur    = parseInt(hidden?.value || 0, 10);
+        if (!force && cur > 0) return;
+        const next = Math.min(cap, maxM);
+        if (hidden) hidden.value = String(next);
+        changed = true;
+        _ctrlCostPreview(ctrl, next);
+    });
+    if (changed) {
+        refreshReserveCtrlRentalModeUi();
+    }
+}
+
+/** Console session total minutes (paid slot + bonus free time). Controller rental may not exceed this. */
+function getReserveSessionMaxControllerMins() {
+    if (selectedMode === 'hourly' && selectedDuration > 0) {
+        const bp  = PRICING.bonus_paid_minutes || 120;
+        const bf  = PRICING.bonus_free_minutes || 30;
+        const paid = selectedDuration;
+        return paid + Math.floor(paid / bp) * bf;
+    }
+    if (selectedMode === 'unlimited') {
+        return RES_CTRL_MAX_OPEN_OR_UNLI;
+    }
+    return 0;
+}
+
+/** Per-controller cap: Hourly add-on = full session window (unlimited console = 12h); Open Time = N/A. */
+function getReserveControllerMaxMins(ctrl) {
+    const mode = getReserveCtrlRentalMode(ctrl);
+    if (mode === 'open_time') {
+        return 0;
+    }
+    return getReserveSessionMaxControllerMins();
+}
+
+function fmtReserveCtrlDurLabel(mins) {
+    const h = Math.floor(mins / 60);
+    const r = mins % 60;
+    if (h && r) {
+        return `${h}h ${r}m`;
+    }
+    if (h) {
+        return h === 1 ? '1 hr' : `${h} hrs`;
+    }
+    return `${mins} min`;
+}
+
+function updateReserveCtrlDurationHint(ctrl) {
+    const hint = document.getElementById('resCtrlDurHint' + ctrl);
+    if (!hint) {
+        return;
+    }
+    const sess = getReserveSessionMaxControllerMins();
+    const maxM = getReserveControllerMaxMins(ctrl);
+    const mode = getReserveCtrlRentalMode(ctrl);
+    if (mode === 'open_time') {
+        hint.style.display = 'none';
+        hint.textContent = '';
+
+        return;
+    }
+    if (selectedMode === 'unlimited') {
+        hint.style.display = 'block';
+        hint.textContent = 'Unlimited console session: controller add-on up to 12 hours at hourly rate (defaults to 12 h). Separate from your flat session fee.';
+
+        return;
+    }
+    if (sess <= 0) {
+        hint.style.display = 'none';
+        hint.textContent = '';
+
+        return;
+    }
+    hint.style.display = 'block';
+    hint.textContent = `Choose up to ${fmtReserveCtrlDurLabel(maxM)} (your full reserved session includes bonus time).`;
+}
+
+function rebuildReserveCtrlDurationControls(ctrl) {
+    const mode = getReserveCtrlRentalMode(ctrl);
+    const btnsHost = document.getElementById('resCtrlDurBtnsHost' + ctrl);
+    const selHost  = document.getElementById('resCtrlDurSelectHost' + ctrl);
+    const sel      = document.getElementById('resCtrlDurSelect' + ctrl);
+    if (!btnsHost || !selHost || !sel) {
+        return;
+    }
+
+    updateReserveCtrlDurationHint(ctrl);
+
+    if (mode === 'open_time') {
+        btnsHost.innerHTML = '';
+        sel.innerHTML      = '';
+        selHost.style.display = 'none';
+
+        return;
+    }
+
+    const maxM = getReserveControllerMaxMins(ctrl);
+    const hidden = document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2');
+    let cur      = parseInt(hidden?.value || 0);
+
+    if (maxM < 30) {
+        btnsHost.style.display  = 'block';
+        selHost.style.display    = 'none';
+        const msg = selectedMode === 'unlimited'
+            ? 'Unable to show duration options. Please refresh the page or contact support.'
+            : '<i class="fas fa-info-circle" style="margin-right:6px;color:#5f85da;"></i>Select your console duration in Step 3 first. Hourly add-on time cannot exceed your booked play time.';
+        btnsHost.innerHTML = '<div style="font-size:11px;color:#9aa8c9;line-height:1.45;">' + msg + '</div>';
+
+        return;
+    }
+
+    if (cur > maxM) {
+        cur = 0;
+        if (hidden) {
+            hidden.value = '0';
+        }
+        _ctrlCostPreview(ctrl, 0);
+    }
+
+    if (selectedMode === 'unlimited' && mode === 'hourly') {
+        btnsHost.style.display = 'none';
+        selHost.style.display  = 'block';
+        btnsHost.innerHTML     = '';
+        sel.innerHTML = '<option value="0">\u2014 Select duration \u2014</option>';
+        for (let m = 30; m <= maxM; m += 30) {
+            const opt       = document.createElement('option');
+            opt.value       = String(m);
+            opt.textContent = fmtReserveCtrlDurLabel(m);
+            sel.appendChild(opt);
+        }
+        sel.value = cur > 0 ? String(cur) : '0';
+    } else {
+        selHost.style.display   = 'none';
+        btnsHost.style.display  = 'block';
+        sel.innerHTML           = '';
+
+        const grid       = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;';
+        grid.id            = 'ctrlResDurationBtns' + ctrl;
+
+        for (let m = 30; m <= maxM; m += 30) {
+            const btn     = document.createElement('button');
+            btn.type      = 'button';
+            btn.className = 'ctrl-res-dur-btn';
+            btn.dataset.mins = String(m);
+            btn.dataset.ctrl = String(ctrl);
+            btn.textContent  = fmtReserveCtrlDurLabel(m);
+            btn.addEventListener('click', function() {
+                onResCtrlDurationSelect(m, ctrl);
+            });
+            if (cur === m) {
+                btn.classList.add('selected');
+            }
+            grid.appendChild(btn);
+        }
+        btnsHost.innerHTML = '';
+        btnsHost.appendChild(grid);
+    }
+}
+
+function onResCtrlDurSelectChange(ctrl, selectEl) {
+    const mins = parseInt(selectEl.value, 10) || 0;
+    const maxM = getReserveControllerMaxMins(ctrl);
+    if (mins > 0 && (maxM <= 0 || mins > maxM)) {
+        selectEl.value = '0';
+
+        return;
+    }
+    const hidden = document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2');
+    if (hidden) {
+        hidden.value = String(mins);
+    }
+    _ctrlCostPreview(ctrl, mins);
+    recalcFee();
+}
+
+function refreshReserveCtrlRentalModeUi() {
+    [1, 2].forEach(function(ctrl) {
+        const wrap = document.getElementById('resCtrlDurWrap' + ctrl);
+        const mode = getReserveCtrlRentalMode(ctrl);
+        if (wrap) {
+            wrap.style.display = mode === 'open_time' ? 'none' : 'block';
+        }
+        if (mode === 'open_time') {
+            const mi = document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2');
+            if (mi) {
+                mi.value = '0';
+            }
+            document.querySelectorAll('.ctrl-res-dur-btn[data-ctrl="' + ctrl + '"]').forEach(function(b) {
+                b.classList.remove('selected');
+            });
+            const h = document.getElementById('resCtrlDurBtnsHost' + ctrl);
+            if (h) {
+                h.innerHTML = '';
+            }
+            const s = document.getElementById('resCtrlDurSelect' + ctrl);
+            if (s) {
+                s.innerHTML = '<option value="0">\u2014</option>';
+                s.value = '0';
+            }
+            const hh = document.getElementById('resCtrlDurHint' + ctrl);
+            if (hh) {
+                hh.style.display = 'none';
+            }
+        } else {
+            rebuildReserveCtrlDurationControls(ctrl);
+        }
+    });
+}
+
+function syncReserveCtrlDurationCaps() {
+    [1, 2].forEach(function(ctrl) {
+        if (getReserveCtrlRentalMode(ctrl) === 'open_time') {
+            return;
+        }
+        const maxM = getReserveControllerMaxMins(ctrl);
+        const el = document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2');
+        const mins = parseInt(el?.value || 0);
+        if (maxM > 0 && mins > maxM) {
+            if (el) {
+                el.value = '0';
+            }
+            document.querySelectorAll('.ctrl-res-dur-btn[data-ctrl="' + ctrl + '"]').forEach(function(b) {
+                b.classList.remove('selected');
+            });
+            const s = document.getElementById('resCtrlDurSelect' + ctrl);
+            if (s) {
+                s.value = '0';
+            }
+            _ctrlCostPreview(ctrl, 0);
+        }
+        rebuildReserveCtrlDurationControls(ctrl);
+    });
+    applyReserveTwelveHourForUnlimitedSession(false);
+    recalcFee();
+}
+
+function onResCtrlRentalModeChange(ctrl) {
+    refreshReserveCtrlRentalModeUi();
+    const mins = parseInt(document.getElementById(ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2')?.value || 0);
+    _ctrlCostPreview(ctrl, mins);
+    syncReserveCtrlDurationCaps();
+}
+
 function getConsoleRate() {
     // Primary: read data-rate from the selected card element (set from console_types.hourly_rate)
     if (selectedConsoleType) {
@@ -2180,18 +2522,19 @@ function updateDurationLabels() {
         maxMinsUntilMidnight = midnightMins - currentTotalMins;
     }
     
-    const maxMins = Math.min(PRICING.max_hourly_minutes || 240, maxMinsUntilMidnight);
+    const maxPaidMins = PRICING.max_hourly_minutes || 240;
     const bp = PRICING.bonus_paid_minutes || 120;
     const bf = PRICING.bonus_free_minutes || 30;
     
     let html = '';
     let visibleCount = 0;
-    for (let paid = 30; paid <= (PRICING.max_hourly_minutes || 240); paid += 30) {
+    for (let paid = 30; paid <= maxPaidMins; paid += 30) {
         let bonus = Math.floor(paid / bp) * bf;
         let total = paid + bonus;
 
-        // If total duration (paid + bonus) exceeds the closing time (12:00 AM), skip it
-        if (total > maxMins) continue;
+        /* max_hourly_minutes = max PAID slot (e.g. 240 = 4h). Do NOT cap total+bonus at that
+           value or the 4h-paid tier disappears (240+60 bonus = 300). Only enforce closing time. */
+        if (total > maxMinsUntilMidnight) continue;
 
         let cost = paid <= 30 ? PRICING.session_min_charge : _timedCost(paid);
         
@@ -2239,6 +2582,10 @@ function onExtraControllerToggle() {
         if (countSel) countSel.disabled = false;
         if (block)    block.style.display = 'block';
         if (ctrl2)    ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
+        refreshReserveCtrlRentalModeUi();
+        syncReserveCtrlDurationCaps();
+        applyReserveTwelveHourForUnlimitedSession(true);
+        if (typeof recalcFee === 'function') recalcFee();
     } else {
         if (countSel) countSel.disabled = true;
         if (block)    block.style.display = 'none';
@@ -2250,11 +2597,15 @@ function onExtraControllerToggle() {
         ['resCtrlMins1','resCtrlMins2'].forEach(id => {
             const i = document.getElementById(id); if (i) i.value = '0';
         });
+        ['resCtrlModeSelect1','resCtrlModeSelect2'].forEach(id => {
+            const m = document.getElementById(id); if (m) m.value = 'hourly';
+        });
+        refreshReserveCtrlRentalModeUi();
         ['ctrlResCostPreview1','ctrlResCostPreview2'].forEach(id => {
             const d = document.getElementById(id); if (d) d.style.display = 'none';
         });
+        if (typeof recalcFee === 'function') recalcFee();
     }
-    if (typeof recalcFee === 'function') recalcFee();
 }
 
 // Called when controllerCount dropdown changes
@@ -2267,9 +2618,11 @@ function _syncCtrl2Visibility() {
         const s2 = document.getElementById('selectedControllerId2'); if (s2) s2.value = '';
         document.querySelectorAll('.ctrl-res-dur-btn[data-ctrl="2"]').forEach(b => b.classList.remove('selected'));
         const m2 = document.getElementById('resCtrlMins2'); if (m2) m2.value = '0';
+        const mode2 = document.getElementById('resCtrlModeSelect2'); if (mode2) mode2.value = 'hourly';
+        refreshReserveCtrlRentalModeUi();
         const p2 = document.getElementById('ctrlResCostPreview2'); if (p2) p2.style.display = 'none';
     }
-    recalcFee();
+    syncReserveCtrlDurationCaps();
 }
 
 function _ctrlCostPreview(ctrl, mins) {
@@ -2282,6 +2635,15 @@ function _ctrlCostPreview(ctrl, mins) {
         ? parseFloat(sel.options[sel.selectedIndex].dataset.rate || 0) : 0;
     const h = Math.floor(mins/60), r = mins%60;
     const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
+    if (getReserveCtrlRentalMode(ctrl) === 'open_time') {
+        if (rate > 0) {
+            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(255,230,200,.95);">Open Time: controller rate &#8369;${rate.toFixed(2)}/hr is charged at the shop when you finish your session (based on actual play time).</span>`;
+            prev.style.display = 'block';
+        } else {
+            prev.style.display = 'none';
+        }
+        return;
+    }
     if (rate > 0 && mins > 0) {
         prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${lbl} = <strong>&#8369;${(rate*mins/60).toFixed(2)}</strong>`;
         prev.style.display = 'block';
@@ -2294,6 +2656,16 @@ function _ctrlCostPreview(ctrl, mins) {
 }
 
 function onResCtrlDurationSelect(mins, ctrl) {
+    if (getReserveCtrlRentalMode(ctrl) === 'open_time') {
+        return;
+    }
+    const maxM = getReserveControllerMaxMins(ctrl);
+    if (maxM > 0 && mins > maxM) {
+        alert(selectedMode === 'unlimited'
+            ? 'Controller rental cannot exceed 12 hours for unlimited sessions.'
+            : 'Controller rental cannot be longer than your reserved session.');
+        return;
+    }
     const minsId = ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2';
     // Highlight only buttons for this controller
     document.querySelectorAll(`.ctrl-res-dur-btn[data-ctrl="${ctrl}"]`).forEach(b => {
@@ -2344,19 +2716,15 @@ function updateControllerDropdown() {
     
     const chk = document.getElementById('withControllerCheck');
     const desc = document.getElementById('ctrlDesc');
-    const defaultDesc = `Select a controller below to see its hourly rate. This rate will be multiplied by your session duration.`;
+    const defaultDesc = selectedMode === 'unlimited'
+        ? 'Unlimited session: extra controllers bill at hourly rate (defaults to 12 h; adjustable). Separate from your flat session fee.'
+        : 'Select a controller below to see its hourly rate. This rate will be multiplied by your session duration.';
 
     if (matching.length === 0) {
         sel.innerHTML = '<option value="">No controllers available for this type</option>';
         if (chk) { chk.disabled = true; chk.checked = false; }
         if (countDropdown) countDropdown.disabled = true;
         if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> No extra controllers are currently available for this console.</span>';
-        onExtraControllerToggle();
-    } else if (selectedMode === 'unlimited') {
-        sel.innerHTML = '<option value="">Not available in unlimited mode</option>';
-        if (chk) { chk.disabled = true; chk.checked = false; }
-        if (countDropdown) countDropdown.disabled = true;
-        if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Extra controllers are not available for Unlimited sessions.</span>';
         onExtraControllerToggle();
     } else {
         if (chk) chk.disabled = false;
@@ -2366,7 +2734,7 @@ function updateControllerDropdown() {
         if (sel2) sel2.innerHTML = '<option value="">Select 2nd controller...</option>';
         matching.forEach(c => {
             const hr = parseFloat(c.hourly_rate || 20);
-            const ctrlMins = parseInt(document.getElementById('resControllerRentalMinutes')?.value || 0);
+            const ctrlMins = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
 
             const costLabel = ctrlMins > 0
                 ? (()=>{ const h=Math.floor(ctrlMins/60),r=ctrlMins%60; const lbl=h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${ctrlMins} min`; return `\u20b1${hr.toFixed(2)}/hr \xd7 ${lbl} = \u20b1${(hr*ctrlMins/60).toFixed(2)}`; })()
@@ -2392,7 +2760,14 @@ function updateControllerDropdown() {
             }
         });
     }
-    if (typeof recalcFee === 'function') recalcFee();
+    if (typeof refreshReserveCtrlRentalModeUi === 'function') {
+        refreshReserveCtrlRentalModeUi();
+    }
+    if (typeof syncReserveCtrlDurationCaps === 'function') {
+        syncReserveCtrlDurationCaps();
+    } else if (typeof recalcFee === 'function') {
+        recalcFee();
+    }
 }
 
 /* ── Time select helpers ────────────────────────── */
@@ -2750,18 +3125,12 @@ function selectMode(mode) {
         document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     }
     
-    // Disable Add-ons for Unlimited Mode
     const addonsCard = document.getElementById('addonsCard');
+    if (addonsCard) addonsCard.style.opacity = '1';
+    syncReserveModesFromReservation();
+    updateControllerDropdown();
     if (mode === 'unlimited') {
-        if (addonsCard) addonsCard.style.opacity = '0.5';
-        const chk = document.getElementById('withControllerCheck');
-        if (chk) { chk.checked = false; chk.disabled = true; }
-        const desc = document.getElementById('ctrlDesc');
-        if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> Extra controllers are not available for Unlimited sessions.</span>';
-        onExtraControllerToggle();
-    } else {
-        if (addonsCard) addonsCard.style.opacity = '1';
-        updateControllerDropdown();
+        applyReserveTwelveHourForUnlimitedSession(true);
     }
 
     if (mode === 'unlimited') {
@@ -2799,7 +3168,11 @@ function hideGcashPanel() {
 
 /* ── Duration ───────────────────────────────────────── */
 function selectDuration(mins) {
-    if (mins > 240) { alert('Hourly reservations are limited to 4 hours maximum.'); return; }
+    const cap = PRICING.max_hourly_minutes || 240;
+    if (mins > cap) {
+        alert('Hourly reservations are limited to ' + (cap / 60) + ' paid hours maximum.');
+        return;
+    }
 
     selectedDuration = mins;
     document.getElementById('hiddenPlannedMinutes').value = mins;
@@ -2807,7 +3180,7 @@ function selectDuration(mins) {
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
     updateControllerDropdown(); // refresh controller labels with duration-based cost
-    recalcFee();
+    if (typeof syncReserveCtrlDurationCaps === 'function') syncReserveCtrlDurationCaps();
 }
 
 function syncControllerDropdowns() {
@@ -2851,18 +3224,20 @@ function recalcFee() {
     const countSel = document.getElementById('controllerCount');
     const count = withCtrl && countSel ? parseInt(countSel.value) : (withCtrl ? 1 : 0);
 
-    // Per-controller independent durations
+    // Per-controller independent durations + rental modes
     const ctrlMins1 = withCtrl ? (parseInt(document.getElementById('resCtrlMins1')?.value) || 0) : 0;
     const ctrlMins2 = (withCtrl && count > 1) ? (parseInt(document.getElementById('resCtrlMins2')?.value) || 0) : 0;
+    const cm1       = withCtrl ? getReserveCtrlRentalMode(1) : 'hourly';
+    const cm2       = (withCtrl && count > 1) ? getReserveCtrlRentalMode(2) : 'hourly';
 
     let ctrlFee = 0;
     if (withCtrl) {
         const sel1 = document.getElementById('selectedControllerId');
         const sel2 = document.getElementById('selectedControllerId2');
-        if (sel1 && sel1.selectedIndex > 0 && ctrlMins1 > 0) {
+        if (sel1 && sel1.selectedIndex > 0 && cm1 !== 'open_time' && ctrlMins1 > 0) {
             ctrlFee += parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) * (ctrlMins1 / 60);
         }
-        if (count > 1 && sel2 && sel2.selectedIndex > 0 && ctrlMins2 > 0) {
+        if (count > 1 && sel2 && sel2.selectedIndex > 0 && cm2 !== 'open_time' && ctrlMins2 > 0) {
             ctrlFee += parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) * (ctrlMins2 / 60);
         }
     }
@@ -2884,21 +3259,30 @@ function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
 
     // Build per-controller breakdown label
     let extraLine = document.getElementById('feeCtrlLine');
-    if (ctrlFee > 0) {
-        // Try to build breakdown
-        const sel1   = document.getElementById('selectedControllerId');
-        const sel2   = document.getElementById('selectedControllerId2');
-        const mins1  = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
-        const mins2  = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
-        const rate1  = (sel1 && sel1.selectedIndex > 0) ? parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
-        const rate2  = (sel2 && sel2.selectedIndex > 0) ? parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) : 0;
-        function fmtM(m) { const h=Math.floor(m/60),r=m%60; return h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${m} min`; }
+    const sel1   = document.getElementById('selectedControllerId');
+    const sel2   = document.getElementById('selectedControllerId2');
+    const mins1  = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
+    const mins2  = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
+    const mode1  = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(1) : 'hourly';
+    const mode2  = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(2) : 'hourly';
+    const rate1  = (sel1 && sel1.selectedIndex > 0) ? parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
+    const rate2  = (sel2 && sel2.selectedIndex > 0) ? parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) : 0;
+    function fmtM(m) { const h=Math.floor(m/60),r=m%60; return h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${m} min`; }
 
-        let parts = [];
-        if (rate1 > 0 && mins1 > 0) parts.push(`Ctrl 1: &#8369;${rate1.toFixed(2)}/hr &times; ${fmtM(mins1)} = <strong>&#8369;${(rate1*mins1/60).toFixed(2)}</strong>`);
-        if (rate2 > 0 && mins2 > 0) parts.push(`Ctrl 2: &#8369;${rate2.toFixed(2)}/hr &times; ${fmtM(mins2)} = <strong>&#8369;${(rate2*mins2/60).toFixed(2)}</strong>`);
-        const label = parts.length ? parts.join(' &nbsp;|&nbsp; ') : `&#8369;${ctrlFee.toFixed(2)}`;
+    let parts = [];
+    if (sel1 && sel1.value && mode1 === 'open_time' && rate1 > 0) {
+        parts.push(`Ctrl 1: Open Time &mdash; settle at shop (&#8369;${rate1.toFixed(2)}/hr)`);
+    } else if (rate1 > 0 && mins1 > 0) {
+        parts.push(`Ctrl 1: &#8369;${rate1.toFixed(2)}/hr &times; ${fmtM(mins1)} = <strong>&#8369;${(rate1*mins1/60).toFixed(2)}</strong>`);
+    }
+    if (sel2 && sel2.value && mode2 === 'open_time' && rate2 > 0) {
+        parts.push(`Ctrl 2: Open Time &mdash; settle at shop (&#8369;${rate2.toFixed(2)}/hr)`);
+    } else if (rate2 > 0 && mins2 > 0) {
+        parts.push(`Ctrl 2: &#8369;${rate2.toFixed(2)}/hr &times; ${fmtM(mins2)} = <strong>&#8369;${(rate2*mins2/60).toFixed(2)}</strong>`);
+    }
+    const label = parts.length ? parts.join(' &nbsp;|&nbsp; ') : (ctrlFee > 0 ? `&#8369;${ctrlFee.toFixed(2)}` : '');
 
+    if (parts.length > 0 || ctrlFee > 0) {
         if (!extraLine) {
             extraLine = document.createElement('div');
             extraLine.id = 'feeCtrlLine';
@@ -3246,10 +3630,24 @@ function updateSummary() {
             const mins2 = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
             const rate1 = (sel1 && sel1.selectedIndex > 0) ? parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
             const rate2 = (sel2 && sel2.selectedIndex > 0) ? parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) : 0;
+            const m1 = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(1) : 'hourly';
+            const m2 = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(2) : 'hourly';
             function fmtMC(m) { const h=Math.floor(m/60),r=m%60; return h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${m} min`; }
             let parts = [];
-            if (rate1 > 0 && mins1 > 0) parts.push(`Ctrl 1: \u20b1${(rate1*mins1/60).toFixed(2)} (${fmtMC(mins1)})`);
-            if (rate2 > 0 && mins2 > 0) parts.push(`Ctrl 2: \u20b1${(rate2*mins2/60).toFixed(2)} (${fmtMC(mins2)})`);
+            if (sel1 && sel1.value) {
+                if (m1 === 'open_time' && rate1 > 0) {
+                    parts.push(`Ctrl 1: Open Time (settle at shop, \u20b1${rate1.toFixed(2)}/hr)`);
+                } else if (rate1 > 0 && mins1 > 0) {
+                    parts.push(`Ctrl 1: \u20b1${(rate1*mins1/60).toFixed(2)} (${fmtMC(mins1)})`);
+                }
+            }
+            if (sel2 && sel2.value) {
+                if (m2 === 'open_time' && rate2 > 0) {
+                    parts.push(`Ctrl 2: Open Time (settle at shop, \u20b1${rate2.toFixed(2)}/hr)`);
+                } else if (rate2 > 0 && mins2 > 0) {
+                    parts.push(`Ctrl 2: \u20b1${(rate2*mins2/60).toFixed(2)} (${fmtMC(mins2)})`);
+                }
+            }
             sCtrl.textContent = parts.length ? parts.join(' + ') : 'Selected (set duration & unit above)';
             ctrlRow.style.display = 'flex';
         } else {
@@ -3299,6 +3697,44 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
+
+    const withCtrlV = document.getElementById('withControllerCheck')?.checked;
+    if (withCtrlV && (selectedMode === 'hourly' || selectedMode === 'unlimited')) {
+        const cap1Fn = typeof getReserveControllerMaxMins === 'function' ? getReserveControllerMaxMins : () => 0;
+        const c1 = document.getElementById('selectedControllerId')?.value;
+        const c2 = document.getElementById('selectedControllerId2')?.value;
+        const cnt = parseInt(document.getElementById('controllerCount')?.value || '1', 10);
+        const md1 = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(1) : 'hourly';
+        const md2 = typeof getReserveCtrlRentalMode === 'function' ? getReserveCtrlRentalMode(2) : 'hourly';
+        const mins1 = parseInt(document.getElementById('resCtrlMins1')?.value || 0, 10);
+        const mins2 = parseInt(document.getElementById('resCtrlMins2')?.value || 0, 10);
+        const cap1 = cap1Fn(1);
+        const cap2 = cap1Fn(2);
+        if (c1 && md1 !== 'open_time' && mins1 <= 0) {
+            e.preventDefault();
+            alert('Controller 1: choose a rental duration, or set rental mode to Open Time.');
+            return;
+        }
+        if (cnt === 2 && c2 && md2 !== 'open_time' && mins2 <= 0) {
+            e.preventDefault();
+            alert('Controller 2: choose a rental duration, or set rental mode to Open Time.');
+            return;
+        }
+        if (c1 && md1 !== 'open_time' && cap1 > 0 && mins1 > cap1) {
+            e.preventDefault();
+            alert(selectedMode === 'unlimited'
+                ? 'Controller 1 rental cannot exceed 12 hours for unlimited sessions.'
+                : 'Controller 1 rental cannot be longer than your reserved session.');
+            return;
+        }
+        if (cnt === 2 && c2 && md2 !== 'open_time' && cap2 > 0 && mins2 > cap2) {
+            e.preventDefault();
+            alert(selectedMode === 'unlimited'
+                ? 'Controller 2 rental cannot exceed 12 hours for unlimited sessions.'
+                : 'Controller 2 rental cannot be longer than your reserved session.');
+            return;
+        }
+    }
 
     const dateVal = document.getElementById('reservedDate').value;
     const timeVal = document.getElementById('reservedTime').value;
@@ -3687,10 +4123,10 @@ document.addEventListener('DOMContentLoaded', function() {
         selectConsoleType(preservedType);
         // If mode was also preserved, select it
         if (preservedMode) {
-            selectRentalMode(preservedMode);
+            selectMode(preservedMode);
             // If mins was preserved for hourly, select it
             if (preservedMode === 'hourly' && preservedMins) {
-                // We need to wait for the duration grid to be rendered by selectRentalMode
+                // Wait for the duration grid to be rendered by selectMode
                 setTimeout(() => {
                     selectDuration(parseInt(preservedMins));
                 }, 100);

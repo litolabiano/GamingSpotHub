@@ -562,7 +562,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     </span>
                 </h3>
                 <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-                    <span style="font-size:12px;color:#888;">Controllers currently rented out in active sessions</span>
+                    <span style="font-size:12px;color:#888;">Controllers currently rented out in active sessions. On unlimited-console sessions they are billed hourly (start modal defaults 12&nbsp;h). Hourly console sessions: controller add-on length cannot exceed the session duration chosen in Start Session.</span>
                     <span class="asb-count" id="ctrlRentalsCount"></span>
                 </div>
             </div>
@@ -578,6 +578,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <th>Rented At</th>
                             <th>Ends At</th>
                             <th>Fee</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -625,6 +626,13 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     <?php endif; ?>
                                 </td>
                             <td data-label="Fee" style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                            <td data-label="Action">
+                                <button type="button" class="btn-sec btn-sm" title="Re-rate add-on to elapsed time and return controllers"
+                                        onclick="gspotEndControllerRentalEarly(<?= (int) $cr['session_id'] ?>)"
+                                        style="white-space:nowrap;">
+                                    <i class="fas fa-hand-holding"></i> End add-on
+                                </button>
+                            </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
