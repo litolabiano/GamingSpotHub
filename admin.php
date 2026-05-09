@@ -1070,7 +1070,7 @@ $crQ = $conn->query(
          ON ar.session_id = gs.session_id
         AND ar.request_type = 'controller_rental'
         AND ar.status = 'approved'
-      WHERE gs.status = 'active'
+      WHERE gs.status IN ('active','paused')
       GROUP BY gs.console_id, gs.session_id"
 );
 if ($crQ) {
@@ -2200,29 +2200,32 @@ function onConsoleChange() {
 }
 
 function onControllerToggle() {
-    const toggle = document.getElementById('controllerRentalToggle');
+    const toggle    = document.getElementById('controllerRentalToggle');
     const container = document.getElementById('controllerSelectContainer');
-    const countSel = document.getElementById('adminControllerCount');
-    const ctrl2 = document.getElementById('adminCtrl2Block');
+    const qtyWrap   = document.getElementById('ctrlQtyWrap');
+    const countSel  = document.getElementById('adminControllerCount');
+    const ctrl2     = document.getElementById('adminCtrl2Block');
 
     if (toggle && container) {
         if (toggle.checked) {
             container.style.display = 'block';
+            if (qtyWrap)  qtyWrap.style.display  = 'block';
             if (countSel) countSel.disabled = false;
             if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
         } else {
             container.style.display = 'none';
+            if (qtyWrap)  qtyWrap.style.display  = 'none';
             if (countSel) countSel.disabled = true;
-            
+
             // Reset both controllers
             ['controllerSelect','controllerSelect2'].forEach(id => {
                 const s = document.getElementById(id); if (s) s.value = '';
             });
             document.querySelectorAll('.admin-ctrl-dur-btn').forEach(b => {
-                b.style.background = 'rgba(95,133,218,.08)';
+                b.style.background  = 'rgba(95,133,218,.1)';
                 b.style.borderColor = 'rgba(95,133,218,.2)';
-                b.style.color = '#c8d5f5';
-                b.style.boxShadow = 'none';
+                b.style.color       = '#c8d5f5';
+                b.style.boxShadow   = 'none';
             });
             ['adminCtrlRentalMinutes','adminCtrlRentalMinutes2'].forEach(id => {
                 const i = document.getElementById(id); if (i) i.value = '0';
@@ -2280,18 +2283,14 @@ function _adminCtrlCostPreview(ctrl, mins) {
 
 function onAdminCtrlDurationSelect(mins, ctrl) {
     const minsId = ctrl === 1 ? 'adminCtrlRentalMinutes' : 'adminCtrlRentalMinutes2';
-    
+
     document.querySelectorAll(`.admin-ctrl-dur-btn[data-ctrl="${ctrl}"]`).forEach(b => {
-        const isSelected = parseInt(b.dataset.mins) === mins;
-        b.style.background   = isSelected ? 'rgba(95,133,218,.35)' : 'rgba(95,133,218,.08)';
-        b.style.borderColor  = isSelected ? '#5f85da'              : 'rgba(95,133,218,.2)';
-        b.style.color        = isSelected ? '#fff'                  : '#c8d5f5';
-        b.style.boxShadow    = isSelected ? '0 0 0 2px rgba(95,133,218,.3)' : 'none';
+        b.classList.toggle('active', parseInt(b.dataset.mins) === mins);
     });
-    
+
     const minsIn = document.getElementById(minsId);
     if (minsIn) minsIn.value = mins;
-    
+
     _adminCtrlCostPreview(ctrl, mins);
     recalcAdminControllerFee();
 }

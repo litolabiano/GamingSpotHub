@@ -55,12 +55,14 @@
     background:linear-gradient(160deg,#0c1a38 0%,#080f1d 100%);
     border:1px solid rgba(95,133,218,.22);
     border-radius:20px;
-    width:100%;max-width:520px;
+    width:100%;max-width:580px;
     max-height:90vh;overflow-y:auto;overflow-x:hidden;
     box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(32,200,161,.06);
     animation:modalSlideIn .25s cubic-bezier(.34,1.36,.64,1);
     scrollbar-width:thin;scrollbar-color:rgba(95,133,218,.25) transparent;
 }
+/* Wide variant — for multi-column content like controller rental */
+.modal-content--wide { max-width:700px; }
 .modal-content::-webkit-scrollbar{width:4px}
 .modal-content::-webkit-scrollbar-thumb{background:rgba(95,133,218,.3);border-radius:4px}
 @keyframes modalSlideIn {
@@ -198,6 +200,26 @@
     cursor:not-allowed!important;
     opacity:.55!important;
 }
+/* Controller duration pill — active / selected state */
+.admin-ctrl-dur-btn.active,
+.admin-ctrl-dur-btn[data-active="1"] {
+    background:rgba(95,133,218,.3)!important;
+    border-color:rgba(95,133,218,.7)!important;
+    color:#fff!important;
+    box-shadow:0 0 0 2px rgba(95,133,218,.25);
+}
+.admin-ctrl-dur-btn:hover {
+    background:rgba(95,133,218,.2)!important;
+    border-color:rgba(95,133,218,.5)!important;
+    color:#fff!important;
+}
+/* Two-column controller grid responsive collapse */
+@media(max-width:520px){
+    #controllerSelectContainer > div[style*="grid-template-columns"] {
+        grid-template-columns:1fr !important;
+    }
+    #adminCtrl2Block { border-right:none !important; border-top:1px solid rgba(95,133,218,.1); }
+}
 
 </style>
 
@@ -315,7 +337,7 @@
 
 <!-- Start Session Modal -->
 <div class="modal" id="startSessionModal">
-    <div class="modal-content">
+    <div class="modal-content modal-content--wide">
         <div class="modal-header">
             <h3 class="modal-title"><i class="fas fa-play-circle" style="color:#20c8a1;margin-right:8px"></i>Start New Session</h3>
             <button class="modal-close" onclick="closeModal('startSession')">&times;</button>
@@ -444,95 +466,105 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
 </script>
 
 <div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
-    <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
-                border-radius:12px;padding:14px 16px;">
-        <div class="form-check" style="margin:0;margin-bottom:8px;">
-            <input type="checkbox" id="controllerRentalToggle"
-                   name="controller_rental" value="1"
-                   onchange="onControllerToggle()">
+    <div style="background:rgba(95,133,218,.06);border:1px solid rgba(95,133,218,.18);border-radius:14px;overflow:hidden;">
+
+        <!-- Header toggle row -->
+        <div style="padding:14px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(95,133,218,.12);">
+            <input type="checkbox" id="controllerRentalToggle" name="controller_rental" value="1"
+                   onchange="onControllerToggle()" style="width:16px;height:16px;accent-color:#20c8a1;cursor:pointer;flex-shrink:0;">
             <label for="controllerRentalToggle" id="controllerRentalLabel"
-                   style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                <i class="fas fa-gamepad" id="ctrlRentalIcon" style="color:var(--clr-mint);font-size:16px;"></i>
-                <div>
-                    <div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;
-                                color:var(--clr-mint);">
-                        Controller Rental
-                        <span id="ctrlRateDisplay" style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
-                        </span>
+                   style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;margin:0;">
+                <i class="fas fa-gamepad" id="ctrlRentalIcon" style="color:#20c8a1;font-size:15px;"></i>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:13px;color:#20c8a1;letter-spacing:.3px;">
+                        Add Controller Rental
+                        <span id="ctrlRateDisplay" style="font-size:11px;font-weight:600;color:#f1a83c;margin-left:6px;"></span>
                     </div>
-                    <div id="ctrlAvailText" style="font-size:11px;margin-top:3px;color:#888;">
-                        <!-- Populated by onConsoleChange() -->
-                    </div>
+                    <div id="ctrlAvailText" style="font-size:11px;margin-top:2px;color:#888;"></div>
                 </div>
             </label>
-        </div>
-        <div id="controllerSelectContainer" style="display:none; margin-top:10px; padding-left: 28px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin:0;">Quantity</label>
-                <select name="controller_count" id="adminControllerCount" onchange="onAdminControllerToggle()" style="background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 8px;outline:none;font-size:12px;">
+            <!-- Quantity selector — only visible when checked -->
+            <div id="ctrlQtyWrap" style="display:none;">
+                <select name="controller_count" id="adminControllerCount" onchange="onAdminControllerToggle()"
+                        style="background:rgba(10,33,81,.8);color:#f0f0f0;border:1px solid rgba(95,133,218,.3);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;outline:none;cursor:pointer;">
                     <option value="1">1 Controller</option>
                     <option value="2">2 Controllers</option>
                 </select>
             </div>
+        </div>
 
-            <div id="adminCtrl1Block">
-                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block;">Select Unit</label>
-                <select name="rented_controller_id" id="controllerSelect" class="asb-select" style="width:100%; border:1px solid rgba(95,133,218,.3); background:rgba(255,255,255,.05); color:#e8eaf6; padding:8px 12px; border-radius:8px; outline:none;" onchange="onControllerSelectChange()">
-                    <!-- Populated by onConsoleChange() -->
-                </select>
-                
-                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-top:12px;margin-bottom:6px;display:block;">
-                    <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 1 — Rental Duration
-                </label>
-                <div id="adminCtrlDurationBtns1" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <?php 
-                    $durations = [30, 60, 90, 120, 150, 180, 210, 240];
-                    foreach ($durations as $mins): 
-                        $h = floor($mins / 60); $r = $mins % 60;
-                        $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1 hr' : "{$h} hrs") : "{$mins} min");
-                    ?>
-                    <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn" data-mins="<?= $mins ?>" data-ctrl="1"
-                            onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 1)"
-                            style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
-                                   color:#c8d5f5;border-radius:8px;padding:6px 14px;font-size:12px;
-                                   font-weight:600;cursor:pointer;transition:all .2s;">
-                        <?= $lbl ?>
-                    </button>
-                    <?php endforeach; ?>
-                </div>
-                <div id="adminCtrlCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;"></div>
-                <input type="hidden" name="controller_rental_minutes" id="adminCtrlRentalMinutes" value="0">
-            </div>
+        <!-- Controller selection body (hidden until checked) -->
+        <div id="controllerSelectContainer" style="display:none;">
 
-            <div id="adminCtrl2Block" style="display:none; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.06);">
-                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block;">Select 2nd Controller *</label>
-                <select name="rented_controller_id_2" id="controllerSelect2" class="asb-select" style="width:100%; border:1px solid rgba(95,133,218,.3); background:rgba(255,255,255,.05); color:#e8eaf6; padding:8px 12px; border-radius:8px; outline:none;" onchange="onControllerSelectChange()">
-                    <!-- Populated by onConsoleChange() -->
-                </select>
-                <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-top:12px;margin-bottom:6px;display:block;">
-                    <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 2 — Rental Duration
-                </label>
-                <div id="adminCtrlDurationBtns2" style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <?php 
-                    foreach ($durations as $mins): 
-                        $h = floor($mins / 60); $r = $mins % 60;
-                        $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1 hr' : "{$h} hrs") : "{$mins} min");
-                    ?>
-                    <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn" data-mins="<?= $mins ?>" data-ctrl="2"
-                            onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 2)"
-                            style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
-                                   color:#c8d5f5;border-radius:8px;padding:6px 14px;font-size:12px;
-                                   font-weight:600;cursor:pointer;transition:all .2s;">
-                        <?= $lbl ?>
-                    </button>
-                    <?php endforeach; ?>
+            <!-- Two-column grid: ctrl 1 | ctrl 2 -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid rgba(95,133,218,.1);">
+
+                <!-- Controller 1 -->
+                <div id="adminCtrl1Block" style="padding:16px 18px;border-right:1px solid rgba(95,133,218,.1);">
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#5f85da;margin-bottom:10px;">
+                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Controller 1
+                    </div>
+                    <select name="rented_controller_id" id="controllerSelect"
+                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;margin-bottom:12px;"
+                            onchange="onControllerSelectChange()">
+                        <!-- Populated by onConsoleChange() -->
+                    </select>
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+                        <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
+                    </div>
+                    <div id="adminCtrlDurationBtns1" style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <?php
+                        $durations = [30, 60, 90, 120, 150, 180, 210, 240];
+                        foreach ($durations as $mins):
+                            $h = floor($mins / 60); $r = $mins % 60;
+                            $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1hr' : "{$h}hrs") : "{$mins}m");
+                        ?>
+                        <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn"
+                                data-mins="<?= $mins ?>" data-ctrl="1"
+                                onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 1)"
+                                style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.2);color:#c8d5f5;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;">
+                            <?= $lbl ?>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div id="adminCtrlCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
+                    <input type="hidden" name="controller_rental_minutes" id="adminCtrlRentalMinutes" value="0">
                 </div>
-                <div id="adminCtrlCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;"></div>
-                <input type="hidden" name="controller_rental_minutes_2" id="adminCtrlRentalMinutes2" value="0">
-            </div>
+
+                <!-- Controller 2 (hidden by default) -->
+                <div id="adminCtrl2Block" style="display:none;padding:16px 18px;">
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#5f85da;margin-bottom:10px;">
+                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Controller 2
+                    </div>
+                    <select name="rented_controller_id_2" id="controllerSelect2"
+                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;margin-bottom:12px;"
+                            onchange="onControllerSelectChange()">
+                        <!-- Populated by onConsoleChange() -->
+                    </select>
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+                        <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
+                    </div>
+                    <div id="adminCtrlDurationBtns2" style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <?php foreach ($durations as $mins):
+                            $h = floor($mins / 60); $r = $mins % 60;
+                            $lbl = ($h > 0 && $r > 0) ? "{$h}h {$r}m" : ($h > 0 ? ($h === 1 ? '1hr' : "{$h}hrs") : "{$mins}m");
+                        ?>
+                        <button type="button" class="ctrl-dur-btn admin-ctrl-dur-btn"
+                                data-mins="<?= $mins ?>" data-ctrl="2"
+                                onclick="onAdminCtrlDurationSelect(<?= $mins ?>, 2)"
+                                style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.2);color:#c8d5f5;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;">
+                            <?= $lbl ?>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div id="adminCtrlCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
+                    <input type="hidden" name="controller_rental_minutes_2" id="adminCtrlRentalMinutes2" value="0">
+                </div>
+
+            </div><!-- /grid -->
 
             <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt" value="0">
-        </div>
+        </div><!-- /controllerSelectContainer -->
     </div>
 </div>
 

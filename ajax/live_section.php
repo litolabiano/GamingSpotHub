@@ -96,7 +96,7 @@ $_crQ = $conn->query(
          ON ar.session_id = gs.session_id
         AND ar.request_type = 'controller_rental'
         AND ar.status = 'approved'
-      WHERE gs.status = 'active'
+      WHERE gs.status IN ('active','paused')
       GROUP BY gs.console_id, gs.session_id"
 );
 if ($_crQ) {

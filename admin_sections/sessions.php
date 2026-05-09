@@ -532,7 +532,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     $activeCtrlRentals = [];
     $_seenCtrlConsoles = [];
     foreach ($recentSessions as $sess) {
-        if ($sess['status'] !== 'active') continue;           // active sessions only
+        // Treat paused sessions as still "live" for controller rentals visibility.
+        if (!in_array($sess['status'], ['active', 'paused'], true)) continue;
         $cid = (int)($sess['console_id'] ?? 0);
         if (!isset($ctrlRentalByConsole[$cid])) continue;    // must have a rental
         if (isset($_seenCtrlConsoles[$cid])) continue;       // deduplicate by console
@@ -551,7 +552,6 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     }
     ?>
 
-    <?php if (!empty($activeCtrlRentals)): ?>
         <div class="card" style="margin-top:24px; border-left:3px solid #20c8a1;">
             <div class="card-header" style="border-bottom:1px solid rgba(32,200,161,.15);flex-wrap:wrap;gap:10px;">
                 <h3 class="card-title" style="color:#20c8a1;">
@@ -566,71 +566,76 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     <span class="asb-count" id="ctrlRentalsCount"></span>
                 </div>
             </div>
-            <table class="data-table" id="ctrlRentalsTable">
-                <thead>
-                    <tr>
-                        <th>Session</th>
-                        <th>Customer</th>
-                        <th>Console</th>
-                        <th>Controllers</th>
-                        <th>Duration</th>
-                        <th>Rented At</th>
-                        <th>Ends At</th>
-                        <th>Fee</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($activeCtrlRentals as $cr): ?>
-                        <?php
-                            $rentedTs = strtotime($cr['rented_since']);
-                            $ph = $cr['max_mins'] > 0 ? intdiv($cr['max_mins'], 60) : 0;
-                            $pm = $cr['max_mins'] > 0 ? $cr['max_mins'] % 60 : 0;
-                            $durStr = $cr['max_mins'] > 0
-                                ? ($ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m")
-                                : '—';
-                            $endsTs  = $cr['max_mins'] > 0 ? ($rentedTs + $cr['max_mins'] * 60) : null;
-                            $isExpired = $endsTs && time() > $endsTs;
-                        ?>
+            <?php if (!empty($activeCtrlRentals)): ?>
+                <table class="data-table" id="ctrlRentalsTable">
+                    <thead>
                         <tr>
-                            <td>#<?= $cr['session_id'] ?></td>
-                            <td>
-                                <?php if ((int)$cr['user_id'] === WALKIN_USER_ID): ?>
-                                    <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
-                                        <i class="fas fa-walking" style="font-size:9px;"></i> Walk-in
-                                    </span>
-                                <?php else: ?>
-                                    <span style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($cr['customer_name']) ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td style="font-weight:700;color:#f1a83c;"><?= htmlspecialchars($cr['unit_number']) ?></td>
-                            <td>
-                                <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.2);border-radius:6px;padding:3px 9px;color:#20c8a1;font-weight:700;font-size:12px;">
-                                    <i class="fa-solid fa-gamepad" style="font-size:10px;"></i>
-                                    <?= $cr['qty'] ?>× Controller<?= $cr['qty'] > 1 ? 's' : '' ?>
-                                </span>
-                            </td>
-                            <td><?= $durStr ?></td>
-                            <td><?= date('h:i A', $rentedTs) ?></td>
-                            <td>
-                                <?php if ($endsTs): ?>
-                                    <span style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
-                                        <?= date('h:i A', $endsTs) ?>
-                                        <?php if ($isExpired): ?>
-                                            <span style="font-size:10px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:4px;padding:1px 5px;margin-left:4px;">OVERDUE</span>
-                                        <?php endif; ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span style="color:#888;">—</span>
-                                <?php endif; ?>
-                            </td>
-                            <td style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                            <th>Session</th>
+                            <th>Customer</th>
+                            <th>Console</th>
+                            <th>Controllers</th>
+                            <th>Duration</th>
+                            <th>Rented At</th>
+                            <th>Ends At</th>
+                            <th>Fee</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-            <div id="ctrlRentalsPagination"></div>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($activeCtrlRentals as $cr): ?>
+                            <?php
+                                $rentedTs = strtotime($cr['rented_since']);
+                                $ph = $cr['max_mins'] > 0 ? intdiv($cr['max_mins'], 60) : 0;
+                                $pm = $cr['max_mins'] > 0 ? $cr['max_mins'] % 60 : 0;
+                                $durStr = $cr['max_mins'] > 0
+                                    ? ($ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m")
+                                    : '—';
+                                $endsTs  = $cr['max_mins'] > 0 ? ($rentedTs + $cr['max_mins'] * 60) : null;
+                                $isExpired = $endsTs && time() > $endsTs;
+                            ?>
+                            <tr>
+                                <td>#<?= $cr['session_id'] ?></td>
+                                <td>
+                                    <?php if ((int)$cr['user_id'] === WALKIN_USER_ID): ?>
+                                        <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                                            <i class="fas fa-walking" style="font-size:9px;"></i> Walk-in
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($cr['customer_name']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="font-weight:700;color:#f1a83c;"><?= htmlspecialchars($cr['unit_number']) ?></td>
+                                <td>
+                                    <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.2);border-radius:6px;padding:3px 9px;color:#20c8a1;font-weight:700;font-size:12px;">
+                                        <i class="fa-solid fa-gamepad" style="font-size:10px;"></i>
+                                        <?= $cr['qty'] ?>× Controller<?= $cr['qty'] > 1 ? 's' : '' ?>
+                                    </span>
+                                </td>
+                                <td><?= $durStr ?></td>
+                                <td><?= date('h:i A', $rentedTs) ?></td>
+                                <td>
+                                    <?php if ($endsTs): ?>
+                                        <span style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
+                                            <?= date('h:i A', $endsTs) ?>
+                                            <?php if ($isExpired): ?>
+                                                <span style="font-size:10px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:4px;padding:1px 5px;margin-left:4px;">OVERDUE</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="color:#888;">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <div id="ctrlRentalsPagination"></div>
+            <?php else: ?>
+                <div style="padding:16px 18px;color:#888;">
+                    No active controller rentals right now.
+                </div>
+            <?php endif; ?>
         </div>
-    <?php endif; ?>
 </div>
 
 <script>
