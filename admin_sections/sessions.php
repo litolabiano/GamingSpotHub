@@ -212,7 +212,6 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <th>#</th>
                         <th>Customer</th>
                         <th>Console</th>
-                        <th>Add-ons</th>
                         <th>Mode</th>
                         <th>Started</th>
                         <th>Status</th>
@@ -261,16 +260,6 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <td>#<?= $ps['session_id'] ?></td>
                             <td><?= sessionCustomerLabel($ps) ?></td>
                             <td><?= htmlspecialchars($ps['unit_number']) ?></td>
-                            <td>
-                                <?php if (!empty($ctrlRentalByConsole[$ps['console_id'] ?? 0])): ?>
-                                    <span class="sess-ctrl-badge" style="margin-top:0;">
-                                        <i class="fa-solid fa-gamepad"></i>
-                                        <?= $ctrlRentalByConsole[$ps['console_id']]['qty'] ?>&#xd7; Ctrl
-                                    </span>
-                                <?php else: ?>
-                                    <span style="color:#666;">—</span>
-                                <?php endif; ?>
-                            </td>
                             <td><?= $psModeLabel ?></td>
                             <td><?= date('h:i A', $psStart) ?></td>
                             <td>
@@ -359,14 +348,13 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     <th data-col="0">#<span class="sort-icon">&#8597;</span></th>
                     <th data-col="1">Customer<span class="sort-icon">&#8597;</span></th>
                     <th data-col="2">Console<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="3" class="no-sort">Add-ons</th>
-                    <th data-col="4">Mode<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="5">Booked<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="6">Start<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="7">End<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="8">Duration<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="9">Cost<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="10">Status<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="3">Mode<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="4">Booked<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="5">Start<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="6">End<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="7">Duration<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="8">Cost<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="9">Status<span class="sort-icon">&#8597;</span></th>
                     <th class="no-sort">Action</th>
                 </tr>
             </thead>
@@ -417,27 +405,6 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 <button class="btn-confirm-console btn-confirm" type="button" style="padding:4px 8px;font-size:11px;">✓</button>
                                 <button class="btn-cancel-console btn-cancel-edit" type="button" style="padding:4px 8px;font-size:11px;">✕</button>
                             </span>
-                        </td>
-                        <td>
-                            <?php if (!empty($ctrlRentalByConsole[$sess['console_id'] ?? 0])): ?>
-                                <?php $cr = $ctrlRentalByConsole[$sess['console_id']]; ?>
-                                <span class="sess-ctrl-badge" title="Rented since <?= date('M d h:i A', strtotime($cr['rented_since'])) ?>" style="margin-top:0;">
-                                    <i class="fa-solid fa-gamepad"></i>
-                                    <?= $cr['qty'] ?>&#xd7; Ctrl
-                                    <?php 
-                                        if (!empty($cr['max_mins']) && $cr['max_mins'] > 0) {
-                                            $ph = intdiv($cr['max_mins'], 60);
-                                            $pm = $cr['max_mins'] % 60;
-                                            $durStr = $ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m";
-                                            $endTs = strtotime($cr['rented_since']) + ($cr['max_mins'] * 60);
-                                            echo " ({$durStr}) &middot; Ends " . date('h:i A', $endTs);
-                                        }
-                                    ?>
-                                    &middot; &#x20b1;<?= number_format($cr['total_cost'], 2) ?>
-                                </span>
-                            <?php else: ?>
-                                <span style="color:#666;">—</span>
-                            <?php endif; ?>
                         </td>
                         <td><?= match ($sess['rental_mode']) {
                                 'open_time' => 'Open Time',
@@ -559,6 +526,111 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         <div class="asb-no-results" id="sessionsSearch_noResults" style="display:none;"><i class="fas fa-search" style="display:block;font-size:28px;margin-bottom:8px;opacity:.4;"></i>No sessions match your search.</div>
         <div id="sessionsPagination"></div>
     </div>
+    
+    <?php
+    // ── Build active controller rentals list (active sessions only, no duplicates) ──
+    $activeCtrlRentals = [];
+    $_seenCtrlConsoles = [];
+    foreach ($recentSessions as $sess) {
+        if ($sess['status'] !== 'active') continue;           // active sessions only
+        $cid = (int)($sess['console_id'] ?? 0);
+        if (!isset($ctrlRentalByConsole[$cid])) continue;    // must have a rental
+        if (isset($_seenCtrlConsoles[$cid])) continue;       // deduplicate by console
+        $_seenCtrlConsoles[$cid] = true;
+        $cr = $ctrlRentalByConsole[$cid];
+        $activeCtrlRentals[] = [
+            'session_id'    => $sess['session_id'],
+            'customer_name' => $sess['customer_name'],
+            'user_id'       => $sess['user_id'],
+            'unit_number'   => $sess['unit_number'],
+            'qty'           => $cr['qty'],
+            'max_mins'      => $cr['max_mins'] ?? 0,
+            'total_cost'    => $cr['total_cost'],
+            'rented_since'  => $cr['rented_since'],
+        ];
+    }
+    ?>
+
+    <?php if (!empty($activeCtrlRentals)): ?>
+        <div class="card" style="margin-top:24px; border-left:3px solid #20c8a1;">
+            <div class="card-header" style="border-bottom:1px solid rgba(32,200,161,.15);flex-wrap:wrap;gap:10px;">
+                <h3 class="card-title" style="color:#20c8a1;">
+                    <i class="fa-solid fa-gamepad" style="margin-right:8px;"></i>
+                    Active Controller Rentals
+                    <span style="background:rgba(32,200,161,.15);color:#20c8a1;font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;margin-left:8px;">
+                        <?= count($activeCtrlRentals) ?>
+                    </span>
+                </h3>
+                <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+                    <span style="font-size:12px;color:#888;">Controllers currently rented out in active sessions</span>
+                    <span class="asb-count" id="ctrlRentalsCount"></span>
+                </div>
+            </div>
+            <table class="data-table" id="ctrlRentalsTable">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Customer</th>
+                        <th>Console</th>
+                        <th>Controllers</th>
+                        <th>Duration</th>
+                        <th>Rented At</th>
+                        <th>Ends At</th>
+                        <th>Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($activeCtrlRentals as $cr): ?>
+                        <?php
+                            $rentedTs = strtotime($cr['rented_since']);
+                            $ph = $cr['max_mins'] > 0 ? intdiv($cr['max_mins'], 60) : 0;
+                            $pm = $cr['max_mins'] > 0 ? $cr['max_mins'] % 60 : 0;
+                            $durStr = $cr['max_mins'] > 0
+                                ? ($ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m")
+                                : '—';
+                            $endsTs  = $cr['max_mins'] > 0 ? ($rentedTs + $cr['max_mins'] * 60) : null;
+                            $isExpired = $endsTs && time() > $endsTs;
+                        ?>
+                        <tr>
+                            <td>#<?= $cr['session_id'] ?></td>
+                            <td>
+                                <?php if ((int)$cr['user_id'] === WALKIN_USER_ID): ?>
+                                    <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                                        <i class="fas fa-walking" style="font-size:9px;"></i> Walk-in
+                                    </span>
+                                <?php else: ?>
+                                    <span style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($cr['customer_name']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="font-weight:700;color:#f1a83c;"><?= htmlspecialchars($cr['unit_number']) ?></td>
+                            <td>
+                                <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.2);border-radius:6px;padding:3px 9px;color:#20c8a1;font-weight:700;font-size:12px;">
+                                    <i class="fa-solid fa-gamepad" style="font-size:10px;"></i>
+                                    <?= $cr['qty'] ?>× Controller<?= $cr['qty'] > 1 ? 's' : '' ?>
+                                </span>
+                            </td>
+                            <td><?= $durStr ?></td>
+                            <td><?= date('h:i A', $rentedTs) ?></td>
+                            <td>
+                                <?php if ($endsTs): ?>
+                                    <span style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
+                                        <?= date('h:i A', $endsTs) ?>
+                                        <?php if ($isExpired): ?>
+                                            <span style="font-size:10px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:4px;padding:1px 5px;margin-left:4px;">OVERDUE</span>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color:#888;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <div id="ctrlRentalsPagination"></div>
+        </div>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -742,8 +814,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
        Sortable Column Headers
        ══════════════════════════════════════════════════════════════════════ */
     (function() {
-        const DATA_KEYS = ['id', 'customer', 'console', null, 'mode', 'booked', 'start', 'end', 'duration', 'cost', 'status'];
-        const NUMERIC_COLS = new Set([0, 5, 6, 7, 8, 9, 10]);
+        const DATA_KEYS = ['id', 'customer', 'console', 'mode', 'booked', 'start', 'end', 'duration', 'cost', 'status'];
+        const NUMERIC_COLS = new Set([0, 4, 5, 6, 7, 8, 9]);
 
         const table = document.getElementById('sessionsTable');
         const tbody = table.querySelector('tbody');
@@ -904,6 +976,18 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
         /* Initial render */
         pag.apply();
+    })();
+
+    /* ── Controller Rentals table pagination ───────────────────────────────── */
+    (function() {
+        if (!document.getElementById('ctrlRentalsTable')) return;
+        const pagCtrl = new AdminPaginator('ctrlRentalsTable', {
+            pageSize:      10,
+            pageSizes:     [10, 25, 50],
+            paginationSel: '#ctrlRentalsPagination',
+            countSel:      '#ctrlRentalsCount',
+        });
+        pagCtrl.apply();
     })();
 
     /* ── Inline toast helper (replaces browser alert) ── */
