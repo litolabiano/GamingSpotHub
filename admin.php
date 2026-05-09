@@ -1765,6 +1765,11 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
                     </div>
                 </div>
                 <div class="admin-dropdown-divider"></div>
+                <?php if ($user['role'] === 'owner'): ?>
+                <a href="auth/register_shopkeeper.php" class="admin-dropdown-item">
+                    <i class="fas fa-user-plus"></i> Create Shopkeeper Account
+                </a>
+                <?php endif; ?>
                 <a href="auth/logout.php" class="admin-dropdown-item admin-dropdown-danger" id="logoutLink" onclick="window.location.href='auth/logout.php';">
                     <i class="fas fa-sign-out-alt"></i> Sign Out
                 </a>
@@ -2043,8 +2048,32 @@ function onRentalModeChange() {
     const openTimeNote    = document.getElementById('openTimeNote');
     const toggle          = document.getElementById('collectNowToggle');
 
+    // Strict Rule: Unlimited not allowed at 7:00 PM or later
+    const now = new Date();
+    const h = now.getHours();
+    const unlimOpt = document.getElementById('ssUnlimOption');
+    const unlimMsg = document.getElementById('ssUnlimRestrictedMsg');
+    
+    if (h >= 19) {
+        if (unlimOpt) unlimOpt.disabled = true;
+        if (unlimMsg) unlimMsg.style.display = 'block';
+        if (mode === 'unlimited') {
+            alert('Unlimited mode is not available at 7:00 PM or later.');
+            document.getElementById('rentalModeSelect').value = 'hourly';
+            onRentalModeChange();
+            return;
+        }
+    } else {
+        if (unlimOpt) unlimOpt.disabled = false;
+        if (unlimMsg) unlimMsg.style.display = 'none';
+    }
+
     // Duration picker: only for hourly
     group.style.display   = (mode === 'hourly') ? 'block' : 'none';
+    if (mode === 'hourly') {
+        restrictStartSessionDuration();
+    }
+    
     if (mode !== 'hourly') {
         preview.style.display = 'none';
         document.getElementById('plannedMinutesInput').value = '';
@@ -2084,6 +2113,39 @@ function onRentalModeChange() {
 
     // Re-evaluate Start button for the new mode
     if (typeof _syncStartBtn === 'function') _syncStartBtn();
+}
+
+/**
+ * Restricts duration options in Start Session modal based on current time
+ */
+function restrictStartSessionDuration() {
+    const sel = document.getElementById('durationSelect');
+    if (!sel) return;
+
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const midnightMins = 24 * 60;
+    const maxMinsAllowed = midnightMins - currentMins;
+
+    let firstValid = null;
+    Array.from(sel.options).forEach(opt => {
+        if (opt.value === "" || opt.disabled) return;
+        const val = parseInt(opt.value);
+        const total = parseInt(opt.dataset.total || val);
+        if (total > maxMinsAllowed) {
+            opt.disabled = true;
+            opt.style.color = '#555';
+        } else {
+            opt.disabled = false;
+            opt.style.color = '';
+            if (!firstValid) firstValid = opt.value;
+        }
+    });
+
+    if (sel.value && sel.options[sel.selectedIndex].disabled) {
+        sel.value = firstValid || "";
+        updateSessionPreview();
+    }
 }
 
 /* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
@@ -2498,6 +2560,9 @@ function _syncStartBtn() {
 
 function openModal(name) {
     document.getElementById(name + 'Modal').classList.add('active');
+    if (name === 'startSession' && typeof onRentalModeChange === 'function') {
+        onRentalModeChange();
+    }
 }
 function closeModal(name) {
     document.getElementById(name + 'Modal').classList.remove('active');

@@ -372,8 +372,11 @@
                     <select name="rental_mode" id="rentalModeSelect" required onchange="onRentalModeChange()">
                         <option value="hourly">Hourly (pre-booked)</option>
                         <option value="open_time">Open Time (bracket pricing)</option>
-                        <option value="unlimited">Unlimited (flat ₱<?= htmlspecialchars($settings['unlimited_rate'] ?? '300') ?>)</option>
+                        <option value="unlimited" id="ssUnlimOption">Unlimited (flat ₱<?= htmlspecialchars($settings['unlimited_rate'] ?? '300') ?>)</option>
                     </select>
+                    <div id="ssUnlimRestrictedMsg" style="display:none; font-size:10px; color:#fb566b; margin-top:4px; font-weight:600;">
+                        <i class="fas fa-exclamation-triangle"></i> Unlimited mode unavailable after 7:00 PM
+                    </div>
                 </div>
             </div>
 
@@ -1401,8 +1404,11 @@ function denyExt(extId) {
                     <select name="rental_mode" id="resAdminModeSelect" required onchange="adminResOnModeChange()">
                         <option value="hourly">Hourly</option>
                         <option value="open_time">Open Time</option>
-                        <option value="unlimited">Unlimited</option>
+                        <option value="unlimited" id="arUnlimOption">Unlimited</option>
                     </select>
+                    <div id="arUnlimRestrictedMsg" style="display:none; font-size:10px; color:#fb566b; margin-top:4px; font-weight:600;">
+                        <i class="fas fa-exclamation-triangle"></i> Unlimited mode unavailable after 7:00 PM
+                    </div>
                 </div>
             </div>
             <div id="adminResDurGroup" class="form-group">
@@ -1434,9 +1440,10 @@ function denyExt(extId) {
                     <select name="reserved_time" id="adminResTime" required onchange="adminResSync()">
                         <option value="" disabled selected>— Select time —</option>
                         <?php 
+                        // Start at 8:00 AM, end at 11:30 PM (last slot)
                         for ($h = 8; $h <= 23; $h++) {
                             foreach (['00', '15', '30', '45'] as $m) {
-                                if ($h == 23 && $m != '00') continue; // End at 11:00 PM
+                                if ($h == 23 && !in_array($m, ['00', '15', '30'])) continue; 
                                 $val  = sprintf('%02d:%s', $h, $m);
                                 $disp = date('g:i A', strtotime("2000-01-01 $val"));
                                 echo "<option value=\"$val\">$disp</option>\n";
@@ -1444,7 +1451,7 @@ function denyExt(extId) {
                         }
                         ?>
                     </select>
-                    <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 8:00 AM – 11:00 PM</p>
+                    <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 8:00 AM – 12:00 AM</p>
                 </div>
             </div>
             <div id="adminResConflictBox" style="display:none; margin-bottom:15px; padding:12px; border-radius:10px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); color:#fb566b; font-size:13px;">
@@ -1486,6 +1493,19 @@ function denyExt(extId) {
 /* ── Reservation modal helpers ───────────────────────────────────── */
 function adminResOnModeChange() {
     const mode = document.getElementById('resAdminModeSelect').value;
+    const timeVal = document.getElementById('adminResTime').value;
+
+    // Strict Rule: Unlimited not allowed at 7:00 PM or later
+    if (mode === 'unlimited' && timeVal) {
+        const [h] = timeVal.split(':').map(Number);
+        if (h >= 19) {
+            alert('Unlimited mode is not available for bookings at 7:00 PM or later.');
+            document.getElementById('resAdminModeSelect').value = 'hourly';
+            adminResOnModeChange();
+            return;
+        }
+    }
+
     const isDurGroup   = (mode === 'hourly');
     document.getElementById('adminResDurGroup').style.display = isDurGroup ? 'block' : 'none';
 
@@ -1517,11 +1537,55 @@ function adminResSync() {
     const cid    = conSel.value;
     const date   = document.getElementById('adminResDate').value;
     const time   = document.getElementById('adminResTime').value;
-    const mins   = document.getElementById('adminResPlannedMins').value || 60;
+    const durSel = document.getElementById('adminResPlannedMins');
+    const mins   = durSel.value || 60;
     const mode   = document.getElementById('resAdminModeSelect').value;
     const box    = document.getElementById('adminResConflictBox');
     const msg    = document.getElementById('adminResConflictMsg');
     const btn    = document.getElementById('adminResSubmitBtn');
+
+    // ── Time-based restrictions ──
+    if (time) {
+        const [h, m] = time.split(':').map(Number);
+        const currentMins = h * 60 + m;
+        const midnightMins = 24 * 60;
+        const maxMins = midnightMins - currentMins;
+
+        // Unlimited restriction
+        const unlimOpt = document.getElementById('arUnlimOption');
+        const unlimMsg = document.getElementById('arUnlimRestrictedMsg');
+        if (h >= 19) {
+            if (unlimOpt) unlimOpt.disabled = true;
+            if (unlimMsg) unlimMsg.style.display = 'block';
+            if (mode === 'unlimited') {
+                document.getElementById('resAdminModeSelect').value = 'hourly';
+                adminResOnModeChange();
+            }
+        } else {
+            if (unlimOpt) unlimOpt.disabled = false;
+            if (unlimMsg) unlimMsg.style.display = 'none';
+        }
+
+        // Duration restriction
+        let firstValid = null;
+        Array.from(durSel.options).forEach(opt => {
+            if (opt.value === "" || opt.disabled) return;
+            const val = parseInt(opt.value);
+            const total = parseInt(opt.dataset.total || val);
+            if (total > maxMins) {
+                opt.disabled = true;
+                opt.style.color = '#555';
+            } else {
+                opt.disabled = false;
+                opt.style.color = '';
+                if (!firstValid) firstValid = opt.value;
+            }
+        });
+
+        if (durSel.value && durSel.options[durSel.selectedIndex].disabled) {
+            durSel.value = firstValid || "";
+        }
+    }
 
     // Enable/Disable Console Select based on Date/Time
     if (!date || !time) {
