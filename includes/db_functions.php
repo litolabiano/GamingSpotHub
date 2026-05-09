@@ -1429,8 +1429,8 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
         // attach the real session_id and update the note — this keeps a single
         // clean ledger entry and makes refund calculations work correctly.
         if (!empty($res['downpayment_amount']) && (float)$res['downpayment_amount'] > 0) {
-            $existingNote = 'Downpayment for reservation #' . $reservation_id;
-            $newNote      = 'Downpayment transferred from reservation #' . $reservation_id;
+            $existingNoteMatch = 'Downpayment for reservation #' . $reservation_id . '%';
+            $newNote           = 'Downpayment transferred from reservation #' . $reservation_id;
 
             // UPDATE the existing reservation downpayment transaction to link it to
             // the new session. This avoids double-recording and ensures refund
@@ -1440,7 +1440,7 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
                     SET session_id   = ?,
                         processed_by = ?,
                         payment_note = ?
-                  WHERE payment_note = ?
+                  WHERE payment_note LIKE ?
                     AND user_id      = ?
                     AND session_id IS NULL
                   LIMIT 1"
@@ -1449,7 +1449,7 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
                 $result['session_id'],
                 $shopkeeper_id,
                 $newNote,
-                $existingNote,
+                $existingNoteMatch,
                 $res['user_id']
             );
             $linkStmt->execute();

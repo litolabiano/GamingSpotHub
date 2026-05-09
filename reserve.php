@@ -1436,10 +1436,10 @@ if (!empty($_GET['console'])) {
                 <?php endif; ?>
                 <form method="POST" action="reserve.php" id="reserveForm" enctype="multipart/form-data"
                     <?= ($activeReservation && !$success) ? 'style="pointer-events:none;user-select:none;"' : '' ?>>
-                    <input type="hidden" name="console_type"         id="hiddenConsoleType">
-                    <input type="hidden" name="rental_mode"          id="hiddenRentalMode">
-                    <input type="hidden" name="planned_minutes"      id="hiddenPlannedMinutes">
-                    <input type="hidden" name="preferred_console_id" id="hiddenPreferredUnit" value="">
+                    <input type="hidden" name="console_type"         id="hiddenConsoleType"    value="<?= htmlspecialchars($_POST['console_type'] ?? '') ?>">
+                    <input type="hidden" name="rental_mode"          id="hiddenRentalMode"     value="<?= htmlspecialchars($_POST['rental_mode'] ?? '') ?>">
+                    <input type="hidden" name="planned_minutes"      id="hiddenPlannedMinutes" value="<?= htmlspecialchars($_POST['planned_minutes'] ?? '') ?>">
+                    <input type="hidden" name="preferred_console_id" id="hiddenPreferredUnit"  value="<?= htmlspecialchars($_POST['preferred_console_id'] ?? '') ?>">
 
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-desktop"></i> Step 1 — Choose Console Type</h2>
@@ -2368,11 +2368,17 @@ function renderUnitPickerLocked() {
 let currentUnitPage = 0;
 let totalUnitPages = 0;
 
-function fetchUnitAvailability(dateV, timeV) {
-    document.getElementById('unitGridContainer').style.display = 'none';
-    document.getElementById('unitPickerLocked').style.display = 'none';
-    document.getElementById('noPrefBtn').style.display = 'none';
-    document.getElementById('unitPickerLoading').style.display = 'block';
+function fetchUnitAvailability(dateV, timeV, retryCount = 0) {
+    const loadingEl = document.getElementById('unitPickerLoading');
+    const lockedEl  = document.getElementById('unitPickerLocked');
+    const gridCont  = document.getElementById('unitGridContainer');
+    const noPrefBtn = document.getElementById('noPrefBtn');
+
+    gridCont.style.display = 'none';
+    lockedEl.style.display = 'none';
+    noPrefBtn.style.display = 'none';
+    loadingEl.style.display = 'block';
+    loadingEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i> Checking availability...';
 
     const mins = selectedDuration || 60;
     const originalValue = selectedUnitId;
@@ -2380,11 +2386,10 @@ function fetchUnitAvailability(dateV, timeV) {
     fetch(`ajax/check_unit_availability.php?date=${encodeURIComponent(dateV)}&time=${encodeURIComponent(timeV)}&console_type=${encodeURIComponent(selectedConsoleType)}&planned_minutes=${mins}`)
         .then(r => r.json())
         .then(data => {
-            document.getElementById('unitPickerLoading').style.display = 'none';
+            loadingEl.style.display = 'none';
             
             if (!data.success) {
-                document.getElementById('unitPickerLocked').style.display = 'block';
-                document.getElementById('unitPickerLocked').textContent = 'Error checking availability.';
+                showUnitPickerError(data.message || 'Error checking availability.', dateV, timeV, retryCount);
                 return;
             }
 
@@ -2397,68 +2402,102 @@ function fetchUnitAvailability(dateV, timeV) {
             grid.innerHTML = '';
             
             let stillAvailable = false;
-            let availableUnits = [];
             
             // Collect all units and build cards
-            data.units.forEach((u, idx) => {
-                const isAvail = u.status === 'available';
-                const iconClass = isAvail ? 'fas fa-check-square' : 'fas fa-times-circle';
-                const statusText = isAvail ? 'Available' : 'Unavailable';
-                const cardClass = isAvail ? 'available' : 'unavailable';
+            if (data.units && data.units.length > 0) {
+                data.units.forEach((u, idx) => {
+                    const isAvail = u.status === 'available';
+                    const iconClass = isAvail ? 'fas fa-check-square' : 'fas fa-times-circle';
+                    const statusText = isAvail ? 'Available' : 'Unavailable';
+                    const cardClass = isAvail ? 'available' : 'unavailable';
+                    
+                    let selectedClass = '';
+                    if (originalValue && originalValue == u.id && isAvail) {
+                        selectedClass = 'selected';
+                        stillAvailable = true;
+                    }
+                    
+                    const pageIdx = Math.floor(idx / 4);
+                    
+                    const card = document.createElement('div');
+                    card.className = `unit-card ${cardClass} ${selectedClass}`;
+                    card.setAttribute('data-unit-page', pageIdx);
+                    card.setAttribute('data-unit-id', u.id);
+                    if (isAvail) {
+                        card.onclick = () => selectUnit(u.id, false, u.unit);
+                    } else {
+                        card.title = u.conflict || 'Unavailable';
+                    }
+                    
+                    card.innerHTML = `
+                        <div class="uc-icon"><i class="${iconClass}"></i></div>
+                        <div class="uc-name">#${u.name || u.type + '-' + u.unit}</div>
+                        <div class="uc-status">${statusText}</div>
+                        <div class="uc-controllers"><i class="fas fa-gamepad"></i> ${u.controllers} Controllers</div>
+                    `;
+                    
+                    grid.appendChild(card);
+                });
                 
-                // Keep selected state if it matches original value
-                let selectedClass = '';
-                if (originalValue && originalValue == u.id && isAvail) {
-                    selectedClass = 'selected';
-                    stillAvailable = true;
-                }
+                totalUnitPages = Math.ceil(data.units.length / 4);
+                currentUnitPage = 0;
                 
-                const pageIdx = Math.floor(idx / 4);
+                gridCont.style.display = 'block';
+                noPrefBtn.style.display = 'flex';
                 
-                const card = document.createElement('div');
-                card.className = `unit-card ${cardClass} ${selectedClass}`;
-                card.setAttribute('data-unit-page', pageIdx);
-                card.setAttribute('data-unit-id', u.id);
-                if (isAvail) {
-                    card.onclick = () => selectUnit(u.id, false, u.unit);
-                } else {
-                    card.title = u.conflict || 'Unavailable';
-                }
-                
-                card.innerHTML = `
-                    <div class="uc-icon"><i class="${iconClass}"></i></div>
-                    <div class="uc-name">#${u.name || u.type + '-' + u.unit}</div>
-                    <div class="uc-status">${statusText}</div>
-                    <div class="uc-controllers"><i class="fas fa-gamepad"></i> ${u.controllers} Controllers</div>
-                `;
-                
-                grid.appendChild(card);
-            });
-            
-            totalUnitPages = Math.ceil(data.units.length / 4);
-            currentUnitPage = 0;
-            
-            document.getElementById('unitGridContainer').style.display = 'block';
-            document.getElementById('noPrefBtn').style.display = 'flex';
-            
-            updateUnitPagination();
-            goToUnitPage(0);
+                updateUnitPagination();
+                goToUnitPage(0);
 
-            // If selected unit is no longer available, warn user
-            if (originalValue && !stillAvailable) {
-                alert('The console unit you previously selected (# ' + selectedUnitLabel + ') is no longer available for this new date/time slot. Please choose another unit or use staff assignment.');
-                selectUnit('', false, '');
-            } else if (!originalValue) {
-                // Ensure no preference is highlighted visually
-                document.getElementById('noPrefBtn').classList.add('selected');
+                if (originalValue && !stillAvailable) {
+                    alert('The console unit you previously selected (# ' + selectedUnitLabel + ') is no longer available for this new date/time slot. Please choose another unit or use staff assignment.');
+                    selectUnit('', false, '');
+                } else if (!originalValue) {
+                    noPrefBtn.classList.add('selected');
+                }
+            } else {
+                showUnitPickerError('No units found for this console type.', dateV, timeV, 99); // 99 = don't retry
             }
         })
-        .catch(() => {
-            document.getElementById('unitPickerLoading').style.display = 'none';
-            document.getElementById('unitPickerLocked').style.display = 'block';
-            document.getElementById('unitPickerLocked').textContent = 'Could not check availability.';
+        .catch(err => {
+            console.error('Unit picker fetch error:', err);
+            loadingEl.style.display = 'none';
+            showUnitPickerError('Could not check availability. Please try again or proceed without a preference.', dateV, timeV, retryCount);
         });
 }
+
+function showUnitPickerError(msg, dateV, timeV, retryCount) {
+    const lockedEl = document.getElementById('unitPickerLocked');
+    const noPrefBtn = document.getElementById('noPrefBtn');
+    
+    lockedEl.style.display = 'block';
+    lockedEl.style.color = '#fb566b';
+    
+    let html = `<div style="padding:10px;">
+                    <i class="fas fa-exclamation-triangle" style="margin-bottom:8px; font-size:18px;"></i><br>
+                    ${msg}
+                </div>`;
+    
+    if (retryCount < 2) {
+        html += `<button type="button" onclick="fetchUnitAvailability('${dateV}', '${timeV}', ${retryCount + 1})" 
+                    style="margin-top:10px; background:rgba(32,200,161,.1); border:1px solid #20c8a1; color:#20c8a1; padding:6px 16px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:700; transition:.2s;" 
+                    onmouseover="this.style.background='rgba(32,200,161,.2)'" onmouseout="this.style.background='rgba(32,200,161,.1)'">
+                    <i class="fas fa-sync-alt"></i> Retry
+                 </button>`;
+    } else {
+        html += `<div style="margin-top:10px; font-size:11px; color:#888;">
+                    Persistent error? You can still proceed by letting staff assign your unit.
+                 </div>`;
+        noPrefBtn.style.display = 'flex';
+        // Auto fallback to no preference if retries exhausted
+        if (!selectedUnitId) {
+            selectUnit('', true, '');
+            noPrefBtn.classList.add('selected');
+        }
+    }
+    
+    lockedEl.innerHTML = html;
+}
+
 
 function updateUnitPagination() {
     const pag = document.getElementById('unitPagination');
@@ -3406,5 +3445,30 @@ function submitUserReschedule(e) {
         </div>
     </div>
 </div>
+
+<script>
+// Restore UI state from preserved hidden input values on page load (e.g. after validation error)
+document.addEventListener('DOMContentLoaded', function() {
+    const preservedType = document.getElementById('hiddenConsoleType').value;
+    const preservedMode = document.getElementById('hiddenRentalMode').value;
+    const preservedMins = document.getElementById('hiddenPlannedMinutes').value;
+    const preservedUnit = document.getElementById('hiddenPreferredUnit').value;
+
+    if (preservedType) {
+        selectConsoleType(preservedType);
+        // If mode was also preserved, select it
+        if (preservedMode) {
+            selectRentalMode(preservedMode);
+            // If mins was preserved for hourly, select it
+            if (preservedMode === 'hourly' && preservedMins) {
+                // We need to wait for the duration grid to be rendered by selectRentalMode
+                setTimeout(() => {
+                    selectDuration(parseInt(preservedMins));
+                }, 100);
+            }
+        }
+    }
+});
+</script>
 </body>
 </html>

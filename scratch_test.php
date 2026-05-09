@@ -1,4 +1,5 @@
 <?php
-$_GET['date'] = '2026-05-10';
-$_GET['time'] = '21:00';
-require 'c:/xampp/htdocs/GamingSpotHub/ajax/check_unit_availability.php';
+$_GET['date'] = '2024-05-09';
+$_GET['time'] = '12:00';
+$_GET['console_type'] = 'PS5';
+include 'ajax/check_unit_availability.php';
