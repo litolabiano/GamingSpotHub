@@ -1323,18 +1323,32 @@ if (!empty($_GET['console'])) {
                         </div>
 
                         <?php if (count($validCards) > 3): ?>
-                        <div class="ct-pagination" style="display:flex; justify-content:center; gap:8px; margin-top: 16px;">
-                            <?php $pages = ceil(count($validCards) / 3); for($p=0; $p<$pages; $p++): ?>
-                            <div class="ct-page-dot" 
-                                 onclick="goToCtPage(<?= $p ?>)" 
-                                 style="width:24px;height:6px;border-radius:10px;background:<?= $p===0?'#20c8a1':'rgba(255,255,255,.15)' ?>;cursor:pointer;transition:background .3s;"></div>
-                            <?php endfor; ?>
+                        <div class="ct-pagination" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top: 16px;">
+                            <i class="fas fa-chevron-left" onclick="goToCtPage('prev')" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>
+                            <div style="display:flex; gap:8px;">
+                                <?php $pages = ceil(count($validCards) / 3); for($p=0; $p<$pages; $p++): ?>
+                                <div class="ct-page-dot" 
+                                     onclick="goToCtPage(<?= $p ?>)" 
+                                     style="width:24px;height:6px;border-radius:10px;background:<?= $p===0?'#20c8a1':'rgba(255,255,255,.15)' ?>;cursor:pointer;transition:background .3s;"></div>
+                                <?php endfor; ?>
+                            </div>
+                            <i class="fas fa-chevron-right" onclick="goToCtPage('next')" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>
                         </div>
                         <script>
+                        let currentCtPage = 0;
+                        const totalCtPages = <?= $pages ?>;
                         function goToCtPage(pageNum) {
+                            if (pageNum === 'prev') {
+                                currentCtPage = Math.max(0, currentCtPage - 1);
+                            } else if (pageNum === 'next') {
+                                currentCtPage = Math.min(totalCtPages - 1, currentCtPage + 1);
+                            } else {
+                                currentCtPage = pageNum;
+                            }
+                            
                             document.querySelectorAll('.console-type-card').forEach(card => {
                                 if (card.hasAttribute('data-ct-page')) {
-                                    if (parseInt(card.getAttribute('data-ct-page')) === pageNum) {
+                                    if (parseInt(card.getAttribute('data-ct-page')) === currentCtPage) {
                                         card.style.display = 'block';
                                     } else {
                                         card.style.display = 'none';
@@ -1342,7 +1356,7 @@ if (!empty($_GET['console'])) {
                                 }
                             });
                             document.querySelectorAll('.ct-page-dot').forEach((dot, idx) => {
-                                dot.style.background = idx === pageNum ? '#20c8a1' : 'rgba(255,255,255,.15)';
+                                dot.style.background = idx === currentCtPage ? '#20c8a1' : 'rgba(255,255,255,.15)';
                             });
                         }
                         // Initialize pagination immediately to prevent layout shifts
@@ -1467,6 +1481,7 @@ if (!empty($_GET['console'])) {
                         </p>
                         <div id="unitPickerGrid"
                              style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:12px;"></div>
+                        <div id="unitPaginationContainer" style="display:none; justify-content:center; align-items:center; gap:12px; margin-bottom:16px;"></div>
         <div id="unitPickerAny" onclick="selectUnit(null)"
                              style="padding:10px 16px;border-radius:10px;border:2px solid rgba(32,200,161,.35);
                                     background:rgba(32,200,161,.06);color:#20c8a1;font-size:13px;font-weight:700;
@@ -2160,10 +2175,19 @@ function fetchUnitAvailability(dateV, timeV) {
         });
 }
 
+let currentUnitPage = 0;
+const UNITS_PER_PAGE = 4;
+
 function renderUnitCards(units, extraHtml = '') {
     const grid = document.getElementById('unitPickerGrid');
+    const pagContainer = document.getElementById('unitPaginationContainer');
+    
+    currentUnitPage = 0;
+    const pages = Math.ceil(units.length / UNITS_PER_PAGE);
 
-    grid.innerHTML = extraHtml + units.map(u => {
+    let html = extraHtml;
+    html += units.map((u, idx) => {
+        const pageIdx = Math.floor(idx / UNITS_PER_PAGE);
         const isAvail    = u.status === 'available';
         const isReserved = u.status === 'reserved';
         const isInUse    = u.status === 'in_use';
@@ -2183,10 +2207,12 @@ function renderUnitCards(units, extraHtml = '') {
             : '';
 
         const controllers = u.controllers || 2;
+        
+        const displayStyle = pageIdx === 0 ? 'block' : 'none';
 
-        return `<div id="unit-${u.id}" data-unit-id="${u.id}" ${tooltip}
+        return `<div id="unit-${u.id}" class="unit-card-item" data-unit-page="${pageIdx}" data-unit-id="${u.id}" ${tooltip}
                      onclick="${clickable ? `selectUnit(${u.id}, false, '${u.unit}')` : ''}"
-                     style="border:2px solid ${border};border-radius:12px;padding:14px 8px;
+                     style="display:${displayStyle}; border:2px solid ${border};border-radius:12px;padding:14px 8px;
                             cursor:${clickable ? 'pointer' : 'not-allowed'};transition:all .2s;
                             text-align:center;background:rgba(255,255,255,${bgAlpha});
                             user-select:none;opacity:${clickable ? '1' : '.65'};">
@@ -2198,8 +2224,27 @@ function renderUnitCards(units, extraHtml = '') {
                     </div>
                 </div>`;
     }).join('');
-
-
+    
+    grid.innerHTML = html;
+    
+    if (pagContainer) {
+        if (pages > 1) {
+            pagContainer.style.display = 'flex';
+            let pagHtml = `<i class="fas fa-chevron-left" onclick="goToUnitPage('prev', ${pages})" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
+            pagHtml += `<div style="display:flex; gap:8px;">`;
+            for (let p = 0; p < pages; p++) {
+                const bg = p === 0 ? '#20c8a1' : 'rgba(255,255,255,.15)';
+                pagHtml += `<div class="unit-page-dot" onclick="goToUnitPage(${p}, ${pages})" style="width:24px;height:6px;border-radius:10px;background:${bg};cursor:pointer;transition:background .3s;"></div>`;
+            }
+            pagHtml += `</div>`;
+            pagHtml += `<i class="fas fa-chevron-right" onclick="goToUnitPage('next', ${pages})" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
+            pagContainer.innerHTML = pagHtml;
+        } else {
+            pagContainer.style.display = 'none';
+            pagContainer.innerHTML = '';
+        }
+    }
+    
     // Restore "any" button
     const anyBtn = document.getElementById('unitPickerAny');
     if (anyBtn) {
@@ -2214,6 +2259,28 @@ function renderUnitCards(units, extraHtml = '') {
             anyBtn.style.background  = 'rgba(32,200,161,.06)';
         }
     }
+}
+
+function goToUnitPage(pageNum, totalPages) {
+    if (pageNum === 'prev') {
+        currentUnitPage = Math.max(0, currentUnitPage - 1);
+    } else if (pageNum === 'next') {
+        currentUnitPage = Math.min(totalPages - 1, currentUnitPage + 1);
+    } else {
+        currentUnitPage = pageNum;
+    }
+    
+    document.querySelectorAll('.unit-card-item').forEach(card => {
+        if (parseInt(card.getAttribute('data-unit-page')) === currentUnitPage) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    document.querySelectorAll('.unit-page-dot').forEach((dot, idx) => {
+        dot.style.background = idx === currentUnitPage ? '#20c8a1' : 'rgba(255,255,255,.15)';
+    });
 }
 
 function formatTime12(timeStr) {
