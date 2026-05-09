@@ -114,7 +114,7 @@ unset($_crQ);
 // Active + recent sessions (used by dashboard, sessions sections)
 $recentSessions = [];
 $rsQ = $conn->query(
-    "SELECT gs.*, u.full_name AS customer_name, u.phone AS customer_phone,
+    "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
             ct.type_name AS console_type, c.unit_number,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
@@ -137,7 +137,7 @@ if ($rsQ) $recentSessions = $rsQ->fetch_all(MYSQLI_ASSOC);
 // Completed sessions (recent 50)
 $completedSessions = [];
 $csQ = $conn->query(
-    "SELECT gs.*, u.full_name AS customer_name, ct.type_name AS console_type, c.unit_number
+    "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, ct.type_name AS console_type, c.unit_number
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
@@ -153,7 +153,7 @@ $pendingResCount      = count(array_filter($upcomingReservations, fn($r) => $r['
 
 $cancelledReservations = [];
 $crQ = $conn->query(
-    "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone, 
+    "SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone, 
             ct.type_name AS console_type, c.unit_number,
             rc.cancel_reason_type, rc.cancel_reason_detail
        FROM reservations r

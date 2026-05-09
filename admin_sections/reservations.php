@@ -91,7 +91,10 @@
                     <?php foreach ($pendingUserReschedules as $pr): ?>
                         <tr>
                             <td style="color:#888;">#<?= $pr['reservation_id'] ?></td>
-                            <td><strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong></td>
+                            <td>
+                                <strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong>
+                                <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($pr['customer_email'] ?? '—') ?></div>
+                            </td>
                             <td>
                                 <?= htmlspecialchars($pr['console_type']) ?>
                                 <?php if (!empty($pr['unit_number'])): ?>
@@ -204,6 +207,7 @@
                                 </td>
                                 <td>
                                     <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
+                                    <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
                                     <?php if ($r['customer_phone']): ?>
                                         <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
                                     <?php endif; ?>
@@ -313,6 +317,7 @@
                                 </td>
                                 <td>
                                     <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
+                                    <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
                                     <?php if (!empty($r['customer_phone'])): ?>
                                         <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
                                     <?php endif; ?>

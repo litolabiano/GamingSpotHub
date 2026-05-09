@@ -5,9 +5,21 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     if ((int)($sess['user_id'] ?? 0) === WALKIN_USER_ID) {
         return $forJs ? 'Walk-in' : '<span style="background:rgba(138,164,232,.18);color:#8aa4e8;border:1px solid rgba(138,164,232,.35);border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;letter-spacing:.3px;">&#128694; Walk-in</span>';
     }
-    return $forJs
-        ? htmlspecialchars(addslashes($sess['customer_name']))
-        : htmlspecialchars($sess['customer_name']);
+    if ($forJs) return htmlspecialchars(addslashes($sess['customer_name']));
+    
+    $email = !empty($sess['customer_email']) ? '<div style="color:#888; font-size:11px; font-weight:400; margin-top:1px;">' . htmlspecialchars($sess['customer_email']) . '</div>' : '';
+    
+    $resBadge = '';
+    if (!empty($sess['source_reservation_id'])) {
+        $resBadge = '<div style="margin-top:4px;">
+            <span style="background:rgba(32,200,161,.12); color:#20c8a1; border:1px solid rgba(32,200,161,.3); border-radius:4px; padding:1px 6px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:3px;" title="Reservation #' . $sess['source_reservation_id'] . '">
+                <i class="fas fa-calendar-check" style="font-size:9px;"></i>
+                RESERVED #' . $sess['source_reservation_id'] . '
+            </span>
+        </div>';
+    }
+    
+    return '<div style="font-weight:600; color:#f0f0f0;">' . htmlspecialchars($sess['customer_name']) . '</div>' . $email . $resBadge;
 }
 ?>
 
@@ -324,7 +336,13 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                 <select class="asb-select" id="sessionsStatusFilter" title="Filter by status">
                     <option value="">All Statuses</option>
                     <option value="active">Active</option>
+                    <option value="ending_soon">Ending Soon</option>
                     <option value="completed">Completed</option>
+                </select>
+                <select class="asb-select" id="sessionsOriginFilter" title="Filter by origin">
+                    <option value="">All Origins</option>
+                    <option value="reservation">From Reservation</option>
+                    <option value="walkin">Walk-in Sessions</option>
                 </select>
                 <button class="btn-sec btn-sm" id="resetSortBtn" title="Reset to default sort: active sessions first">
                     <i class="fas fa-sort-amount-down"></i>
@@ -362,17 +380,21 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     // Current end time in 24-hour HH:MM for the time input default value
                     $endHHMM   = $sess['end_time'] ? date('H:i', $endTs) : '';
                     ?>
-                    <tr
+                        <tr
                         data-id="<?= $sess['session_id'] ?>"
                         data-customer="<?= htmlspecialchars(strtolower((int)($sess['user_id'] ?? 0) === WALKIN_USER_ID ? 'walk-in' : $sess['customer_name'])) ?>"
+                        data-email="<?= htmlspecialchars(strtolower($sess['customer_email'] ?? '')) ?>"
                         data-console="<?= htmlspecialchars(strtolower($sess['unit_number'])) ?>"
                         data-mode="<?= htmlspecialchars($sess['rental_mode']) ?>"
                         data-booked="<?= $bookedMinutes ?>"
+                        data-planned="<?= $sess['planned_minutes'] ?? 0 ?>"
+                        data-remaining="9999999"
                         data-start="<?= $startTs ?>"
                         data-end="<?= $endTs ?>"
                         data-duration="<?= $durationV ?>"
                         data-cost="<?= $costVal ?>"
-                        data-status="<?= $isLive ?>">
+                        data-status="<?= $isLive ?>"
+                        data-source-res-id="<?= $sess['source_reservation_id'] ?? 0 ?>">
                         <td>#<?= $sess['session_id'] ?></td>
                         <td><?= sessionCustomerLabel($sess) ?></td>
                         <td class="console-cell" data-session-id="<?= $sess['session_id'] ?>">
@@ -429,10 +451,13 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?php elseif ($sess['status'] === 'active'): ?>
                                 <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']): ?>
                                     <?php $projectedEndTs = $startTs + ($sess['planned_minutes'] * 60); ?>
-                                    <span style="color:#20c8a1;font-weight:600;" title="Projected end: start + booked time">
-                                        <?= date('h:i A', $projectedEndTs) ?>
-                                    </span>
-                                    <span style="font-size:10px;color:#5f85da;display:block;margin-top:2px;">Projected</span>
+                                    <div class="projected-end-wrap">
+                                        <span style="color:#20c8a1;font-weight:600;" title="Projected end: start + booked time">
+                                            <?= date('h:i A', $projectedEndTs) ?>
+                                        </span>
+                                        <div class="remaining-countdown" style="margin-top:2px;"></div>
+                                        <span style="font-size:10px;color:#5f85da;display:block;margin-top:2px;" class="projected-label">Projected</span>
+                                    </div>
                                 <?php else: ?>
                                     <span style="color:#20c8a1">Live</span>
                                 <?php endif; ?>
@@ -813,18 +838,37 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         function filterRows() {
             const q  = (searchInput?.value || '').trim().toLowerCase();
             const st = (statusFilter?.value || '').toLowerCase();
+            const og = (document.getElementById('sessionsOriginFilter')?.value || '').toLowerCase();
+            const endingSoon = st === 'ending_soon';
+            
             tbody.querySelectorAll('tr').forEach(row => {
+                const rowStatus = row.dataset.status === '1' ? 'active' : 'completed';
+                const rowOrigin = parseInt(row.dataset.sourceResId) > 0 ? 'reservation' : 'walkin';
+                
                 const hay = [
                     row.dataset.customer || '',
                     row.dataset.console  || '',
                     row.dataset.mode     || '',
                     row.dataset.id       || '',
-                    row.dataset.status === '1' ? 'active' : 'completed'
+                    rowStatus,
+                    rowOrigin
                 ].join(' ').toLowerCase();
-                const statusText = row.dataset.status === '1' ? 'active' : 'completed';
-                const match = (!q || hay.includes(q)) && (!st || statusText === st);
+                
+                let statusMatch = !st || rowStatus === st;
+                if (endingSoon) {
+                    statusMatch = (rowStatus === 'active' && parseInt(row.dataset.planned) > 0);
+                }
+
+                let originMatch = !og || rowOrigin === og;
+
+                const match = (!q || hay.includes(q)) && statusMatch && originMatch;
                 row.classList.toggle('asb-hidden', !match);
             });
+
+            if (endingSoon) {
+                sortEndingSoon();
+            }
+
             /* Update clear-btn visibility */
             const cb = searchInput?.parentElement?.querySelector('.asb-clear');
             if (cb) cb.style.display = q ? 'block' : 'none';
@@ -833,6 +877,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
         if (searchInput)  searchInput.addEventListener('input', filterRows);
         if (statusFilter) statusFilter.addEventListener('change', filterRows);
+        const originFilter = document.getElementById('sessionsOriginFilter');
+        if (originFilter) originFilter.addEventListener('change', filterRows);
         const clearBtn = searchInput?.parentElement?.querySelector('.asb-clear');
         if (clearBtn) clearBtn.addEventListener('click', () => {
             searchInput.value = '';
@@ -935,38 +981,90 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         });
     }
 
-    /* ── Restore Countdown Logic ── */
-    function initRestoreTimers() {
-        document.querySelectorAll('.btn-restore').forEach(btn => {
-            if (btn.dataset.timerInit) return;
-            btn.dataset.timerInit = 'true';
+    /* ── Remaining Time Countdown ── */
+    function initRemainingTimers() {
+        const rows = document.querySelectorAll('#sessionsTable tbody tr');
+        
+        function updateTimers() {
+            const now = Math.floor(Date.now() / 1000);
+            let needsSort = false;
+            const statusFilter = document.getElementById('sessionsStatusFilter');
+            const isEndingSoonFilter = statusFilter && statusFilter.value === 'ending_soon';
 
-            const endTs = parseInt(btn.dataset.endTs);
-            const updateTimer = () => {
-                const now = Math.floor(Date.now() / 1000);
-                const diff = 3600 - (now - endTs);
-                if (diff <= 0) {
-                    const parent = btn.parentElement;
-                    if (parent) parent.innerHTML = '—';
-                    return;
+            rows.forEach(row => {
+                if (row.dataset.status !== '1') return; // Only active sessions
+                const mode = row.dataset.mode;
+                const planned = parseInt(row.dataset.planned);
+                const start = parseInt(row.dataset.start);
+                
+                if (mode === 'hourly' && planned > 0) {
+                    const totalSec = planned * 60;
+                    const elapsed = now - start;
+                    const remaining = totalSec - elapsed;
+                    
+                    row.dataset.remaining = remaining;
+                    
+                    const countdownEl = row.querySelector('.remaining-countdown');
+                    const labelEl = row.querySelector('.projected-label');
+                    
+                    if (countdownEl) {
+                        if (remaining <= 300) { // 5 minutes or less
+                            const m = Math.floor(Math.abs(remaining) / 60);
+                            const s = Math.abs(remaining) % 60;
+                            const timeStr = (remaining < 0 ? '-' : '') + `${m}:${s.toString().padStart(2, '0')}`;
+                            
+                            countdownEl.innerHTML = `<span class="ending-soon-badge"><i class="fas fa-clock"></i> ${timeStr}</span>`;
+                            countdownEl.style.display = 'block';
+                            if (labelEl) labelEl.style.display = 'none';
+                            row.classList.add('ending-soon-highlight');
+                        } else {
+                            countdownEl.style.display = 'none';
+                            if (labelEl) labelEl.style.display = 'block';
+                            row.classList.remove('ending-soon-highlight');
+                        }
+                    }
+                } else {
+                    row.dataset.remaining = "9999999";
                 }
-                const m = Math.floor(diff / 60);
-                const s = diff % 60;
-                const timerSpan = btn.querySelector('.restore-timer');
-                if (timerSpan) timerSpan.textContent = `(${m}:${s.toString().padStart(2, '0')})`;
-                setTimeout(updateTimer, 1000);
-            };
-            updateTimer();
-        });
+            });
+
+            if (isEndingSoonFilter) {
+                sortEndingSoon();
+            }
+        }
+
+        function sortEndingSoon() {
+            const table = document.getElementById('sessionsTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr:not(.asb-hidden)'));
+            
+            rows.sort((a, b) => {
+                const remA = parseInt(a.dataset.remaining) || 9999999;
+                const remB = parseInt(b.dataset.remaining) || 9999999;
+                return remA - remB;
+            });
+            
+            rows.forEach(r => tbody.appendChild(r));
+        }
+
+        // Run once immediately
+        updateTimers();
+        // Update every second
+        setInterval(updateTimers, 1000);
+        
+        // Expose sort function for the filter
+        window.sortEndingSoon = sortEndingSoon;
     }
 
     // Initial call
+    initRemainingTimers();
     initRestoreTimers();
 
     // Use MutationObserver to re-init timers when the section content is updated by live_section.php
     const sessionsContainer = document.getElementById('sessions');
     if (sessionsContainer) {
         const observer = new MutationObserver((mutations) => {
+            initRemainingTimers();
             initRestoreTimers();
         });
         observer.observe(sessionsContainer, { childList: true, subtree: true });

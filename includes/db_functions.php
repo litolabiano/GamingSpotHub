@@ -866,7 +866,7 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, u.full_name AS customer_name, c.console_name, ct.type_name AS console_type, c.unit_number,
+    $sql = "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, ct.type_name AS console_type, c.unit_number,
                    gs.source_reservation_id,
                    COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -1441,7 +1441,7 @@ function getUpcomingReservations($days = null) {
     if ($days !== null) {
         $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
         $stmt = $conn->prepare(
-            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.phone AS customer_phone,
+            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
                     c.unit_number, c.console_name
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
@@ -1455,7 +1455,7 @@ function getUpcomingReservations($days = null) {
     } else {
         // Show ALL future reservations (no upper bound)
         $stmt = $conn->prepare(
-            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.phone AS customer_phone,
+            "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
                     c.unit_number, c.console_name
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
@@ -1499,7 +1499,7 @@ function getMyReservations($user_id) {
 function getCancelledReservations() {
     global $conn;
     $stmt = $conn->prepare(
-        "SELECT r.*, u.full_name AS customer_name, u.phone AS customer_phone,
+        "SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
                 c.unit_number, c.console_name, ct.type_name AS console_type,
                 rc.cancel_reason_type, rc.cancel_reason_detail,
                 rc.cancelled_at

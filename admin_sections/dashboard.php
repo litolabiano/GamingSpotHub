@@ -71,7 +71,10 @@
             <?php foreach ($activeSessions as $sess): ?>
             <tr>
                 <td><span style="color:#555;font-size:12px">#</span><?= $sess['session_id'] ?></td>
-                <td style="font-weight:600"><?= htmlspecialchars($sess['customer_name']) ?></td>
+                <td style="font-weight:600">
+                    <?= htmlspecialchars($sess['customer_name']) ?>
+                    <div style="color:rgba(32,200,161,.7);font-size:10px;font-weight:400;margin-top:1px;"><?= htmlspecialchars($sess['customer_email'] ?? '') ?></div>
+                </td>
                 <td>
                     <?php
                         $tL = strtolower($sess['console_type']);
@@ -165,7 +168,10 @@
                 ?>
                 <tr>
                     <td style="font-weight:600;color:#f1e1aa;white-space:nowrap;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></td>
-                    <td style="font-weight:600"><?= htmlspecialchars($r['customer_name']) ?></td>
+                    <td style="font-weight:600">
+                        <?= htmlspecialchars($r['customer_name']) ?>
+                        <div style="color:rgba(32,200,161,.7);font-size:10px;font-weight:400;margin-top:1px;"><?= htmlspecialchars($r['customer_email'] ?? '') ?></div>
+                    </td>
                     <td><?= htmlspecialchars($r['console_type']) ?><?php if ($r['unit_number']): ?> <span style="color:#20c8a1;font-size:11px;font-weight:700"><?= htmlspecialchars($r['unit_number']) ?></span><?php endif; ?></td>
                     <td style="color:#aaa;font-size:12px;"><?= match($r['rental_mode']) { 'open_time' => 'Open Time', 'unlimited' => 'Unlimited', default => 'Hourly' . ($r['planned_minutes'] ? ' ('.($r['planned_minutes']/60).'h)' : '') } ?></td>
                     <td><span style="background:<?= $sc[1] ?>;color:<?= $sc[0] ?>;border:1px solid <?= $sc[0] ?>44;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;text-transform:uppercase;"><?= ucfirst($r['status']) ?></span></td>
@@ -215,7 +221,10 @@
             <?php foreach (array_slice($recentSessions, 0, 6) as $sess): ?>
             <tr>
                 <td style="color:#555;font-size:12px">#<?= $sess['session_id'] ?></td>
-                <td style="font-weight:600"><?= htmlspecialchars($sess['customer_name']) ?></td>
+                <td style="font-weight:600">
+                    <?= htmlspecialchars($sess['customer_name']) ?>
+                    <div style="color:rgba(32,200,161,.7);font-size:10px;font-weight:400;margin-top:1px;"><?= htmlspecialchars($sess['customer_email'] ?? '') ?></div>
+                </td>
                 <td style="color:#aaa"><?= htmlspecialchars($sess['unit_number']) ?></td>
                 <td style="color:#aaa"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></td>
                 <td style="color:#aaa"><?= $sess['duration_minutes'] !== null ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'].' min' : '< 1 min') : '—' ?></td>

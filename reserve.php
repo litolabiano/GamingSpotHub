@@ -1131,8 +1131,17 @@ if (!empty($_GET['console'])) {
     .ur-alert { background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.3); color:#fb566b; padding:12px; border-radius:8px; font-size:12px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start; }
     .ur-alert i { margin-top:2px; }
     .ur-btn-row { display: flex; justify-content: flex-end; gap: 10px; }
-    </style>
-
+    /* ── Animations ─────────────────────────────────────── */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-5px); }
+        40%, 80% { transform: translateX(5px); }
+    }
+    .shake-animation { animation: shake 0.4s ease-in-out; }
     </style>
 
 </head>
@@ -1660,6 +1669,10 @@ if (!empty($_GET['console'])) {
                                 I acknowledge that any payment I make for this reservation will not be refunded for any reason.
                             </span>
                         </label>
+                        <div id="noRefundError" style="display:none; color:#fb566b; font-size:12px; margin-top:12px; background:rgba(251,86,107,.1); padding:12px 14px; border-radius:10px; border:1px solid rgba(251,86,107,.2); align-items:center; gap:10px; animation: fadeIn 0.3s ease;">
+                            <i class="fas fa-exclamation-circle" style="font-size:1.1rem;"></i>
+                            <span>Please agree to the Terms and Conditions before proceeding with your payment.</span>
+                        </div>
                     </div>
 
                     <div class="reserve-card" style="margin-bottom:24px;">
@@ -1680,7 +1693,7 @@ if (!empty($_GET['console'])) {
                     </div>
 
                     <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
-                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn" disabled>
+                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn">
                         <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
                         <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
                         <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
@@ -2446,15 +2459,24 @@ function handlePolicyChecks() {
     const btn           = document.getElementById('submitBtn');
     const noRefund      = document.getElementById('noRefundCheck');
     const noRefundLabel = document.getElementById('noRefundLabel');
+    const noRefundError = document.getElementById('noRefundError');
 
     if (noRefundLabel) {
-        noRefundLabel.style.borderColor = noRefund?.checked ? 'rgba(251,86,107,.6)' : 'rgba(255,255,255,.1)';
-        noRefundLabel.style.background  = noRefund?.checked ? 'rgba(251,86,107,.08)' : 'rgba(255,255,255,.04)';
+        if (noRefund && noRefund.checked) {
+            noRefundLabel.style.borderColor = 'rgba(32,200,161,.6)'; // Success green border
+            noRefundLabel.style.background  = 'rgba(32,200,161,.08)';
+            if (noRefundError) noRefundError.style.display = 'none';
+        } else {
+            noRefundLabel.style.borderColor = 'rgba(255,255,255,.1)';
+            noRefundLabel.style.background  = 'rgba(255,255,255,.04)';
+        }
     }
 
-    const allAgreed   = noRefund ? noRefund.checked : false;
-    btn.disabled      = !allAgreed;
-    btn.style.opacity = allAgreed ? '1' : '0.5';
+    // Button is now always clickable to trigger validation warning if unchecked
+    if (btn) {
+        btn.disabled      = false;
+        btn.style.opacity = '1';
+    }
 }
 
 /* Alias — the no-refund checkbox calls this by name */
@@ -2721,6 +2743,32 @@ function updateSummary() {
 
 /* ── Form validation ────────────────────────────────── */
 document.getElementById('reserveForm').addEventListener('submit', function(e) {
+    // ── T&C / No-Refund Validation ──
+    const noRefund = document.getElementById('noRefundCheck');
+    if (noRefund && !noRefund.checked) {
+        e.preventDefault();
+        
+        // Show informative warning message
+        const noRefundError = document.getElementById('noRefundError');
+        if (noRefundError) {
+            noRefundError.style.display = 'flex';
+            noRefundError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // Visually highlight the checkbox and label
+        const noRefundLabel = document.getElementById('noRefundLabel');
+        if (noRefundLabel) {
+            noRefundLabel.style.borderColor = '#fb566b'; // Warning red
+            noRefundLabel.style.background = 'rgba(251,86,107,.15)';
+            
+            // Trigger shake animation
+            noRefundLabel.classList.remove('shake-animation');
+            void noRefundLabel.offsetWidth; // trigger reflow
+            noRefundLabel.classList.add('shake-animation');
+        }
+        return;
+    }
+
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }

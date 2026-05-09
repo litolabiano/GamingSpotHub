@@ -1082,7 +1082,7 @@ unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, c.console_name, c.unit_number, ct.type_name AS console_type,
+    "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, c.unit_number, ct.type_name AS console_type,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -1122,7 +1122,7 @@ $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r[
 
 // Pending User-Initiated Reschedule Requests
 $purStmt = $conn->query(
-    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, c.unit_number
+    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, c.unit_number
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
