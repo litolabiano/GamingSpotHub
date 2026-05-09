@@ -93,7 +93,10 @@
                             <td style="color:#888;">#<?= $pr['reservation_id'] ?></td>
                             <td>
                                 <strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong>
-                                <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($pr['customer_email'] ?? '—') ?></div>
+                                <div style="color:#888; font-size: 11px; margin-top: 1px;">
+                                    <?= htmlspecialchars((!empty($pr['customer_phone']) && $pr['customer_phone'] !== $pr['customer_email']) ? $pr['customer_phone'] : '—') ?>
+                                </div>
+                                <div style="color:#888; font-size: 11px;"><?= htmlspecialchars($pr['customer_email'] ?? '—') ?></div>
                             </td>
                             <td>
                                 <?= htmlspecialchars($pr['console_type']) ?>
@@ -207,10 +210,10 @@
                                 </td>
                                 <td>
                                     <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
-                                    <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
-                                    <?php if ($r['customer_phone']): ?>
-                                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
-                                    <?php endif; ?>
+                                    <div style="color:#888; font-size: 11px; margin-top: 1px;">
+                                        <?= htmlspecialchars((!empty($r['customer_phone']) && $r['customer_phone'] !== $r['customer_email']) ? $r['customer_phone'] : '—') ?>
+                                    </div>
+                                    <div style="color:#888; font-size: 11px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
                                 </td>
                                 <td>
                                     <?= htmlspecialchars($r['console_type']) ?>
@@ -317,10 +320,10 @@
                                 </td>
                                 <td>
                                     <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
-                                    <div style="color:#888; font-size: 11px; margin-top: 1px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
-                                    <?php if (!empty($r['customer_phone'])): ?>
-                                        <div style="color:#888;font-size:11px;"><?= htmlspecialchars($r['customer_phone']) ?></div>
-                                    <?php endif; ?>
+                                    <div style="color:#888; font-size: 11px; margin-top: 1px;">
+                                        <?= htmlspecialchars((!empty($r['customer_phone']) && $r['customer_phone'] !== $r['customer_email']) ? $r['customer_phone'] : '—') ?>
+                                    </div>
+                                    <div style="color:#888; font-size: 11px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
                                 </td>
                                 <td>
                                     <?= htmlspecialchars($r['console_type']) ?>

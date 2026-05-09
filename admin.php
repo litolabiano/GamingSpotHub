@@ -324,10 +324,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Console deleted permanently.';
                 $messageType = 'success';
                 
-                // Activity Log
-                logActivity($user['user_id'], "Delete Console", "Permanently deleted Console ID #{$console_id}");
+                // Activity Log with detailed info
+                $cName = $res['console_name'] ?? 'Unknown';
+                $cUnit = $res['unit_number'] ?? '#'.$console_id;
+                $cType = $res['console_type'] ?? 'Unknown Type';
+                logActivity($user['user_id'], "Delete Console", "Permanently deleted Console: {$cName} (Unit: {$cUnit}, Type: {$cType})");
             } else {
-                $message = 'Cannot delete console. It likely has existing sessions/reservations associated with it. Keep it archived instead.';
+                $message = $res['message'] ?? 'Cannot delete console.';
                 $messageType = 'error';
             }
         }
@@ -971,34 +974,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // UPDATE PARTICIPANT PAYMENT STATUS
-    elseif ($action === 'update_participant_payment') {
-        $pid        = (int)($_POST['participant_id']  ?? 0);
-        $pay_status = in_array($_POST['payment_status'] ?? '', ['pending','paid'])
-                      ? $_POST['payment_status'] : 'pending';
-        if ($pid) {
-            $stmt = $conn->prepare("UPDATE tournament_participants SET payment_status = ? WHERE participant_id = ?");
-            $stmt->bind_param('si', $pay_status, $pid);
-            $stmt->execute();
-            $message = 'Payment status updated.';
-            $messageType = 'success';
-        }
-
-    // REMOVE TOURNAMENT PARTICIPANT
-    elseif ($action === 'remove_participant') {
-        $pid = (int)($_POST['participant_id'] ?? 0);
-        if ($pid) {
-            $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id = ?");
-            $stmt->bind_param('i', $pid);
-            $stmt->execute();
-            $message = 'Participant removed.';
-            $messageType = 'success';
-
-            logActivity($user['user_id'], "Tournament Leave", "Removed Participant #{$pid} from tournament");
-        }
-    }
-
-}
+    // END TOURNAMENT ACTIONS
 
 }
 
@@ -1122,7 +1098,7 @@ $pendingResCount       = count(array_filter($upcomingReservations, fn($r) => $r[
 
 // Pending User-Initiated Reschedule Requests
 $purStmt = $conn->query(
-    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, c.unit_number
+    "SELECT rs.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone, c.unit_number
      FROM reservation_reschedules rs
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
@@ -1254,17 +1230,30 @@ $cancelByConsole = $conn->query(
 $nowTs = time();
 $cancelTrend = [];
 $cancelTrendLabels = [];
+$cancelTrendContext = [];
 for ($i = 29; $i >= 0; $i--) {
     $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
     [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
     
     $cancelTrendLabels[] = date('M d', strtotime($targetOpDay));
-    $cs = $conn->prepare(
-        "SELECT COUNT(*) AS cnt FROM reservation_cancellations WHERE (cancelled_at BETWEEN ? AND ?)"
-    );
+    
+    $cs = $conn->prepare("SELECT COUNT(*) AS cnt FROM reservation_cancellations WHERE (cancelled_at BETWEEN ? AND ?)");
     $cs->bind_param('ss', $sBound, $eBound);
     $cs->execute();
-    $cancelTrend[] = (int)$cs->get_result()->fetch_assoc()['cnt'];
+    $cnt = (int)$cs->get_result()->fetch_assoc()['cnt'];
+    $cancelTrend[] = $cnt;
+
+    // Context for spike annotation
+    if ($cnt > 0) {
+        $rs = $conn->prepare("SELECT cancel_reason_type, COUNT(*) as c FROM reservation_cancellations WHERE (cancelled_at BETWEEN ? AND ?) GROUP BY cancel_reason_type ORDER BY c DESC LIMIT 1");
+        $rs->bind_param('ss', $sBound, $eBound);
+        $rs->execute();
+        $topReason = $rs->get_result()->fetch_assoc();
+        $reasonText = $topReason ? ($reasonLabels[$topReason['cancel_reason_type']] ?? $topReason['cancel_reason_type']) : 'Unknown';
+        $cancelTrendContext[] = $cnt > 1 ? "Batch: $reasonText" : $reasonText;
+    } else {
+        $cancelTrendContext[] = "";
+    }
 }
 
 // Cancelled-by breakdown (for doughnut)
@@ -1284,15 +1273,32 @@ foreach ($settingsKeys as $k) {
 // Chart data: revenue last 7 days
 $revChartData = [];
 $revLabels = [];
+$revContext = [];
 for ($i = 6; $i >= 0; $i--) {
     $targetOpDay = getOperatingDay(date('Y-m-d H:i:s', strtotime("-{$i} days", $nowTs)));
     [$sBound, $eBound] = getOperatingDayBounds($targetOpDay);
     
     $revLabels[] = date('M d', strtotime($targetOpDay));
+    
+    // Revenue
     $s = $conn->prepare("SELECT COALESCE(SUM(amount),0) AS rev FROM transactions WHERE (transaction_date BETWEEN ? AND ?) AND payment_status='completed'");
     $s->bind_param("ss", $sBound, $eBound);
     $s->execute();
-    $revChartData[] = (float)$s->get_result()->fetch_assoc()['rev'];
+    $rev = (float)$s->get_result()->fetch_assoc()['rev'];
+    $revChartData[] = $rev;
+
+    // Context (Sessions & Reservations)
+    $sc = $conn->prepare("SELECT COUNT(*) as c FROM gaming_sessions WHERE (start_time BETWEEN ? AND ?)");
+    $sc->bind_param("ss", $sBound, $eBound);
+    $sc->execute();
+    $sessCnt = $sc->get_result()->fetch_assoc()['c'];
+
+    $rc = $conn->prepare("SELECT COUNT(*) as c FROM reservations WHERE (created_at BETWEEN ? AND ?) AND status='confirmed'");
+    $rc->bind_param("ss", $sBound, $eBound);
+    $rc->execute();
+    $resCnt = $rc->get_result()->fetch_assoc()['c'];
+
+    $revContext[] = ($sessCnt > 0 || $resCnt > 0) ? "$sessCnt sessions, $resCnt bookings" : "";
 }
 
 // Chart data: console type usage
@@ -3674,15 +3680,56 @@ setInterval(updateTimers, 1000);
 
 // Ã¢”â‚¬Ã¢”â‚¬ Charts Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
 function renderCharts() {
+    Chart.defaults.color = '#fff';
+    Chart.defaults.borderColor = 'rgba(255,255,255,.1)';
     const revLabels = <?= json_encode($revLabels) ?>;
     const revData   = <?= json_encode($revChartData) ?>;
     const typeLabels= <?= json_encode($typeLabels) ?>;
     const typeCounts= <?= json_encode($typeCounts) ?>;
 
-    const chartOpts = { responsive: true, plugins: { legend: { labels: { color: '#ccc' } } },
-                        scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,.05)' } },
-                                  y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,.05)' } } } };
+    /* ── Unified Console Colors ───────────────────────────────────────────── */
+    window.getConsoleColor = function(label) {
+        if (!label) return '#888';
+        const normalized = label.trim();
+        const brand = {
+            'PS5': '#5f85da',          // Blue
+            'Xbox Series X': '#20c8a1', // Green
+            'Nintendo Switch': '#fb566b', // Red
+            'PS4': '#b37bec',          // Purple
+            'Xbox One': '#0ea5e9',     // Teal
+            'PC': '#f1a83c',           // Orange
+        };
+        if (brand[normalized]) return brand[normalized];
+        const l = normalized.toLowerCase();
+        if (l.includes('ps5')) return brand['PS5'];
+        if (l.includes('xbox series x') || l.includes('xbox sx')) return brand['Xbox Series X'];
+        if (l.includes('switch')) return brand['Nintendo Switch'];
+        if (l.includes('ps4')) return brand['PS4'];
+        if (l.includes('xbox one')) return brand['Xbox One'];
+        if (l.includes('pc')) return brand['PC'];
+        const fallbacks = ['#38bdf8', '#fb923c', '#f1e1aa', '#a78bfa', '#f472b6', '#4ade80'];
+        let hash = 0;
+        for (let i = 0; i < normalized.length; i++) hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
+        return fallbacks[Math.abs(hash) % fallbacks.length];
+    };
 
+    const chartOpts = { 
+        responsive: true, 
+        plugins: { 
+            legend: { labels: { color: '#fff' } },
+            tooltip: {
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                footerColor: '#fff'
+            }
+        },
+        scales: { 
+            x: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,.05)' } },
+            y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,.05)' } } 
+        } 
+    };
+
+    const revContext = <?= json_encode($revContext) ?>;
     new Chart(document.getElementById('revChart'), {
         type: 'bar',
         data: {
@@ -3691,18 +3738,68 @@ function renderCharts() {
                 backgroundColor: 'rgba(32,200,161,.5)', borderColor: '#20c8a1',
                 borderWidth: 2, borderRadius: 6 }]
         },
-        options: { ...chartOpts, plugins: { legend: { display: false } } }
+        options: { 
+            ...chartOpts, 
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const ctxText = revContext[context.dataIndex];
+                            return ctxText ? '\n' + ctxText : '';
+                        }
+                    }
+                }
+            } 
+        }
     });
 
     new Chart(document.getElementById('typeChart'), {
         type: 'doughnut',
         data: {
             labels: typeLabels,
-            datasets: [{ data: typeCounts,
-                backgroundColor: ['rgba(95,133,218,.7)', 'rgba(32,200,161,.7)'],
-                borderColor: ['#5f85da','#20c8a1'], borderWidth: 2 }]
+            datasets: [{
+                data: typeCounts,
+                backgroundColor: typeLabels.map(l => window.getConsoleColor(l)),
+                borderWidth: 2,
+                borderColor: '#0d1117'
+            }]
         },
-        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#ccc' } } } }
+        options: {
+            ...chartOpts,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#fff',
+                        font: { size: 11 },
+                        padding: 15,
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                    return {
+                                        text: `${label} — ${value} (${percentage}%)`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: data.datasets[0].borderColor,
+                                        fontColor: '#fff',
+                                        color: '#fff',
+                                        lineWidth: data.datasets[0].borderWidth,
+                                        hidden: isNaN(data.datasets[0].data[i]) || chart.getDatasetMeta(0).data[i].hidden,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
+                        }
+                    }
+                }
+            }
+        }
     });
 }
 

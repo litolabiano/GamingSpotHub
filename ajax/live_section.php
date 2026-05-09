@@ -74,6 +74,7 @@ $ctrlAvailCount  = $ctrlAvailable;
 $activeSessions   = getActiveSessions();
 $activeCount      = count($activeSessions);
 $allConsoles      = getConsoles();
+$archivedConsoles = getConsoles('archived');
 $availableCount   = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
 $inUseCount       = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount = count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));

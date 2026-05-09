@@ -661,7 +661,7 @@ function openEditTournament(t) {
 }
 
 function viewParticipants(tournamentId, tournamentName) {
-    document.getElementById('drawerTournamentName').textContent = tournamentName;
+    if (tournamentName) document.getElementById('drawerTournamentName').textContent = tournamentName;
     document.getElementById('drawerContent').innerHTML =
         '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>';
     const drawer = document.getElementById('participantsDrawer');
@@ -693,34 +693,24 @@ function viewParticipants(tournamentId, tournamentName) {
                     <td style="color:#888;font-size:12px;">${p.contact_number ? escHtml(p.contact_number) : '<span style="color:#555;">—</span>'}</td>
                     <td style="color:#888;font-size:12px;">${p.registration_date}</td>
                     <td>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="csrf_token" value="${escHtml(_CSRF)}">
-                            <input type="hidden" name="action" value="update_participant_payment">
-                            <input type="hidden" name="participant_id" value="${p.participant_id}">
-                            <input type="hidden" name="payment_status" value="${isPaid ? 'pending' : 'paid'}">
-                            <button type="submit"
+                        <button type="button"
+                                onclick="updateParticipantPayment(${p.participant_id}, '${isPaid ? 'pending' : 'paid'}', ${tournamentId})"
                                 style="background:${isPaid ? 'rgba(32,200,161,.15)' : 'rgba(241,168,60,.15)'};
                                        color:${isPaid ? '#20c8a1' : '#f1a83c'};
                                        border:1px solid ${isPaid ? 'rgba(32,200,161,.3)' : 'rgba(241,168,60,.3)'};
                                        padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;">
-                                ${isPaid ? '✓ Paid' : '⏳ Pending'}
-                            </button>
-                        </form>
+                            ${isPaid ? '✓ Paid' : '⏳ Pending'}
+                        </button>
                     </td>
                     <td>${proofHtml}</td>
                     <td>
-                        <form method="POST" style="display:inline;" id="${fid}">
-                            <input type="hidden" name="csrf_token" value="${escHtml(_CSRF)}">
-                            <input type="hidden" name="action" value="remove_participant">
-                            <input type="hidden" name="participant_id" value="${p.participant_id}">
-                            <button type="button"
-                                onclick="gspotConfirm('Remove this participant?', function(){ document.getElementById('${fid}').submit(); }, {danger:true, yesLabel:'Remove'})"
+                        <button type="button"
+                                onclick="gspotConfirm('Remove this participant?', function(){ removeParticipant(${p.participant_id}, ${tournamentId}); }, {danger:true, yesLabel:'Remove'})"
                                 style="background:rgba(251,86,107,.12);color:#fb566b;
                                        border:1px solid rgba(251,86,107,.3);
                                        padding:3px 10px;border-radius:8px;font-size:11px;cursor:pointer;">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 </tr>`;
             });
@@ -804,5 +794,55 @@ function escHtml(str) {
 
     pag.apply();
 })();
+
+window.updateParticipantPayment = function(pid, status, tournamentId) {
+    const formData = new FormData();
+    formData.append('participant_id', pid);
+    formData.append('payment_status', status);
+    formData.append('csrf_token', _CSRF);
+
+    fetch('ajax/update_tournament_payment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (window.showToast) window.showToast(data.message, 'success');
+            viewParticipants(tournamentId, '');
+        } else {
+            if (window.showToast) window.showToast(data.message, 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        if (window.showToast) window.showToast('Failed to update payment status.', 'error');
+    });
+};
+
+window.removeParticipant = function(pid, tournamentId) {
+    const formData = new FormData();
+    formData.append('participant_id', pid);
+    formData.append('csrf_token', _CSRF);
+
+    fetch('ajax/remove_tournament_participant.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (window.showToast) window.showToast(data.message, 'success');
+            // Refresh the list immediately
+            viewParticipants(tournamentId, '');
+        } else {
+            if (window.showToast) window.showToast(data.message, 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        if (window.showToast) window.showToast('Failed to remove participant.', 'error');
+    });
+};
 </script>
 

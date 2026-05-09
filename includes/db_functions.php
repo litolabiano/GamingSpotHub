@@ -286,16 +286,76 @@ function updateConsoleControllerCount($console_id, $count) {
 
 /**
  * Permanently delete a console. 
- * Note: Will fail if the console has associated sessions/reservations due to FK constraints.
+ * Safely unlinks related sessions and reservations by adding a note about the deletion.
  */
 function deleteConsole($console_id) {
     global $conn;
+
+    // 1. Fetch console details for the note and activity log
+    $stmt = $conn->prepare("
+        SELECT c.console_name, c.unit_number, ct.type_name 
+        FROM consoles c 
+        LEFT JOIN console_types ct ON c.console_type_id = ct.type_id 
+        WHERE c.console_id = ?
+    ");
+    $stmt->bind_param("i", $console_id);
+    $stmt->execute();
+    $console = $stmt->get_result()->fetch_assoc();
+    
+    if (!$console) return ['success' => false, 'message' => 'Console not found.'];
+    
+    $cName = $console['console_name'];
+    $cUnit = $console['unit_number'];
+    $cType = $console['type_name'] ?? 'Unknown Type';
+
+    // 2. Check for ACTIVE sessions. If active, we shouldn't delete.
+    $stmt = $conn->prepare("SELECT COUNT(*) as active_count FROM gaming_sessions WHERE console_id = ? AND status = 'active'");
+    $stmt->bind_param("i", $console_id);
+    $stmt->execute();
+    $activeCount = $stmt->get_result()->fetch_assoc()['active_count'];
+    
+    if ($activeCount > 0) {
+        return ['success' => false, 'message' => 'This console is currently in use. End the session before deleting.'];
+    }
+
+    // 3. Retain with a note: Update related sessions and reservations
+    $notePrefix = "[Deleted Console: $cName ($cUnit)] ";
+    
+    // Update gaming_sessions
+    $stmt = $conn->prepare("UPDATE gaming_sessions SET notes = CONCAT(?, IFNULL(notes, '')) WHERE console_id = ?");
+    $stmt->bind_param("si", $notePrefix, $console_id);
+    $stmt->execute();
+    
+    // Update reservations
+    $stmt = $conn->prepare("UPDATE reservations SET notes = CONCAT(?, IFNULL(notes, '')) WHERE console_id = ?");
+    $stmt->bind_param("si", $notePrefix, $console_id);
+    $stmt->execute();
+
+    // Update reservation_reschedules
+    $stmt = $conn->prepare("UPDATE reservation_reschedules SET reason_detail = CONCAT(?, IFNULL(reason_detail, '')) WHERE console_id = ? OR old_console_id = ?");
+    $stmt->bind_param("sii", $notePrefix, $console_id, $console_id);
+    $stmt->execute();
+    
+    // Explicitly nullify references in reschedules (as they lack FK SET NULL)
+    $stmt = $conn->prepare("UPDATE reservation_reschedules SET console_id = NULL WHERE console_id = ?");
+    $stmt->bind_param("i", $console_id);
+    $stmt->execute();
+    $stmt = $conn->prepare("UPDATE reservation_reschedules SET old_console_id = NULL WHERE old_console_id = ?");
+    $stmt->bind_param("i", $console_id);
+    $stmt->execute();
+
+    // 4. Perform the deletion
     $stmt = $conn->prepare("DELETE FROM consoles WHERE console_id = ?");
     $stmt->bind_param("i", $console_id);
     if ($stmt->execute()) {
-        return ['success' => true];
+        return [
+            'success'      => true, 
+            'console_name' => $cName, 
+            'unit_number'  => $cUnit,
+            'console_type' => $cType
+        ];
     } else {
-        return ['success' => false, 'message' => $conn->error];
+        return ['success' => false, 'message' => 'Database error: ' . $conn->error];
     }
 }
 

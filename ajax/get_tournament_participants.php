@@ -18,7 +18,7 @@ $stmt = $conn->prepare("
            u.full_name, u.email
     FROM tournament_participants tp
     JOIN users u ON tp.user_id = u.user_id
-    WHERE tp.tournament_id = ?
+    WHERE tp.tournament_id = ? AND tp.status = 'active'
     ORDER BY tp.registration_date ASC
 ");
 $stmt->bind_param('i', $tournament_id);

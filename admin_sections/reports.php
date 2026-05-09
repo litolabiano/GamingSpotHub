@@ -129,13 +129,10 @@
     ?>
 
     <div id="cancellationAnalyticsPrintArea">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin:32px 0 16px;">
+        <div style="margin:32px 0 16px;">
             <h3 style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:#fff; margin:0; display:flex;align-items:center;gap:10px;">
                 <i class="fas fa-ban" style="color:#fb566b"></i> Reservation Cancellation Analytics
             </h3>
-            <button class="btn-prim btn-sm" onclick="printCancellationAnalytics()" style="background:#fb566b; border-color:#fb566b; color:#fff; height: 32px; padding: 0 16px;">
-                <i class="fas fa-print"></i> Print Graphs
-            </button>
         </div>
 
     <!-- Stat cards row -->
@@ -147,12 +144,16 @@
             ['label'=>'Admin-Initiated',      'value'=>$adminCancels.' ('.$adminPct.'%)',      'icon'=>'shield-alt',   'color'=>'#b37bec', 'bg'=>'rgba(179,123,236,.12)'],
             ['label'=>'Rescheduled',          'value'=>$totalRescheduled,                     'icon'=>'calendar-alt', 'color'=>'#20c8a1', 'bg'=>'rgba(32,200,161,.12)'],
         ];
-        foreach ($cancelStatCards as $sc): ?>
-        <div class="card" style="padding:18px;border-color:<?= $sc['color'] ?>22">
+        foreach ($cancelStatCards as $sc): 
+            $isZero = (strpos((string)$sc['value'], '0 ') === 0 || (string)$sc['value'] === '0');
+            $cardOpacity = $isZero ? '0.45' : '1';
+            $cardFilter = $isZero ? 'grayscale(0.8)' : 'none';
+        ?>
+        <div class="card" style="padding:18px;border-color:<?= $sc['color'] ?>22; opacity:<?= $cardOpacity ?>; filter:<?= $cardFilter ?>;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
                 <div>
                     <div style="font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;color:#fff"><?= $sc['value'] ?></div>
-                    <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px"><?= $sc['label'] ?></div>
+                    <div style="font-size:11px;color:rgba(255,255,255,<?= $isZero ? '.3' : '.45' ?>);margin-top:3px"><?= $sc['label'] ?></div>
                 </div>
                 <div style="width:40px;height:40px;border-radius:10px;background:<?= $sc['bg'] ?>;
                             display:flex;align-items:center;justify-content:center;color:<?= $sc['color'] ?>;font-size:18px">
@@ -195,9 +196,18 @@
         </div>
         <div class="card">
             <div class="card-header"><h3 class="card-title"><i class="fas fa-users" style="color:#b37bec"></i> Cancelled By</h3></div>
-            <?php if ($totalCancels > 0): ?>
-            <div style="position:relative;height:180px;display:flex;align-items:center;justify-content:center">
-                <canvas id="cancelByWhoChart"></canvas>
+            <?php if ($totalCancels > 0): 
+                $topWho = $cancelByWho[0]; // Usually only one anyway as per FIX 6 description
+                $whoLabel = ucfirst($topWho['cancelled_by']);
+                $whoPct = round($topWho['cnt'] / $totalCancels * 100);
+            ?>
+            <div style="padding: 24px; text-align: center;">
+                <div style="font-size: 11px; color: rgba(255,255,255,.4); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Primary Source</div>
+                <div style="font-size: 32px; font-weight: 800; color: #b37bec; font-family: 'Outfit', sans-serif;"><?= $whoLabel ?></div>
+                <div style="font-size: 16px; color: #fff; margin-top: 4px;"><?= $topWho['cnt'] ?> cancellations (<?= $whoPct ?>%)</div>
+                <div style="margin-top: 20px; height: 8px; background: rgba(255,255,255,.05); border-radius: 4px; overflow: hidden;">
+                    <div style="width: <?= $whoPct ?>%; height: 100%; background: #b37bec; box-shadow: 0 0 12px rgba(179,123,236,.4);"></div>
+                </div>
             </div>
             <?php else: ?>
             <div style="text-align:center;padding:30px 20px;color:rgba(255,255,255,.4)">No data yet</div>
@@ -281,7 +291,10 @@
     const chartDefaults = {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: 'rgba(255,255,255,.55)', font: { size: 11 } } } }
+        plugins: { 
+            legend: { labels: { color: '#fff', font: { size: 11 } } },
+            tooltip: { titleColor: '#fff', bodyColor: '#fff', footerColor: '#fff' }
+        }
     };
 
     /* ── Reasons Doughnut ─────────────────────────────────────────────────── */
@@ -302,13 +315,14 @@
             cutout: '65%',
             plugins: {
                 ...chartDefaults.plugins,
-                legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', font: { size: 11 }, padding: 10 } }
+                legend: { position: 'bottom', labels: { color: '#fff', font: { size: 11 }, padding: 10 } }
             }
         }
     });
     <?php endif; ?>
 
     /* ── Trend Line ───────────────────────────────────────────────────────── */
+    const cancelTrendContext = <?= json_encode($cancelTrendContext) ?>;
     new Chart(document.getElementById('cancelTrendChart'), {
         type: 'line',
         data: {
@@ -319,7 +333,8 @@
                 borderColor: CORAL,
                 backgroundColor: 'rgba(251,86,107,.08)',
                 borderWidth: 2,
-                pointRadius: 3,
+                pointRadius: 4,
+                pointHoverRadius: 6,
                 pointBackgroundColor: CORAL,
                 fill: true,
                 tension: 0.4,
@@ -327,22 +342,34 @@
         },
         options: {
             ...chartDefaults,
+            plugins: {
+                ...chartDefaults.plugins,
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const ctxText = cancelTrendContext[context.dataIndex];
+                            return ctxText ? '\nContext: ' + ctxText : '';
+                        }
+                    }
+                }
+            },
             scales: {
-                x: { ticks: { color: 'rgba(255,255,255,.4)', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
-                y: { ticks: { color: 'rgba(255,255,255,.4)', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true }
+                x: { ticks: { color: '#fff', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+                y: { ticks: { color: '#fff', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true }
             }
         }
     });
 
     /* ── Console Breakdown Bar ────────────────────────────────────────────── */
+    const cancelConsoleLabels = <?= json_encode($cancelConsoleLabels) ?>;
     new Chart(document.getElementById('cancelConsoleChart'), {
         type: 'bar',
         data: {
-            labels: <?= json_encode($cancelConsoleLabels) ?>,
+            labels: cancelConsoleLabels,
             datasets: [{
                 label: 'Cancellations',
                 data: <?= json_encode($cancelConsoleCounts) ?>,
-                backgroundColor: consoleColors.slice(0, <?= count($cancelConsoleCounts) ?>),
+                backgroundColor: cancelConsoleLabels.map(l => window.getConsoleColor(l)),
                 borderRadius: 6,
                 borderSkipped: false,
             }]
@@ -350,40 +377,38 @@
         options: {
             ...chartDefaults,
             indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            },
             scales: {
-                x: { ticks: { color: 'rgba(255,255,255,.4)', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true },
-                y: { ticks: { color: 'rgba(255,255,255,.55)' }, grid: { display: false } }
+                x: { ticks: { color: '#fff', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true },
+                y: { ticks: { color: '#fff' }, grid: { display: false } }
             }
-        }
+        },
+        plugins: [{
+            id: 'barLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx, data, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+                ctx.save();
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+
+                const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+                data.datasets[0].data.forEach((value, i) => {
+                    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                    const bar = chart.getDatasetMeta(0).data[i];
+                    const label = `${value} (${percentage}%)`;
+                    ctx.fillText(label, bar.x + 8, bar.y);
+                });
+                ctx.restore();
+            }
+        }]
     });
 
-    /* ── Cancelled-By Doughnut ────────────────────────────────────────────── */
-    <?php
-    $whoLabels = array_map(fn($w) => ucfirst($w['cancelled_by']), $cancelByWho);
-    $whoCounts = array_column($cancelByWho, 'cnt');
-    ?>
-    <?php if ($totalCancels > 0 && !empty($whoLabels)): ?>
-    new Chart(document.getElementById('cancelByWhoChart'), {
-        type: 'doughnut',
-        data: {
-            labels: <?= json_encode($whoLabels) ?>,
-            datasets: [{
-                data: <?= json_encode($whoCounts) ?>,
-                backgroundColor: [GOLD, PURPLE],
-                borderWidth: 2,
-                borderColor: '#0d1117',
-            }]
-        },
-        options: {
-            ...chartDefaults,
-            cutout: '65%',
-            plugins: {
-                ...chartDefaults.plugins,
-                legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,.55)', font: { size: 11 }, padding: 10 } }
-            }
-        }
-    });
-    <?php endif; ?>
 })();
 </script>
 
@@ -423,43 +448,4 @@ document.addEventListener('DOMContentLoaded', function() {
     usagePag.apply();
 });
 
-function printCancellationAnalytics() {
-    document.body.classList.add('print-cancel-mode');
-    // Allow a tiny delay for browser to apply class if necessary before invoking print
-    setTimeout(() => {
-        window.print();
-        document.body.classList.remove('print-cancel-mode');
-    }, 100);
-}
 </script>
-
-<style>
-@media print {
-    body.print-cancel-mode {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-    body.print-cancel-mode * {
-        visibility: hidden;
-    }
-    body.print-cancel-mode #cancellationAnalyticsPrintArea, 
-    body.print-cancel-mode #cancellationAnalyticsPrintArea * {
-        visibility: visible;
-    }
-    body.print-cancel-mode #cancellationAnalyticsPrintArea {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        padding: 20px;
-    }
-    /* Chart.js canvases need specific sizing rules to print properly */
-    body.print-cancel-mode canvas {
-        max-width: 100% !important;
-    }
-    /* Hide the print button when printing */
-    body.print-cancel-mode button[onclick="printCancellationAnalytics()"] {
-        display: none !important;
-    }
-}
-</style>

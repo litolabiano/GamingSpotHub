@@ -66,6 +66,17 @@ $rescheduleStmt->bind_param('i', $user_id);
 $rescheduleStmt->execute();
 $unseenReschedules = $rescheduleStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+$removalStmt = $conn->prepare(
+    "SELECT tp.participant_id, t.tournament_name, tp.removed_at
+       FROM tournament_participants tp
+       JOIN tournaments t ON tp.tournament_id = t.tournament_id
+      WHERE tp.user_id = ? AND tp.status = 'removed' AND tp.seen_by_user = 0
+      ORDER BY tp.removed_at DESC"
+);
+$removalStmt->bind_param('i', $user_id);
+$removalStmt->execute();
+$unseenRemovals = $removalStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 $rescheduleReasonLabels = [
     'typhoon'       => ' Typhoon / Bad Weather',
     'power_outage'  => ' Power Outage',
@@ -250,7 +261,7 @@ $myCancelCount = count($myCancels);
 $myTournaments = [];
 $tStmt = $conn->prepare(
     "SELECT tp.participant_id, tp.tournament_id, tp.registration_date,
-            tp.payment_status, tp.ign, tp.contact_number, tp.notes,
+            tp.payment_status, tp.status, tp.removed_at, tp.ign, tp.contact_number, tp.notes,
             tp.placement, tp.prize_amount,
             t.tournament_name, t.game_name, t.console_type,
             t.start_date, t.end_date, t.entry_fee, t.prize_pool,
@@ -264,7 +275,7 @@ $tStmt->bind_param('i', $user_id);
 $tStmt->execute();
 $myTournaments     = $tStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $myTournamentCount = count($myTournaments);
-$myActiveTournamentCount = count(array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing'])));
+$myActiveTournamentCount = count(array_filter($myTournaments, fn($t) => $t['status'] === 'active' && in_array($t['tournament_status'], ['scheduled','ongoing'])));
 
 // Reason label map (shared with JS)
 $cancelReasonLabelMap = [
@@ -981,6 +992,40 @@ function fmtMins(int $m): string {
         @media (min-width: 901px) {
             .cd-main { padding: 28px !important; }
         }
+
+        /* ═══════════════════════════════════════════════════════
+           GLOBAL DROPDOWN & SELECT STYLES (DARK THEME)
+           ═══════════════════════════════════════════════════════ */
+        select, 
+        option,
+        .form-control,
+        .form-select,
+        .pf-input {
+            background-color: #0d1b3e !important; /* Premium Dark Navy */
+            color: #f8f9fa !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+
+        /* Ensure native options dropdown list is dark on all browsers */
+        select option {
+            background-color: #0d1b3e !important;
+            color: #f8f9fa !important;
+        }
+
+        /* Interactive states */
+        select:hover,
+        .form-control:hover,
+        .pf-input:hover {
+            border-color: rgba(32, 200, 161, 0.4) !important;
+        }
+
+        select:focus,
+        .form-control:focus,
+        .pf-input:focus {
+            border-color: #20c8a1 !important;
+            box-shadow: 0 0 0 3px rgba(32, 200, 161, 0.15) !important;
+            outline: none !important;
+        }
     </style>
 </head>
 <?php
@@ -1144,9 +1189,9 @@ function fmtMins(int $m): string {
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:800;font-size:14px;margin-bottom:4px;
                             color:<?= ($rs['status']==='pending' && $rs['initiated_by']==='admin') ? '#f1a83c' : '#20c8a1' ?>;">
-                            <?php if ($rs['status']==='pending' && $rs['initiated_by']==='admin'): ?>
-                                â³ Action Required: Confirm Your New Schedule
-                            <?php else: ?>
+                            <?php if ($rs['status']==='pending' && $rs['initiated_by']==='admin'): ?><span style="display:none;">
+                                â³ </span><i class="fas fa-hourglass-half" style="margin-right:5px;"></i> Action Required: Confirm Your New Schedule<span style="display:none;">
+                            </span><?php else: ?>
                                  Your Reservation Has Been Rescheduled
                             <?php endif; ?>
                         </div>
@@ -1314,6 +1359,44 @@ function fmtMins(int $m): string {
                 });
             }
             </script>
+            <?php endif; ?>
+
+            <?php if (!empty($unseenRemovals)): ?>
+            <!-- Tournament Removal Notifications -->
+            <div id="tournament-removal-notifications">
+                <?php foreach ($unseenRemovals as $rem): ?>
+                <div id="trn-<?= $rem['participant_id'] ?>" style="
+                    background: linear-gradient(135deg, rgba(251,86,107,.1), rgba(251,86,107,.05));
+                    border: 1px solid rgba(251,86,107,.35);
+                    border-radius: 16px;
+                    padding: 18px 22px;
+                    margin-bottom: 14px;
+                    display: flex;
+                    gap: 16px;
+                    align-items: flex-start;
+                    position: relative;">
+                    <div style="width:42px;height:42px;border-radius:12px;flex-shrink:0;
+                        background:rgba(251,86,107,.15);color:#fb566b;
+                        display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;font-size:14px;margin-bottom:4px;color:#fb566b;">
+                            Tournament Entry Removed
+                        </div>
+                        <p style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:8px;line-height:1.5;">
+                            Your entry for <strong><?= htmlspecialchars($rem['tournament_name']) ?></strong> has been removed by the admin on <?= date('M d, Y h:i A', strtotime($rem['removed_at'])) ?>.
+                        </p>
+                        <button onclick="dismissTournamentRemoval(<?= $rem['participant_id'] ?>)"
+                            style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:6px 12px; color:#fff; font-size:11px; font-weight:700; cursor:pointer; transition:all .2s;"
+                            onmouseover="this.style.background='rgba(255,255,255,0.12)'"
+                            onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+                            Got it, dismiss
+                        </button>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
             <?php endif; ?>
 
             <?php if ($activeSession): ?>
@@ -1516,7 +1599,7 @@ function fmtMins(int $m): string {
                 ?>
                 <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(241,168,60,0.12);">
                     <div style="width:36px;height:36px;border-radius:10px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.25);
-                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">ðŸ†</div>
+                                display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;"><i class="fas fa-trophy" style="color:#f1a83c;"></i><span style="display:none;">ðŸ†</span></div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-weight:700;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                             <?= htmlspecialchars($ot['tournament_name']) ?>
@@ -2327,7 +2410,7 @@ function fmtMins(int $m): string {
 
         <!-- == PAGE: MY TOURNAMENTS ======================================== -->
         <?php
-            $upcomingTournaments  = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing']));
+            $upcomingTournaments  = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['scheduled','ongoing']) || $t['status'] === 'removed');
             $completedTournaments = array_filter($myTournaments, fn($t) => in_array($t['tournament_status'], ['completed','cancelled']));
             $paidTournaments      = array_filter($myTournaments, fn($t) => $t['payment_status'] === 'paid');
             $tournamentStatusMap  = [
@@ -2403,9 +2486,11 @@ function fmtMins(int $m): string {
             </div>
             <div style="display:grid;gap:16px;margin-bottom:28px;">
             <?php foreach ($upcomingTournaments as $tr):
-                $tsm = $tournamentStatusMap[$tr['tournament_status']] ?? ['gray','circle',ucfirst($tr['tournament_status'])];
+                $isRemoved = $tr['status'] === 'removed';
+                $tsm = $tournamentStatusMap[$tr['tournament_status']] ?? ['gray','circle',ucfirst($tr['tournament_status'] ?? '')];
+                if ($isRemoved) $tsm = ['coral', 'ban', 'Removed by Admin'];
             ?>
-            <div class="cd-card" style="border-color:rgba(32,200,161,0.3);background:linear-gradient(135deg,rgba(10,33,81,0.7),rgba(8,14,26,0.8));padding:0;overflow:hidden;">
+            <div class="cd-card" style="<?= $isRemoved ? 'opacity:0.65; filter:grayscale(0.8);' : 'border-color:rgba(32,200,161,0.3);' ?> background:linear-gradient(135deg,rgba(10,33,81,0.7),rgba(8,14,26,0.8));padding:0;overflow:hidden;">
                 <!-- Gold accent top bar -->
                 <div style="height:3px;background:linear-gradient(90deg,#f1a83c,#fb566b,#b37bec);"></div>
                 <div style="padding:20px 22px;">
@@ -2462,12 +2547,17 @@ function fmtMins(int $m): string {
                                     <div style="font-size:13px;font-weight:700;color:#b37bec;"><?= date('M d, Y', strtotime($tr['registration_date'])) ?></div>
                                 </div>
                             </div>
+                            <?php if ($isRemoved && $tr['removed_at']): ?>
+                            <div style="margin-top:14px; padding:10px 14px; background:rgba(251,86,107,0.1); border:1px solid rgba(251,86,107,0.2); border-radius:10px; font-size:12px; color:#fb566b; font-weight:600;">
+                                <i class="fas fa-info-circle" style="margin-right:6px;"></i> This entry was removed by admin on <?= date('M d, Y h:i A', strtotime($tr['removed_at'])) ?>
+                            </div>
+                            <?php endif; ?>
                         </div>
                         <!-- Trophy icon -->
                         <div style="width:52px;height:52px;border-radius:14px;background:rgba(241,168,60,0.12);border:1px solid rgba(241,168,60,0.3);
-                                    display:flex;align-items:center;justify-content:center;font-size:22px;color:#f1a83c;flex-shrink:0;">
+                                    display:flex;align-items:center;justify-content:center;font-size:22px;color:#f1a83c;flex-shrink:0;"><i class="fas fa-trophy"></i><span style="display:none;">
                             ðŸ†
-                        </div>
+                        </span></div>
                     </div>
                     <?php if ($tr['notes']): ?>
                     <div style="margin-top:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:rgba(255,255,255,0.45);">
@@ -2477,6 +2567,42 @@ function fmtMins(int $m): string {
                 </div>
             </div>
             <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($unseenRemovals)): ?>
+            <!-- Tournament Removal Notifications -->
+            <div id="tournament-removal-notifications">
+                <?php foreach ($unseenRemovals as $rem): ?>
+                <div id="trn-<?= $rem['participant_id'] ?>" style="
+                    background: linear-gradient(135deg, rgba(251,86,107,.1), rgba(251,86,107,.05));
+                    border: 1px solid rgba(251,86,107,.35);
+                    border-radius: 16px;
+                    padding: 18px 22px;
+                    margin-bottom: 14px;
+                    display: flex;
+                    gap: 16px;
+                    align-items: flex-start;
+                    position: relative;">
+                    <div style="width:42px;height:42px;border-radius:12px;flex-shrink:0;
+                        background:rgba(251,86,107,.15);color:#fb566b;
+                        display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;font-size:14px;margin-bottom:4px;color:#fb566b;">
+                            Tournament Entry Removed
+                        </div>
+                        <p style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:8px;line-height:1.5;">
+                            Your entry for <strong><?= htmlspecialchars($rem['tournament_name']) ?></strong> has been removed by the admin on <?= date('M d, Y h:i A', strtotime($rem['removed_at'])) ?>.
+                        </p>
+                        <button onclick="dismissTournamentRemoval(<?= $rem['participant_id'] ?>)"
+                            style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:6px 12px; color:#fff; font-size:11px; font-weight:700; cursor:pointer; transition:all .2s;">
+                            Got it, dismiss
+                        </button>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
 
@@ -3542,6 +3668,25 @@ function submitUserReschedule(e) {
         err.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = 'Confirm Reschedule';
+    });
+}
+
+function dismissTournamentRemoval(pid) {
+    const el = document.getElementById('trn-' + pid);
+    if (el) el.style.opacity = '0.5';
+
+    const fd = new FormData();
+    fd.append('participant_id', pid);
+
+    fetch('ajax/dismiss_tournament_removal.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && el) {
+            el.style.transition = 'all .3s ease';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-10px)';
+            setTimeout(() => el.remove(), 300);
+        }
     });
 }
 </script>

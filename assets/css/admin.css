@@ -1230,4 +1230,40 @@ body {
         display: none;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+   GLOBAL DROPDOWN & SELECT STYLES (DARK THEME)
+   ═══════════════════════════════════════════════════════ */
+select, 
+option,
+.form-control,
+.form-select,
+.asb-select,
+.asb-native-input,
+.asb-input {
+    background-color: #0d1b3e !important; /* Premium Dark Navy */
+    color: #f8f9fa !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Ensure native options dropdown list is dark on all browsers */
+select option {
+    background-color: #0d1b3e !important;
+    color: #f8f9fa !important;
+}
+
+/* Interactive states */
+select:hover,
+.form-control:hover,
+.asb-input:hover {
+    border-color: rgba(32, 200, 161, 0.4) !important;
+}
+
+select:focus,
+.form-control:focus,
+.asb-input:focus {
+    border-color: #20c8a1 !important;
+    box-shadow: 0 0 0 3px rgba(32, 200, 161, 0.15) !important;
+    outline: none !important;
+}
 
