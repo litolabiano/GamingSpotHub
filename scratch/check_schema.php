@@ -1,15 +1,6 @@
 <?php
-require_once __DIR__ . '/../includes/db_config.php';
-$r = $conn->query('DESCRIBE reservations');
-echo "<table border=1>";
-while($f=$r->fetch_assoc()) {
-    echo "<tr><td>" . implode("</td><td>", $f) . "</td></tr>";
+$conn = new mysqli('localhost', 'root', '', 'gamingspothub');
+$res = $conn->query('DESCRIBE reservation_reschedules');
+while($row = $res->fetch_assoc()) {
+    echo $row['Field'] . "\n";
 }
-echo "</table>";
-
-$r = $conn->query('DESCRIBE reservation_reschedules');
-echo "<h3>Reschedule Table</h3><table border=1>";
-while($f=$r->fetch_assoc()) {
-    echo "<tr><td>" . implode("</td><td>", $f) . "</td></tr>";
-}
-echo "</table>";

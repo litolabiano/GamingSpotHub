@@ -1209,13 +1209,9 @@ function fmtMins(int $m): string {
                             <?php endif; ?>
                             <?php if ($rs['status'] === 'pending' && $rs['initiated_by'] === 'admin'): ?>
                                 <div style="display:flex;gap:10px;margin-top:12px;">
-                                    <button onclick="openRescheduleConfirmModal(<?= $rs['reschedule_id'] ?>, '<?= $rs['new_date'] ?>', '<?= substr($rs['new_time'],0,5) ?>')"
+                                    <button onclick="openRescheduleConfirmModal(<?= $rs['reschedule_id'] ?>, '<?= $rs['new_date'] ?>', '<?= substr($rs['new_time'],0,5) ?>', '<?= addslashes($rs['console_type']) ?>', '<?= addslashes($rs['unit_number'] ?? '') ?>')"
                                         style="flex:1;background:linear-gradient(135deg,rgba(32,200,161,.2),rgba(32,200,161,.1));border:1px solid rgba(32,200,161,.45);color:#20c8a1;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;transition:all .2s;">
-                                        <i class="fas fa-calendar-check"></i> Choose My Date
-                                    </button>
-                                    <button onclick="respondReschedule(<?= $rs['reschedule_id'] ?>, 'cancel')"
-                                        style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;transition:all .2s;">
-                                        <i class="fas fa-times"></i> Decline
+                                        <i class="fas fa-calendar-check"></i> Review & Respond
                                     </button>
                                 </div>
                             <?php endif; ?>
@@ -1246,105 +1242,178 @@ function fmtMins(int $m): string {
                     if (el) { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }
                 });
             }
-            function openRescheduleConfirmModal(id, minDate, preTime) {
+            function openRescheduleConfirmModal(id, propDate, propTime, consoleType, unitNum) {
                 document.getElementById('rcmRescheduleId').value = id;
-                const dateInput  = document.getElementById('rcmDate');
-                const timeSelect = document.getElementById('rcmTime');
-                dateInput.min    = minDate;
-                dateInput.value  = minDate || '';
-                // Store original proposed values
-                dateInput.dataset.original = minDate || '';
-                if (timeSelect && preTime) {
-                    // Check if the preTime exists in the select options
-                    let optionExists = false;
-                    for (let i = 0; i < timeSelect.options.length; i++) {
-                        if (timeSelect.options[i].value === preTime) {
-                            optionExists = true;
-                            break;
-                        }
-                    }
-                    // If it doesn't exist, add it
-                    if (!optionExists) {
-                        const newOpt = document.createElement('option');
-                        newOpt.value = preTime;
-                        // Format the time for display (e.g., 14:45 -> 2:45 PM)
-                        let [h, m] = preTime.split(':');
-                        let ampm = h >= 12 ? 'PM' : 'AM';
-                        h = h % 12;
-                        h = h ? h : 12; // the hour '0' should be '12'
-                        newOpt.text = h + ':' + m + ' ' + ampm;
-                        timeSelect.appendChild(newOpt);
-                    }
-                    timeSelect.value = preTime || '';
-                    timeSelect.dataset.original = preTime || '';
-                }
-                const d = new Date(minDate + 'T00:00:00');
-                document.getElementById('rcmProposedDate').textContent =
-                    d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
                 
-                // Reset reason field
-                document.getElementById('rcmReasonGroup').style.display = 'none';
+                // Set proposed values for display with fallbacks
+                const d = new Date(propDate + 'T00:00:00');
+                document.getElementById('rcmDisplayDate').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                let [h, m] = (propTime || '00:00').split(':');
+                let ampm = h >= 12 ? 'PM' : 'AM';
+                let hDisp = h % 12 || 12;
+                document.getElementById('rcmDisplayTime').textContent = hDisp + ':' + m + ' ' + ampm;
+                
+                const cType = consoleType || 'Not specified';
+                const uNum  = unitNum || '';
+                document.getElementById('rcmDisplayConsole').textContent = cType + (uNum ? ' - ' + uNum : '');
+
+                // Store original values
+                document.getElementById('rcmDate').dataset.original = propDate;
+                document.getElementById('rcmTime').dataset.original = propTime;
+
+                // Reset UI state: show admin proposal first
+                document.getElementById('rcmProposedView').style.display = 'block';
+                document.getElementById('rcmAltForm').style.display = 'none';
+                document.getElementById('rcmSubmitBtn').innerHTML = '<i class="fas fa-check-circle"></i> Confirm Admin Proposal';
+                document.getElementById('rcmSubmitBtn').dataset.mode = 'confirm';
+                
+                // Setup Date Picker
+                const dateInput = document.getElementById('rcmDate');
+                dateInput.min = new Date().toISOString().split('T')[0];
+                dateInput.max = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                dateInput.value = '';
                 document.getElementById('rcmReason').value = '';
-                
+
                 document.getElementById('rescheduleConfirmModal').style.display = 'flex';
+                checkIfPropPast();
             }
 
-            function checkRcmChanges() {
+            // Keep time picker updated for today's past times
+            setInterval(() => {
+                if (document.getElementById('rescheduleConfirmModal').style.display === 'flex') {
+                    updateRcmTimePicker();
+                    checkIfPropPast();
+                }
+            }, 30000);
+
+            function checkIfPropPast() {
                 const dateInput = document.getElementById('rcmDate');
-                const timeInput = document.getElementById('rcmTime');
-                const reasonGroup = document.getElementById('rcmReasonGroup');
-                
+                if (!dateInput) return;
                 const propDate = dateInput.dataset.original;
-                const propTime = (timeInput.dataset.original || '').substring(0, 5);
-                
-                if (dateInput.value !== propDate || timeInput.value !== propTime) {
-                    reasonGroup.style.display = 'block';
+                const propTime = document.getElementById('rcmTime').dataset.original;
+                const btn = document.getElementById('rcmConfirmPropBtn');
+                if (!btn) return;
+
+                const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+                const propDateTime = new Date(propDate + 'T' + propTime);
+
+                if (propDateTime < now) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.title = "This proposal has already passed. Please suggest an alternative schedule.";
+                    btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Proposal Expired';
                 } else {
-                    reasonGroup.style.display = 'none';
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.title = "";
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm Proposal';
+                }
+            }
+
+            function showAlternativeSchedule() {
+                document.getElementById('rcmProposedView').style.display = 'none';
+                document.getElementById('rcmAltForm').style.display = 'block';
+                document.getElementById('rcmSubmitBtn').innerHTML = '<i class="fas fa-paper-plane"></i> Send Counter-Proposal';
+                document.getElementById('rcmSubmitBtn').dataset.mode = 'reschedule';
+                
+                // Set default to admin's proposal so they can adjust from there
+                const dateInput = document.getElementById('rcmDate');
+                const timeSelect = document.getElementById('rcmTime');
+                dateInput.value = dateInput.dataset.original;
+                timeSelect.value = document.getElementById('rcmTime').dataset.original;
+                
+                updateRcmTimePicker();
+            }
+
+            function updateRcmTimePicker() {
+                const dateInput = document.getElementById('rcmDate');
+                const timeSelect = document.getElementById('rcmTime');
+                const selectedDate = dateInput.value;
+                const propDate = dateInput.dataset.original;
+                const propTime = document.getElementById('rcmTime').dataset.original;
+                
+                const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+                const todayStr = now.toISOString().split('T')[0];
+
+                Array.from(timeSelect.options).forEach(opt => {
+                    const timeVal = opt.value;
+                    let disabled = false;
+
+                    // 1. No past times if today
+                    if (selectedDate === todayStr && timeVal <= now.getHours() + ':' + now.getMinutes()) {
+                        disabled = true;
+                    }
+
+                    // 2. Strictly ahead of admin proposal if on the same day
+                    if (selectedDate === propDate && timeVal <= propTime) {
+                        disabled = true;
+                    }
+
+                    opt.disabled = disabled;
+                    opt.style.opacity = disabled ? '0.4' : '1';
+                });
+
+                if (timeSelect.selectedOptions[0]?.disabled) {
+                    timeSelect.value = '';
                 }
             }
             function closeRescheduleConfirmModal() {
                 document.getElementById('rescheduleConfirmModal').style.display = 'none';
             }
             function submitRescheduleConfirm() {
+                const btn  = document.getElementById('rcmSubmitBtn');
+                const mode = btn.dataset.mode;
                 const id   = document.getElementById('rcmRescheduleId').value;
-                const date = document.getElementById('rcmDate').value;
-                const time = document.getElementById('rcmTime').value;
-                const reasonGroup = document.getElementById('rcmReasonGroup');
-                const reason = document.getElementById('rcmReason').value.trim();
+                
+                let date, time, reason;
+                
+                if (mode === 'confirm') {
+                    // Use admin's proposal
+                    date = document.getElementById('rcmDate').dataset.original;
+                    time = document.getElementById('rcmTime').dataset.original;
+                    reason = '';
+                } else {
+                    // Use user's counter-proposal
+                    date = document.getElementById('rcmDate').value;
+                    time = document.getElementById('rcmTime').value;
+                    reason = document.getElementById('rcmReason').value.trim();
 
-                if (!date) { alert('Please select a date.'); return; }
-                if (!time) { alert('Please select a time.'); return; }
-
-                // If date or time changed, reason is mandatory
-                if (reasonGroup.style.display !== 'none' && !reason) {
-                    alert('Please provide a reason for changing the proposed schedule.');
-                    return;
+                    if (!date) { showDashToast('Please select a date.', 'error'); return; }
+                    if (!time) { showDashToast('Please select a time.', 'error'); return; }
+                    if (!reason) { showDashToast('Please provide a reason for the reschedule.', 'error'); return; }
+                    
+                    // Strictly later check
+                    const propDate = document.getElementById('rcmDate').dataset.original;
+                    const propTime = document.getElementById('rcmTime').dataset.original;
+                    if (date < propDate || (date === propDate && time <= propTime)) {
+                        showDashToast('Your alternative schedule must be later than the admin\'s proposal.', 'error');
+                        return;
+                    }
                 }
 
-                const btn = document.getElementById('rcmSubmitBtn');
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> processing...';
                 
                 fetch('ajax/respond_reschedule.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'reschedule_id=' + id + '&action=confirm&chosen_date=' + encodeURIComponent(date) + '&chosen_time=' + encodeURIComponent(time) + '&reason=' + encodeURIComponent(reason)
                 }).then(r => r.json()).then(d => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
                     if (d.success) { 
-                        if (d.counter_proposal) {
-                            alert('Your counter-proposal has been sent back to the admin for review.');
-                        }
                         closeRescheduleConfirmModal(); 
-                        location.reload(); 
+                        showDashToast(d.message, 'success');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showDashToast(d.message, 'error');
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
                     }
-                    else alert(d.message);
                 }).catch(() => {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Date';
-                    alert('Network error. Please try again.');
+                    btn.innerHTML = originalHtml;
+                    showDashToast('Network error. Please try again.', 'error');
                 });
             }
             function respondReschedule(id, action) {
@@ -1852,7 +1921,7 @@ function fmtMins(int $m): string {
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                 <?php if ($pendingAdminResched): ?>
-                                    <button onclick="openRescheduleConfirmModal(<?= $pendingAdminResched['reschedule_id'] ?>, '<?= $pendingAdminResched['new_date'] ?>', '<?= substr($pendingAdminResched['new_time'],0,5) ?>')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;">
+                                    <button onclick="openRescheduleConfirmModal(<?= $pendingAdminResched['reschedule_id'] ?>, '<?= $pendingAdminResched['new_date'] ?>', '<?= substr($pendingAdminResched['new_time'],0,5) ?>', '<?= addslashes($pendingAdminResched['console_type']) ?>', '<?= addslashes($pendingAdminResched['unit_number'] ?? '') ?>')" class="cd-btn" style="background:rgba(32,200,161,.15);border:1px solid rgba(32,200,161,.4);color:#20c8a1;font-size:11px;padding:4px 10px;">
                                         <i class="fas fa-calendar-check"></i> Confirm
                                     </button>
                                     <button onclick="respondReschedule(<?= $pendingAdminResched['reschedule_id'] ?>, 'cancel')" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
@@ -3876,73 +3945,107 @@ function togglePwVisibility(inputId, btnId) {
                         border:1px solid rgba(32,200,161,.25);flex-shrink:0;
                         display:flex;align-items:center;justify-content:center;
                         box-shadow:0 0 20px rgba(32,200,161,.15);">
-                <i class="fas fa-calendar-check" style="color:#20c8a1;font-size:19px;"></i>
+                <i class="fas fa-calendar-alt" style="color:#20c8a1;font-size:19px;"></i>
             </div>
             <div>
                 <div style="font-weight:800;color:#fff;font-size:16px;margin-bottom:3px;">Confirm Reschedule</div>
-                <div style="font-size:12px;color:#888;">Earliest date: <span id="rcmProposedDate" style="color:#f1a83c;font-weight:600;"></span></div>
+                <div style="font-size:12px;color:#888;">Review the proposed changes below</div>
             </div>
         </div>
 
         <input type="hidden" id="rcmRescheduleId">
 
-        <div style="background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.18);
-                    border-radius:10px;padding:10px 14px;font-size:12px;color:#f1a83c;
-                    margin-bottom:18px;display:flex;gap:8px;align-items:flex-start;">
-            <i class="fas fa-info-circle" style="margin-top:2px;flex-shrink:0;"></i>
-            <span>Choose any date <strong>on or after</strong> the proposed date. Your reservation is only updated after you confirm.</span>
+        <!--  READ ONLY PROPOSAL VIEW  -->
+        <div id="rcmProposedView">
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+                        border-radius:16px;padding:20px;margin-bottom:24px;">
+                <div style="display:grid;grid-template-columns:1fr;gap:16px;">
+                    <div>
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Proposed Date</div>
+                        <div id="rcmDisplayDate" style="font-weight:700;color:#fff;font-size:15px;"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Proposed Time</div>
+                        <div id="rcmDisplayTime" style="font-weight:700;color:#20c8a1;font-size:15px;"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Console Unit</div>
+                        <div id="rcmDisplayConsole" style="font-weight:700;color:#5f85da;font-size:15px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px;">
+                <button onclick="submitRescheduleConfirm()" id="rcmConfirmPropBtn"
+                    style="width:100%;background:linear-gradient(135deg,#20c8a1,#16a085);color:#fff;
+                           border:none;border-radius:12px;padding:15px;cursor:pointer;
+                           font-size:15px;font-weight:700;font-family:inherit;
+                           display:flex;align-items:center;justify-content:center;gap:10px;
+                           box-shadow:0 6px 20px rgba(32,200,161,.25);transition:all .2s;">
+                    <i class="fas fa-check-circle"></i> Confirm Proposal
+                </button>
+                <button onclick="showAlternativeSchedule()"
+                    style="width:100%;background:rgba(95,133,218,.12);border:1px solid rgba(95,133,218,.25);
+                           color:#8aa4e8;border-radius:12px;padding:13px;cursor:pointer;
+                           font-size:14px;font-weight:600;font-family:inherit;
+                           display:flex;align-items:center;justify-content:center;gap:8px;
+                           transition:all .2s;">
+                    <i class="fas fa-calendar-plus"></i> Suggest Alternative Schedule
+                </button>
+            </div>
         </div>
 
-        <div style="margin-bottom:14px;">
-            <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
-                          text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
-            <input type="date" id="rcmDate" onchange="checkRcmChanges()"
-                style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
-                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
-                       font-family:inherit;outline:none;box-sizing:border-box;">
-        </div>
+        <!--  ALTERNATIVE SCHEDULE FORM (HIDDEN INITIALLY)  -->
+        <div id="rcmAltForm" style="display:none;">
+            <div style="background:rgba(95,133,218,.06);border:1px solid rgba(95,133,218,.2);
+                        border-radius:12px;padding:12px 14px;font-size:12px;color:#8aa4e8;
+                        margin-bottom:18px;display:flex;gap:10px;align-items:flex-start;">
+                <i class="fas fa-info-circle" style="margin-top:2px;"></i>
+                <span>Suggest a different schedule. Counter-proposals must be <strong>later</strong> than the admin's original proposal.</span>
+            </div>
 
-        <div style="margin-bottom:18px;">
-            <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
-                          text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
-            <select id="rcmTime" onchange="checkRcmChanges()"
-                style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
-                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
-                       font-family:inherit;outline:none;">
-                <?php for($h=12;$h<=23;$h++) foreach(['00','30'] as $m){
-                    $v=sprintf('%02d:%s',$h,$m);
-                    echo '<option value="'.$v.'">'.date('g:i A',strtotime('2000-01-01 '.$v)).'</option>'.PHP_EOL;
-                } ?>
-            </select>
-        </div>
+            <div style="margin-bottom:14px;">
+                <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
+                              text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
+                <input type="date" id="rcmDate" onchange="updateRcmTimePicker()"
+                    style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
+                           color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
+                           font-family:inherit;outline:none;box-sizing:border-box;">
+            </div>
 
-        <!-- Reason for change (Hidden by default, shown if date/time differs from proposal) -->
-        <div id="rcmReasonGroup" style="display:none;margin-bottom:24px;">
-            <label style="font-size:11px;font-weight:700;color:#fb566b;display:block;margin-bottom:6px;
-                          text-transform:uppercase;letter-spacing:.6px;">Reason for change *</label>
-            <textarea id="rcmReason" rows="2" placeholder="Please explain why you need a different schedule..."
-                style="width:100%;background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.25);
-                       color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:13px;
-                       font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
-        </div>
+            <div style="margin-bottom:18px;">
+                <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
+                              text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
+                <select id="rcmTime"
+                    style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
+                           color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
+                           font-family:inherit;outline:none;">
+                    <?php for($h=12;$h<=23;$h++) foreach(['00','30'] as $m){
+                        $v=sprintf('%02d:%s',$h,$m);
+                        echo '<option value="'.$v.'">'.date('g:i A',strtotime('2000-01-01 '.$v)).'</option>'.PHP_EOL;
+                    } ?>
+                </select>
+            </div>
 
-        <div style="display:flex;gap:10px;">
-            <button id="rcmSubmitBtn" onclick="submitRescheduleConfirm()"
-                style="flex:1;background:linear-gradient(135deg,#20c8a1,#5f85da);color:#fff;
-                       border:none;border-radius:10px;padding:13px 18px;cursor:pointer;
-                       font-size:14px;font-weight:700;font-family:inherit;
-                       display:flex;align-items:center;justify-content:center;gap:8px;
-                       box-shadow:0 4px 18px rgba(32,200,161,.3);transition:opacity .2s;">
-                <i class="fas fa-calendar-check"></i> Confirm Date
-            </button>
-            <button onclick="closeRescheduleConfirmModal()"
-                style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
-                       color:#aaa;border-radius:10px;padding:13px 22px;cursor:pointer;
-                       font-size:14px;font-weight:600;font-family:inherit;transition:all .2s;"
-                onmouseover="this.style.background='rgba(255,255,255,.12)'"
-                onmouseout="this.style.background='rgba(255,255,255,.07)'">
-                Cancel
-            </button>
+            <div style="margin-bottom:24px;">
+                <label style="font-size:11px;font-weight:700;color:#fb566b;display:block;margin-bottom:6px;
+                              text-transform:uppercase;letter-spacing:.6px;">Reason for change *</label>
+                <textarea id="rcmReason" rows="2" placeholder="Explain why you need this schedule..."
+                    style="width:100%;background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.25);
+                           color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:13px;
+                           font-family:inherit;outline:none;box-sizing:border-box;resize:none;"></textarea>
+            </div>
+
+            <div style="display:flex;gap:10px;">
+                <button id="rcmSubmitBtn" onclick="submitRescheduleConfirm()"
+                    style="flex:1;background:linear-gradient(135deg,#5f85da,#20c8a1);color:#fff;
+                           border:none;border-radius:10px;padding:13px 18px;cursor:pointer;
+                           font-size:14px;font-weight:700;font-family:inherit;
+                           display:flex;align-items:center;justify-content:center;gap:8px;
+                           box-shadow:0 4px 18px rgba(95,133,218,.3);transition:all .2s;">
+                    <i class="fas fa-calendar-check"></i> Send Proposal
+                </button>
+            </div>
         </div>
     </div>
 </div>
