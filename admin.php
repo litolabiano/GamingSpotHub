@@ -1148,6 +1148,7 @@ $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === '
 
 // ── Controller Rental status per active console ──────────────────────────────
 // Maps console_id => [ qty => int, total_cost => float, session_id => int ]
+// Rows tagged [ENDED] are excluded — they represent returned controllers.
 $ctrlRentalByConsole = [];
 $crQ = $conn->query(
     "SELECT gs.console_id,
@@ -1160,6 +1161,7 @@ $crQ = $conn->query(
          ON ar.session_id = gs.session_id
         AND ar.request_type = 'controller_rental'
         AND ar.status = 'approved'
+        AND ar.description NOT LIKE '%[ENDED]%'
       WHERE gs.status IN ('active','paused')
       GROUP BY gs.console_id, gs.session_id"
 );
@@ -1182,6 +1184,8 @@ if ($crQ) {
                 }
             }
         }
+        // Skip if no active controllers remain (all ended on this session)
+        if ($qty <= 0) continue;
         $ctrlRentalByConsole[(int)$row['console_id']] = [
             'qty'         => $qty,
             'max_mins'    => $max_mins,
@@ -3339,16 +3343,17 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
         .then(function(ex){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
                 plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate,
-                ex.extras || 0, ex.items || [], sourceReservationId);
+                ex.extras || 0, ex.items || [], sourceReservationId, ex);
         })
         .catch(function(){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
-                plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, 0, [], sourceReservationId);
+                plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, 0, [], sourceReservationId, {});
         });
 }
 
-function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, extras, extraItems, sourceReservationId) {
+function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, extras, extraItems, sourceReservationId, extrasData) {
     extras                 = extras                 || 0;
+    extrasData             = extrasData             || {};
     reservationDownpayment = reservationDownpayment || 0;
 
     // Helper: Update the itemized billing breakdown UI
@@ -3817,9 +3822,8 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         confirmLbl.textContent = 'Confirm End & Record Payment';
     }
 
-    /* ── Controller add-on: end early (re-rate + release hardware) ─────── */
+    /* ── Controller add-on: per-controller end-early panel ─────────────── */
     const ctrlEarlyPanel = document.getElementById('endCtrlRentalEarlyPanel');
-    const ctrlEarlyBtn   = document.getElementById('endCtrlRentalEarlyBtn');
     const ctrlEarlyMsg   = document.getElementById('endCtrlRentalEarlyMsg');
     const endModalEl     = document.getElementById('endSessionModal');
     if (endModalEl) {
@@ -3836,64 +3840,113 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             sourceReservationId: sourceReservationId
         });
     }
-    const hasCtrlExtra = (extraItems || []).some(function (it) {
-        return /controller\s*rental/i.test(it.description || '');
-    });
-    if (ctrlEarlyPanel && ctrlEarlyBtn && ctrlEarlyMsg) {
-        if (hasCtrlExtra) {
+
+    const ctrlRows = (extrasData && extrasData.controller_rows) ? extrasData.controller_rows : [];
+    const activeCtrlRows = ctrlRows.filter(r => !r.is_ended);
+
+    if (ctrlEarlyPanel) {
+        if (activeCtrlRows.length > 0) {
             ctrlEarlyPanel.style.display = 'block';
-            ctrlEarlyMsg.textContent = '';
-            ctrlEarlyMsg.style.color = '#888';
-            ctrlEarlyBtn.disabled = false;
-            ctrlEarlyBtn.onclick = function () {
-                if (!confirm('End controller add-on now? Fees will be recalculated to elapsed session time and controllers returned to available.')) {
-                    return;
-                }
-                ctrlEarlyBtn.disabled = true;
-                ctrlEarlyMsg.style.color = '#888';
-                ctrlEarlyMsg.textContent = 'Processing...';
-                const fd = new FormData();
-                fd.append('csrf_token', window.GSPOT_CSRF || '');
-                fd.append('session_id', String(sessionId));
-                fetch('ajax/end_controller_rental_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        ctrlEarlyBtn.disabled = false;
-                        if (data.success) {
-                            ctrlEarlyMsg.style.color = '#20c8a1';
-                            ctrlEarlyMsg.textContent = data.message || 'Updated.';
-                            let ctx = {};
-                            try { ctx = JSON.parse(endModalEl.dataset.endSessionCtx || '{}'); } catch (e) {}
-                            setTimeout(function () {
-                                openEndSessionModal(
-                                    ctx.sessionId,
-                                    ctx.customerName,
-                                    ctx.unitNumber,
-                                    ctx.mode,
-                                    ctx.startTs,
-                                    ctx.plannedMinutes,
-                                    ctx.upfrontPaid,
-                                    ctx.reservationDownpayment,
-                                    ctx.unlimitedRate,
-                                    ctx.sourceReservationId
-                                );
-                            }, 400);
-                        } else {
-                            ctrlEarlyMsg.style.color = '#fb566b';
-                            ctrlEarlyMsg.textContent = data.message || 'Failed.';
-                        }
-                    })
-                    .catch(function () {
-                        ctrlEarlyBtn.disabled = false;
-                        ctrlEarlyMsg.style.color = '#fb566b';
-                        ctrlEarlyMsg.textContent = 'Network error.';
-                    });
-            };
+            if (ctrlEarlyMsg) { ctrlEarlyMsg.textContent = ''; }
+
+            // Build header row
+            let html = '<div style="font-weight:700;color:#8aa4e8;font-size:13px;margin-bottom:10px;">'
+                     + '<i class="fas fa-gamepad" style="margin-right:6px;"></i> Controller add-on'
+                     + '<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px;">Return individual controllers early — fee prorated to elapsed time.</span>'
+                     + '</div>';
+
+            // Per-controller rows
+            html += '<div id="ctrlPerRowList" style="display:flex;flex-direction:column;gap:8px;">';
+            activeCtrlRows.forEach(function(cr) {
+                const costLabel = cr.original_cost > 0 ? '₱' + cr.original_cost.toFixed(2) + ' booked' : 'Open Time';
+                html += '<div id="ctrlRow_' + cr.controller_id + '" style="display:flex;align-items:center;gap:10px;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:10px 14px;">'
+                      + '<i class="fas fa-gamepad" style="color:#8aa4e8;font-size:14px;flex-shrink:0;"></i>'
+                      + '<div style="flex:1;min-width:0;">'
+                      + '<div style="font-weight:700;color:#f0f0f0;font-size:13px;">' + cr.label + '</div>'
+                      + '<div style="font-size:11px;color:#888;margin-top:2px;">' + costLabel + '</div>'
+                      + '</div>'
+                      + '<button type="button" class="btn-sec btn-sm ctrl-single-end-btn" data-cid="' + cr.controller_id + '" style="white-space:nowrap;font-size:11px;padding:7px 12px;">'
+                      + '<i class="fas fa-hand-holding"></i> End Now'
+                      + '</button>'
+                      + '</div>';
+            });
+            html += '</div>';
+
+            // "End ALL" shortcut only when > 1 active controller
+            if (activeCtrlRows.length > 1) {
+                html += '<button type="button" id="endAllCtrlBtn" class="btn-sec btn-sm" style="margin-top:10px;width:100%;font-size:11px;padding:7px 0;">'
+                      + '<i class="fas fa-hand-holding-heart"></i> End ALL controllers now'
+                      + '</button>';
+            }
+
+            ctrlEarlyPanel.innerHTML = html;
+
+            // Wire up per-controller buttons
+            ctrlEarlyPanel.querySelectorAll('.ctrl-single-end-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const cid = parseInt(btn.dataset.cid, 10);
+                    if (!cid) return;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    const fd = new FormData();
+                    fd.append('csrf_token', window.GSPOT_CSRF || '');
+                    fd.append('session_id', String(sessionId));
+                    fd.append('controller_id', String(cid));
+                    fetch('ajax/end_single_controller_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            const row = document.getElementById('ctrlRow_' + cid);
+                            if (data.success) {
+                                const refund = parseFloat(data.refund_amount || 0);
+                                if (row) {
+                                    const refundBadge = refund > 0
+                                        ? '<span style="font-size:11px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:6px;padding:2px 8px;margin-left:8px;">'
+                                          + '<i class="fas fa-undo-alt" style="margin-right:3px;"></i>Refund ₱' + refund.toFixed(2) + '</span>'
+                                        : '';
+                                    row.style.opacity = '0.5';
+                                    row.querySelector('.ctrl-single-end-btn').outerHTML =
+                                        '<span style="font-size:11px;color:#20c8a1;font-weight:700;white-space:nowrap;">'
+                                        + '<i class="fas fa-check-circle" style="margin-right:4px;"></i>Ended' + refundBadge + '</span>';
+                                }
+                                // Refresh the modal costs to reflect the new extras total
+                                let ctx = {};
+                                try { ctx = JSON.parse(endModalEl.dataset.endSessionCtx || '{}'); } catch(e) {}
+                                setTimeout(function() {
+                                    openEndSessionModal(
+                                        ctx.sessionId, ctx.customerName, ctx.unitNumber,
+                                        ctx.mode, ctx.startTs, ctx.plannedMinutes,
+                                        ctx.upfrontPaid, ctx.reservationDownpayment,
+                                        ctx.unlimitedRate, ctx.sourceReservationId
+                                    );
+                                }, 600);
+                            } else {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-hand-holding"></i> End Now';
+                                showInlineToast(data.message || 'Failed.', 'error');
+                            }
+                        })
+                        .catch(function() {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-hand-holding"></i> End Now';
+                            showInlineToast('Network error.', 'error');
+                        });
+                });
+            });
+
+            // Wire up "End ALL" button
+            const endAllBtn = document.getElementById('endAllCtrlBtn');
+            if (endAllBtn) {
+                endAllBtn.addEventListener('click', function() {
+                    if (!confirm('End ALL controller add-ons now? Fees will be recalculated to elapsed session time and all controllers returned to available.')) return;
+                    gspotEndControllerRentalEarly(sessionId);
+                });
+            }
+
         } else {
             ctrlEarlyPanel.style.display = 'none';
-            ctrlEarlyBtn.onclick = null;
         }
     }
+
 
     openModal('endSession');
 }

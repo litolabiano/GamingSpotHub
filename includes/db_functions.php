@@ -845,6 +845,240 @@ function computePartialPeriodCost($minutes) {
 }
 
 /**
+ * Staff: end ONE specific controller's rental early on an active session.
+ *
+ * If the session has two controllers on a single additional_requests row,
+ * the row is split:
+ *   - ended controller → frozen [FIX:id:cost] at prorated elapsed time
+ *   - remaining controller(s) → kept in the original row (cost adjusted)
+ *
+ * Returns refund_amount = original_cost_for_this_controller - prorated_cost.
+ *
+ * @return array{success:bool, message?:string, refund_amount?:float,
+ *               prorated_cost?:float, original_cost?:float, elapsed_minutes?:int}
+ */
+function endSingleControllerEarly(int $session_id, int $controller_id, int $staff_user_id): array {
+    global $conn;
+
+    if ($session_id <= 0 || $controller_id <= 0) {
+        return ['success' => false, 'message' => 'Invalid session or controller.'];
+    }
+
+    $conn->begin_transaction();
+    try {
+        // ── 1. Fetch active session ───────────────────────────────────────
+        $s = $conn->prepare(
+            "SELECT session_id, start_time FROM gaming_sessions WHERE session_id = ? AND status = 'active'"
+        );
+        $s->bind_param('i', $session_id);
+        $s->execute();
+        $session = $s->get_result()->fetch_assoc();
+        if (!$session) {
+            $conn->rollback();
+            return ['success' => false, 'message' => 'Session is not active.'];
+        }
+
+        $start   = new DateTime($session['start_time'], new DateTimeZone('Asia/Manila'));
+        $now     = new DateTime('now',                  new DateTimeZone('Asia/Manila'));
+        $elapsed = max(0, (int) floor(($now->getTimestamp() - $start->getTimestamp()) / 60));
+
+        // ── 2. Find the controller_rental row containing this controller ──
+        $ar = $conn->prepare(
+            "SELECT request_id, description, extra_cost
+               FROM additional_requests
+              WHERE session_id = ? AND request_type = 'controller_rental' AND status = 'approved'"
+        );
+        $ar->bind_param('i', $session_id);
+        $ar->execute();
+        $rows = $ar->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $targetRow = null;
+        $allIds    = [];
+        foreach ($rows as $row) {
+            if (preg_match('/IDs:\s*([\d,\s]+)/', $row['description'], $m)) {
+                $ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($m[1])))));
+                if (in_array($controller_id, $ids, true)) {
+                    $targetRow = $row;
+                    $allIds    = $ids;
+                    break;
+                }
+            }
+        }
+        if (!$targetRow) {
+            $conn->rollback();
+            return ['success' => false, 'message' => 'Controller #' . $controller_id . ' not found in any active rental row for this session.'];
+        }
+
+        // ── 3. Fetch controller hourly rate ───────────────────────────────
+        $cr = $conn->prepare('SELECT hourly_rate, unit_number FROM controllers WHERE controller_id = ?');
+        $cr->bind_param('i', $controller_id);
+        $cr->execute();
+        $ctrlRow = $cr->get_result()->fetch_assoc();
+        if (!$ctrlRow || (float)$ctrlRow['hourly_rate'] <= 0) {
+            $conn->rollback();
+            return ['success' => false, 'message' => 'Controller rate not found.'];
+        }
+        $rate       = (float) $ctrlRow['hourly_rate'];
+        $ctrlLabel  = 'Controller #' . $controller_id . ' (' . ($ctrlRow['unit_number'] ?? 'C' . $controller_id) . ')';
+
+        // ── 4. Calculate original cost for THIS controller ────────────────
+        $desc        = (string) $targetRow['description'];
+        $totalCost   = (float) $targetRow['extra_cost'];
+        $numCtrls    = count($allIds);
+
+        // Parse [FIX:id:cost|...] to find this controller's original amount
+        $fixParts = [];
+        if (preg_match('/\[FIX:([^\]]+)\]/', $desc, $fm)) {
+            foreach (explode('|', $fm[1]) as $pair) {
+                $pair = trim($pair);
+                if ($pair === '') continue;
+                $parts = explode(':', $pair, 2);
+                if (count($parts) === 2) {
+                    $fixParts[(int)$parts[0]] = (float)$parts[1];
+                }
+            }
+        }
+
+        // Parse [OT_IDS:...] and [Mins:...] for open-time or minute-based billing
+        $otIds = [];
+        if (preg_match('/\[OT_IDS:([^\]]*)\]/', $desc, $om)) {
+            $s2 = trim((string)$om[1]);
+            if ($s2 !== '') {
+                $otIds = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', $s2))));
+            }
+        } elseif (strpos($desc, 'Open Time run-the-clock') !== false) {
+            // Legacy open-time: all IDs are open-time
+            $otIds = $allIds;
+        }
+        $minsMap = [];
+        if (preg_match('/\[Mins:\s*([\d,\s]+)\]/', $desc, $mm)) {
+            $minsMap = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($mm[1])))));
+        }
+
+        // Determine original cost for this controller
+        $ctrlIdx      = array_search($controller_id, $allIds, true);
+        $originalCost = 0.0;
+        if (isset($fixParts[$controller_id])) {
+            $originalCost = $fixParts[$controller_id];
+        } elseif (in_array($controller_id, $otIds, true)) {
+            // Open-time: original cost was the running total at elapsed — just use prorated as original
+            $originalCost = computeControllerOpenTimeFeeForDuration($elapsed, $rate); // will net 0 refund
+        } elseif ($minsMap !== [] && isset($minsMap[$ctrlIdx])) {
+            $originalCost = round($rate * ($minsMap[$ctrlIdx] / 60), 2);
+        } elseif ($numCtrls === 1 && $totalCost > 0) {
+            $originalCost = $totalCost;
+        } else {
+            // Fallback: split evenly
+            $originalCost = round($totalCost / $numCtrls, 2);
+        }
+
+        // ── 5. Prorate cost to elapsed time ───────────────────────────────
+        $proratedCost = 0.0;
+        if (in_array($controller_id, $otIds, true)) {
+            $proratedCost = computeControllerOpenTimeFeeForDuration($elapsed, $rate);
+        } elseif ($originalCost > 0) {
+            $bookedMins   = (int) round(($originalCost / $rate) * 60);
+            $billMins     = min($bookedMins, $elapsed);
+            $proratedCost = round($rate * ($billMins / 60), 2);
+        }
+
+        $refundAmt = max(0.0, round($originalCost - $proratedCost, 2));
+
+        // ── 6. Update the additional_requests row ─────────────────────────
+        $remainingIds = array_values(array_filter($allIds, fn($id) => $id !== $controller_id));
+
+        if ($remainingIds === []) {
+            // Only controller on this row — freeze entire row at elapsed
+            $newDesc  = 'Controller rental (IDs: ' . $controller_id . ') [FIX:' . $controller_id . ':' . number_format($proratedCost, 2, '.', '') . '] [ENDED]';
+            $newCost  = $proratedCost;
+            $upd = $conn->prepare('UPDATE additional_requests SET description = ?, extra_cost = ? WHERE request_id = ?');
+            $rid = (int) $targetRow['request_id'];
+            $upd->bind_param('sdi', $newDesc, $newCost, $rid);
+            $upd->execute();
+        } else {
+            // Multiple controllers — freeze ended one; keep rest in original row
+            // Ended controller: new row with frozen cost
+            $endedDesc = 'Controller rental (IDs: ' . $controller_id . ') [FIX:' . $controller_id . ':' . number_format($proratedCost, 2, '.', '') . '] [ENDED]';
+            $ins = $conn->prepare(
+                "INSERT INTO additional_requests (session_id, request_type, description, extra_cost, status, created_at)
+                 VALUES (?, 'controller_rental', ?, ?, 'approved', NOW())"
+            );
+            $ins->bind_param('isd', $session_id, $endedDesc, $proratedCost);
+            $ins->execute();
+
+            // Rebuild remaining controllers row: rebuild fix parts minus ended controller
+            $remainingFixParts = $fixParts;
+            unset($remainingFixParts[$controller_id]);
+
+            $remainingOtIds = array_values(array_filter($otIds, fn($id) => $id !== $controller_id));
+            $remainingMinsMap = $minsMap;
+            if (isset($remainingMinsMap[$ctrlIdx])) {
+                array_splice($remainingMinsMap, $ctrlIdx, 1);
+            }
+
+            // Build new fix-parts string for remaining controllers
+            $newPairs = [];
+            foreach ($remainingIds as $i => $rid2) {
+                if (isset($remainingFixParts[$rid2])) {
+                    $newPairs[] = $rid2 . ':' . number_format($remainingFixParts[$rid2], 2, '.', '');
+                } elseif (in_array($rid2, $remainingOtIds, true)) {
+                    // stays as open-time — no fix part yet
+                } elseif (isset($remainingMinsMap[$i])) {
+                    $amt = round($rate * ($remainingMinsMap[$i] / 60), 2);
+                    $newPairs[] = $rid2 . ':' . number_format($amt, 2, '.', '');
+                }
+            }
+
+            $newRemDesc = 'Controller rental (IDs: ' . implode(', ', $remainingIds) . ')';
+            if ($newPairs !== []) {
+                $newRemDesc .= ' [FIX:' . implode('|', $newPairs) . ']';
+            }
+            if ($remainingOtIds !== []) {
+                $newRemDesc .= ' [OT_IDS:' . implode(',', $remainingOtIds) . ']';
+            }
+            if ($remainingMinsMap !== [] && $newPairs === []) {
+                $newRemDesc .= ' [Mins:' . implode(',', $remainingMinsMap) . ']';
+            }
+
+            // Recalculate remaining row cost
+            $newRemCost = round($totalCost - $originalCost, 2);
+            $upd2 = $conn->prepare('UPDATE additional_requests SET description = ?, extra_cost = ? WHERE request_id = ?');
+            $origRid = (int) $targetRow['request_id'];
+            $upd2->bind_param('sdi', $newRemDesc, $newRemCost, $origRid);
+            $upd2->execute();
+        }
+
+        // ── 7. Mark controller as available ───────────────────────────────
+        $cu = $conn->prepare("UPDATE controllers SET status = 'available' WHERE controller_id = ?");
+        $cu->bind_param('i', $controller_id);
+        $cu->execute();
+
+        $conn->commit();
+
+        logActivity(
+            $staff_user_id,
+            'Controller rental',
+            "Ended {$ctrlLabel} early on session #{$session_id} (elapsed {$elapsed} min). " .
+            "Prorated: ₱" . number_format($proratedCost, 2) . " / Original: ₱" . number_format($originalCost, 2) . " / Refund: ₱" . number_format($refundAmt, 2) . "."
+        );
+
+        return [
+            'success'         => true,
+            'message'         => $ctrlLabel . ' rental ended. Prorated to elapsed time.',
+            'refund_amount'   => $refundAmt,
+            'prorated_cost'   => $proratedCost,
+            'original_cost'   => $originalCost,
+            'elapsed_minutes' => $elapsed,
+            'controller_label'=> $ctrlLabel,
+        ];
+
+    } catch (Throwable $e) {
+        $conn->rollback();
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
  * Compute cost for any duration using DB-driven bracket billing with
  * a FREE bonus every N paid minutes.
  *
