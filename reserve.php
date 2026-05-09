@@ -87,7 +87,7 @@ $controllerRentalFee = (float)(getSetting('controller_rental_fee') ?? 20.0);
 // ── Load available controllers for rental (status=available) ─────────────────
 $availableControllers = [];
 $ctrlRes = $conn->query(
-    "SELECT c.controller_id, c.unit_number,
+    "SELECT c.controller_id, c.unit_number, c.hourly_rate,
             ct.type_name AS type_name, ct.console_type_id,
             cs.type_name AS console_type_name
        FROM controllers c
@@ -323,18 +323,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $ctrl_fee = 0.0;
     if ($with_ctrl) {
-        $getFee = $conn->prepare("SELECT ct.hourly_rate FROM controllers c JOIN controller_types ct ON c.controller_type_id = ct.type_id WHERE c.controller_id = ?");
+        $getFee = $conn->prepare("SELECT c.hourly_rate FROM controllers c WHERE c.controller_id = ?");
+        $duration_hours = ($rental_mode === 'hourly' && $planned_minutes > 0) ? ($planned_minutes / 60) : 0;
         if ($ctrl_id) {
             $getFee->bind_param('i', $ctrl_id);
             $getFee->execute();
             $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0);
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * $duration_hours;
         }
         if ($ctrl_id_2) {
             $getFee->bind_param('i', $ctrl_id_2);
             $getFee->execute();
             $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0);
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * $duration_hours;
         }
     }
 
@@ -1711,23 +1712,65 @@ if (!empty($_GET['console'])) {
                             </div>
                         </label>
                         <div id="controllerSelectorBlock" style="display:none;margin-top:14px;background:rgba(0,0,0,.2);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,.06);">
-                            <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Specific Controller *</label>
                             <style>
                                 #selectedControllerId option, #selectedControllerId2 option {
-                                    background-color: #0d1a35;
-                                    color: #e8eaf6;
+                                    background-color: #0d1a35; color: #e8eaf6;
                                 }
+                                .ctrl-res-dur-btn {
+                                    background: rgba(95,133,218,.08);
+                                    border: 1px solid rgba(95,133,218,.2);
+                                    color: #c8d5f5; border-radius: 8px;
+                                    padding: 7px 4px; font-size: 11px; font-weight: 600;
+                                    cursor: pointer; transition: all .2s; font-family: inherit;
+                                    text-align: center; line-height: 1.4;
+                                }
+                                .ctrl-res-dur-btn:hover { background: rgba(95,133,218,.2); border-color: rgba(95,133,218,.5); }
+                                .ctrl-res-dur-btn.selected { background: rgba(95,133,218,.35); border-color: #5f85da; color: #fff; box-shadow: 0 0 0 2px rgba(95,133,218,.3); }
                             </style>
-                            <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:8px;" onchange="recalcFee()">
+
+                            <?php
+                            // Reusable duration button HTML generator
+                            function ctrlDurationBtns(string $idx): string {
+                                $html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;" id="ctrlResDurationBtns' . $idx . '">';
+                                for ($m = 30; $m <= 240; $m += 30) {
+                                    $h = intdiv($m, 60); $r = $m % 60;
+                                    if ($h && $r)  $lbl = "{$h}h {$r}m";
+                                    elseif ($h)    $lbl = $h === 1 ? '1 hr' : "{$h} hrs";
+                                    else           $lbl = "{$r} min";
+                                    $html .= "<button type=\"button\" class=\"ctrl-res-dur-btn\" data-mins=\"{$m}\" data-ctrl=\"{$idx}\" onclick=\"onResCtrlDurationSelect({$m},{$idx})\">{$lbl}</button>";
+                                }
+                                $html .= '</div>';
+                                return $html;
+                            }
+                            ?>
+
+                            <!-- ── Controller 1 ── -->
+                            <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Specific Controller *</label>
+                            <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;" onchange="onCtrl1Change()">
                                 <option value="">Select a controller...</option>
                             </select>
-                            
-                            <label id="lblControllerId2" style="display:none;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:.5px;">Select 2nd Controller *</label>
-                            <select name="controller_id_2" id="selectedControllerId2" style="display:none;width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;" onchange="recalcFee()">
-                                <option value="">Select 2nd controller...</option>
-                            </select>
-                        </div>
-                    </div>
+                            <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+                                <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 1 — Rental Duration
+                            </label>
+                            <?= ctrlDurationBtns('1') ?>
+                            <div id="ctrlResCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;padding:7px 10px;background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);border-radius:8px;"></div>
+                            <input type="hidden" name="controller_rental_minutes_1" id="resCtrlMins1" value="0">
+
+                            <!-- ── Controller 2 (shown when count = 2) ── -->
+                            <div id="ctrl2Block" style="display:none; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.06);">
+                                <label id="lblControllerId2" style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select 2nd Controller *</label>
+                                <select name="controller_id_2" id="selectedControllerId2" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;" onchange="onCtrl2Change()">
+                                    <option value="">Select 2nd controller...</option>
+                                </select>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+                                    <i class="fas fa-clock" style="margin-right:4px;"></i> Controller 2 — Rental Duration
+                                </label>
+                                <?= ctrlDurationBtns('2') ?>
+                                <div id="ctrlResCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;padding:7px 10px;background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);border-radius:8px;"></div>
+                                <input type="hidden" name="controller_rental_minutes_2" id="resCtrlMins2" value="0">
+                            </div><!-- /ctrl2Block -->
+                        </div><!-- /controllerSelectorBlock -->
+                    </div><!-- /addonsCard -->
 
                     <!-- ── Step 4: Reservation Fee / GCash Payment ── -->
                     <div class="reserve-card" style="margin-bottom:24px;" id="dpCard">
@@ -2149,31 +2192,91 @@ function updateDurationLabels() {
 }
 
 function onExtraControllerToggle() {
-    const chk = document.getElementById('withControllerCheck');
+    const chk      = document.getElementById('withControllerCheck');
     const countSel = document.getElementById('controllerCount');
-    const block = document.getElementById('controllerSelectorBlock');
-    const sel2 = document.getElementById('selectedControllerId2');
-    const lbl2 = document.getElementById('lblControllerId2');
-    
+    const block    = document.getElementById('controllerSelectorBlock');
+    const ctrl2    = document.getElementById('ctrl2Block');
+
     if (chk && chk.checked) {
-        if(countSel) countSel.disabled = false;
-        if(block) block.style.display = 'block';
-        if (countSel && countSel.value === '2') {
-            if(sel2) sel2.style.display = 'block';
-            if(lbl2) lbl2.style.display = 'block';
-        } else {
-            if(sel2) { sel2.style.display = 'none'; sel2.value = ''; }
-            if(lbl2) lbl2.style.display = 'none';
-        }
+        if (countSel) countSel.disabled = false;
+        if (block)    block.style.display = 'block';
+        if (ctrl2)    ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
     } else {
-        if(countSel) countSel.disabled = true;
-        if(block) block.style.display = 'none';
-        const sel = document.getElementById('selectedControllerId');
-        if (sel) sel.value = '';
-        if (sel2) { sel2.style.display = 'none'; sel2.value = ''; }
-        if (lbl2) lbl2.style.display = 'none';
+        if (countSel) countSel.disabled = true;
+        if (block)    block.style.display = 'none';
+        // Reset both controllers
+        ['selectedControllerId','selectedControllerId2'].forEach(id => {
+            const s = document.getElementById(id); if (s) s.value = '';
+        });
+        document.querySelectorAll('.ctrl-res-dur-btn').forEach(b => b.classList.remove('selected'));
+        ['resCtrlMins1','resCtrlMins2'].forEach(id => {
+            const i = document.getElementById(id); if (i) i.value = '0';
+        });
+        ['ctrlResCostPreview1','ctrlResCostPreview2'].forEach(id => {
+            const d = document.getElementById(id); if (d) d.style.display = 'none';
+        });
     }
     if (typeof recalcFee === 'function') recalcFee();
+}
+
+// Called when controllerCount dropdown changes
+function _syncCtrl2Visibility() {
+    const countSel = document.getElementById('controllerCount');
+    const ctrl2    = document.getElementById('ctrl2Block');
+    if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
+    // If ctrl2 hidden, clear its values
+    if (countSel?.value !== '2') {
+        const s2 = document.getElementById('selectedControllerId2'); if (s2) s2.value = '';
+        document.querySelectorAll('.ctrl-res-dur-btn[data-ctrl="2"]').forEach(b => b.classList.remove('selected'));
+        const m2 = document.getElementById('resCtrlMins2'); if (m2) m2.value = '0';
+        const p2 = document.getElementById('ctrlResCostPreview2'); if (p2) p2.style.display = 'none';
+    }
+    recalcFee();
+}
+
+function _ctrlCostPreview(ctrl, mins) {
+    const selId = ctrl === 1 ? 'selectedControllerId' : 'selectedControllerId2';
+    const prevId = `ctrlResCostPreview${ctrl}`;
+    const sel = document.getElementById(selId);
+    const prev = document.getElementById(prevId);
+    if (!prev) return;
+    const rate = (sel && sel.selectedIndex > 0)
+        ? parseFloat(sel.options[sel.selectedIndex].dataset.rate || 0) : 0;
+    const h = Math.floor(mins/60), r = mins%60;
+    const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
+    if (rate > 0 && mins > 0) {
+        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${lbl} = <strong>&#8369;${(rate*mins/60).toFixed(2)}</strong>`;
+        prev.style.display = 'block';
+    } else if (mins > 0) {
+        prev.innerHTML = `<i class="fas fa-clock" style="margin-right:4px;"></i>Select a controller unit above to see the cost.`;
+        prev.style.display = 'block';
+    } else {
+        prev.style.display = 'none';
+    }
+}
+
+function onResCtrlDurationSelect(mins, ctrl) {
+    const minsId = ctrl === 1 ? 'resCtrlMins1' : 'resCtrlMins2';
+    // Highlight only buttons for this controller
+    document.querySelectorAll(`.ctrl-res-dur-btn[data-ctrl="${ctrl}"]`).forEach(b => {
+        b.classList.toggle('selected', parseInt(b.dataset.mins) === mins);
+    });
+    const minsIn = document.getElementById(minsId);
+    if (minsIn) minsIn.value = mins;
+    _ctrlCostPreview(ctrl, mins);
+    recalcFee();
+}
+
+function onCtrl1Change() {
+    const mins = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
+    _ctrlCostPreview(1, mins);
+    recalcFee();
+}
+
+function onCtrl2Change() {
+    const mins = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
+    _ctrlCostPreview(2, mins);
+    recalcFee();
 }
 
 function updateControllerDropdown() {
@@ -2225,17 +2328,28 @@ function updateControllerDropdown() {
         if (sel2) sel2.innerHTML = '<option value="">Select 2nd controller...</option>';
         matching.forEach(c => {
             const hr = parseFloat(c.hourly_rate || 20);
+            const ctrlMins = parseInt(document.getElementById('resControllerRentalMinutes')?.value || 0);
+
+            const costLabel = ctrlMins > 0
+                ? (()=>{ const h=Math.floor(ctrlMins/60),r=ctrlMins%60; const lbl=h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${ctrlMins} min`; return `\u20b1${hr.toFixed(2)}/hr \xd7 ${lbl} = \u20b1${(hr*ctrlMins/60).toFixed(2)}`; })()
+                : `\u20b1${hr.toFixed(2)}/hr`;
+
             const opt = document.createElement('option');
             opt.value = c.controller_id;
             opt.dataset.rate = hr;
-            opt.textContent = `${c.type_name} #${c.unit_number} (₱${hr.toFixed(2)})`;
+            opt.textContent = `${c.type_name} #${c.unit_number} (${costLabel})`;
             sel.appendChild(opt);
-            
+
             if (sel2) {
+                // Build label using ctrl2 minutes
+                const ctrlMins2 = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
+                const costLabel2 = ctrlMins2 > 0
+                    ? (()=>{ const h=Math.floor(ctrlMins2/60),r=ctrlMins2%60; const lbl=h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${ctrlMins2} min`; return `\u20b1${hr.toFixed(2)}/hr \xd7 ${lbl} = \u20b1${(hr*ctrlMins2/60).toFixed(2)}`; })()
+                    : `\u20b1${hr.toFixed(2)}/hr`;
                 const opt2 = document.createElement('option');
                 opt2.value = c.controller_id;
                 opt2.dataset.rate = hr;
-                opt2.textContent = `${c.type_name} #${c.unit_number} (₱${hr.toFixed(2)})`;
+                opt2.textContent = `${c.type_name} #${c.unit_number} (${costLabel2})`;
                 sel2.appendChild(opt2);
             }
         });
@@ -2606,7 +2720,7 @@ function selectDuration(mins) {
     document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
     document.querySelector(`.dur-btn[data-mins="${mins}"]`)?.classList.add('selected');
 
-    const btn      = document.querySelector(`.dur-btn[data-mins="${mins}"]`);
+    updateControllerDropdown(); // refresh controller labels with duration-based cost
     recalcFee();
 }
 
@@ -2650,23 +2764,25 @@ function recalcFee() {
     const withCtrl = document.getElementById('withControllerCheck')?.checked;
     const countSel = document.getElementById('controllerCount');
     const count = withCtrl && countSel ? parseInt(countSel.value) : (withCtrl ? 1 : 0);
-    
+
+    // Per-controller independent durations
+    const ctrlMins1 = withCtrl ? (parseInt(document.getElementById('resCtrlMins1')?.value) || 0) : 0;
+    const ctrlMins2 = (withCtrl && count > 1) ? (parseInt(document.getElementById('resCtrlMins2')?.value) || 0) : 0;
+
     let ctrlFee = 0;
-    if (withCtrl && selectedMode === 'hourly' && selectedDuration > 0) {
-        let baseCtrlFee = 0;
+    if (withCtrl) {
         const sel1 = document.getElementById('selectedControllerId');
         const sel2 = document.getElementById('selectedControllerId2');
-        if (sel1 && sel1.selectedIndex > 0) {
-            baseCtrlFee += parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0);
+        if (sel1 && sel1.selectedIndex > 0 && ctrlMins1 > 0) {
+            ctrlFee += parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) * (ctrlMins1 / 60);
         }
-        if (count > 1 && sel2 && sel2.selectedIndex > 0) {
-            baseCtrlFee += parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0);
+        if (count > 1 && sel2 && sel2.selectedIndex > 0 && ctrlMins2 > 0) {
+            ctrlFee += parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) * (ctrlMins2 / 60);
         }
-        ctrlFee = baseCtrlFee * (selectedDuration / 60);
     }
     const totalSessionCost = baseCost + ctrlFee;
-    
-    // Reservation fee = \u20b120 + 5% of (session cost + controller fee)
+
+    // Reservation fee = ₱20 + 5% of (session cost + controller fee)
     const pct = totalSessionCost * 0.05;
     const fee = 20 + pct;
 

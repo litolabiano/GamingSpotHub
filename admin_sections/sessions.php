@@ -1058,14 +1058,12 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
     // Initial call
     initRemainingTimers();
-    initRestoreTimers();
 
     // Use MutationObserver to re-init timers when the section content is updated by live_section.php
     const sessionsContainer = document.getElementById('sessions');
     if (sessionsContainer) {
         const observer = new MutationObserver((mutations) => {
             initRemainingTimers();
-            initRestoreTimers();
         });
         observer.observe(sessionsContainer, { childList: true, subtree: true });
     }

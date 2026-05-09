@@ -526,23 +526,34 @@ function endSession($session_id) {
 
         // ── Restore controller if one was rented for this session ──────────
         $checkCtrl = $conn->prepare(
-            "SELECT COUNT(*) AS n FROM additional_requests
+            "SELECT description FROM additional_requests
              WHERE session_id = ? AND request_type = 'controller_rental' AND status = 'approved'"
         );
         $checkCtrl->bind_param('i', $session_id);
         $checkCtrl->execute();
-        $hadCtrl = (int)$checkCtrl->get_result()->fetch_assoc()['n'];
-        if ($hadCtrl > 0) {
-            $resCtrl = $conn->query(
-                "SELECT c.controller_id 
-                 FROM controllers c
-                 JOIN controller_types ct ON c.controller_type_id = ct.type_id
-                 WHERE c.status = 'in_use' AND ct.type_name = 'Xbox Controller'
-                 ORDER BY c.unit_number ASC LIMIT 1"
-            );
-            if ($resCtrl && $resCtrl->num_rows > 0) {
-                $cid = (int)$resCtrl->fetch_assoc()['controller_id'];
-                $conn->query("UPDATE controllers SET status = 'available' WHERE controller_id = $cid");
+        $ctrlReqs = $checkCtrl->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        foreach ($ctrlReqs as $req) {
+            if (preg_match('/ID(?:s)?:\s*([\d, ]+)/', $req['description'], $matches)) {
+                $idsRaw = explode(',', $matches[1]);
+                foreach ($idsRaw as $idRaw) {
+                    $cid = (int)trim($idRaw);
+                    if ($cid > 0) {
+                        $conn->query("UPDATE controllers SET status = 'available' WHERE controller_id = $cid");
+                    }
+                }
+            } else {
+                // Fallback for old sessions without ID in description
+                $resCtrl = $conn->query(
+                    "SELECT c.controller_id 
+                     FROM controllers c
+                     WHERE c.status = 'in_use'
+                     ORDER BY c.unit_number ASC LIMIT 1"
+                );
+                if ($resCtrl && $resCtrl->num_rows > 0) {
+                    $cid = (int)$resCtrl->fetch_assoc()['controller_id'];
+                    $conn->query("UPDATE controllers SET status = 'available' WHERE controller_id = $cid");
+                }
             }
         }
         // ──────────────────────────────────────────────────────────────────
@@ -1423,6 +1434,45 @@ function convertReservationToSession($reservation_id, $console_id, $shopkeeper_i
     );
 
     if ($result['success']) {
+        // ── Handle Pre-Booked Controllers ──────────────────────────────────────
+        // If the customer reserved extra controllers online, they must be converted
+        // into additional_requests so the session billing system can pick them up.
+        // It also marks those specific controllers as 'in_use'.
+        if (!empty($res['with_controller']) && $res['with_controller'] == 1) {
+            $ctrlFee = (float)($res['controller_fee'] ?? 0);
+            
+            $ctrlIds = [];
+            if (!empty($res['controller_id'])) $ctrlIds[] = (int)$res['controller_id'];
+            if (!empty($res['controller_id_2'])) $ctrlIds[] = (int)$res['controller_id_2'];
+
+            $desc = 'Pre-booked controller rental fee';
+            if (!empty($ctrlIds)) {
+                $desc .= ' (IDs: ' . implode(', ', $ctrlIds) . ')';
+            }
+
+            if ($ctrlFee > 0) {
+                // Record the cost in additional_requests
+                $arStmt = $conn->prepare(
+                    "INSERT INTO additional_requests (session_id, request_type, description, extra_cost, status)
+                     VALUES (?, 'controller_rental', ?, ?, 'approved')"
+                );
+                $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrlFee);
+                $arStmt->execute();
+            }
+
+            // Mark reserved controllers as 'in_use'
+
+            if (!empty($ctrlIds)) {
+                $placeholders = implode(',', array_fill(0, count($ctrlIds), '?'));
+                $cTypes = str_repeat('i', count($ctrlIds));
+                $updCtrl = $conn->prepare("UPDATE controllers SET status = 'in_use' WHERE controller_id IN ($placeholders) AND status = 'available'");
+                if ($updCtrl) {
+                    $updCtrl->bind_param($cTypes, ...$ctrlIds);
+                    $updCtrl->execute();
+                }
+            }
+        }
+
         // ── Link the existing reservation downpayment transaction to the new session ──
         // createReservation() already recorded the downpayment with session_id = NULL.
         // Instead of adding a duplicate transaction, we UPDATE that existing row to

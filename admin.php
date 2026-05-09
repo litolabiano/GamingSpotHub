@@ -63,16 +63,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
             if ($ctrl_fee > 0) {
+                $rented_ctrl_id = (int)($_POST['rented_controller_id'] ?? 0);
+                $desc = 'Controller rental fee';
+                if ($rented_ctrl_id > 0) {
+                    $desc .= " (ID: $rented_ctrl_id)";
+                }
+
                 $arStmt = $conn->prepare(
                     "INSERT INTO additional_requests
                         (session_id, request_type, description, extra_cost, status)
-                     VALUES (?, 'controller_rental', 'Controller rental fee', ?, 'approved')"
+                     VALUES (?, 'controller_rental', ?, ?, 'approved')"
                 );
-                $arStmt->bind_param('id', $result['session_id'], $ctrl_fee);
+                $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrl_fee);
                 $arStmt->execute(); // execute once only
 
                 // Mark the specific rented controller as in_use (from the dropdown selection)
-                $rented_ctrl_id = (int)($_POST['rented_controller_id'] ?? 0);
                 if ($rented_ctrl_id > 0) {
                     $ctrlUpd = $conn->prepare(
                         "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
@@ -2086,10 +2091,6 @@ function onRentalModeChange() {
     if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
 
-/* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
-Hides/shows the controller rental checkbox depending on the selected
-console type. Only Xbox units support controller rentals.
-*/
 function onConsoleChange() {
     const sel    = document.getElementById('consoleSelect');
     const opt    = sel ? sel.options[sel.selectedIndex] : null;
@@ -2105,47 +2106,124 @@ function onConsoleChange() {
     const label  = document.getElementById('controllerRentalLabel');
     const icon   = document.getElementById('ctrlRentalIcon');
     const text   = document.getElementById('ctrlAvailText');
+    const cSelect = document.getElementById('controllerSelect');
     if (!group) return;
 
     // Look up availability for this console type
-    const info      = (typeof CTRL_AVAIL_BY_TYPE !== 'undefined' && type) ? (CTRL_AVAIL_BY_TYPE[type] || null) : null;
-    const hasCtrl   = info && info.total > 0;
-    const available = info ? info.available : 0;
-    const total     = info ? info.total : 0;
+    const ctrlList = (typeof CTRL_LIST_BY_TYPE !== 'undefined' && type) ? (CTRL_LIST_BY_TYPE[type] || []) : [];
+    const available = ctrlList.length;
 
-    if (hasCtrl) {
+    if (available > 0) {
         group.style.display = 'block';
-        const hasAvail = available > 0;
         if (toggle) {
-            toggle.disabled = !hasAvail;
-            if (!hasAvail && toggle.checked) {
+            toggle.disabled = false;
+            if (toggle.checked) {
                 toggle.checked = false;
-                if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+                onControllerToggle();
             }
         }
-        if (label) label.style.cursor = hasAvail ? 'pointer' : 'not-allowed';
-        if (icon)  icon.style.color   = hasAvail ? 'var(--clr-mint)' : '#666';
+        if (label) label.style.cursor = 'pointer';
+        if (icon)  icon.style.color   = 'var(--clr-mint)';
         if (text) {
-            if (hasAvail) {
-                text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
-                               + `<strong style="color:#20c8a1;">${available}</strong>`
-                               + ` of ${total} controller${total !== 1 ? 's' : ''} available`;
-                text.style.color = '#888';
-            } else {
-                text.innerHTML = `<i class="fas fa-times-circle" style="color:#fb566b;margin-right:3px;"></i>No controllers available right now`;
-                text.style.color = '#fb566b';
-            }
+            text.innerHTML = `<i class="fas fa-check-circle" style="color:#20c8a1;margin-right:3px;"></i>`
+                           + `<strong style="color:#20c8a1;">${available}</strong>`
+                           + ` controller${available !== 1 ? 's' : ''} available`;
+            text.style.color = '#888';
+        }
+        
+        // Populate specific controller select
+        if (cSelect) {
+            cSelect.innerHTML = '';
+            ctrlList.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.dataset.rate = c.rate;
+                opt.textContent = `${c.unit} (+₱${c.rate}/session)`;
+                cSelect.appendChild(opt);
+            });
+            onControllerSelectChange();
         }
     } else {
         group.style.display = 'none';
         if (toggle && toggle.checked) {
             toggle.checked = false;
-            if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+            onControllerToggle();
         }
     }
 
     // Refresh duration option labels to reflect this console's per-type rate
-    _refreshDurationLabels();
+    if (typeof _refreshDurationLabels === 'function') _refreshDurationLabels();
+}
+
+function onControllerToggle() {
+    const toggle = document.getElementById('controllerRentalToggle');
+    const container = document.getElementById('controllerSelectContainer');
+    if (toggle && container) {
+        container.style.display = toggle.checked ? 'block' : 'none';
+        // Reset duration selection when unchecked
+        if (!toggle.checked) {
+            document.querySelectorAll('.ctrl-dur-btn').forEach(b => b.style.cssText = b.style.cssText);
+            document.querySelectorAll('.ctrl-dur-btn').forEach(b => {
+                b.style.background = 'rgba(95,133,218,.08)';
+                b.style.borderColor = 'rgba(95,133,218,.2)';
+                b.style.color = '#c8d5f5';
+            });
+            const hoursInput = document.getElementById('controllerRentalHours');
+            if (hoursInput) hoursInput.value = '0';
+        }
+        onControllerSelectChange();
+    }
+}
+
+function onCtrlDurationSelect(hours) {
+    // Highlight selected button
+    document.querySelectorAll('.ctrl-dur-btn').forEach(b => {
+        const isSelected = parseInt(b.dataset.hours) === hours;
+        b.style.background   = isSelected ? 'rgba(95,133,218,.35)' : 'rgba(95,133,218,.08)';
+        b.style.borderColor  = isSelected ? '#5f85da'              : 'rgba(95,133,218,.2)';
+        b.style.color        = isSelected ? '#fff'                  : '#c8d5f5';
+        b.style.boxShadow    = isSelected ? '0 0 0 2px rgba(95,133,218,.3)' : 'none';
+    });
+    const hoursInput = document.getElementById('controllerRentalHours');
+    if (hoursInput) hoursInput.value = hours;
+    onControllerSelectChange();
+}
+
+function onControllerSelectChange() {
+    const toggle    = document.getElementById('controllerRentalToggle');
+    const cSelect   = document.getElementById('controllerSelect');
+    const feeInput  = document.getElementById('controllerFeeAmt');
+    const rateDisp  = document.getElementById('ctrlRateDisplay');
+    const costPrev  = document.getElementById('ctrlCostPreview');
+    const hours     = parseInt(document.getElementById('controllerRentalHours')?.value || 0);
+
+    let rate = 0;
+    let totalFee = 0;
+
+    if (toggle?.checked && cSelect && cSelect.selectedIndex >= 0) {
+        rate = parseFloat(cSelect.options[cSelect.selectedIndex].dataset.rate) || 0;
+        totalFee = hours > 0 ? rate * hours : 0;
+    }
+
+    if (feeInput) feeInput.value = totalFee;
+
+    // Rate badge on the label
+    if (rateDisp) {
+        rateDisp.innerHTML = rate > 0 ? `+&#8369;${rate.toFixed(2)}/hr` : '';
+    }
+
+    // Cost preview line below buttons
+    if (costPrev) {
+        if (totalFee > 0) {
+            const hLabel = hours === 1 ? '1 hr' : `${hours} hrs`;
+            costPrev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${hLabel} = <strong>&#8369;${totalFee.toFixed(2)}</strong>`;
+            costPrev.style.display = 'block';
+        } else {
+            costPrev.style.display = 'none';
+        }
+    }
+
+    if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
 }
 
 /* Recompute cost labels in the duration dropdown using the currently selected
@@ -3735,6 +3813,32 @@ updateTimers();
 setInterval(updateTimers, 1000);
 
 // Ã¢”â‚¬Ã¢”â‚¬ Charts Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
+/* ── Unified Console Colors (global) ────────────────────────────────────── */
+window.getConsoleColor = function(label) {
+    if (!label) return '#888';
+    const normalized = label.trim();
+    const brand = {
+        'PS5': '#5f85da',
+        'Xbox Series X': '#20c8a1',
+        'Nintendo Switch': '#fb566b',
+        'PS4': '#b37bec',
+        'Xbox One': '#0ea5e9',
+        'PC': '#f1a83c',
+    };
+    if (brand[normalized]) return brand[normalized];
+    const l = normalized.toLowerCase();
+    if (l.includes('ps5'))        return brand['PS5'];
+    if (l.includes('xbox series x') || l.includes('xbox sx')) return brand['Xbox Series X'];
+    if (l.includes('switch'))     return brand['Nintendo Switch'];
+    if (l.includes('ps4'))        return brand['PS4'];
+    if (l.includes('xbox one'))   return brand['Xbox One'];
+    if (l.includes('pc'))         return brand['PC'];
+    const fallbacks = ['#38bdf8','#fb923c','#f1e1aa','#a78bfa','#f472b6','#4ade80'];
+    let hash = 0;
+    for (let i = 0; i < normalized.length; i++) hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
+    return fallbacks[Math.abs(hash) % fallbacks.length];
+};
+
 function renderCharts() {
     Chart.defaults.color = '#fff';
     Chart.defaults.borderColor = 'rgba(255,255,255,.1)';
@@ -3742,32 +3846,6 @@ function renderCharts() {
     const revData   = <?= json_encode($revChartData) ?>;
     const typeLabels= <?= json_encode($typeLabels) ?>;
     const typeCounts= <?= json_encode($typeCounts) ?>;
-
-    /* ── Unified Console Colors ───────────────────────────────────────────── */
-    window.getConsoleColor = function(label) {
-        if (!label) return '#888';
-        const normalized = label.trim();
-        const brand = {
-            'PS5': '#5f85da',          // Blue
-            'Xbox Series X': '#20c8a1', // Green
-            'Nintendo Switch': '#fb566b', // Red
-            'PS4': '#b37bec',          // Purple
-            'Xbox One': '#0ea5e9',     // Teal
-            'PC': '#f1a83c',           // Orange
-        };
-        if (brand[normalized]) return brand[normalized];
-        const l = normalized.toLowerCase();
-        if (l.includes('ps5')) return brand['PS5'];
-        if (l.includes('xbox series x') || l.includes('xbox sx')) return brand['Xbox Series X'];
-        if (l.includes('switch')) return brand['Nintendo Switch'];
-        if (l.includes('ps4')) return brand['PS4'];
-        if (l.includes('xbox one')) return brand['Xbox One'];
-        if (l.includes('pc')) return brand['PC'];
-        const fallbacks = ['#38bdf8', '#fb923c', '#f1e1aa', '#a78bfa', '#f472b6', '#4ade80'];
-        let hash = 0;
-        for (let i = 0; i < normalized.length; i++) hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
-        return fallbacks[Math.abs(hash) % fallbacks.length];
-    };
 
     const chartOpts = { 
         responsive: true, 

@@ -416,42 +416,40 @@
             </div>
 
 <?php
-// Load controller availability grouped by console type (joins through controller_types → console_types)
-$ctrlAvailByType = [];
+// Load specific available controllers grouped by console type
+$ctrlAvailListByType = [];
 $ctrlRes = $conn->query(
     "SELECT cs.type_name AS console_type,
-            COUNT(*) AS total,
-            SUM(c.status = 'available') AS available
+            c.controller_id, c.unit_number, c.hourly_rate
        FROM controllers c
        JOIN controller_types ct ON ct.type_id = c.controller_type_id
-       JOIN console_types    cs ON cs.type_id  = ct.console_type_id
-      GROUP BY cs.type_name"
+       JOIN console_types cs ON cs.type_id = ct.console_type_id
+       WHERE c.status = 'available'
+       ORDER BY c.unit_number ASC"
 );
 if ($ctrlRes) {
     while ($row = $ctrlRes->fetch_assoc()) {
-        $ctrlAvailByType[$row['console_type']] = [
-            'available' => (int)$row['available'],
-            'total'     => (int)$row['total'],
+        $ctrlAvailListByType[$row['console_type']][] = [
+            'id' => (int)$row['controller_id'],
+            'unit' => $row['unit_number'],
+            'rate' => (float)$row['hourly_rate']
         ];
     }
 }
-$ctrlAvailJson = json_encode($ctrlAvailByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+$ctrlAvailListJson = json_encode($ctrlAvailListByType, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>
 <script>
-/* Controller availability per console type — used by onConsoleChange() */
-const CTRL_AVAIL_BY_TYPE = <?= $ctrlAvailJson ?>;
+/* Specific controllers by console type — used by onConsoleChange() */
+const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
 </script>
 
 <div id="controllerRentalGroup" style="display:none; margin-bottom:16px;">
     <div style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
                 border-radius:12px;padding:14px 16px;">
-        <div class="form-check" style="margin:0;">
+        <div class="form-check" style="margin:0;margin-bottom:8px;">
             <input type="checkbox" id="controllerRentalToggle"
                    name="controller_rental" value="1"
-                   onchange="recalcSessionPreview()">
-            <input type="hidden" name="controller_rental_fee_amt"
-                   id="controllerFeeAmt"
-                   value="<?= htmlspecialchars(getSetting('controller_rental_fee') ?? 20) ?>">
+                   onchange="onControllerToggle()">
             <label for="controllerRentalToggle" id="controllerRentalLabel"
                    style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                 <i class="fas fa-gamepad" id="ctrlRentalIcon" style="color:var(--clr-mint);font-size:16px;"></i>
@@ -459,8 +457,7 @@ const CTRL_AVAIL_BY_TYPE = <?= $ctrlAvailJson ?>;
                     <div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;
                                 color:var(--clr-mint);">
                         Controller Rental
-                        <span style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
-                            +&#8369;<?= getSetting('controller_rental_fee') ?? 20 ?>/session
+                        <span id="ctrlRateDisplay" style="font-size:12px;font-weight:600;color:#f1a83c;margin-left:4px;">
                         </span>
                     </div>
                     <div id="ctrlAvailText" style="font-size:11px;margin-top:3px;color:#888;">
@@ -468,6 +465,32 @@ const CTRL_AVAIL_BY_TYPE = <?= $ctrlAvailJson ?>;
                     </div>
                 </div>
             </label>
+        </div>
+        <div id="controllerSelectContainer" style="display:none; margin-top:10px; padding-left: 28px;">
+            <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block;">Select Unit</label>
+            <select name="rented_controller_id" id="controllerSelect" class="asb-select" style="width:100%; border:1px solid rgba(95,133,218,.3); background:rgba(255,255,255,.05); color:#e8eaf6; padding:8px 12px; border-radius:8px; outline:none;" onchange="onControllerSelectChange()">
+                <!-- Populated by onConsoleChange() -->
+            </select>
+
+            <!-- Controller duration buttons -->
+            <label style="font-size:11px;color:#6b7fa8;text-transform:uppercase;letter-spacing:.6px;margin-top:12px;margin-bottom:6px;display:block;">
+                <i class="fas fa-clock" style="margin-right:4px;"></i> Rental Duration
+            </label>
+            <div id="ctrlDurationBtns" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <?php foreach ([1,2,3,4] as $h): ?>
+                <button type="button" class="ctrl-dur-btn" data-hours="<?= $h ?>"
+                        onclick="onCtrlDurationSelect(<?= $h ?>)"
+                        style="background:rgba(95,133,218,.08);border:1px solid rgba(95,133,218,.2);
+                               color:#c8d5f5;border-radius:8px;padding:6px 14px;font-size:12px;
+                               font-weight:600;cursor:pointer;transition:all .2s;">
+                    <?= $h === 1 ? '1 hr' : $h . ' hrs' ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <div id="ctrlCostPreview" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:600;"></div>
+
+            <input type="hidden" name="controller_rental_fee_amt" id="controllerFeeAmt" value="0">
+            <input type="hidden" name="controller_rental_hours" id="controllerRentalHours" value="0">
         </div>
     </div>
 </div>
