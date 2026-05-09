@@ -1088,6 +1088,12 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 
     /* ── Remaining Time Countdown ── */
     function initRemainingTimers() {
+        // Prevent runaway intervals when the sessions section is re-rendered.
+        if (window._sessionsRemainingTimerInterval) {
+            clearInterval(window._sessionsRemainingTimerInterval);
+            window._sessionsRemainingTimerInterval = null;
+        }
+
         const rows = document.querySelectorAll('#sessionsTable tbody tr');
         
         function updateTimers() {
@@ -1155,7 +1161,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
         // Run once immediately
         updateTimers();
         // Update every second
-        setInterval(updateTimers, 1000);
+        window._sessionsRemainingTimerInterval = setInterval(updateTimers, 1000);
         
         // Expose sort function for the filter
         window.sortEndingSoon = sortEndingSoon;
@@ -1167,8 +1173,11 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
     // Use MutationObserver to re-init timers when the section content is updated by live_section.php
     const sessionsContainer = document.getElementById('sessions');
     if (sessionsContainer) {
-        const observer = new MutationObserver((mutations) => {
-            initRemainingTimers();
+        // Debounce re-init to avoid tight loops while the DOM is being replaced.
+        let _reinitT = null;
+        const observer = new MutationObserver(() => {
+            if (_reinitT) clearTimeout(_reinitT);
+            _reinitT = setTimeout(() => initRemainingTimers(), 80);
         });
         observer.observe(sessionsContainer, { childList: true, subtree: true });
     }

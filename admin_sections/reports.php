@@ -276,6 +276,9 @@
 <!-- ══ CANCELLATION CHARTS JAVASCRIPT ════════════════════════════════════════ -->
 <script>
 (function () {
+    // Defensive: chart scripts can run before helper functions are defined.
+    const getColor = (label) => (typeof window.getConsoleColor === 'function' ? window.getConsoleColor(label) : '#888');
+
     /* Palette */
     const CORAL   = '#fb566b';
     const GOLD    = '#f1a83c';
@@ -369,7 +372,7 @@
             datasets: [{
                 label: 'Cancellations',
                 data: <?= json_encode($cancelConsoleCounts) ?>,
-                backgroundColor: cancelConsoleLabels.map(l => window.getConsoleColor(l)),
+                backgroundColor: (Array.isArray(cancelConsoleLabels) ? cancelConsoleLabels : []).map(l => getColor(l)),
                 borderRadius: 6,
                 borderSkipped: false,
             }]

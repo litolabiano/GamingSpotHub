@@ -1901,6 +1901,37 @@ function showPage(page, el) {
     // Persist active page in URL hash so reloads stay on the same section
     history.replaceState(null, '', '#' + page);
 
+    // ── Unified Console Colors (global) ──────────────────────────────────────
+    // Used by Charts. Must be defined BEFORE renderCharts() can run.
+    if (typeof window.getConsoleColor !== 'function') {
+        window.getConsoleColor = function(label) {
+            if (!label) return '#888';
+            const normalized = String(label).trim();
+            const brand = {
+                'PS5': '#5f85da',
+                'Xbox Series X': '#20c8a1',
+                'Nintendo Switch': '#fb566b',
+                'PS4': '#b37bec',
+                'Xbox One': '#0ea5e9',
+                'PC': '#f1a83c',
+            };
+            if (brand[normalized]) return brand[normalized];
+            const l = normalized.toLowerCase();
+            if (l.includes('ps5')) return brand['PS5'];
+            if (l.includes('xbox series x') || l.includes('xbox sx')) return brand['Xbox Series X'];
+            if (l.includes('switch')) return brand['Nintendo Switch'];
+            if (l.includes('ps4')) return brand['PS4'];
+            if (l.includes('xbox one')) return brand['Xbox One'];
+            if (l.includes('pc')) return brand['PC'];
+            const fallbacks = ['#38bdf8', '#fb923c', '#f1e1aa', '#a78bfa', '#f472b6', '#4ade80'];
+            let hash = 0;
+            for (let i = 0; i < normalized.length; i++) {
+                hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return fallbacks[Math.abs(hash) % fallbacks.length];
+        };
+    }
+
     // Render charts lazily on first visit to reports
     if (page === 'reports' && !window.chartsRendered) {
         renderCharts();
@@ -1918,6 +1949,8 @@ var _currentSection = 'dashboard';
     var REFRESH_MS = 12000;
     // Sections we can safely auto-refresh (exclude settings to avoid mid-edit disruption)
     var refreshable = ['dashboard','sessions','reservations','consoles','transactions','tournaments','blocked_dates'];
+    var _refreshInFlight = false;
+    var _refreshTimerId  = null;
 
     // CSS flash keyframe for subtle update feedback
     var styleEl = document.createElement('style');
@@ -1954,9 +1987,11 @@ var _currentSection = 'dashboard';
         var section = _currentSection;
         if (!refreshable.includes(section)) return;
         if (isModalOpen() || isInputFocused()) return; // don't interrupt user
+        if (_refreshInFlight) return; // prevent request pile-ups when server/session is slow
 
         // Dim dot while fetching
         dot.style.background = '#888';
+        _refreshInFlight = true;
 
         fetch('ajax/live_section.php?section=' + encodeURIComponent(section), { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
@@ -1980,13 +2015,17 @@ var _currentSection = 'dashboard';
             .catch(function() {
                 dot.style.background = '#fb566b'; // red on error
                 setTimeout(function() { dot.style.background = '#20c8a1'; }, 3000);
+            })
+            .finally(function() {
+                _refreshInFlight = false;
             });
     }
 
     // Start after 5s, then every 12s
     setTimeout(function() {
         refreshSection();
-        setInterval(refreshSection, REFRESH_MS);
+        if (_refreshTimerId) clearInterval(_refreshTimerId);
+        _refreshTimerId = setInterval(refreshSection, REFRESH_MS);
     }, 5000);
 
     // Also refresh immediately when switching to a refreshable section
@@ -4077,34 +4116,13 @@ function updateTimers() {
 updateTimers();
 setInterval(updateTimers, 1000);
 
-// Ã¢”â‚¬Ã¢”â‚¬ Charts Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
-/* ── Unified Console Colors (global) ────────────────────────────────────── */
-window.getConsoleColor = function(label) {
-    if (!label) return '#888';
-    const normalized = label.trim();
-    const brand = {
-        'PS5': '#5f85da',
-        'Xbox Series X': '#20c8a1',
-        'Nintendo Switch': '#fb566b',
-        'PS4': '#b37bec',
-        'Xbox One': '#0ea5e9',
-        'PC': '#f1a83c',
-    };
-    if (brand[normalized]) return brand[normalized];
-    const l = normalized.toLowerCase();
-    if (l.includes('ps5'))        return brand['PS5'];
-    if (l.includes('xbox series x') || l.includes('xbox sx')) return brand['Xbox Series X'];
-    if (l.includes('switch'))     return brand['Nintendo Switch'];
-    if (l.includes('ps4'))        return brand['PS4'];
-    if (l.includes('xbox one'))   return brand['Xbox One'];
-    if (l.includes('pc'))         return brand['PC'];
-    const fallbacks = ['#38bdf8','#fb923c','#f1e1aa','#a78bfa','#f472b6','#4ade80'];
-    let hash = 0;
-    for (let i = 0; i < normalized.length; i++) hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
-    return fallbacks[Math.abs(hash) % fallbacks.length];
-};
-
 function renderCharts() {
+    // Guard: charts libs/elements might not exist depending on role/section render.
+    if (typeof Chart === 'undefined') return;
+    const revEl  = document.getElementById('revChart');
+    const typeEl = document.getElementById('typeChart');
+    if (!revEl || !typeEl) return;
+
     Chart.defaults.color = '#fff';
     Chart.defaults.borderColor = 'rgba(255,255,255,.1)';
     const revLabels = <?= json_encode($revLabels) ?>;
@@ -4129,7 +4147,7 @@ function renderCharts() {
     };
 
     const revContext = <?= json_encode($revContext) ?>;
-    new Chart(document.getElementById('revChart'), {
+    new Chart(revEl, {
         type: 'bar',
         data: {
             labels: revLabels,
@@ -4153,13 +4171,15 @@ function renderCharts() {
         }
     });
 
-    new Chart(document.getElementById('typeChart'), {
+    new Chart(typeEl, {
         type: 'doughnut',
         data: {
             labels: typeLabels,
             datasets: [{
                 data: typeCounts,
-                backgroundColor: typeLabels.map(l => window.getConsoleColor(l)),
+                backgroundColor: (Array.isArray(typeLabels) ? typeLabels : []).map(l => {
+                    return (typeof window.getConsoleColor === 'function') ? window.getConsoleColor(l) : '#888';
+                }),
                 borderWidth: 2,
                 borderColor: '#0d1117'
             }]
