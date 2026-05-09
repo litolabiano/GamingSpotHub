@@ -87,7 +87,7 @@ $controllerRentalFee = (float)(getSetting('controller_rental_fee') ?? 20.0);
 // ── Load available controllers for rental (status=available) ─────────────────
 $availableControllers = [];
 $ctrlRes = $conn->query(
-    "SELECT c.controller_id, c.controller_name, c.unit_number,
+    "SELECT c.controller_id, c.unit_number,
             ct.type_name AS type_name, ct.console_type_id,
             cs.type_name AS console_type_name
        FROM controllers c
@@ -316,8 +316,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // pay_via removed; we only use paymongo now.
     // Controller add-on
     $with_ctrl         = !empty($_POST['with_controller']) && $_POST['with_controller'] === '1';
-    $ctrl_id           = $with_ctrl ? ((int)($_POST['selected_controller_id'] ?? 0) ?: null) : null;
-    $ctrl_fee          = $with_ctrl && $ctrl_id ? $controllerRentalFee : 0.0;
+    $ctrl_id           = ($with_ctrl && !empty($_POST['controller_id'])) ? (int)$_POST['controller_id'] : null;
+    $ctrl_fee          = $with_ctrl ? $controllerRentalFee : 0.0;
 
     // ── Reservation ban check ─────────────────────────────────────────────────
     $banStmt = $conn->prepare(
@@ -353,7 +353,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ── Field validation ──────────────────────────────────────────────────────
-    if (!$error && !in_array($console_type, ['PS5', 'PS4', 'Xbox Series X'])) {
+    $validConsoleTypes = array_column($ctCards, 'type');
+    if (!$error && !in_array($console_type, $validConsoleTypes)) {
         $error = 'Please select a valid console type.';
     } elseif (!$error && !in_array($rental_mode, ['hourly', 'unlimited'])) {
         $error = 'Please select a valid rental mode.';
@@ -1419,7 +1420,7 @@ if (!empty($_GET['console'])) {
                                         <!-- Hidden input keeps id=reservedTime so all existing JS works -->
                                         <input type="hidden" id="reservedTime" name="reserved_time"
                                                value="<?= htmlspecialchars($_POST['reserved_time'] ?? '') ?>">
-                                        <select id="timeSelect" onchange="onTimeSelect(this)" required>
+                                        <select id="timeSelect" class="dt-native-input" onchange="onTimeSelect(this)" required>
                                             <option value="" disabled selected>Select time&hellip;</option>
                                         </select>
                                         <div class="dt-field-sublabel" id="timeSublabel">12:00 PM &ndash; 11:00 PM</div>
@@ -1520,16 +1521,21 @@ if (!empty($_GET['console'])) {
                             <input type="checkbox" name="with_controller" id="withControllerCheck" value="1" onchange="onExtraControllerToggle()" style="margin-top:4px;width:16px;height:16px;accent-color:#20c8a1;">
                             <div style="flex:1;">
                                 <div style="font-weight:700;color:#fff;font-size:14px;margin-bottom:4px;">Rent an Extra Controller</div>
-                                <div style="font-size:11px;color:#888;">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> and will be added to your reservation fee.</div>
-                                
-                                <div id="controllerSelectorBlock" style="display:none;margin-top:12px;">
-                                    <div style="font-size:11px;font-weight:700;color:#bbb;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Controller</div>
-                                    <select name="selected_controller_id" id="selectedControllerId" class="res-input" style="margin-bottom:0;padding:10px;font-size:13px;" onchange="recalcFee()">
-                                        <!-- Populated via JS based on selected console type -->
-                                    </select>
-                                </div>
+                                <div style="font-size:11px;color:#888;" id="ctrlDesc">Adding an extra controller costs <strong style="color:#20c8a1;">₱<?= number_format($controllerRentalFee, 2) ?></strong> and will be added to your reservation fee.</div>
                             </div>
                         </label>
+                        <div id="controllerSelectorBlock" style="display:none;margin-top:14px;background:rgba(0,0,0,.2);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,.06);">
+                            <label style="display:block;font-size:11px;font-weight:700;color:#6b7fa8;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Select Specific Controller *</label>
+                            <style>
+                                #selectedControllerId option {
+                                    background-color: #0d1a35;
+                                    color: #e8eaf6;
+                                }
+                            </style>
+                            <select name="controller_id" id="selectedControllerId" style="width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:14px;outline:none;" onchange="recalcFee()">
+                                <option value="">Select a controller...</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- ── Step 4: Reservation Fee / GCash Payment ── -->
@@ -1947,19 +1953,25 @@ function updateControllerDropdown() {
     }
     
     if (typeof AVAILABLE_CONTROLLERS === 'undefined') return;
-    const matching = AVAILABLE_CONTROLLERS.filter(c => c.console_type === selectedConsoleType);
+    const matching = AVAILABLE_CONTROLLERS.filter(c => c.console_type_name === selectedConsoleType);
     
     const chk = document.getElementById('withControllerCheck');
+    const desc = document.getElementById('ctrlDesc');
+    const defaultDesc = `Adding an extra controller costs <strong style="color:#20c8a1;">₱${controllerRentalFee.toFixed(2)}</strong> and will be added to your reservation fee.`;
+
     if (matching.length === 0) {
         sel.innerHTML = '<option value="">No controllers available for this type</option>';
         if (chk) { chk.disabled = true; chk.checked = false; }
+        if (desc) desc.innerHTML = '<span style="color:#fb566b;font-weight:600;"><i class="fas fa-exclamation-triangle"></i> No extra controllers are currently available for this console.</span>';
         onExtraControllerToggle();
     } else {
         if (chk) chk.disabled = false;
+        if (desc) desc.innerHTML = defaultDesc;
+        sel.innerHTML = '';
         matching.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.controller_id;
-            opt.textContent = `${c.unit_number} - ${c.controller_name}`;
+            opt.textContent = `${c.type_name} #${c.unit_number}`;
             sel.appendChild(opt);
         });
     }

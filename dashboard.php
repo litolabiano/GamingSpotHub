@@ -1699,7 +1699,7 @@ function fmtMins(int $m): string {
                 </div>
                 <div style="overflow-x:auto">
                 <table class="cd-table">
-                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Mode</th><th>Payment</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Extra Controller</th><th>Mode</th><th>Payment</th><th>Status</th><th>Notes</th><th></th></tr></thead>
                     <tbody>
                     <?php foreach ($upcoming as $r):
                         $isToday = ($r['reserved_date'] === date('Y-m-d'));
@@ -1728,6 +1728,18 @@ function fmtMins(int $m): string {
                             <?= htmlspecialchars($r['console_type']) ?>
                             <?php if ($r['unit_number']): ?>
                             <br><span style="color:var(--mint);font-size:11px;font-weight:700"><?= htmlspecialchars($r['unit_number']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (!empty($r['with_controller']) && !empty($r['ctrl_type'])): ?>
+                            <div style="font-size:12px;">
+                                <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
+                                <?php if (!empty($r['ctrl_unit'])): ?>
+                                <br><span style="color:#5f85da;font-weight:700;font-size:11px;"><?= htmlspecialchars($r['ctrl_unit']) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php else: ?>
+                            <span style="color:var(--muted);font-size:12px;">None</span>
                             <?php endif; ?>
                         </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') } ?></td>
@@ -1802,7 +1814,7 @@ function fmtMins(int $m): string {
                 </div>
                 <div style="overflow-x:auto">
                 <table class="cd-table">
-                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Mode</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Date &amp; Time</th><th>Console</th><th>Extra Controller</th><th>Mode</th><th>Status</th></tr></thead>
                     <tbody>
                     <?php foreach ($past as $r): ?>
                     <tr>
@@ -1811,6 +1823,15 @@ function fmtMins(int $m): string {
                             <span style="color:var(--muted)"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                         </td>
                         <td><?= htmlspecialchars($r['console_type']) ?></td>
+                        <td>
+                            <?php if (!empty($r['with_controller']) && !empty($r['ctrl_type'])): ?>
+                            <div style="font-size:12px;">
+                                <i class="fas fa-gamepad"></i> <?= htmlspecialchars($r['ctrl_type']) ?>
+                            </div>
+                            <?php else: ?>
+                            <span style="color:var(--muted);font-size:12px;">None</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly' } ?></td>
                         <td>
                             <?php
@@ -2791,6 +2812,21 @@ function fmtMins(int $m): string {
 <script>
 /* â•â• Navigation â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const BNAV_MAP = {
+    // Topbar user dropdown toggle
+    _initTopbar: (function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('cdTopbarUserBtn')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                this.classList.toggle('open');
+            });
+            document.addEventListener('click', function(e) {
+                const btn = document.getElementById('cdTopbarUserBtn');
+                if (btn && !btn.contains(e.target)) {
+                    btn.classList.remove('open');
+                }
+            });
+        });
+    })(),
     overview:      'bnavOverview',
     sessions:      'bnavSessions',
     reservations:  'bnavReservations',

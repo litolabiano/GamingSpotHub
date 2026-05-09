@@ -260,12 +260,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to add console. Unit number "' . htmlspecialchars($unit_number) . '" is already in use.';
                 $messageType = 'error';
             } else {
-                if (addConsole($name, $type_id, $unit_number)) {
+                $controller_count = (int)($_POST['controller_count'] ?? 2);
+                if (addConsole($name, $type_id, $unit_number, $controller_count)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                     
                     // Activity Log
-                    logActivity($user['user_id'], "Add Console", "Added new console: {$name} ({$type}), Unit: {$unit_number}, Rate: ₱{$rate}/hr");
+                    logActivity($user['user_id'], "Add Console", "Added new console: {$name}, Unit: {$unit_number}");
                 } else {
                     $message = 'Failed to add console. An unexpected database error occurred.';
                     $messageType = 'error';
@@ -293,16 +294,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message     = 'Unit number "' . htmlspecialchars($unit) . '" is already used by another console.';
                 $messageType = 'error';
             } else {
+                $controller_count = (int)($_POST['controller_count'] ?? 2);
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ? WHERE console_id = ?"
+                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ? WHERE console_id = ?"
                 );
-                $stmt->bind_param('sisi', $name, $type_id, $unit, $console_id);
+                $stmt->bind_param('sisii', $name, $type_id, $unit, $controller_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
 
                     // Activity Log
-                    logActivity($user['user_id'], "Edit Console", "Updated Console ID #{$console_id}: {$name}, Unit: {$unit}, Rate: ₱{$rate}/hr");
+                    logActivity($user['user_id'], "Edit Console", "Updated Console ID #{$console_id}: {$name}, Unit: {$unit}");
                 } else {
                     $message     = 'Failed to update console: ' . $conn->error;
                     $messageType = 'error';
@@ -473,7 +475,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── CONTROLLER (UNIT) ACTIONS ─────────────────────────────────────────────
     elseif ($action === 'add_controller') {
-        $ctrl_name   = trim($_POST['controller_name'] ?? '');
         $ctrl_type   = trim($_POST['controller_type'] ?? '');  // legacy text field
         $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
         $ctrl_unit   = trim($_POST['ctrl_unit_number'] ?? '');
@@ -481,7 +482,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Validate: must match a real controller type by ID
         $validTypeIds = array_column(getControllerTypes(true), 'type_id');
-        if ($ctrl_name && $ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
+        if ($ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
             // Also get the type name for the legacy column
             $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['type_id'] === $ctrl_typeId))[0] ?? null;
             $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
@@ -493,13 +494,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_name, controller_type_id, console_type_id, unit_number, notes) VALUES (?,?,?,?,?)"
+                    "INSERT INTO controllers (controller_type_id, console_type_id, unit_number, notes) VALUES (?,?,?,?)"
                 );
-                $stmt->bind_param('siiss', $ctrl_name, $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
+                $stmt->bind_param('iiss', $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
-                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_name} ({$ctrl_type}), Unit: {$ctrl_unit}");
+                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_type}, Unit: {$ctrl_unit}");
                 } else {
                     $message = 'Failed to add controller: ' . $conn->error;
                     $messageType = 'error';
@@ -1070,7 +1071,7 @@ if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 
 // Available controllers for the Start Session rental dropdown (injected to JS)
 $_avRes = $conn->query("
-    SELECT c.controller_id, c.controller_name, ct.type_name AS controller_type, c.unit_number 
+    SELECT c.controller_id, ct.type_name AS controller_type, c.unit_number 
     FROM controllers c
     LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
     WHERE c.status = 'available' 

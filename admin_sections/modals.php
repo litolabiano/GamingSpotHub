@@ -1749,20 +1749,13 @@ function adminDpChange() {
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Controller Name *</label>
-                        <input type="text" name="controller_name" required
-                               placeholder="e.g. DualSense Controller">
-                    </div>
-                    <div class="form-group">
                         <label>Unit Number *</label>
                         <input type="text" name="ctrl_unit_number" required
                                placeholder="e.g. CTRL-01">
-                        <div class="form-hint">Must be unique (e.g. CTRL-01, CTRL-02)</div>
+                        <div class="form-hint">Must be unique (e.g. CTRL-01)</div>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Controller Type *</label>
+                    <div class="form-group">
+                        <label>Controller Type *</label>
                     <select name="controller_type_id" required
                             onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
                         <option value="" disabled selected>— Select Type —</option>
@@ -1778,6 +1771,7 @@ function adminDpChange() {
                     </select>
                     <!-- Hidden: keeps the type name in sync for the legacy controller_type text column -->
                     <input type="hidden" name="controller_type" value="">
+                </div>
                 </div>
 
 

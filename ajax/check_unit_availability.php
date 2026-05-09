@@ -35,7 +35,7 @@ if ($date < $today) {
 
 // ── 1. Get all non-maintenance consoles of this type (join console_types) ─────
 $stmt = $conn->prepare(
-    "SELECT c.console_id, c.unit_number, c.console_name, c.status
+    "SELECT c.console_id, c.unit_number, c.console_name, c.status, c.controller_count
        FROM consoles c
        JOIN console_types ct ON c.console_type_id = ct.type_id
       WHERE ct.type_name = ? AND c.status != 'maintenance'
@@ -104,7 +104,7 @@ foreach ($consoles as $c) {
         'unit'        => $c['unit_number'],
         'name'        => $c['console_name'],
         'status'      => $status,
-        'controllers' => 2, // default; controller_count was removed
+        'controllers' => (int)$c['controller_count'],
         'conflict'    => $conflict,
     ];
 }

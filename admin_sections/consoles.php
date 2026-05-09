@@ -122,7 +122,7 @@
                 <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
-                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>')"                                class="btn-sec btn-sm">
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= (int)($con['controller_count'] ?? 2) ?>)"                                class="btn-sec btn-sm">
                             <i class="fas fa-edit"></i> Edit Console
                         </button>
 
@@ -249,9 +249,10 @@
     <?php
         $allControllers = [];
         $_res = $conn->query("
-            SELECT c.*, ct.type_name AS controller_type 
+            SELECT c.*, ct.type_name AS controller_type, cs.type_name AS console_type 
             FROM controllers c 
             LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+            LEFT JOIN console_types cs ON ct.console_type_id = cs.type_id 
             WHERE c.status != 'archived' 
             ORDER BY c.unit_number
         ");
@@ -323,10 +324,11 @@
                     <?php foreach ($allControllers as $ctrl): ?>
                     <tr style="border-top:1px solid rgba(255,255,255,.05);">
                         <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
-                        <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_name']) ?></td>
+                        <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_type'] ?? 'Unknown') ?></td>
                         <td style="padding:12px 16px;">
-                            <span class="console-type-badge xbox">
-                                <i class="fa-solid fa-gamepad"></i> <?= htmlspecialchars($ctrl['controller_type']) ?>
+                            <?php $badgeCls = match($ctrl['console_type'] ?? '') { 'PS5' => 'ps5', 'PS4' => 'ps4', default => 'xbox' }; ?>
+                            <span class="console-type-badge <?= $badgeCls ?>">
+                                <i class="fa-solid fa-gamepad"></i> <?= htmlspecialchars($ctrl['console_type'] ?? 'Unknown') ?>
                             </span>
                         </td>
                         <td style="padding:12px 16px;">
@@ -378,9 +380,10 @@
         <?php
             $archivedControllers = [];
             $_res = $conn->query("
-                SELECT c.*, ct.type_name AS controller_type 
+                SELECT c.*, ct.type_name AS controller_type, cs.type_name AS console_type 
                 FROM controllers c 
                 LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+                LEFT JOIN console_types cs ON ct.console_type_id = cs.type_id 
                 WHERE c.status = 'archived' 
                 ORDER BY c.unit_number
             ");
@@ -411,7 +414,7 @@
                     <?php foreach ($archivedControllers as $ctrl): ?>
                         <tr style="border-top:1px solid rgba(255,255,255,.05);">
                             <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
-                            <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_name']) ?></td>
+                            <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_type'] ?? 'Unknown') ?></td>
                             <td style="padding:12px 16px;">
                                 <div style="display:flex;gap:6px;">
                                     <form method="POST" action="admin.php#consoles" style="display:inline;">
@@ -479,6 +482,10 @@
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
                     <input type="text" name="unit_number" class="form-control" required maxlength="20" placeholder="e.g. PS5-01">
                 </div>
+                <div class="form-group">
+                    <label>Default Controllers Included</label>
+                    <input type="number" name="controller_count" class="form-control" required min="0" max="4" value="2">
+                </div>
 
             </div>
             <div class="modal-footer">
@@ -519,6 +526,11 @@
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
                     <input type="text" name="unit_number" id="editConsoleUnit"
                            class="form-control" required maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>Default Controllers Included</label>
+                    <input type="number" name="controller_count" id="editConsoleControllers"
+                           class="form-control" required min="0" max="4" value="2">
                 </div>
 
             </div>
@@ -567,11 +579,12 @@
 </div>
 
 <script>
-function openEditConsoleModal(id, name, type, unit) {
+function openEditConsoleModal(id, name, type, unit, controllerCount) {
     document.getElementById('editConsoleId').value   = id;
     document.getElementById('editConsoleName').value = name;
     document.getElementById('editConsoleType').value = type;
     document.getElementById('editConsoleUnit').value = unit;
+    document.getElementById('editConsoleControllers').value = controllerCount;
     openModal('editConsole');
 }
 

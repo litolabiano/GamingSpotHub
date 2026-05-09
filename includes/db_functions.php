@@ -264,11 +264,11 @@ function updateConsoleStatus($console_id, $status) {
  * Add a new console to the database.
  * $type_id is the console_types.type_id FK.
  */
-function addConsole($name, $type_id, $unit_number) {
+function addConsole($name, $type_id, $unit_number, $controller_count = 2) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, status) VALUES (?, ?, ?, 'available')");
-        $stmt->bind_param("sis", $name, $type_id, $unit_number);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, controller_count, status) VALUES (?, ?, ?, ?, 'available')");
+        $stmt->bind_param("sisi", $name, $type_id, $unit_number, $controller_count);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         return false;
@@ -1198,9 +1198,9 @@ function createReservation(
     $downpayment_paid  = 0;
     $preferred_unit_id = $preferred_unit_id ? (int)$preferred_unit_id : null;
     $proof_status      = $payment_proof ? 'pending' : null;
-    $with_controller   = $controller_id ? 1 : 0;
     $controller_id     = $controller_id ? (int)$controller_id : null;
-    $controller_fee    = (float)$controller_fee;
+    $with_controller   = $controller_id ? 1 : 0;
+    $controller_fee    = $with_controller ? (float)$controller_fee : 0.0;
 
     // Lookup console_type_id
     $ctQ = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0");
@@ -1477,10 +1477,13 @@ function getUpcomingReservations($days = null) {
 function getMyReservations($user_id) {
     global $conn;
     $stmt = $conn->prepare(
-        "SELECT r.*, ct.type_name AS console_type, c.unit_number, c.console_name
+        "SELECT r.*, ct.type_name AS console_type, c.unit_number, c.console_name,
+                ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type
            FROM reservations r
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+           LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
           WHERE r.user_id = ?
           ORDER BY r.reserved_date DESC, r.reserved_time DESC"
     );

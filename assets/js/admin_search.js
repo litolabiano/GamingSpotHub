@@ -113,6 +113,80 @@
         font-size:11px; font-family:inherit; outline:none; cursor:pointer;
         margin-left:6px;
     }
+
+    /* ── Arrow Field Wrap (for form inputs & selects) ── */
+    .asb-field-wrap {
+        display: flex;
+        align-items: center;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 8px;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: all .2s;
+        position: relative;
+    }
+    .asb-field-wrap:focus-within, .asb-field-wrap:hover {
+        border-color: #20c8a1;
+        background: rgba(255,255,255,.08);
+    }
+    .asb-field-icon {
+        color: rgba(255,255,255,.4);
+        font-size: 14px;
+        margin-right: 12px;
+        transition: transform .2s;
+    }
+    .asb-field-wrap:hover .asb-field-icon { transform: scale(1.08); }
+    .asb-field-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .asb-field-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #888;
+        margin-bottom: 2px;
+    }
+    .asb-native-input {
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 13px;
+        font-family: inherit;
+        padding: 0;
+        outline: none;
+        width: 100%;
+        cursor: pointer;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+    }
+    .asb-native-input option {
+        background: #0d1117;
+        color: #fff;
+    }
+    .asb-native-input::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        cursor: pointer;
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .asb-field-arrow {
+        color: rgba(255,255,255,.3);
+        font-size: 12px;
+        margin-left: 12px;
+        transition: all .2s;
+        pointer-events: none;
+    }
+    .asb-field-wrap:hover .asb-field-arrow, .asb-field-wrap:focus-within .asb-field-arrow {
+        color: rgba(32,200,161,.7);
+        transform: translateX(2px);
+    }
     `;
     document.head.appendChild(s);
 })();
