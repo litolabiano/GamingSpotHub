@@ -324,18 +324,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ctrl_fee = 0.0;
     if ($with_ctrl) {
         $getFee = $conn->prepare("SELECT c.hourly_rate FROM controllers c WHERE c.controller_id = ?");
-        $duration_hours = ($rental_mode === 'hourly' && $planned_minutes > 0) ? ($planned_minutes / 60) : 0;
-        if ($ctrl_id) {
+        
+        // Use granular minutes passed from the frontend via POST
+        $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
+        $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+        
+        if ($ctrl_id && $ctrl_1_mins > 0) {
             $getFee->bind_param('i', $ctrl_id);
             $getFee->execute();
             $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * $duration_hours;
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * ($ctrl_1_mins / 60);
         }
-        if ($ctrl_id_2) {
+        if ($ctrl_id_2 && $ctrl_2_mins > 0) {
             $getFee->bind_param('i', $ctrl_id_2);
             $getFee->execute();
             $row = $getFee->get_result()->fetch_assoc();
-            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * $duration_hours;
+            $ctrl_fee += (float)($row['hourly_rate'] ?? 20.0) * ($ctrl_2_mins / 60);
         }
     }
 
@@ -1899,6 +1903,7 @@ if (!empty($_GET['console'])) {
                         <div class="rs-row"><span class="rs-label">Date &amp; Time</span><span class="rs-value" id="s-datetime">—</span></div>
                         <div class="rs-row"><span class="rs-label">Mode</span><span class="rs-value" id="s-mode">—</span></div>
                         <div class="rs-row"><span class="rs-label">Duration</span><span class="rs-value" id="s-duration">—</span></div>
+                        <div class="rs-row" id="ctrlSummaryRow" style="display:none;"><span class="rs-label">Controller Rental</span><span class="rs-value" id="s-ctrl"></span></div>
                         <div class="rs-row"><span class="rs-label">Reservation Fee</span><span class="rs-value" id="s-dp">—</span></div>
                     </div>
 
@@ -2793,24 +2798,39 @@ function recalcFee() {
 
 function setGcashFee(sessionCost, pct, fee, ctrlFee = 0) {
     document.getElementById('dpAmount').value = fee;
-    document.getElementById('feeCostLabel').textContent     = '\u20b1' + sessionCost;
-    document.getElementById('feePctAmount').textContent     = '\u20b1' + pct.toFixed(2);
-    
+    document.getElementById('feeCostLabel').textContent  = '\u20b1' + sessionCost;
+    document.getElementById('feePctAmount').textContent  = '\u20b1' + pct.toFixed(2);
+
+    // Build per-controller breakdown label
     let extraLine = document.getElementById('feeCtrlLine');
     if (ctrlFee > 0) {
+        // Try to build breakdown
+        const sel1   = document.getElementById('selectedControllerId');
+        const sel2   = document.getElementById('selectedControllerId2');
+        const mins1  = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
+        const mins2  = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
+        const rate1  = (sel1 && sel1.selectedIndex > 0) ? parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
+        const rate2  = (sel2 && sel2.selectedIndex > 0) ? parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) : 0;
+        function fmtM(m) { const h=Math.floor(m/60),r=m%60; return h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${m} min`; }
+
+        let parts = [];
+        if (rate1 > 0 && mins1 > 0) parts.push(`Ctrl 1: &#8369;${rate1.toFixed(2)}/hr &times; ${fmtM(mins1)} = <strong>&#8369;${(rate1*mins1/60).toFixed(2)}</strong>`);
+        if (rate2 > 0 && mins2 > 0) parts.push(`Ctrl 2: &#8369;${rate2.toFixed(2)}/hr &times; ${fmtM(mins2)} = <strong>&#8369;${(rate2*mins2/60).toFixed(2)}</strong>`);
+        const label = parts.length ? parts.join(' &nbsp;|&nbsp; ') : `&#8369;${ctrlFee.toFixed(2)}`;
+
         if (!extraLine) {
             extraLine = document.createElement('div');
             extraLine.id = 'feeCtrlLine';
-            extraLine.style = 'display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;';
+            extraLine.style = 'display:flex;justify-content:space-between;font-size:12px;color:#bbb;margin-bottom:6px;gap:8px;flex-wrap:wrap;';
             document.getElementById('feePctAmount').parentNode.after(extraLine);
         }
-        extraLine.innerHTML = `<span>Extra Controller (Added to session cost)</span><span>₱${ctrlFee.toFixed(2)}</span>`;
+        extraLine.innerHTML = `<span><i class="fas fa-gamepad" style="margin-right:4px;color:#5f85da;"></i>Controller Rental</span><span style="text-align:right;">${label}</span>`;
         extraLine.style.display = 'flex';
     } else if (extraLine) {
         extraLine.style.display = 'none';
     }
 
-    document.getElementById('feeTotalLabel').textContent    = '\u20b1' + fee.toFixed(2);
+    document.getElementById('feeTotalLabel').textContent = '\u20b1' + fee.toFixed(2);
     const gcashDisp = document.getElementById('gcashAmountDisplay');
     if (gcashDisp) gcashDisp.textContent = '\u20b1' + fee.toFixed(2);
     const pmBtn = document.getElementById('pmBtnAmount');
@@ -3105,9 +3125,32 @@ function updateSummary() {
     }
     document.getElementById('s-duration').textContent = durText;
 
+    // Controller rental summary line
+    const sCtrl = document.getElementById('s-ctrl');
+    const ctrlRow = document.getElementById('ctrlSummaryRow');
+    const withCtrl = document.getElementById('withControllerCheck')?.checked;
+    if (sCtrl && ctrlRow) {
+        if (withCtrl) {
+            const sel1  = document.getElementById('selectedControllerId');
+            const sel2  = document.getElementById('selectedControllerId2');
+            const mins1 = parseInt(document.getElementById('resCtrlMins1')?.value || 0);
+            const mins2 = parseInt(document.getElementById('resCtrlMins2')?.value || 0);
+            const rate1 = (sel1 && sel1.selectedIndex > 0) ? parseFloat(sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
+            const rate2 = (sel2 && sel2.selectedIndex > 0) ? parseFloat(sel2.options[sel2.selectedIndex].dataset.rate || 0) : 0;
+            function fmtMC(m) { const h=Math.floor(m/60),r=m%60; return h&&r?`${h}h ${r}m`:h?(h===1?'1 hr':`${h} hrs`):`${m} min`; }
+            let parts = [];
+            if (rate1 > 0 && mins1 > 0) parts.push(`Ctrl 1: \u20b1${(rate1*mins1/60).toFixed(2)} (${fmtMC(mins1)})`);
+            if (rate2 > 0 && mins2 > 0) parts.push(`Ctrl 2: \u20b1${(rate2*mins2/60).toFixed(2)} (${fmtMC(mins2)})`);
+            sCtrl.textContent = parts.length ? parts.join(' + ') : 'Selected (set duration & unit above)';
+            ctrlRow.style.display = 'flex';
+        } else {
+            ctrlRow.style.display = 'none';
+        }
+    }
+
     let dpText = 'None';
     if (dp > 0) {
-        dpText = '₱' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' — payment method required');
+        dpText = '\u20b1' + dp.toFixed(2) + (selectedDpMethod ? ' via ' + selectedDpMethod : ' — payment method required');
     } else if (selectedMode === 'hourly') {
         dpText = 'Select a duration above';
     } else if (selectedMode === 'unlimited') {

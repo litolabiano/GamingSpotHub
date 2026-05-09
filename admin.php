@@ -62,11 +62,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ── and the End Session modal both read from this table.          ──────
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
+            $ctrl_count = (int)($_POST['controller_count'] ?? 1);
+            $rented_1 = (int)($_POST['rented_controller_id'] ?? 0);
+            $rented_2 = (int)($_POST['rented_controller_id_2'] ?? 0);
+
             if ($ctrl_fee > 0) {
-                $rented_ctrl_id = (int)($_POST['rented_controller_id'] ?? 0);
                 $desc = 'Controller rental fee';
-                if ($rented_ctrl_id > 0) {
-                    $desc .= " (ID: $rented_ctrl_id)";
+                $ids = [];
+                $mins = [];
+                $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
+                $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
+
+                if ($rented_1 > 0) { $ids[] = $rented_1; $mins[] = $ctrl_1_mins; }
+                if ($ctrl_count > 1 && $rented_2 > 0) { $ids[] = $rented_2; $mins[] = $ctrl_2_mins; }
+                
+                if (!empty($ids)) {
+                    $desc .= " (IDs: " . implode(', ', $ids) . ")";
+                    $desc .= " [Mins: " . implode(', ', $mins) . "]";
                 }
 
                 $arStmt = $conn->prepare(
@@ -75,14 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      VALUES (?, 'controller_rental', ?, ?, 'approved')"
                 );
                 $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrl_fee);
-                $arStmt->execute(); // execute once only
+                $arStmt->execute();
 
-                // Mark the specific rented controller as in_use (from the dropdown selection)
-                if ($rented_ctrl_id > 0) {
+                // Mark the specific rented controllers as in_use
+                foreach ($ids as $cid) {
                     $ctrlUpd = $conn->prepare(
                         "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
                     );
-                    $ctrlUpd->bind_param('i', $rented_ctrl_id);
+                    $ctrlUpd->bind_param('i', $cid);
                     $ctrlUpd->execute();
                 }
             }
@@ -91,6 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($rental_mode === 'unlimited') {
         $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
         $upfront_cost      = $unlim_rate;
+        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+            $ctrl_fee = (float)($_POST['controller_rental_fee_amt'] ?? getSetting('controller_rental_fee') ?? 20);
+            $upfront_cost += $ctrl_fee;
+        }
         $tendered          = (float)$_POST['unlimited_tendered'];
 
         recordTransaction(
@@ -1046,7 +1062,7 @@ $ctrlRentalByConsole = [];
 $crQ = $conn->query(
     "SELECT gs.console_id,
             gs.session_id,
-            COUNT(ar.request_id)     AS qty,
+            GROUP_CONCAT(ar.description SEPARATOR '||') AS desc_list,
             SUM(ar.extra_cost)       AS total_cost,
             MIN(ar.created_at)       AS rented_since
        FROM gaming_sessions gs
@@ -1059,8 +1075,26 @@ $crQ = $conn->query(
 );
 if ($crQ) {
     while ($row = $crQ->fetch_assoc()) {
+        $qty = 0;
+        $max_mins = 0;
+        $descs = explode('||', $row['desc_list']);
+        foreach ($descs as $d) {
+            if (preg_match('/ID(?:s)?:\s*([\d, ]+)/', $d, $m)) {
+                $qty += count(explode(',', $m[1]));
+            } else {
+                $qty += 1;
+            }
+            if (preg_match('/\[Mins:\s*([\d, ]+)\]/', $d, $m2)) {
+                $minsRaw = explode(',', $m2[1]);
+                foreach ($minsRaw as $minRaw) {
+                    $mVal = (int)trim($minRaw);
+                    if ($mVal > $max_mins) $max_mins = $mVal;
+                }
+            }
+        }
         $ctrlRentalByConsole[(int)$row['console_id']] = [
-            'qty'         => (int)$row['qty'],
+            'qty'         => $qty,
+            'max_mins'    => $max_mins,
             'total_cost'  => (float)$row['total_cost'],
             'session_id'  => (int)$row['session_id'],
             'rented_since'=> $row['rented_since'],
@@ -2133,13 +2167,23 @@ function onConsoleChange() {
         
         // Populate specific controller select
         if (cSelect) {
-            cSelect.innerHTML = '';
+            cSelect.innerHTML = '<option value="" disabled selected>— Select Controller 1 —</option>';
+            const cSelect2 = document.getElementById('controllerSelect2');
+            if (cSelect2) cSelect2.innerHTML = '<option value="" disabled selected>— Select Controller 2 —</option>';
             ctrlList.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.id;
                 opt.dataset.rate = c.rate;
-                opt.textContent = `${c.unit} (+₱${c.rate}/session)`;
+                opt.textContent = `${c.unit} (+₱${c.rate}/hr)`;
                 cSelect.appendChild(opt);
+                
+                if (cSelect2) {
+                    const opt2 = document.createElement('option');
+                    opt2.value = c.id;
+                    opt2.dataset.rate = c.rate;
+                    opt2.textContent = `${c.unit} (+₱${c.rate}/hr)`;
+                    cSelect2.appendChild(opt2);
+                }
             });
             onControllerSelectChange();
         }
@@ -2158,72 +2202,171 @@ function onConsoleChange() {
 function onControllerToggle() {
     const toggle = document.getElementById('controllerRentalToggle');
     const container = document.getElementById('controllerSelectContainer');
+    const countSel = document.getElementById('adminControllerCount');
+    const ctrl2 = document.getElementById('adminCtrl2Block');
+
     if (toggle && container) {
-        container.style.display = toggle.checked ? 'block' : 'none';
-        // Reset duration selection when unchecked
-        if (!toggle.checked) {
-            document.querySelectorAll('.ctrl-dur-btn').forEach(b => b.style.cssText = b.style.cssText);
-            document.querySelectorAll('.ctrl-dur-btn').forEach(b => {
+        if (toggle.checked) {
+            container.style.display = 'block';
+            if (countSel) countSel.disabled = false;
+            if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
+        } else {
+            container.style.display = 'none';
+            if (countSel) countSel.disabled = true;
+            
+            // Reset both controllers
+            ['controllerSelect','controllerSelect2'].forEach(id => {
+                const s = document.getElementById(id); if (s) s.value = '';
+            });
+            document.querySelectorAll('.admin-ctrl-dur-btn').forEach(b => {
                 b.style.background = 'rgba(95,133,218,.08)';
                 b.style.borderColor = 'rgba(95,133,218,.2)';
                 b.style.color = '#c8d5f5';
+                b.style.boxShadow = 'none';
             });
-            const hoursInput = document.getElementById('controllerRentalHours');
-            if (hoursInput) hoursInput.value = '0';
+            ['adminCtrlRentalMinutes','adminCtrlRentalMinutes2'].forEach(id => {
+                const i = document.getElementById(id); if (i) i.value = '0';
+            });
+            ['adminCtrlCostPreview1','adminCtrlCostPreview2'].forEach(id => {
+                const d = document.getElementById(id); if (d) d.style.display = 'none';
+            });
         }
-        onControllerSelectChange();
+        recalcAdminControllerFee();
     }
 }
 
-function onCtrlDurationSelect(hours) {
-    // Highlight selected button
-    document.querySelectorAll('.ctrl-dur-btn').forEach(b => {
-        const isSelected = parseInt(b.dataset.hours) === hours;
+function onAdminControllerToggle() {
+    const countSel = document.getElementById('adminControllerCount');
+    const ctrl2    = document.getElementById('adminCtrl2Block');
+    if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
+    
+    // If ctrl2 hidden, clear its values
+    if (countSel?.value !== '2') {
+        const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
+        document.querySelectorAll('.admin-ctrl-dur-btn[data-ctrl="2"]').forEach(b => {
+            b.style.background = 'rgba(95,133,218,.08)';
+            b.style.borderColor = 'rgba(95,133,218,.2)';
+            b.style.color = '#c8d5f5';
+            b.style.boxShadow = 'none';
+        });
+        const m2 = document.getElementById('adminCtrlRentalMinutes2'); if (m2) m2.value = '0';
+        const p2 = document.getElementById('adminCtrlCostPreview2'); if (p2) p2.style.display = 'none';
+    }
+    recalcAdminControllerFee();
+}
+
+function _adminCtrlCostPreview(ctrl, mins) {
+    const selId = ctrl === 1 ? 'controllerSelect' : 'controllerSelect2';
+    const prevId = `adminCtrlCostPreview${ctrl}`;
+    const sel = document.getElementById(selId);
+    const prev = document.getElementById(prevId);
+    if (!prev) return;
+    
+    const rate = (sel && sel.selectedIndex > 0)
+        ? parseFloat(sel.options[sel.selectedIndex].dataset.rate || 0) : 0;
+    const h = Math.floor(mins/60), r = mins%60;
+    const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
+    
+    if (rate > 0 && mins > 0) {
+        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${lbl} = <strong>&#8369;${(rate*mins/60).toFixed(2)}</strong>`;
+        prev.style.display = 'block';
+    } else if (mins > 0) {
+        prev.innerHTML = `<i class="fas fa-clock" style="margin-right:4px;"></i>Select a unit above to see cost.`;
+        prev.style.display = 'block';
+    } else {
+        prev.style.display = 'none';
+    }
+}
+
+function onAdminCtrlDurationSelect(mins, ctrl) {
+    const minsId = ctrl === 1 ? 'adminCtrlRentalMinutes' : 'adminCtrlRentalMinutes2';
+    
+    document.querySelectorAll(`.admin-ctrl-dur-btn[data-ctrl="${ctrl}"]`).forEach(b => {
+        const isSelected = parseInt(b.dataset.mins) === mins;
         b.style.background   = isSelected ? 'rgba(95,133,218,.35)' : 'rgba(95,133,218,.08)';
         b.style.borderColor  = isSelected ? '#5f85da'              : 'rgba(95,133,218,.2)';
         b.style.color        = isSelected ? '#fff'                  : '#c8d5f5';
         b.style.boxShadow    = isSelected ? '0 0 0 2px rgba(95,133,218,.3)' : 'none';
     });
-    const hoursInput = document.getElementById('controllerRentalHours');
-    if (hoursInput) hoursInput.value = hours;
-    onControllerSelectChange();
+    
+    const minsIn = document.getElementById(minsId);
+    if (minsIn) minsIn.value = mins;
+    
+    _adminCtrlCostPreview(ctrl, mins);
+    recalcAdminControllerFee();
 }
 
 function onControllerSelectChange() {
+    onAdminCtrl1Change();
+}
+
+function onAdminCtrl1Change() {
+    const mins = parseInt(document.getElementById('adminCtrlRentalMinutes')?.value || 0);
+    _adminCtrlCostPreview(1, mins);
+    syncAdminControllerDropdowns();
+    recalcAdminControllerFee();
+}
+
+function onAdminCtrl2Change() {
+    const mins = parseInt(document.getElementById('adminCtrlRentalMinutes2')?.value || 0);
+    _adminCtrlCostPreview(2, mins);
+    syncAdminControllerDropdowns();
+    recalcAdminControllerFee();
+}
+
+function syncAdminControllerDropdowns() {
+    const sel1 = document.getElementById('controllerSelect');
+    const sel2 = document.getElementById('controllerSelect2');
+    if (!sel1 || !sel2) return;
+    
+    const val1 = sel1.value;
+    const val2 = sel2.value;
+    
+    Array.from(sel1.options).forEach(opt => {
+        if (opt.value !== "" && opt.value === val2) opt.style.display = "none";
+        else opt.style.display = "";
+    });
+    Array.from(sel2.options).forEach(opt => {
+        if (opt.value !== "" && opt.value === val1) opt.style.display = "none";
+        else opt.style.display = "";
+    });
+}
+
+function recalcAdminControllerFee() {
     const toggle    = document.getElementById('controllerRentalToggle');
-    const cSelect   = document.getElementById('controllerSelect');
     const feeInput  = document.getElementById('controllerFeeAmt');
     const rateDisp  = document.getElementById('ctrlRateDisplay');
-    const costPrev  = document.getElementById('ctrlCostPreview');
-    const hours     = parseInt(document.getElementById('controllerRentalHours')?.value || 0);
-
-    let rate = 0;
+    const countSel  = document.getElementById('adminControllerCount');
+    
     let totalFee = 0;
-
-    if (toggle?.checked && cSelect && cSelect.selectedIndex >= 0) {
-        rate = parseFloat(cSelect.options[cSelect.selectedIndex].dataset.rate) || 0;
-        totalFee = hours > 0 ? rate * hours : 0;
-    }
-
-    if (feeInput) feeInput.value = totalFee;
-
-    // Rate badge on the label
-    if (rateDisp) {
-        rateDisp.innerHTML = rate > 0 ? `+&#8369;${rate.toFixed(2)}/hr` : '';
-    }
-
-    // Cost preview line below buttons
-    if (costPrev) {
-        if (totalFee > 0) {
-            const hLabel = hours === 1 ? '1 hr' : `${hours} hrs`;
-            costPrev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${hLabel} = <strong>&#8369;${totalFee.toFixed(2)}</strong>`;
-            costPrev.style.display = 'block';
-        } else {
-            costPrev.style.display = 'none';
+    let rate1 = 0;
+    
+    if (toggle?.checked) {
+        const count = countSel ? parseInt(countSel.value) : 1;
+        const sel1 = document.getElementById('controllerSelect');
+        const sel2 = document.getElementById('controllerSelect2');
+        const mins1 = parseInt(document.getElementById('adminCtrlRentalMinutes')?.value || 0);
+        const mins2 = parseInt(document.getElementById('adminCtrlRentalMinutes2')?.value || 0);
+        
+        if (sel1 && sel1.selectedIndex > 0) {
+            rate1 = parseFloat(sel1.options[sel1.selectedIndex].dataset.rate) || 0;
+            if (mins1 > 0) totalFee += rate1 * (mins1 / 60);
+        }
+        
+        if (count > 1 && sel2 && sel2.selectedIndex > 0) {
+            const rate2 = parseFloat(sel2.options[sel2.selectedIndex].dataset.rate) || 0;
+            if (mins2 > 0) totalFee += rate2 * (mins2 / 60);
         }
     }
-
+    
+    if (feeInput) feeInput.value = totalFee;
+    
+    if (rateDisp) {
+        rateDisp.innerHTML = rate1 > 0 ? `+&#8369;${rate1.toFixed(2)}/hr` : '';
+    }
+    
     if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
+    if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
 
 /* Recompute cost labels in the duration dropdown using the currently selected

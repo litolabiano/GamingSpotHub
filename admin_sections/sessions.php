@@ -26,24 +26,23 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
 <style>
     /* ── Controller Rental inline badge (Console column) ───────────────────── */
     .sess-ctrl-badge {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 4px;
-        margin-top: 4px;
-        padding: 2px 7px;
-        background: rgba(32, 200, 161, 0.12);
-        border: 1px solid rgba(32, 200, 161, 0.3);
-        border-radius: 20px;
+        gap: 5px;
+        margin-top: 5px;
+        padding: 3px 8px;
+        background: rgba(32, 200, 161, 0.1);
+        border: 1px solid rgba(32, 200, 161, 0.25);
+        border-radius: 6px;
         color: #20c8a1;
-        font-size: 10.5px;
-        font-weight: 700;
+        font-size: 10px;
+        font-weight: 600;
         white-space: nowrap;
         width: fit-content;
-        letter-spacing: 0.2px;
     }
 
     .sess-ctrl-badge i {
-        font-size: 10px;
+        font-size: 9px;
     }
 
     /* ── Sortable table headers ─────────────────────────────────────────── */
@@ -213,6 +212,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <th>#</th>
                         <th>Customer</th>
                         <th>Console</th>
+                        <th>Add-ons</th>
                         <th>Mode</th>
                         <th>Started</th>
                         <th>Status</th>
@@ -260,13 +260,15 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
                             <td>#<?= $ps['session_id'] ?></td>
                             <td><?= sessionCustomerLabel($ps) ?></td>
+                            <td><?= htmlspecialchars($ps['unit_number']) ?></td>
                             <td>
-                                <?= htmlspecialchars($ps['unit_number']) ?>
                                 <?php if (!empty($ctrlRentalByConsole[$ps['console_id'] ?? 0])): ?>
-                                    <span class="sess-ctrl-badge">
+                                    <span class="sess-ctrl-badge" style="margin-top:0;">
                                         <i class="fa-solid fa-gamepad"></i>
-                                        <?= $ctrlRentalByConsole[$ps['console_id']]['qty'] ?>&#xd7; Controller Rental
+                                        <?= $ctrlRentalByConsole[$ps['console_id']]['qty'] ?>&#xd7; Ctrl
                                     </span>
+                                <?php else: ?>
+                                    <span style="color:#666;">—</span>
                                 <?php endif; ?>
                             </td>
                             <td><?= $psModeLabel ?></td>
@@ -357,13 +359,14 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                     <th data-col="0">#<span class="sort-icon">&#8597;</span></th>
                     <th data-col="1">Customer<span class="sort-icon">&#8597;</span></th>
                     <th data-col="2">Console<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="3">Mode<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="4">Booked<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="5">Start<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="6">End<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="7">Duration<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="8">Cost<span class="sort-icon">&#8597;</span></th>
-                    <th data-col="9">Status<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="3" class="no-sort">Add-ons</th>
+                    <th data-col="4">Mode<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="5">Booked<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="6">Start<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="7">End<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="8">Duration<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="9">Cost<span class="sort-icon">&#8597;</span></th>
+                    <th data-col="10">Status<span class="sort-icon">&#8597;</span></th>
                     <th class="no-sort">Action</th>
                 </tr>
             </thead>
@@ -414,13 +417,26 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 <button class="btn-confirm-console btn-confirm" type="button" style="padding:4px 8px;font-size:11px;">✓</button>
                                 <button class="btn-cancel-console btn-cancel-edit" type="button" style="padding:4px 8px;font-size:11px;">✕</button>
                             </span>
-
+                        </td>
+                        <td>
                             <?php if (!empty($ctrlRentalByConsole[$sess['console_id'] ?? 0])): ?>
                                 <?php $cr = $ctrlRentalByConsole[$sess['console_id']]; ?>
-                                <span class="sess-ctrl-badge">
+                                <span class="sess-ctrl-badge" title="Rented since <?= date('M d h:i A', strtotime($cr['rented_since'])) ?>" style="margin-top:0;">
                                     <i class="fa-solid fa-gamepad"></i>
-                                    <?= $cr['qty'] ?>&#xd7; Controller &middot; &#x20b1;<?= number_format($cr['total_cost'], 2) ?>
+                                    <?= $cr['qty'] ?>&#xd7; Ctrl
+                                    <?php 
+                                        if (!empty($cr['max_mins']) && $cr['max_mins'] > 0) {
+                                            $ph = intdiv($cr['max_mins'], 60);
+                                            $pm = $cr['max_mins'] % 60;
+                                            $durStr = $ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m";
+                                            $endTs = strtotime($cr['rented_since']) + ($cr['max_mins'] * 60);
+                                            echo " ({$durStr}) &middot; Ends " . date('h:i A', $endTs);
+                                        }
+                                    ?>
+                                    &middot; &#x20b1;<?= number_format($cr['total_cost'], 2) ?>
                                 </span>
+                            <?php else: ?>
+                                <span style="color:#666;">—</span>
                             <?php endif; ?>
                         </td>
                         <td><?= match ($sess['rental_mode']) {
@@ -726,8 +742,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
        Sortable Column Headers
        ══════════════════════════════════════════════════════════════════════ */
     (function() {
-        const DATA_KEYS = ['id', 'customer', 'console', 'mode', 'booked', 'start', 'end', 'duration', 'cost', 'status'];
-        const NUMERIC_COLS = new Set([0, 4, 5, 6, 7, 8, 9]);
+        const DATA_KEYS = ['id', 'customer', 'console', null, 'mode', 'booked', 'start', 'end', 'duration', 'cost', 'status'];
+        const NUMERIC_COLS = new Set([0, 5, 6, 7, 8, 9, 10]);
 
         const table = document.getElementById('sessionsTable');
         const tbody = table.querySelector('tbody');

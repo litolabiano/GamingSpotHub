@@ -88,7 +88,7 @@ $ctrlRentalByConsole = [];
 $_crQ = $conn->query(
     "SELECT gs.console_id,
             gs.session_id,
-            COUNT(ar.request_id)  AS qty,
+            GROUP_CONCAT(ar.description SEPARATOR '||') AS desc_list,
             SUM(ar.extra_cost)    AS total_cost,
             MIN(ar.created_at)    AS rented_since
        FROM gaming_sessions gs
@@ -101,8 +101,26 @@ $_crQ = $conn->query(
 );
 if ($_crQ) {
     while ($row = $_crQ->fetch_assoc()) {
+        $qty = 0;
+        $max_mins = 0;
+        $descs = explode('||', $row['desc_list']);
+        foreach ($descs as $d) {
+            if (preg_match('/ID(?:s)?:\s*([\d, ]+)/', $d, $m)) {
+                $qty += count(explode(',', $m[1]));
+            } else {
+                $qty += 1;
+            }
+            if (preg_match('/\[Mins:\s*([\d, ]+)\]/', $d, $m2)) {
+                $minsRaw = explode(',', $m2[1]);
+                foreach ($minsRaw as $minRaw) {
+                    $mVal = (int)trim($minRaw);
+                    if ($mVal > $max_mins) $max_mins = $mVal;
+                }
+            }
+        }
         $ctrlRentalByConsole[(int)$row['console_id']] = [
-            'qty'          => (int)$row['qty'],
+            'qty'          => $qty,
+            'max_mins'     => $max_mins,
             'total_cost'   => (float)$row['total_cost'],
             'session_id'   => (int)$row['session_id'],
             'rented_since' => $row['rented_since'],
