@@ -2843,6 +2843,46 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
 function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, extras, extraItems, sourceReservationId) {
     extras                 = extras                 || 0;
     reservationDownpayment = reservationDownpayment || 0;
+
+    // Helper: Update the itemized billing breakdown UI
+    function updateBreakdown(currentMins, grossTimeCost, finalDue) {
+        const b = document.getElementById('endSessionTransparentBreakdown');
+        if (!b) return;
+        b.style.display = 'block';
+
+        const h = Math.floor(currentMins / 60), m = currentMins % 60;
+        document.getElementById('ebd-time-label').textContent = h ? `${h}h ${m}m` : `${m}m`;
+        document.getElementById('ebd-gross-cost').textContent = '₱' + grossTimeCost.toFixed(2);
+        
+        const extrasRow = document.getElementById('ebd-extras-row');
+        if (extras > 0) {
+            extrasRow.style.display = 'flex';
+            document.getElementById('ebd-extras-cost').textContent = '₱' + extras.toFixed(2);
+        } else {
+            extrasRow.style.display = 'none';
+        }
+
+        const upfrontRow = document.getElementById('ebd-upfront-row');
+        // Upfront paid is the TOTAL paid so far. For breakdown, we show 
+        // pure upfront (non-reservation) and reservation credit separately.
+        const pureUpfront = Math.max(0, upfrontPaid - reservationDownpayment);
+        if (pureUpfront > 0) {
+            upfrontRow.style.display = 'flex';
+            document.getElementById('ebd-upfront-paid').textContent = '-₱' + pureUpfront.toFixed(2);
+        } else {
+            upfrontRow.style.display = 'none';
+        }
+
+        const resRow = document.getElementById('ebd-res-row');
+        if (reservationDownpayment > 0) {
+            resRow.style.display = 'flex';
+            document.getElementById('ebd-res-credit').textContent = '-₱' + reservationDownpayment.toFixed(2);
+        } else {
+            resRow.style.display = 'none';
+        }
+
+        document.getElementById('ebd-final-due').textContent = '₱' + Math.max(0, finalDue).toFixed(2);
+    }
     sourceReservationId    = sourceReservationId    || 0;
 
     // ── Reservation-source notice ─────────────────────────────────────────
@@ -3166,6 +3206,10 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             costEl.textContent = '\u20b1' + dueCost.toFixed(2);
             updateExtrasTag(extras, extraItems);
             const remaining = Math.max(0, dueCost - upfrontPaid);
+            
+            // Update breakdown
+            updateBreakdown(minutes, dueCost - extras, remaining);
+
             // Sync cost holder + big display
             if (remaining > 0) {
                 setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
@@ -3221,6 +3265,10 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 setAmountDue(remaining, `Actual time used: ${minutes}m → ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
                 noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end — charged for <strong>${minutes} min</strong> used. Collect <strong>₱${remaining.toFixed(2)}</strong> now.`;
             }
+            
+            // Update breakdown
+            updateBreakdown(minutes, cost - extras, remaining);
+
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Collect Payment';
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
@@ -3235,6 +3283,9 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             payGroup.style.display    = 'none';
             prepaidNote.style.display = 'block';
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+            
+            // Update breakdown even if paid in full
+            updateBreakdown(minutes, cost - extras, 0);
         }
 
     /* ── UNLIMITED: flat rate was fully prepaid ── */
@@ -3248,6 +3299,9 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         payGroup.style.display    = 'none';
         prepaidNote.style.display = 'block';
         confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
+
+        // Update breakdown for unlimited
+        updateBreakdown(0, unlimitedRate, 0);
 
     } else {
         panel.style.display = 'none';

@@ -796,6 +796,36 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
             <!-- Shown for open_time / hourly-with-overtime; hidden for unlimited -->
             <div class="form-group" id="endPaymentMethodGroup">
 
+                <!-- ── NEW: Transparent Billing Breakdown ── -->
+                <div id="endSessionTransparentBreakdown" style="display:none; margin: 0 0 20px 0; padding: 18px; border-radius: 14px; background: rgba(95, 133, 218, 0.08); border: 1px solid rgba(95, 133, 218, 0.15); box-shadow: inset 0 0 15px rgba(0,0,0,0.2);">
+                    <div style="font-size: 11px; font-weight: 700; color: #8aa4e8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-receipt" style="font-size: 13px;"></i> Payment Breakdown
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 14px; align-items: center;">
+                            <span style="color: #aaa; font-weight: 500;">Base Session Fee (<span id="ebd-time-label" style="color:#f0f0f0;">0m</span>)</span>
+                            <span style="color: #f0f0f0; font-weight: 600;" id="ebd-gross-cost">₱0.00</span>
+                        </div>
+                        <div id="ebd-extras-row" style="display: flex; justify-content: space-between; font-size: 14px; align-items: center;">
+                            <span style="color: #aaa; font-weight: 500;">Additional Requests</span>
+                            <span style="color: #f0f0f0; font-weight: 600;" id="ebd-extras-cost">₱0.00</span>
+                        </div>
+                        <div style="margin: 4px 0; height: 1px; background: rgba(255,255,255,0.06);"></div>
+                        <div id="ebd-upfront-row" style="display: flex; justify-content: space-between; font-size: 14px; align-items: center;">
+                            <span style="color: #aaa; font-weight: 500;"><i class="fas fa-check-circle" style="font-size:12px; color:#20c8a1; margin-right:4px;"></i> Upfront Paid</span>
+                            <span style="color: #20c8a1; font-weight: 600;" id="ebd-upfront-paid">-₱0.00</span>
+                        </div>
+                        <div id="ebd-res-row" style="display: flex; justify-content: space-between; font-size: 14px; align-items: center;">
+                            <span style="color: #aaa; font-weight: 500;"><i class="fas fa-star" style="font-size:12px; color:#f1a83c; margin-right:4px;"></i> Reservation Credit</span>
+                            <span style="color: #20c8a1; font-weight: 600;" id="ebd-res-credit">-₱0.00</span>
+                        </div>
+                        <div style="margin-top: 8px; padding-top: 12px; border-top: 2px dashed rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 15px; font-weight: 700; color: #f0f0f0;">Final Balance Due</span>
+                            <span style="font-size: 20px; font-weight: 800; color: #fb566b; text-shadow: 0 0 10px rgba(251,86,107,0.3);" id="ebd-final-due">₱0.00</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ── Amount to Pay (prominent bill display) ── -->
                 <div id="endAmountDueBox" style="display:none;background:linear-gradient(135deg,rgba(251,86,107,.12),rgba(241,168,60,.08));border:1px solid rgba(251,86,107,.3);border-radius:12px;padding:18px 20px;margin-bottom:16px;text-align:center;">
                     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:6px;">
