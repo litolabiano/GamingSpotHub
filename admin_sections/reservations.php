@@ -244,7 +244,7 @@
                                 <td>
                                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
                                         <button class="btn-prim btn-sm" title="Reschedule"
-                                            onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>', '<?= addslashes($r['console_type']) ?>')">
+                                            onclick="openRescheduleModal(<?= $r['reservation_id'] ?>, '<?= htmlspecialchars($r['customer_name']) ?>', '<?= $r['reserved_date'] ?>', '<?= $r['reserved_time'] ?>', '<?= addslashes($r['console_type']) ?>', <?= (int)($r['console_id'] ?? 0) ?>)">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
 
@@ -454,10 +454,12 @@
             <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Date *</label>
             <input type="date" id="rescheduleDate" required
                 min="<?= date('Y-m-d') ?>"
+                max="<?= date('Y-m-d', strtotime('+1 month')) ?>"
                 style="width:100%;background:rgba(10,33,81,.7);
                 border:1px solid rgba(95,133,218,.3);
                 color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;">
+                font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;"
+                onchange="updateRescheduleTimes(); rescheduleSync();">
         </div>
 
         <!-- New Time -->
@@ -467,7 +469,7 @@
                 width:100%;background:rgba(10,33,81,.7);
                 border:1px solid rgba(95,133,218,.3);
                 color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                font-size:14px;font-family:inherit;outline:none;">
+                font-size:14px;font-family:inherit;outline:none;" onchange="rescheduleSync()">
                 <option value="" disabled selected>-- Select a time --</option>
                 <?php
                 for ($h = 12; $h <= 23; $h++) {
@@ -481,29 +483,27 @@
             </select>
         </div>
 
-        <!-- Console Type -->
+        <!-- Console Type (Read-only) -->
         <div style="margin-bottom:14px;">
-            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Console Type *</label>
-            <select id="rescheduleConsoleType" required style="
-                width:100%;background:rgba(10,33,81,.7);
-                border:1px solid rgba(95,133,218,.3);
-                color:#f0f0f0;padding:11px 14px;border-radius:10px;
-                font-size:14px;font-family:inherit;outline:none;" onchange="refreshRescheduleUnits()">
-                <?php foreach ($consoleTypes as $ct): ?>
-                    <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">Console Type <span style="font-size:10px;font-weight:400;text-transform:none;">(Original)</span></label>
+            <input type="text" id="rescheduleConsoleType" readonly style="
+                width:100%;background:rgba(10,33,81,0.4);
+                border:1px solid rgba(95,133,218,0.2);
+                color:#8aa4e8;padding:11px 14px;border-radius:10px;
+                font-size:14px;font-family:inherit;outline:none;
+                cursor:not-allowed;box-shadow:inset 0 0 10px rgba(0,0,0,0.2);" 
+                title="This reservation is locked to its original console type.">
         </div>
 
         <!-- New Unit (Dynamic) -->
         <div style="margin-bottom:20px;">
-            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Unit (Optional)</label>
-            <select id="rescheduleUnit" style="
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;">New Console Unit *</label>
+            <select id="rescheduleUnit" required style="
                 width:100%;background:rgba(10,33,81,.7);
                 border:1px solid rgba(95,133,218,.3);
                 color:#f0f0f0;padding:11px 14px;border-radius:10px;
                 font-size:14px;font-family:inherit;outline:none;">
-                <option value="">-- Assign any available --</option>
+                <option value="" disabled selected>— Select Date & Time first —</option>
             </select>
             <div id="rescheduleUnitStatus" style="font-size:11px;color:#888;margin-top:4px;">Select date & time to check unit availability</div>
         </div>
@@ -522,20 +522,149 @@
 </div>
 
 <script>
-function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType) {
+/**
+ * Synchronizes the reschedule form availability logic.
+ * Ensures console selection is only possible after date and time are set,
+ * and fetches only available units for the selected slot.
+ */
+function rescheduleSync() {
+    const dateInput = document.getElementById('rescheduleDate');
+    const timeInput = document.getElementById('rescheduleTime');
+    const typeInput = document.getElementById('rescheduleConsoleType');
+    const unitInput = document.getElementById('rescheduleUnit');
+    const statLabel = document.getElementById('rescheduleUnitStatus');
+    const submitBtn = document.getElementById('rescheduleSubmitBtn');
+
+    const date = dateInput.value;
+    const time = timeInput.value;
+    const type = typeInput.value;
+    const resId = document.getElementById('rescheduleResId').value;
+
+    if (!date || !time) {
+        unitInput.disabled = true;
+        unitInput.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
+        statLabel.textContent = 'Awaiting date and time selection...';
+        return;
+    }
+
+    unitInput.disabled = false;
+    statLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking available units...';
+    
+    // Fetch available units for the selected console type at the selected date/time
+    // We pass exclude_res_id to ensure the current reservation doesn't block itself
+    fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(type)}&exclude_res_id=${resId}`)
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            statLabel.textContent = 'Error: ' + data.message;
+            return;
+        }
+
+        const currentUnitId = unitInput.dataset.initialUnitId;
+        unitInput.innerHTML = '<option value="" disabled selected>— Select an available unit —</option>';
+        
+        let availableCount = 0;
+        data.units.forEach(u => {
+            if (u.status === 'available') {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = `#${u.unit} — ${u.name || u.type}`;
+                if (u.id == currentUnitId && !unitInput.value) {
+                    opt.selected = true;
+                }
+                unitInput.appendChild(opt);
+                availableCount++;
+            }
+        });
+
+        if (availableCount === 0) {
+            statLabel.innerHTML = '<span style="color:#fb566b;"><i class="fas fa-exclamation-triangle"></i> No available units for the selected date and time.</span>';
+            unitInput.innerHTML = '<option value="" disabled selected>— No units available —</option>';
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.5';
+        } else {
+            statLabel.innerHTML = `<span style="color:#20c8a1;"><i class="fas fa-check-circle"></i> ${availableCount} units available.</span>`;
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        statLabel.textContent = 'Network error checking availability.';
+    });
+}
+
+/**
+ * Filters the time selection options based on the selected date.
+ * If today, blocks/hides past times.
+ */
+function updateRescheduleTimes() {
+    const dateInput = document.getElementById('rescheduleDate');
+    const timeSelect = document.getElementById('rescheduleTime');
+    if (!dateInput || !timeSelect) return;
+
+    const selectedDate = dateInput.value;
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const currentHHMM = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+    Array.from(timeSelect.options).forEach(opt => {
+        if (!opt.value) return; // Skip placeholder
+        
+        if (selectedDate === today) {
+            // Block past times
+            if (opt.value < currentHHMM) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else {
+                opt.disabled = false;
+                opt.style.display = '';
+            }
+        } else {
+            // Future date, all times available
+            opt.disabled = false;
+            opt.style.display = '';
+        }
+    });
+
+    // If current selection is now hidden/disabled, reset it
+    if (timeSelect.selectedOptions[0] && (timeSelect.selectedOptions[0].disabled || timeSelect.selectedOptions[0].style.display === 'none')) {
+        timeSelect.value = '';
+    }
+}
+
+// Set up real-time past time blocking
+setInterval(updateRescheduleTimes, 30000); // Check every 30 seconds
+
+function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType, oldUnitId) {
     document.getElementById('rescheduleResId').value = resId;
     document.getElementById('rescheduleResSubtitle').textContent =
         'Reservation #' + resId + ' — ' + customerName;
     document.getElementById('rescheduleReason').value  = '';
     document.getElementById('rescheduleDetail').value  = '';
-    document.getElementById('rescheduleDate').dataset.oldDate = oldDate;
-    document.getElementById('rescheduleTime').dataset.oldTime = oldTime.substring(0,5);
-    document.getElementById('rescheduleDate').dataset.consoleType = consoleType;
-    document.getElementById('rescheduleConsoleType').value = consoleType;
-    document.getElementById('rescheduleDate').value    = oldDate;
-    document.getElementById('rescheduleTime').value    = oldTime.substring(0,5);
+    
+    // Store original state for comparison
+    const dateInput = document.getElementById('rescheduleDate');
+    const timeInput = document.getElementById('rescheduleTime');
+    const unitInput = document.getElementById('rescheduleUnit');
+    const typeInput = document.getElementById('rescheduleConsoleType');
+    
+    dateInput.dataset.oldDate = oldDate;
+    timeInput.dataset.oldTime = oldTime.substring(0,5);
+    dateInput.dataset.consoleType = consoleType;
+    unitInput.dataset.initialUnitId = oldUnitId || '';
+    
+    typeInput.value = consoleType;
+    dateInput.value = oldDate;
+    
+    // Update times list before setting value to ensure it's not blocked if it's in the past
+    updateRescheduleTimes();
+    timeInput.value = oldTime.substring(0,5);
+    
     document.getElementById('rescheduleResModal').style.display = 'flex';
-    refreshRescheduleUnits();
+    
+    // Trigger initial sync
+    rescheduleSync();
 }
 
 function closeRescheduleModal() {
@@ -549,33 +678,6 @@ document.getElementById('rescheduleReason')?.addEventListener('change', function
     document.getElementById('rescheduleDetailLabel').textContent =
         isOther ? 'Please describe the reason *' : 'Additional Notes (Optional)';
 });
-document.getElementById('rescheduleDate')?.addEventListener('change', refreshRescheduleUnits);
-document.getElementById('rescheduleTime')?.addEventListener('change', refreshRescheduleUnits);
-
-function refreshRescheduleUnits() {
-    const date = document.getElementById('rescheduleDate').value;
-    const time = document.getElementById('rescheduleTime').value;
-    const type = document.getElementById('rescheduleConsoleType').value;
-    const sel  = document.getElementById('rescheduleUnit');
-    const stat = document.getElementById('rescheduleUnitStatus');
-    if (!date || !time || !type) return;
-    stat.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking units...';
-    sel.disabled = true;
-    fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(type)}`)
-    .then(r => r.json())
-    .then(data => {
-        sel.disabled = false;
-        if (!data.success) { stat.textContent = 'Error checking units'; return; }
-        let html = '<option value="">-- Assign any available --</option>';
-        data.units.forEach(u => {
-            const ok = u.status === 'available';
-            html += `<option value="${u.id}" ${ok ? '' : 'disabled'}>#${u.unit} - ${u.name} ${ok ? '(Available)' : '(' + u.status + ')'}</option>`;
-        });
-        sel.innerHTML = html;
-        stat.textContent = data.units.filter(u => u.status === 'available').length + ' units available for this slot';
-    })
-    .catch(() => { sel.disabled = false; stat.textContent = 'Network error'; });
-}
 
 function submitReschedule() {
     const resId  = document.getElementById('rescheduleResId').value;
@@ -585,31 +687,40 @@ function submitReschedule() {
     const time   = document.getElementById('rescheduleTime').value;
     const type   = document.getElementById('rescheduleConsoleType').value;
     const unitId = document.getElementById('rescheduleUnit').value;
+    
     if (!reason) { alert('Please select a reason.'); return; }
     if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
     if (!date)   { alert('Please select a new date.'); return; }
     if (!time)   { alert('Please select a new time.'); return; }
     if (!type)   { alert('Please select a console type.'); return; }
+    if (!unitId) { alert('Please select a console unit.'); return; }
+    
     const oldDate = document.getElementById('rescheduleDate').dataset.oldDate;
     const oldTime = document.getElementById('rescheduleTime').dataset.oldTime;
-    if (date === oldDate && time === oldTime && !unitId && type === document.getElementById('rescheduleDate').dataset.consoleType) {
-        alert('Please change the date, time, console type, or assign a specific unit.');
-        return;
-    }
+    
     const btn = document.getElementById('rescheduleSubmitBtn');
     btn.disabled = true;
     btn.textContent = 'Rescheduling...';
+    
     fetch('ajax/reschedule_reservation.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: new URLSearchParams({ reservation_id: resId, reason, reason_detail: detail, new_date: date, new_time: time, console_type: type, console_id: unitId })
+        body: new URLSearchParams({ 
+            reservation_id: resId, 
+            reason, 
+            reason_detail: detail, 
+            new_date: date, 
+            new_time: time, 
+            console_type: type, 
+            console_id: unitId 
+        })
     })
     .then(async r => {
         const text = await r.text();
         try {
             return JSON.parse(text);
         } catch (e) {
-            throw new Error('Invalid server response. The request might have succeeded, but we couldn\'t confirm it.');
+            throw new Error('Invalid server response.');
         }
     })
     .then(data => {
@@ -629,6 +740,7 @@ function submitReschedule() {
         btn.innerHTML = '<i class="fas fa-calendar-check"></i> Confirm Reschedule';
     });
 }
+
 </script>
 
 <script>
