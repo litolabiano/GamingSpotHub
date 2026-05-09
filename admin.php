@@ -672,14 +672,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notes        = trim($_POST['notes'] ?? '');
         $dp_amount    = (float)($_POST['downpayment_amount'] ?? 0);
         $dp_method    = $dp_amount > 0 ? ($_POST['downpayment_method'] ?? null) : null;
+        $console_id   = (int)($_POST['console_id'] ?? 0) ?: null;
+
         if ($uid && $ctype && $rmode && $rdate && $rtime) {
             $result = createReservation($uid, $ctype, $rmode, $pmins, $rdate, $rtime,
-                                        $notes ?: null, $dp_amount, $dp_method);
+                                        $notes ?: null, $dp_amount, $dp_method, $console_id);
             $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
             $messageType = $result['success'] ? 'success' : 'error';
 
             if ($result['success']) {
-                logActivity($user['user_id'], "Add Reservation", "Created new Reservation #{$result['reservation_id']} for User #{$uid} on {$rdate} {$rtime}. Console Type: {$ctype}");
+                $logMsg = "Created new Reservation #{$result['reservation_id']} for User #{$uid} on {$rdate} {$rtime}. Console Type: {$ctype}";
+                if ($console_id) $logMsg .= " (Console Unit #{$console_id})";
+                logActivity($user['user_id'], "Add Reservation", $logMsg);
             }
         } else {
             $message = 'Please fill in all required fields.';
@@ -1350,6 +1354,17 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             --radius-md:   12px;
             --radius-lg:   16px;
             --shadow-card: 0 4px 24px rgba(0,0,0,.35);
+        }
+
+        /* ── Global Dark Selects ── */
+        select, .res-input {
+            background-color: #0d1b3e !important;
+            color: #fff !important;
+            border: 1.5px solid rgba(255,255,255,.12) !important;
+        }
+        select option {
+            background-color: #0d1b3e !important;
+            color: #fff !important;
         }
 
         /* Force page visibility */

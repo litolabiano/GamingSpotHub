@@ -1360,13 +1360,11 @@ function denyExt(extId) {
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Console Type <span class="req">*</span></label>
-                    <select name="console_type" required>
-                        <option value="" disabled selected>— Select —</option>
-                        <?php foreach ($consoleTypes as $ct): ?>
-                            <option value="<?= htmlspecialchars($ct['type_name']) ?>"><?= htmlspecialchars($ct['type_name']) ?></option>
-                        <?php endforeach; ?>
+                    <label>Console <span class="req">*</span></label>
+                    <select name="console_id" id="adminResConsoleSelect" required onchange="adminResSync()" disabled>
+                        <option value="" disabled selected>— Select Date & Time first —</option>
                     </select>
+                    <input type="hidden" name="console_type" id="adminResConsoleTypeHidden">
                 </div>
                 <div class="form-group">
                     <label>Rental Mode <span class="req">*</span></label>
@@ -1379,34 +1377,49 @@ function denyExt(extId) {
             </div>
             <div id="adminResDurGroup" class="form-group">
                 <label>Duration <span class="req">*</span></label>
-                <select name="planned_minutes" id="adminResPlannedMins" onchange="adminResCalcDownpayment()">
-                    <option value="" disabled selected>— Select —</option>
-                    <option value="30">30 min — &#8369;50</option>
-                    <option value="60">1 hr — &#8369;80</option>
-                    <option value="90">1h 30m — &#8369;120</option>
-                    <option value="120">2 hrs — &#8369;160</option>
-                    <option value="150">2h 30m — &#8369;200</option>
-                    <option value="180">3 hrs — &#8369;240</option>
-                    <option value="240">4 hrs — &#8369;320</option>
-                    <option value="300">5 hrs — &#8369;400</option>
-                    <option value="360">6 hrs — &#8369;480</option>
-                    <option value="480">8 hrs — &#8369;640</option>
+                <select name="planned_minutes" id="adminResPlannedMins" onchange="adminResSync()">
+                    <option value="" disabled selected>— Select duration —</option>
+                    <?php 
+                    // Use same duration options as Start Session for consistency
+                    foreach (getHourlyDurationOptions() as $opt): ?>
+                        <option value="<?= $opt['paid'] ?>" 
+                                data-total="<?= $opt['total'] ?>"
+                                data-cost="<?= $opt['cost'] ?>">
+                            <?= $opt['label_total'] ?> — ₱<?= round($opt['cost']) ?><?= $opt['label_bonus'] ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Date <span class="req">*</span></label>
-                    <input type="date" name="reserved_date" required
+                    <input type="date" name="reserved_date" id="adminResDate" required
                            min="<?= date('Y-m-d') ?>"
-                           max="<?= date('Y-m-d', strtotime('+90 days')) ?>">
+                           max="<?= date('Y-m-d', strtotime('+90 days')) ?>"
+                           onchange="adminResSync()">
                     <p class="field-hint">Reservations accepted up to 90 days in advance.</p>
                 </div>
                 <div class="form-group">
                     <label>Time <span class="req">*</span></label>
-                    <input type="time" name="reserved_time" required
-                           min="08:00" max="23:00" step="900">
+                    <select name="reserved_time" id="adminResTime" required onchange="adminResSync()">
+                        <option value="" disabled selected>— Select time —</option>
+                        <?php 
+                        for ($h = 8; $h <= 23; $h++) {
+                            foreach (['00', '15', '30', '45'] as $m) {
+                                if ($h == 23 && $m != '00') continue; // End at 11:00 PM
+                                $val  = sprintf('%02d:%s', $h, $m);
+                                $disp = date('g:i A', strtotime("2000-01-01 $val"));
+                                echo "<option value=\"$val\">$disp</option>\n";
+                            }
+                        }
+                        ?>
+                    </select>
                     <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 8:00 AM – 11:00 PM</p>
                 </div>
+            </div>
+            <div id="adminResConflictBox" style="display:none; margin-bottom:15px; padding:12px; border-radius:10px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); color:#fb566b; font-size:13px;">
+                <i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>
+                <span id="adminResConflictMsg"></span>
             </div>
             <div class="form-group" id="adminDpGroup" style="display:none;">
                 <label style="display:flex;justify-content:space-between;align-items:center;">
@@ -1428,7 +1441,7 @@ function denyExt(extId) {
                 <label>Notes</label>
                 <textarea name="notes" rows="2" placeholder="Any notes…"></textarea>
             </div>
-            <button type="submit" class="btn-prim btn-full">
+            <button type="submit" class="btn-prim btn-full" id="adminResSubmitBtn">
                 <i class="fas fa-calendar-check"></i> Save Reservation
             </button>
 
@@ -1439,6 +1452,7 @@ function denyExt(extId) {
 
 
 <script>
+/* ── Reservation modal helpers ───────────────────────────────────── */
 /* ── Reservation modal helpers ───────────────────────────────────── */
 function adminResOnModeChange() {
     const mode = document.getElementById('resAdminModeSelect').value;
@@ -1451,17 +1465,127 @@ function adminResOnModeChange() {
     document.getElementById('adminDpMethodGroup').style.display = 'none';
     document.getElementById('adminResPlannedMins').value       = '';
     document.getElementById('adminDpHint').textContent         = '';
+    
+    adminResSync();
+}
+
+/**
+ * Syncs the console type hidden field, re-calculates downpayment,
+ * and checks for real-time scheduling conflicts.
+ */
+function adminResSync() {
+    const conSel = document.getElementById('adminResConsoleSelect');
+    const opt    = conSel.options[conSel.selectedIndex];
+    const type   = opt ? (opt.dataset.type || '') : '';
+    const hidden = document.getElementById('adminResConsoleTypeHidden');
+    if (hidden) hidden.value = type;
+
+    // 1. Recalculate Downpayment
+    adminResCalcDownpayment();
+
+    // 2. Fetch Availability & Conflict Check
+    const cid    = conSel.value;
+    const date   = document.getElementById('adminResDate').value;
+    const time   = document.getElementById('adminResTime').value;
+    const mins   = document.getElementById('adminResPlannedMins').value || 60;
+    const mode   = document.getElementById('resAdminModeSelect').value;
+    const box    = document.getElementById('adminResConflictBox');
+    const msg    = document.getElementById('adminResConflictMsg');
+    const btn    = document.getElementById('adminResSubmitBtn');
+
+    // Enable/Disable Console Select based on Date/Time
+    if (!date || !time) {
+        conSel.disabled = true;
+        conSel.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
+        if (box) box.style.display = 'none';
+        return;
+    }
+
+    // If Date/Time set but Console Select was disabled or has placeholder, fetch consoles
+    if (conSel.disabled || conSel.options.length <= 1) {
+        conSel.disabled = false;
+        conSel.innerHTML = '<option value="" disabled selected>— Fetching Available Consoles… —</option>';
+        
+        fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&planned_minutes=${mins}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const currentVal = conSel.value;
+                    conSel.innerHTML = '<option value="" disabled selected>— Select console —</option>';
+                    let foundMatch = false;
+                    
+                    data.units.forEach(u => {
+                        if (u.status === 'available') {
+                            const opt = document.createElement('option');
+                            opt.value = u.id;
+                            opt.dataset.type = u.type;
+                            opt.dataset.rate = u.rate;
+                            opt.textContent = `#${u.unit} — ${u.type} (₱${Math.round(u.rate)}/hr)`;
+                            if (u.id == currentVal) {
+                                opt.selected = true;
+                                foundMatch = true;
+                            }
+                            conSel.appendChild(opt);
+                        }
+                    });
+
+                    // If previously selected unit is no longer available
+                    if (currentVal && !foundMatch) {
+                        if (box) {
+                            box.style.display = 'block';
+                            box.style.background = 'rgba(251,86,107,.15)';
+                            box.style.borderColor = 'rgba(251,86,107,.3)';
+                            box.style.color = '#fb566b';
+                            msg.textContent = 'The previously selected console unit is no longer available for this slot. Please select another unit.';
+                        }
+                        btn.disabled = true;
+                    } else {
+                        if (box) box.style.display = 'none';
+                        btn.disabled = false;
+                    }
+                }
+            });
+        return;
+    }
+
+    // If a console is selected, double-check it's still valid
+    if (cid && date && time) {
+        // Show loading state for conflict check
+        if (msg) msg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying slot...';
+        if (box) box.style.display = 'block';
+
+        fetch(`ajax/check_reservation_conflict.php?console_id=${cid}&date=${date}&time=${time}&planned_minutes=${mins}&rental_mode=${mode}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.conflict) {
+                box.style.display = 'block';
+                box.style.background = 'rgba(251,86,107,.15)';
+                box.style.borderColor = 'rgba(251,86,107,.3)';
+                box.style.color = '#fb566b';
+                msg.textContent = data.message;
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            } else {
+                box.style.display = 'none';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        });
+    }
 }
 
 /* Calculates 50% of the selected duration cost and fills the downpayment field */
 function adminResCalcDownpayment() {
-    const mins = parseInt(document.getElementById('adminResPlannedMins').value) || 0;
+    const durSel = document.getElementById('adminResPlannedMins');
+    const opt    = durSel.options[durSel.selectedIndex];
+    const cost   = opt ? parseFloat(opt.dataset.cost || 0) : 0;
+    
     const dpGroup    = document.getElementById('adminDpGroup');
     const dpMethod   = document.getElementById('adminDpMethodGroup');
     const dpInput    = document.getElementById('adminDpAmount');
     const dpHint     = document.getElementById('adminDpHint');
 
-    if (!mins) {
+    if (!cost) {
         dpGroup.style.display  = 'none';
         dpMethod.style.display = 'none';
         dpInput.value          = '';
@@ -1469,12 +1593,10 @@ function adminResCalcDownpayment() {
         return;
     }
 
-    // Mirror PHP pricing: 30 min = ₱50, otherwise ₱80/hr
-    const fullCost = mins <= 30 ? 50 : (mins / 60 * 80);
-    const dp       = Math.ceil(fullCost * 0.5); // 50%, rounded up to nearest peso
+    const dp = Math.ceil(cost * 0.5); // 50%, rounded up to nearest peso
 
     dpInput.value          = dp;
-    dpHint.textContent     = `50% of ₱${fullCost.toFixed(0)}`;
+    dpHint.textContent     = `50% of ₱${Math.round(cost)}`;
     dpGroup.style.display  = 'block';
     dpMethod.style.display = 'block';
 }

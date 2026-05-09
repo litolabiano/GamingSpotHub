@@ -505,6 +505,17 @@ if (!empty($_GET['console'])) {
        Breakpoints: xs <480  sm <576  md <768  lg <992
     ══════════════════════════════════════════════════════ */
 
+    /* ── Global Dark Selects & Inputs ── */
+    select, .res-input {
+        background-color: #0d1b3e !important;
+        color: #fff !important;
+        border: 1.5px solid rgba(255,255,255,.12) !important;
+    }
+    select option {
+        background-color: #0d1b3e !important;
+        color: #fff !important;
+    }
+
     /* ── Hero ───────────────────────────────────────────── */
     .reserve-hero {
         background: #060d1a;
@@ -1486,19 +1497,14 @@ if (!empty($_GET['console'])) {
                             <span style="font-size:12px;font-weight:500;color:#888;margin-left:6px;">(Optional)</span>
                         </h2>
                         <p style="color:#888;font-size:13px;margin-bottom:14px;">
-                            Availability shown is based on your chosen date &amp; time.
+                            Only units available for your selected date &amp; time are displayed below.
                         </p>
-                        <div id="unitPickerGrid"
-                             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:12px;"></div>
-                        <div id="unitPaginationContainer" style="display:none; justify-content:center; align-items:center; gap:12px; margin-bottom:16px;"></div>
-        <div id="unitPickerAny" onclick="selectUnit(null)"
-                             style="padding:10px 16px;border-radius:10px;border:2px solid rgba(32,200,161,.35);
-                                    background:rgba(32,200,161,.06);color:#20c8a1;font-size:13px;font-weight:700;
-                                    cursor:pointer;text-align:center;transition:.2s;"
-                             onmouseover="this.style.borderColor='rgba(32,200,161,.8)'"
-                             onmouseout="this.style.borderColor='rgba(32,200,161,.35)'">
-                            <i class="fas fa-shuffle" style="margin-right:6px;"></i> No preference &mdash; let staff assign
-                        </div>
+                        <select name="preferred_console_id" id="userUnitSelect" 
+                                style="width:100%; padding:14px; border-radius:12px; border:1.5px solid rgba(255,255,255,.1); 
+                                       background:rgba(8,16,38,.8); color:#fff; font-size:14px; outline:none; cursor:pointer;"
+                                onchange="selectUnit(this.value, false, this.options[this.selectedIndex].text)" disabled>
+                            <option value="" selected>No preference — let staff assign</option>
+                        </select>
                     </div>
 
                     <!-- ── Step 3: Rental Mode ── -->
@@ -1716,9 +1722,36 @@ if (!empty($_GET['console'])) {
                     <div style="display:flex;flex-direction:column;gap:16px;">
                         <?php
                         $steps = [
-                            ['icon'=>'fas fa-calendar-plus','color'=>'#20c8a1','title'=>'1. Submit Request','desc'=>'Fill out the form and pick your preferred console, date, time, and mode.'],
-                            ['icon'=>'fas fa-bell','color'=>'#f1a83c','title'=>'2. Staff Confirms','desc'=>'Our team reviews your booking and assigns a specific unit to you.'],
-                            ['icon'=>'fas fa-play-circle','color'=>'#5f85da','title'=>'3. Show Up & Play','desc'=>'Arrive at your reserved time and the session starts right away.'],
+                            [
+                                'icon'  => 'fas fa-calendar-day',
+                                'color' => '#20c8a1',
+                                'title' => '1. Select Console, Date, & Time',
+                                'desc'  => 'Pick your preferred console type and unit, available date/time slot, and session mode. Units are automatically filtered to show only those available for your chosen slot.'
+                            ],
+                            [
+                                'icon'  => 'fas fa-file-signature',
+                                'color' => '#f1a83c',
+                                'title' => '2. Review & Agree to Terms',
+                                'desc'  => 'Review your reservation details and agree to the Terms and Conditions. Pay the reservation fee via GCash to secure your booking.'
+                            ],
+                            [
+                                'icon'  => 'fas fa-check-circle',
+                                'color' => '#5f85da',
+                                'title' => '3. Instant Confirmation',
+                                'desc'  => 'Once payment is complete, your status is immediately set to \'Reserved\'. No admin approval is needed; your booking appears confirmed in your dashboard instantly.'
+                            ],
+                            [
+                                'icon'  => 'fas fa-calendar-alt',
+                                'color' => '#b37bec',
+                                'title' => '4. Reschedule if Needed',
+                                'desc'  => 'Either party can initiate a reschedule. Status becomes \'Pending\' during negotiation and returns to \'Reserved\' once both agree on a new schedule.'
+                            ],
+                            [
+                                'icon'  => 'fas fa-gamepad',
+                                'color' => '#fb566b',
+                                'title' => '5. Show Up & Play',
+                                'desc'  => 'Arrive at your reserved time and the session starts automatically. If you don\'t show up, the fee is forfeited and the unit is released.'
+                            ],
                         ];
                         foreach ($steps as $s): ?>
                         <div style="display:flex;gap:14px;align-items:flex-start;">
@@ -2121,180 +2154,60 @@ function refreshUnitPicker() {
 }
 
 function renderUnitPickerLocked() {
-    const grid = document.getElementById('unitPickerGrid');
-    // Show static cards from PHP data but greyed out with a lock overlay
-    const units = CONSOLES_BY_TYPE[selectedConsoleType] || [];
-    if (!units.length) {
-        document.getElementById('unitPickerCard').style.display = 'none';
-        return;
-    }
-    grid.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:22px 16px;
-                    background:rgba(255,255,255,.03);border-radius:12px;
-                    border:1.5px dashed rgba(255,255,255,.1);color:#555;font-size:13px;">
-            <i class="fas fa-calendar-clock" style="font-size:1.6rem;display:block;margin-bottom:10px;color:#444;"></i>
-            <strong style="color:#888;">Pick a date &amp; time first</strong><br>
-            <span style="font-size:11px;">Available units will appear here once you've chosen your slot in Step 2.</span>
-        </div>`;
-    const anyBtn = document.getElementById('unitPickerAny');
-    if (anyBtn) { anyBtn.style.opacity = '.35'; anyBtn.style.pointerEvents = 'none'; }
+    const sel = document.getElementById('userUnitSelect');
+    if (!sel) return;
+    sel.disabled = true;
+    sel.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
 }
 
 function fetchUnitAvailability(dateV, timeV) {
-    const grid = document.getElementById('unitPickerGrid');
-    const anyBtn = document.getElementById('unitPickerAny');
+    const sel = document.getElementById('userUnitSelect');
+    if (!sel) return;
 
     // Loading state
-    grid.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#888;font-size:12px;">
-            <i class="fas fa-spinner fa-spin" style="margin-right:6px;color:#20c8a1;"></i>
-            Checking availability for ${dateV} at ${formatTime12(timeV)}…
-        </div>`;
+    sel.disabled = true;
+    const originalValue = sel.value;
+    sel.innerHTML = '<option value="" disabled selected>Checking availability...</option>';
 
-    fetch(`ajax/check_unit_availability.php?date=${encodeURIComponent(dateV)}&time=${encodeURIComponent(timeV)}&console_type=${encodeURIComponent(selectedConsoleType)}`)
+    const mins = selectedDuration || 60;
+
+    fetch(`ajax/check_unit_availability.php?date=${encodeURIComponent(dateV)}&time=${encodeURIComponent(timeV)}&console_type=${encodeURIComponent(selectedConsoleType)}&planned_minutes=${mins}`)
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
-                grid.innerHTML = `<div style="grid-column:1/-1;color:#fb566b;font-size:12px;padding:12px;">
-                    <i class="fas fa-exclamation-circle"></i> ${data.message}</div>`;
+                sel.innerHTML = '<option value="" disabled selected>Error checking availability.</option>';
                 return;
             }
 
-            // ── Unassigned reservation warning ──────────────────────────
-            let extraHtml = '';
-            if (data.unassigned_count > 0) {
-                const names = data.unassigned_reservations
-                    .map(r => `<strong>${r.reserved_by}</strong> @ ${formatTime12(r.reserved_time)}`)
-                    .join(', ');
-                extraHtml = `
-                <div style="grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;
-                            padding:10px 14px;border-radius:10px;margin-bottom:6px;
-                            background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.3);">
-                    <i class="fas fa-triangle-exclamation" style="color:#f1a83c;margin-top:2px;flex-shrink:0;"></i>
-                    <span style="font-size:12px;color:#ccc;">
-                        <strong style="color:#f1a83c;">${data.unassigned_count} reservation${data.unassigned_count > 1 ? 's' : ''}</strong>
-                        exist for this date but no specific unit was assigned yet
-                        (${names}). Staff will allocate a unit at check-in.
-                    </span>
-                </div>`;
-            }
+            sel.disabled = false;
+            sel.innerHTML = '<option value="">No preference — let staff assign</option>';
+            
+            let stillAvailable = false;
+            data.units.forEach(u => {
+                if (u.status === 'available') {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.textContent = `Unit #${u.unit} (${u.controllers} Controllers)`;
+                    if (u.id == originalValue) {
+                        opt.selected = true;
+                        stillAvailable = true;
+                    }
+                    sel.appendChild(opt);
+                }
+            });
 
-            renderUnitCards(data.units, extraHtml);
-            if (anyBtn) { anyBtn.style.opacity = '1'; anyBtn.style.pointerEvents = ''; }
+            // If selected unit is no longer available, warn user
+            if (originalValue && !stillAvailable) {
+                alert('The console unit you previously selected (# ' + selectedUnitLabel + ') is no longer available for this new date/time slot. Please choose another unit or use staff assignment.');
+                selectUnit('', false, '');
+            }
         })
         .catch(() => {
-            grid.innerHTML = `<div style="grid-column:1/-1;color:#fb566b;font-size:12px;padding:12px;">
-                <i class="fas fa-exclamation-circle"></i> Could not check availability.</div>`;
+            sel.innerHTML = '<option value="" disabled selected>Could not check availability.</option>';
         });
 }
 
-let currentUnitPage = 0;
-const UNITS_PER_PAGE = 4;
-
-function renderUnitCards(units, extraHtml = '') {
-    const grid = document.getElementById('unitPickerGrid');
-    const pagContainer = document.getElementById('unitPaginationContainer');
-    
-    currentUnitPage = 0;
-    const pages = Math.ceil(units.length / UNITS_PER_PAGE);
-
-    let html = extraHtml;
-    html += units.map((u, idx) => {
-        const pageIdx = Math.floor(idx / UNITS_PER_PAGE);
-        const isAvail    = u.status === 'available';
-        const isReserved = u.status === 'reserved';
-        const isInUse    = u.status === 'in_use';
-
-        const colour  = isAvail ? '#20c8a1' : isInUse ? '#f1a83c' : '#fb566b';
-        const bgAlpha = isAvail ? '.03'     : '.06';
-        const border  = isAvail
-            ? 'rgba(255,255,255,.12)'
-            : isInUse ? 'rgba(241,168,60,.3)' : 'rgba(251,86,107,.3)';
-
-        const statusIcon  = isAvail ? '✅' : isReserved ? '🔒' : '🎮';
-        const statusLabel = isAvail ? 'Available' : isReserved ? 'Reserved' : 'In Use';
-        const clickable   = isAvail;
-
-        const tooltip = isReserved && u.conflict
-            ? `title="Reserved at ${u.conflict.reserved_time} by ${u.conflict.reserved_by}"`
-            : '';
-
-        const controllers = u.controllers || 2;
-        
-        const displayStyle = pageIdx === 0 ? 'block' : 'none';
-
-        return `<div id="unit-${u.id}" class="unit-card-item" data-unit-page="${pageIdx}" data-unit-id="${u.id}" ${tooltip}
-                     onclick="${clickable ? `selectUnit(${u.id}, false, '${u.unit}')` : ''}"
-                     style="display:${displayStyle}; border:2px solid ${border};border-radius:12px;padding:14px 8px;
-                            cursor:${clickable ? 'pointer' : 'not-allowed'};transition:all .2s;
-                            text-align:center;background:rgba(255,255,255,${bgAlpha});
-                            user-select:none;opacity:${clickable ? '1' : '.65'};">
-                    <div style="font-size:1.2rem;margin-bottom:4px;">${statusIcon}</div>
-                    <div style="font-weight:700;font-size:14px;color:#fff;margin-bottom:2px;">#${u.unit}</div>
-                    <div style="font-size:10px;color:${colour};font-weight:700;margin-bottom:6px;">${statusLabel}</div>
-                    <div style="font-size:9px;color:${isAvail ? '#20c8a1' : '#555'};font-weight:700;background:rgba(255,255,255,.05);padding:3px;border-radius:6px;">
-                        <i class="fas fa-gamepad"></i> ${controllers} Controllers
-                    </div>
-                </div>`;
-    }).join('');
-    
-    grid.innerHTML = html;
-    
-    if (pagContainer) {
-        if (pages > 1) {
-            pagContainer.style.display = 'flex';
-            let pagHtml = `<i class="fas fa-chevron-left" onclick="goToUnitPage('prev', ${pages})" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
-            pagHtml += `<div style="display:flex; gap:8px;">`;
-            for (let p = 0; p < pages; p++) {
-                const bg = p === 0 ? '#20c8a1' : 'rgba(255,255,255,.15)';
-                pagHtml += `<div class="unit-page-dot" onclick="goToUnitPage(${p}, ${pages})" style="width:24px;height:6px;border-radius:10px;background:${bg};cursor:pointer;transition:background .3s;"></div>`;
-            }
-            pagHtml += `</div>`;
-            pagHtml += `<i class="fas fa-chevron-right" onclick="goToUnitPage('next', ${pages})" style="cursor:pointer;color:#888;transition:color .3s;padding:4px;" onmouseover="this.style.color='#20c8a1'" onmouseout="this.style.color='#888'"></i>`;
-            pagContainer.innerHTML = pagHtml;
-        } else {
-            pagContainer.style.display = 'none';
-            pagContainer.innerHTML = '';
-        }
-    }
-    
-    // Restore "any" button
-    const anyBtn = document.getElementById('unitPickerAny');
-    if (anyBtn) {
-        anyBtn.style.opacity = '1';
-        anyBtn.style.pointerEvents = '';
-        // Re-highlight if "any" is currently selected
-        if (!selectedUnitId) {
-            anyBtn.style.borderColor = '#20c8a1';
-            anyBtn.style.background  = 'rgba(32,200,161,.15)';
-        } else {
-            anyBtn.style.borderColor = 'rgba(32,200,161,.35)';
-            anyBtn.style.background  = 'rgba(32,200,161,.06)';
-        }
-    }
-}
-
-function goToUnitPage(pageNum, totalPages) {
-    if (pageNum === 'prev') {
-        currentUnitPage = Math.max(0, currentUnitPage - 1);
-    } else if (pageNum === 'next') {
-        currentUnitPage = Math.min(totalPages - 1, currentUnitPage + 1);
-    } else {
-        currentUnitPage = pageNum;
-    }
-    
-    document.querySelectorAll('.unit-card-item').forEach(card => {
-        if (parseInt(card.getAttribute('data-unit-page')) === currentUnitPage) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-    
-    document.querySelectorAll('.unit-page-dot').forEach((dot, idx) => {
-        dot.style.background = idx === currentUnitPage ? '#20c8a1' : 'rgba(255,255,255,.15)';
-    });
-}
+// Obsolete grid-picker functions removed
 
 function formatTime12(timeStr) {
     if (!timeStr) return '';
@@ -2308,26 +2221,8 @@ function selectUnit(id, silent = false, label = '') {
     selectedUnitLabel = label;
     document.getElementById('hiddenPreferredUnit').value = id || '';
 
-    // Reset all unit cards
-    document.querySelectorAll('[data-unit-id]').forEach(el => {
-        const isReserved = el.querySelector('div:last-child')?.textContent.trim() === 'Reserved';
-        const isInUse    = el.querySelector('div:last-child')?.textContent.trim() === 'In Use';
-        el.style.borderColor = isReserved ? 'rgba(251,86,107,.3)'
-                             : isInUse    ? 'rgba(241,168,60,.3)'
-                             :              'rgba(255,255,255,.12)';
-        el.style.background  = 'rgba(255,255,255,.03)';
-    });
-
-    const anyBtn = document.getElementById('unitPickerAny');
-    if (anyBtn) { anyBtn.style.borderColor = 'rgba(32,200,161,.35)'; anyBtn.style.background = 'rgba(32,200,161,.06)'; }
-
-    if (id) {
-        const card = document.getElementById(`unit-${id}`);
-        if (card) { card.style.borderColor = '#f1a83c'; card.style.background = 'rgba(241,168,60,.13)'; }
-    } else if (!silent && anyBtn) {
-        anyBtn.style.borderColor = '#20c8a1';
-        anyBtn.style.background  = 'rgba(32,200,161,.15)';
-    }
+    const sel = document.getElementById('userUnitSelect');
+    if (sel) sel.value = id || '';
 
     if (!silent) updateSummary();
 }
