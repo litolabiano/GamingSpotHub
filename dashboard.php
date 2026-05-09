@@ -458,10 +458,23 @@ function fmtMins(int $m): string {
             transform: translateX(4px);
         }
         .cd-nav-btn.active {
-            background: linear-gradient(135deg, rgba(32,200,161,0.18), rgba(95,133,218,0.12));
-            color: var(--mint);
-            border: 1px solid rgba(32,200,161,0.25);
-            transform: translateX(4px);
+            background: rgba(32,200,161,0.12);
+            color: #fff;
+            border: 1px solid rgba(32,200,161,0.2);
+            transform: none;
+            position: relative;
+        }
+        .cd-nav-btn.active i { color: var(--mint); }
+        .cd-nav-btn.active::after {
+            content: '';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 5px; height: 5px;
+            background: var(--mint);
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(32,200,161,0.6);
         }
         .cd-nav-spacer {
             height: 1px;
@@ -717,16 +730,23 @@ function fmtMins(int $m): string {
         /*  Card  */
         .cd-card {
             background: var(--panel);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(95,133,218,0.1);
             border-radius: var(--radius);
             padding: 22px;
             margin-bottom: 20px;
+            transition: box-shadow .25s ease, border-color .25s ease;
+        }
+        .cd-card:hover {
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            border-color: rgba(95,133,218,0.22);
         }
         .cd-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(95,133,218,0.1);
         }
         .cd-card-title {
             font-family: 'Outfit', sans-serif;
@@ -768,13 +788,15 @@ function fmtMins(int $m): string {
             border-radius: 20px;
             font-size: 11px;
             font-weight: 700;
+            border: 1px solid transparent;
+            letter-spacing: 0.2px;
         }
-        .cd-badge.mint    { background: rgba(32,200,161,0.15); color: var(--mint); }
-        .cd-badge.blue    { background: rgba(95,133,218,0.15); color: var(--blue); }
-        .cd-badge.coral   { background: rgba(251,86,107,0.15); color: var(--coral); }
-        .cd-badge.purple  { background: rgba(179,123,236,0.15); color: var(--purple); }
-        .cd-badge.gold    { background: rgba(241,168,60,0.15); color: var(--gold); }
-        .cd-badge.gray    { background: rgba(150,150,150,0.15); color: #aaa; }
+        .cd-badge.mint   { background: rgba(32,200,161,0.15); color: var(--mint);   border-color: rgba(32,200,161,0.3); }
+        .cd-badge.blue   { background: rgba(95,133,218,0.15); color: var(--blue);   border-color: rgba(95,133,218,0.3); }
+        .cd-badge.coral  { background: rgba(251,86,107,0.15); color: var(--coral);  border-color: rgba(251,86,107,0.3); }
+        .cd-badge.purple { background: rgba(179,123,236,0.15); color: var(--purple); border-color: rgba(179,123,236,0.3); }
+        .cd-badge.gold   { background: rgba(241,168,60,0.15); color: var(--gold);   border-color: rgba(241,168,60,0.3); }
+        .cd-badge.gray   { background: rgba(150,150,150,0.15); color: #aaa;          border-color: rgba(150,150,150,0.2); }
 
         /*  Cancel reservation button  */
         .cd-cancel-btn {
@@ -791,19 +813,28 @@ function fmtMins(int $m): string {
 
         /*  Active session live card  */
         .cd-live-card {
-            background: linear-gradient(135deg, rgba(32,200,161,0.14), rgba(95,133,218,0.07));
-            border: 1px solid rgba(32,200,161,0.35);
+            background: linear-gradient(135deg, rgba(32,200,161,0.12), rgba(95,133,218,0.06));
+            border: 1px solid rgba(32,200,161,0.3);
             border-radius: var(--radius);
             padding: 22px;
             margin-bottom: 24px;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 0 0 1px rgba(32,200,161,0.08), 0 8px 32px rgba(32,200,161,0.1);
         }
         .cd-live-card::before {
             content:'';
             position: absolute; inset: 0;
             background: radial-gradient(circle at 80% 20%, rgba(32,200,161,0.08), transparent 60%);
             pointer-events: none;
+        }
+        .cd-live-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--mint), var(--blue), var(--purple));
+            border-radius: var(--radius) var(--radius) 0 0;
         }
         .cd-live-header {
             display: flex;
@@ -1045,25 +1076,11 @@ function fmtMins(int $m): string {
             transform: none !important;
         }
         .cd-nav-btn:hover i { color: var(--mint); }
-        .cd-nav-btn.active {
-            background: rgba(32,200,161,0.12) !important;
-            color: #fff !important;
-            border: 1px solid rgba(32,200,161,0.2) !important;
-            transform: none !important;
-        }
-        .cd-nav-btn.active i { color: var(--mint); }
-
         /* Nav spacer: match admin divider */
         .cd-nav-spacer {
-            background: rgba(255,255,255,0.06) !important;
-            margin: 6px 0 !important;
+            background: rgba(255,255,255,0.06);
+            margin: 6px 0;
         }
-
-        /* Cards: align border opacity with admin */
-        .cd-card {
-            border-color: rgba(95,133,218,0.1) !important;
-        }
-        .cd-card:hover { border-color: rgba(95,133,218,0.18) !important; }
 
         /* Main content: match admin .main-content padding */
         @media (min-width: 901px) {
@@ -1127,26 +1144,7 @@ function fmtMins(int $m): string {
         .cd-stat-icon { transition: box-shadow .22s ease; border-radius: 12px !important; }
         .cd-stat-value { letter-spacing: -0.5px; }
 
-        /* ── Enhanced badges with border ── */
-        .cd-badge {
-            border: 1px solid transparent;
-            letter-spacing: 0.2px;
-        }
-        .cd-badge.mint   { border-color: rgba(32,200,161,0.3); }
-        .cd-badge.blue   { border-color: rgba(95,133,218,0.3); }
-        .cd-badge.coral  { border-color: rgba(251,86,107,0.3); }
-        .cd-badge.purple { border-color: rgba(179,123,236,0.3); }
-        .cd-badge.gold   { border-color: rgba(241,168,60,0.3); }
-        .cd-badge.gray   { border-color: rgba(150,150,150,0.2); }
-
-        /* ── Cards: smooth hover elevation ── */
-        .cd-card {
-            transition: box-shadow .25s ease, border-color .25s ease !important;
-        }
-        .cd-card:hover {
-            box-shadow: 0 8px 32px rgba(0,0,0,0.25) !important;
-            border-color: rgba(95,133,218,0.22) !important;
-        }
+        /* (Badge and card hover rules merged into canonical definitions above) */
 
         /* ── Table: stronger row hover + sticky headers ── */
         .cd-table th {
@@ -1377,20 +1375,7 @@ function fmtMins(int $m): string {
             color: #f8c768;
         }
 
-        /* ── Active session card: enhanced glow ── */
-        .cd-live-card {
-            background: linear-gradient(135deg, rgba(32,200,161,0.12), rgba(95,133,218,0.06)) !important;
-            border: 1px solid rgba(32,200,161,0.3) !important;
-            box-shadow: 0 0 0 1px rgba(32,200,161,0.08), 0 8px 32px rgba(32,200,161,0.1) !important;
-        }
-        .cd-live-card::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--mint), var(--blue), var(--purple));
-            border-radius: var(--radius) var(--radius) 0 0;
-        }
+        /* (Live-card glow merged into canonical .cd-live-card definition above) */
 
         /* ── Progress bar enhancements ── */
         .cd-progress-bar {
@@ -1423,12 +1408,7 @@ function fmtMins(int $m): string {
             margin-left: 12px;
         }
 
-        /* ── Card header divider line ── */
-        .cd-card-header {
-            padding-bottom: 14px;
-            border-bottom: 1px solid rgba(95,133,218,0.1);
-            margin-bottom: 16px !important;
-        }
+        /* (Card-header border merged into canonical .cd-card-header definition above) */
 
         /* ── Chart cards subtle top bar ── */
         .cd-charts-grid .cd-card {
@@ -1469,22 +1449,7 @@ function fmtMins(int $m): string {
             border-radius: 20px;
         }
 
-        /* ── Sidebar nav active indicator enhancement ── */
-        .cd-nav-btn.active {
-            position: relative;
-        }
-        .cd-nav-btn.active::after {
-            content: '';
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 5px;
-            height: 5px;
-            background: var(--mint);
-            border-radius: 50%;
-            box-shadow: 0 0 6px rgba(32,200,161,0.6);
-        }
+        /* (Nav active dot indicator merged into canonical .cd-nav-btn.active definition above) */
 
         /* ── Today reservation highlight ── */
         .res-card.res-card--today {

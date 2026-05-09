@@ -1,6 +1,6 @@
 127.0.0.1/gamingspothub/		http://localhost/phpmyadmin/index.php?route=/database/sql&db=gamingspothub
 
-   Showing rows 0 - 499 (786 total, Query took 0.2557 seconds.)
+   Showing rows 0 - 499 (792 total, Query took 0.2895 seconds.)
 
 
 SELECT 'mysql' dbms,t.TABLE_SCHEMA,t.TABLE_NAME,c.COLUMN_NAME,c.ORDINAL_POSITION,c.DATA_TYPE,c.CHARACTER_MAXIMUM_LENGTH,n.CONSTRAINT_TYPE,k.REFERENCED_TABLE_SCHEMA,k.REFERENCED_TABLE_NAME,k.REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.TABLES t LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE k ON c.TABLE_SCHEMA=k.TABLE_SCHEMA AND c.TABLE_NAME=k.TABLE_NAME AND c.COLUMN_NAME=k.COLUMN_NAME LEFT JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS n ON k.CONSTRAINT_SCHEMA=n.CONSTRAINT_SCHEMA AND k.CONSTRAINT_NAME=n.CONSTRAINT_NAME AND k.TABLE_SCHEMA=n.TABLE_SCHEMA AND k.TABLE_NAME=n.TABLE_NAME WHERE t.TABLE_TYPE='BASE TABLE' AND t.TABLE_SCHEMA NOT IN('INFORMATION_SCHEMA','mysql','performance_schema');
@@ -139,14 +139,14 @@ mysql	gamingspothub	additional_requests	status	6	enum	8	NULL	NULL	NULL	NULL
 mysql	gamingspothub	additional_requests	created_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	blocked_dates	reason	3	varchar	255	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	blocked_dates	created_at	4	datetime	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	consoles	unit_number	4	varchar	20	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	unit_number	5	varchar	20	UNIQUE	NULL	NULL	NULL	
 mysql	gamingspothub	consoles	console_type_id	3	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
 mysql	gamingspothub	console_types	type_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	console_types	type_name	2	varchar	50	UNIQUE	NULL	NULL	NULL	
 mysql	gamingspothub	controllers	controller_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	unit_number	4	varchar	50	UNIQUE	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	console_type_id	9	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
-mysql	gamingspothub	controllers	controller_type_id	3	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
+mysql	gamingspothub	controllers	unit_number	3	varchar	50	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	console_type_id	8	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
+mysql	gamingspothub	controllers	controller_type_id	2	int	NULL	FOREIGN KEY	gamingspothub	controller_types	type_id	
 mysql	gamingspothub	controller_types	type_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	controller_types	type_name	2	varchar	50	UNIQUE	NULL	NULL	NULL	
 mysql	gamingspothub	gaming_sessions	session_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
@@ -159,7 +159,8 @@ mysql	gamingspothub	reports	generated_by	3	int	NULL	FOREIGN KEY	gamingspothub	us
 mysql	gamingspothub	reservations	reservation_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	reservations	console_id	3	int	NULL	FOREIGN KEY	gamingspothub	consoles	console_id	
 mysql	gamingspothub	reservations	controller_id	11	int	NULL	FOREIGN KEY	gamingspothub	controllers	controller_id	
-mysql	gamingspothub	reservations	created_by	22	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	reservations	controller_id_2	12	int	NULL	FOREIGN KEY	gamingspothub	controllers	controller_id	
+mysql	gamingspothub	reservations	created_by	23	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
 mysql	gamingspothub	reservations	user_id	2	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
 mysql	gamingspothub	reservations	console_type_id	4	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
 mysql	gamingspothub	reservation_cancellations	cancel_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
@@ -169,17 +170,18 @@ mysql	gamingspothub	reservation_reschedules	reschedule_id	1	int	NULL	PRIMARY KEY
 mysql	gamingspothub	reservation_reschedules	new_console_type_id	11	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
 mysql	gamingspothub	reservation_reschedules	old_console_type_id	7	int	NULL	FOREIGN KEY	gamingspothub	console_types	type_id	
 mysql	gamingspothub	consoles	console_name	2	varchar	50	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	consoles	status	5	enum	11	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	consoles	created_at	6	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	controller_count	4	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	status	6	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	consoles	created_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	console_types	is_archived	3	tinyint	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	console_types	category	4	enum	7	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	console_types	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	console_types	hourly_rate	6	decimal	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	controller_name	2	varchar	100	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	status	5	enum	11	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	notes	6	text	65535	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	created_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	controllers	updated_at	8	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	status	4	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	notes	5	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	created_at	6	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	updated_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	controllers	hourly_rate	9	decimal	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	controller_types	console_type_id	3	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	controller_types	is_archived	4	tinyint	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	controller_types	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
@@ -195,6 +197,7 @@ mysql	gamingspothub	gaming_sessions	payment_status	12	enum	7	NULL	NULL	NULL	NULL
 mysql	gamingspothub	gaming_sessions	created_at	14	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	gaming_sessions	extended_minutes	15	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	gaming_sessions	source_reservation_id	16	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	gaming_sessions	notes	17	text	65535	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	pricing_tiers	min_minutes	2	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	pricing_tiers	max_minutes	3	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	pricing_tiers	charge	4	decimal	NULL	NULL	NULL	NULL	NULL	
@@ -205,28 +208,28 @@ mysql	gamingspothub	reports	file_path	6	varchar	255	NULL	NULL	NULL	NULL
 mysql	gamingspothub	reports	created_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservations	rental_mode	5	enum	9	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservations	planned_minutes	6	int	NULL	NULL	NULL	NULL	NULL	
+
 mysql	gamingspothub	reservations	reserved_date	7	date	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservations	reserved_time	8	time	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservations	notes	9	text	65535	NULL	NULL	NULL	NULL	
-
 mysql	gamingspothub	reservations	with_controller	10	tinyint	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	controller_fee	12	decimal	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	downpayment_amount	13	decimal	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	downpayment_method	14	enum	11	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	downpayment_paid	15	tinyint	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	payment_proof	16	varchar	255	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	payment_proof_status	17	enum	8	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	paymongo_source_id	18	varchar	60	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	paymongo_payment_id	19	varchar	60	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	paymongo_status	20	varchar	30	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	status	21	enum	9	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	created_at	23	datetime	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	updated_at	24	datetime	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	cancelled_by	25	enum	5	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	cancellation_reason	26	varchar	300	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	refund_issued	27	tinyint	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	cancel_reason_type	28	enum	17	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservations	cancel_reason_detail	29	text	65535	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	controller_fee	13	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_amount	14	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_method	15	enum	11	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	downpayment_paid	16	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	payment_proof	17	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	payment_proof_status	18	enum	8	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_source_id	19	varchar	60	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_payment_id	20	varchar	60	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	paymongo_status	21	varchar	30	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	status	22	enum	9	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	created_at	24	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	updated_at	25	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancelled_by	26	enum	5	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancellation_reason	27	varchar	300	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	refund_issued	28	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancel_reason_type	29	enum	17	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservations	cancel_reason_detail	30	text	65535	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_cancellations	cancelled_by	4	enum	5	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_cancellations	cancel_reason_type	5	enum	17	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_cancellations	cancel_reason_detail	6	text	65535	NULL	NULL	NULL	NULL	
@@ -245,23 +248,21 @@ mysql	gamingspothub	reservation_reschedules	reason_detail	13	varchar	300	NULL	NU
 mysql	gamingspothub	reservation_reschedules	rescheduled_by	14	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_reschedules	initiated_by	15	enum	5	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_reschedules	status	16	enum	9	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservation_reschedules	seen_by_user	17	tinyint	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	reservation_reschedules	created_at	18	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	session_extensions	extension_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	shop_hours_overrides	override_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	system_settings	setting_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	system_settings	setting_key	2	varchar	50	UNIQUE	NULL	NULL	NULL	
 mysql	gamingspothub	tournaments	tournament_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	tournament_participants	participant_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	registered_by	11	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
+mysql	gamingspothub	tournament_participants	registered_by	14	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
 mysql	gamingspothub	tournament_participants	tournament_id	2	int	NULL	FOREIGN KEY	gamingspothub	tournaments	tournament_id	
 mysql	gamingspothub	tournament_participants	user_id	3	int	NULL	FOREIGN KEY	gamingspothub	users	user_id	
 mysql	gamingspothub	transactions	transaction_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	users	user_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	gamingspothub	users	email	2	varchar	100	UNIQUE	NULL	NULL	NULL	
 mysql	hotelreservation_db	guest	guest_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
-mysql	hotelreservation_db	hotel_room	room_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
-mysql	hotelreservation_db	hotel_room	room_number	2	varchar	10	UNIQUE	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	seen_by_user	17	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	reservation_reschedules	created_at	18	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_reschedules	reviewed_by	19	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	reservation_reschedules	reviewed_at	20	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	session_extensions	session_id	2	int	NULL	NULL	NULL	NULL	NULL	
@@ -297,19 +298,22 @@ mysql	gamingspothub	tournaments	created_by	13	int	NULL	NULL	NULL	NULL	NULL
 mysql	gamingspothub	tournaments	created_at	14	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	tournament_participants	registration_date	4	datetime	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	tournament_participants	payment_status	5	enum	7	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	placement	6	int	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	prize_amount	7	decimal	NULL	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	ign	8	varchar	100	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	contact_number	9	varchar	20	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	gcash_proof	10	varchar	255	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	walkin_name	12	varchar	100	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	notes	13	varchar	255	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	paymongo_source_id	14	varchar	80	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	paymongo_payment_id	15	varchar	80	NULL	NULL	NULL	NULL	
-mysql	gamingspothub	tournament_participants	paymongo_status	16	varchar	30	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	status	6	enum	7	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	removed_at	7	datetime	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	seen_by_user	8	tinyint	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	placement	9	int	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	prize_amount	10	decimal	NULL	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	ign	11	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	contact_number	12	varchar	20	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	gcash_proof	13	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	walkin_name	15	varchar	100	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	notes	16	varchar	255	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	paymongo_source_id	17	varchar	80	NULL	NULL	NULL	NULL	
+
+mysql	gamingspothub	tournament_participants	paymongo_payment_id	18	varchar	80	NULL	NULL	NULL	NULL	
+mysql	gamingspothub	tournament_participants	paymongo_status	19	varchar	30	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	transactions	session_id	2	int	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	transactions	user_id	3	int	NULL	NULL	NULL	NULL	NULL	
-
 mysql	gamingspothub	transactions	amount	4	decimal	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	transactions	tendered_amount	5	decimal	NULL	NULL	NULL	NULL	NULL	
 mysql	gamingspothub	transactions	shortfall_amount	6	decimal	NULL	NULL	NULL	NULL	NULL	
@@ -351,10 +355,8 @@ mysql	hotelreservation_db	guest	number_of_children	17	int	NULL	NULL	NULL	NULL	NU
 mysql	hotelreservation_db	guest	number_of_pets	18	int	NULL	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	guest	number_of_Infants	19	int	NULL	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	guest	registration_date	20	timestamp	NULL	NULL	NULL	NULL	NULL	
-mysql	hotelreservation_db	guest	admin_status	21	int	NULL	NULL	NULL	NULL	NULL	
-mysql	hotelreservation_db	guest	activated_status	22	int	NULL	NULL	NULL	NULL	NULL	
-mysql	hotelreservation_db	guest	room_no	23	int	NULL	NULL	NULL	NULL	NULL	
-mysql	hotelreservation_db	hotel_room	room_type	3	enum	8	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_number	2	varchar	10	UNIQUE	NULL	NULL	NULL	
 mysql	hotelreservation_db	payments	payment_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	hotelreservation_db	payments	guest_id	2	int	NULL	FOREIGN KEY	hotelreservation_db	guest	guest_id	
 mysql	hotelreservation_db	reservation	reservation_id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
@@ -379,9 +381,10 @@ mysql	kld_jobs	job_skills	job_id	2	int	NULL	UNIQUE	NULL	NULL	NULL
 mysql	kld_jobs	job_skills	skill_id	3	int	NULL	UNIQUE	NULL	NULL	NULL	
 mysql	kld_jobs	job_skills	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
 mysql	kld_jobs	job_skills	skill_id	3	int	NULL	FOREIGN KEY	kld_jobs	skills	id	
-mysql	kld_jobs	job_views	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
-mysql	kld_jobs	job_views	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
-mysql	kld_jobs	job_views	user_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
+mysql	hotelreservation_db	guest	admin_status	21	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	activated_status	22	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	guest	room_no	23	int	NULL	NULL	NULL	NULL	NULL	
+mysql	hotelreservation_db	hotel_room	room_type	3	enum	8	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	hotel_room	bed_count	4	int	NULL	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	hotel_room	price_per_night	5	decimal	NULL	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	hotel_room	is_available	6	tinyint	NULL	NULL	NULL	NULL	NULL	
@@ -407,10 +410,10 @@ mysql	hotelreservation_db	reservation	number_of_pets	14	int	NULL	NULL	NULL	NULL	
 mysql	hotelreservation_db	reservation	number_of_infants	15	int	NULL	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	activity_log	action	3	varchar	100	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	activity_log	description	4	text	65535	NULL	NULL	NULL	NULL	
+
 mysql	kld_jobs	activity_log	ip_address	5	varchar	45	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	activity_log	user_agent	6	text	65535	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	activity_log	created_at	7	timestamp	NULL	NULL	NULL	NULL	NULL	
-
 mysql	kld_jobs	agency_commissions	application_id	2	int	NULL	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	agency_commissions	job_id	3	int	NULL	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	agency_commissions	freelancer_id	4	int	NULL	NULL	NULL	NULL	NULL	
@@ -476,10 +479,9 @@ mysql	kld_jobs	job_applications	applied_at	13	timestamp	NULL	NULL	NULL	NULL	NULL
 mysql	kld_jobs	job_applications	reviewed_at	14	timestamp	NULL	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	job_applications	notes	15	text	65535	NULL	NULL	NULL	NULL	
 mysql	kld_jobs	job_skills	required	4	tinyint	NULL	NULL	NULL	NULL	NULL	
-mysql	kld_jobs	job_skills	created_at	5	timestamp	NULL	NULL	NULL	NULL	NULL	
-mysql	kld_jobs	job_views	ip_address	4	varchar	45	NULL	NULL	NULL	NULL	
-mysql	kld_jobs	job_views	user_agent	5	text	65535	NULL	NULL	NULL	NULL	
-mysql	kld_jobs	job_views	created_at	6	timestamp	NULL	NULL	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
+mysql	kld_jobs	job_views	job_id	2	int	NULL	FOREIGN KEY	kld_jobs	jobs	id	
+mysql	kld_jobs	job_views	user_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
 mysql	kld_jobs	messages	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	kld_jobs	messages	sender_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
 mysql	kld_jobs	messages	recipient_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id	
@@ -509,5 +511,3 @@ mysql	kld_jobs	reviews	reviewer_id	3	int	NULL	FOREIGN KEY	kld_jobs	users	id
 mysql	kld_jobs	reviews	reviewee_id	4	int	NULL	FOREIGN KEY	kld_jobs	users	id	
 mysql	kld_jobs	saved_jobs	id	1	int	NULL	PRIMARY KEY	NULL	NULL	NULL	
 mysql	kld_jobs	saved_jobs	user_id	2	int	NULL	UNIQUE	NULL	NULL	NULL	
-mysql	kld_jobs	saved_jobs	job_id	3	int	NULL	UNIQUE	NULL	NULL	NULL	
-mysql	kld_jobs	saved_jobs	user_id	2	int	NULL	FOREIGN KEY	kld_jobs	users	id	
