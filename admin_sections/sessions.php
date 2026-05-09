@@ -206,7 +206,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                 </h3>
                 <span style="font-size:12px;color:#888;">Sessions with outstanding balances</span>
             </div>
-            <table class="data-table" id="pendingPaymentsTable">
+            <table class="data-table table-cards" id="pendingPaymentsTable">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -257,12 +257,12 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         $bookedMinutes = ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) ? (int)$ps['planned_minutes'] : 0;
                     ?>
                         <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
-                            <td>#<?= $ps['session_id'] ?></td>
-                            <td><?= sessionCustomerLabel($ps) ?></td>
-                            <td><?= htmlspecialchars($ps['unit_number']) ?></td>
-                            <td><?= $psModeLabel ?></td>
-                            <td><?= date('h:i A', $psStart) ?></td>
-                            <td>
+                            <td data-label="#">#<?= $ps['session_id'] ?></td>
+                            <td data-label="Customer"><?= sessionCustomerLabel($ps) ?></td>
+                            <td data-label="Console"><?= htmlspecialchars($ps['unit_number']) ?></td>
+                            <td data-label="Mode"><?= $psModeLabel ?></td>
+                            <td data-label="Started"><?= date('h:i A', $psStart) ?></td>
+                            <td data-label="Status">
                                 <?php if ($isCompleted): ?>
                                     <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
                                         Ended
@@ -273,14 +273,14 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     </span>
                                 <?php endif; ?>
                             </td>
-                            <td style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
-                            <td>
+                            <td data-label="Paid So Far" style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
+                            <td data-label="Balance Owed">
                                 <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
                                  padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">
                                     ₱<?= number_format($psOwed, 2) ?> due
                                 </span>
                             </td>
-                            <td>
+                            <td data-label="Action">
                                 <?php if ($psOwed > 0): ?>
                                     <button class="btn-prim btn-sm" title="Collect Payment"
                                         onclick="openPayModal(
@@ -342,7 +342,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                 <span class="asb-count" id="sessionsCount"></span>
             </div>
         </div>
-        <table class="data-table" id="sessionsTable">
+        <table class="data-table table-cards" id="sessionsTable">
             <thead>
                 <tr>
                     <th data-col="0">#<span class="sort-icon">&#8597;</span></th>
@@ -386,9 +386,9 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         data-cost="<?= $costVal ?>"
                         data-status="<?= $isLive ?>"
                         data-source-res-id="<?= $sess['source_reservation_id'] ?? 0 ?>">
-                        <td>#<?= $sess['session_id'] ?></td>
-                        <td><?= sessionCustomerLabel($sess) ?></td>
-                        <td class="console-cell" data-session-id="<?= $sess['session_id'] ?>">
+                        <td data-label="#">#<?= $sess['session_id'] ?></td>
+                        <td data-label="Customer"><?= sessionCustomerLabel($sess) ?></td>
+                        <td data-label="Console" class="console-cell" data-session-id="<?= $sess['session_id'] ?>">
                             <span class="console-display end-time-display" title="Click to reassign console" style="border-bottom:1px dashed rgba(255, 255, 255, .25);">
                                 <span class="unit-text"><?= htmlspecialchars($sess['unit_number']) ?></span>
                                 <i class="fas fa-pen edit-pen" style="font-size:10px;margin-left:4px;"></i>
@@ -406,21 +406,21 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 <button class="btn-cancel-console btn-cancel-edit" type="button" style="padding:4px 8px;font-size:11px;">✕</button>
                             </span>
                         </td>
-                        <td><?= match ($sess['rental_mode']) {
+                        <td data-label="Mode"><?= match ($sess['rental_mode']) {
                                 'open_time' => 'Open Time',
                                 default => ucfirst($sess['rental_mode'])
                             } ?></td>
-                        <td>
+                        <td data-label="Booked">
                             <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']):
                                 $ph = intdiv($sess['planned_minutes'], 60);
                                 $pm = $sess['planned_minutes'] % 60;
                                 echo $ph ? ($pm ? "{$ph}h {$pm}m" : "{$ph}h") : "{$pm}m";
                             else: ?>—<?php endif; ?>
                         </td>
-                        <td><?= date('M d h:i A', $startTs) ?></td>
+                        <td data-label="Start"><?= date('M d h:i A', $startTs) ?></td>
 
                         <!-- ── End Time cell (editable for completed sessions only) ── -->
-                        <td class="end-time-cell" data-session-id="<?= $sess['session_id'] ?>">
+                        <td data-label="End" class="end-time-cell" data-session-id="<?= $sess['session_id'] ?>">
                             <?php if ($sess['status'] === 'completed' && $sess['end_time']): ?>
                                 <span class="end-time-display" title="Click to edit end time">
                                     <?= date('h:i A', $endTs) ?>
@@ -447,17 +447,17 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 <?php else: ?>—<?php endif; ?>
                         </td>
 
-                        <td class="duration-cell">
+                        <td data-label="Duration" class="duration-cell">
                             <?= $sess['duration_minutes'] !== null
                                 ? ($sess['duration_minutes'] > 0 ? $sess['duration_minutes'] . ' min' : '< 1 min')
                                 : '—' ?>
                         </td>
-                <td class="cost-cell">
+                <td data-label="Cost" class="cost-cell">
                             <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 2) : '—' ?>
                         </td>
 
-                        <td><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
-                        <td>
+                        <td data-label="Status"><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
+                        <td data-label="Action">
                             <?php if ($sess['status'] === 'active'): ?>
                                 <div style="display:flex;flex-wrap:wrap;gap:6px;min-width:170px;">
                                     <button class="btn-dang btn-sm" title="End Session"
@@ -567,7 +567,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                 </div>
             </div>
             <?php if (!empty($activeCtrlRentals)): ?>
-                <table class="data-table" id="ctrlRentalsTable">
+                <table class="data-table table-cards" id="ctrlRentalsTable">
                     <thead>
                         <tr>
                             <th>Session</th>
@@ -593,8 +593,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 $isExpired = $endsTs && time() > $endsTs;
                             ?>
                             <tr>
-                                <td>#<?= $cr['session_id'] ?></td>
-                                <td>
+                            <td data-label="Session">#<?= $cr['session_id'] ?></td>
+                            <td data-label="Customer">
                                     <?php if ((int)$cr['user_id'] === WALKIN_USER_ID): ?>
                                         <span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
                                             <i class="fas fa-walking" style="font-size:9px;"></i> Walk-in
@@ -603,16 +603,16 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <span style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($cr['customer_name']) ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="font-weight:700;color:#f1a83c;"><?= htmlspecialchars($cr['unit_number']) ?></td>
-                                <td>
+                            <td data-label="Console" style="font-weight:700;color:#f1a83c;"><?= htmlspecialchars($cr['unit_number']) ?></td>
+                            <td data-label="Controllers">
                                     <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.2);border-radius:6px;padding:3px 9px;color:#20c8a1;font-weight:700;font-size:12px;">
                                         <i class="fa-solid fa-gamepad" style="font-size:10px;"></i>
                                         <?= $cr['qty'] ?>× Controller<?= $cr['qty'] > 1 ? 's' : '' ?>
                                     </span>
                                 </td>
-                                <td><?= $durStr ?></td>
-                                <td><?= date('h:i A', $rentedTs) ?></td>
-                                <td>
+                            <td data-label="Duration"><?= $durStr ?></td>
+                            <td data-label="Rented At"><?= date('h:i A', $rentedTs) ?></td>
+                            <td data-label="Ends At">
                                     <?php if ($endsTs): ?>
                                         <span style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
                                             <?= date('h:i A', $endsTs) ?>
@@ -624,7 +624,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <span style="color:#888;">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                            <td data-label="Fee" style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

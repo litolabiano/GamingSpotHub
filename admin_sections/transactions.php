@@ -66,7 +66,7 @@
             </h3>
             <span style="font-size:12px;color:#888;">Sessions with unpaid balances — collect before end of day</span>
         </div>
-        <table class="data-table">
+        <table class="data-table table-cards">
             <thead>
                 <tr>
                     <th>#</th>
@@ -83,6 +83,7 @@
             <?php foreach ($pendingSessions as $ps):
                 $psStart   = strtotime($ps['start_time']);
                 $psPaid    = (float)$ps['paid_so_far'];
+                $psExtras  = (float)($ps['approved_extras'] ?? 0); // approved additional_requests (controller rental etc.)
                 $isCompleted = ($ps['status'] === 'completed');
 
                 if ($isCompleted) {
@@ -100,16 +101,18 @@
                         $psExpected  = $unlimitedRateVal;
                         $psModeLabel = 'Unlimited';
                     }
+                    // Add approved extras (controller rental etc.) so balance owed matches pay modal/end session.
+                    $psExpected += $psExtras;
                 }
                 $psOwed = max(0, $psExpected - $psPaid);
                 $bookedMinutes = ($ps['rental_mode'] === 'hourly' && $ps['planned_minutes']) ? (int)$ps['planned_minutes'] : 0;
             ?>
             <tr style="<?= $isCompleted ? 'background:rgba(251,86,107,.03);' : '' ?>">
-                <td>#<?= $ps['session_id'] ?></td>
-                <td><?= htmlspecialchars($ps['customer_name']) ?></td>
-                <td><?= htmlspecialchars($ps['unit_number']) ?></td>
-                <td><?= $psModeLabel ?></td>
-                <td>
+                <td data-label="#">#<?= $ps['session_id'] ?></td>
+                <td data-label="Customer"><?= htmlspecialchars($ps['customer_name']) ?></td>
+                <td data-label="Console"><?= htmlspecialchars($ps['unit_number']) ?></td>
+                <td data-label="Mode"><?= $psModeLabel ?></td>
+                <td data-label="Status">
                     <?php if ($isCompleted): ?>
                     <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">
                         Ended
@@ -120,14 +123,14 @@
                     </span>
                     <?php endif; ?>
                 </td>
-                <td style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
-                <td>
+                <td data-label="Paid" style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
+                <td data-label="Balance Owed">
                     <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
                                  padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">
                         ₱<?= number_format($psOwed, 2) ?> due
                     </span>
                 </td>
-                <td>
+                <td data-label="Action">
                     <?php if ($psOwed > 0): ?>
                     <button class="btn-prim btn-sm" title="Collect Payment"
                         onclick="openPayModal(
@@ -176,7 +179,7 @@
                 <span class="asb-count" id="txCount"></span>
             </div>
         </div>
-        <table class="data-table" id="txTable">
+        <table class="data-table table-cards" id="txTable">
             <thead><tr>
                 <th>#</th>
                 <th>Customer</th>
@@ -195,21 +198,21 @@
                 $pmId     = $pmPayId ?: $pmSrcId;  // prefer payment_id, fallback to session_id
             ?>
             <tr>
-                <td>#<?= $t['transaction_id'] ?></td>
-                <td><?= htmlspecialchars($t['customer_name']) ?></td>
-                <td><?= htmlspecialchars($t['unit_number']) ?></td>
-                <td><?= match($t['rental_mode']) {
+                <td data-label="#">#<?= $t['transaction_id'] ?></td>
+                <td data-label="Customer"><?= htmlspecialchars($t['customer_name']) ?></td>
+                <td data-label="Console"><?= htmlspecialchars($t['unit_number']) ?></td>
+                <td data-label="Mode"><?= match($t['rental_mode']) {
                     'open_time'   => 'Open Time',
                     'reservation' => '<span style="color:#20c8a1;font-weight:700;">Reservation</span>',
                     'tournament'  => '<span style="color:#f1a83c;font-weight:700;">Tournament</span>',
                     'refund'      => '<span style="color:#fb566b;">Refund</span>',
                     default       => ucfirst($t['rental_mode'])
                 } ?></td>
-                <td style="color:<?= (float)$t['amount'] < 0 ? '#fb566b' : '#20c8a1' ?>;font-weight:700">
+                <td data-label="Amount" style="color:<?= (float)$t['amount'] < 0 ? '#fb566b' : '#20c8a1' ?>;font-weight:700">
                     <?= (float)$t['amount'] < 0 ? '-' : '' ?>₱<?= number_format(abs((float)$t['amount']), 2) ?>
                 </td>
-                <td><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
-                <td style="font-size:11px;">
+                <td data-label="Method"><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
+                <td data-label="PayMongo ID" style="font-size:11px;">
                     <?php if ($pmId): ?>
                         <span style="font-family:monospace;color:#20c8a1;font-weight:600;letter-spacing:.3px;"
                               title="<?= htmlspecialchars($pmId) ?>">
@@ -224,8 +227,8 @@
                         <span style="color:#444;">—</span>
                     <?php endif; ?>
                 </td>
-                <td><?= date('M d, Y h:i A', strtotime($t['transaction_date'])) ?></td>
-                <td><span class="badge <?= $t['payment_status'] === 'completed' ? 'completed' : 'cancelled' ?>"><?= ucfirst($t['payment_status']) ?></span></td>
+                <td data-label="Date"><?= date('M d, Y h:i A', strtotime($t['transaction_date'])) ?></td>
+                <td data-label="Status"><span class="badge <?= $t['payment_status'] === 'completed' ? 'completed' : 'cancelled' ?>"><?= ucfirst($t['payment_status']) ?></span></td>
             </tr>
             <?php endforeach; ?>
             </tbody>

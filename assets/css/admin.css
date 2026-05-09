@@ -1350,3 +1350,86 @@ select:focus,
         scroll-behavior: auto !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+   MOBILE TABLE → CARD ROWS
+   Add class "table-cards" on tables you want stacked.
+   Requires each <td> to have data-label="Column name".
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    table.data-table.table-cards {
+        min-width: 0 !important;
+        border-collapse: separate;
+        border-spacing: 0 10px;
+    }
+
+    table.data-table.table-cards thead {
+        display: none;
+    }
+
+    table.data-table.table-cards tbody,
+    table.data-table.table-cards tr,
+    table.data-table.table-cards td {
+        display: block;
+        width: 100%;
+    }
+
+    table.data-table.table-cards tr {
+        background: linear-gradient(135deg, rgba(10, 33, 81, 0.78), rgba(13, 17, 23, 0.78));
+        border: 1px solid rgba(95, 133, 218, 0.14);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    table.data-table.table-cards td {
+        padding: 10px 12px;
+        border: 0;
+        border-bottom: 1px solid rgba(95, 133, 218, 0.10);
+        position: relative;
+        padding-left: 42%;
+    }
+
+    table.data-table.table-cards tr td:last-child {
+        border-bottom: 0;
+    }
+
+    table.data-table.table-cards td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 12px;
+        top: 10px;
+        width: 38%;
+        padding-right: 10px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Make action areas wrap nicely */
+    table.data-table.table-cards td[data-label="Action"],
+    table.data-table.table-cards td[data-label="Actions"] {
+        padding-left: 12px;
+    }
+    table.data-table.table-cards td[data-label="Action"]::before,
+    table.data-table.table-cards td[data-label="Actions"]::before {
+        display: none;
+    }
+
+    table.data-table.table-cards button,
+    table.data-table.table-cards .btn,
+    table.data-table.table-cards .btn-sm {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Don’t force embedded layout spans to break */
+    table.data-table.table-cards td * {
+        max-width: 100%;
+    }
+}

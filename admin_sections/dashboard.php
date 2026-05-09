@@ -65,17 +65,17 @@
                 <p>No active sessions right now</p>
             </div>
         <?php else: ?>
-        <table class="data-table">
+        <table class="data-table table-cards">
             <thead><tr><th>#</th><th>Customer</th><th>Console</th><th>Mode</th><th>Started</th><th>Booked Until</th><th>Elapsed / Remaining</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($activeSessions as $sess): ?>
             <tr>
-                <td><span style="color:#555;font-size:12px">#</span><?= $sess['session_id'] ?></td>
-                <td style="font-weight:600">
+                <td data-label="#" ><span style="color:#555;font-size:12px">#</span><?= $sess['session_id'] ?></td>
+                <td data-label="Customer" style="font-weight:600">
                     <?= htmlspecialchars($sess['customer_name']) ?>
                     <div style="color:rgba(32,200,161,.7);font-size:10px;font-weight:400;margin-top:1px;"><?= htmlspecialchars($sess['customer_email'] ?? '') ?></div>
                 </td>
-                <td>
+                <td data-label="Console">
                     <?php
                         $tL = strtolower($sess['console_type']);
                         $bC = (str_contains($tL, 'ps5')) ? 'ps5' : ((str_contains($tL, 'ps4')) ? 'ps4' : 'xbox');
@@ -85,9 +85,9 @@
                     </span>
                     <span style="color:#aaa;font-size:12px;margin-left:4px"><?= htmlspecialchars($sess['unit_number']) ?></span>
                 </td>
-                <td><span class="badge pending"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></span></td>
-                <td><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
-                <td>
+                <td data-label="Mode"><span class="badge pending"><?= match($sess['rental_mode']) { 'open_time' => 'Open Time', default => ucfirst($sess['rental_mode']) } ?></span></td>
+                <td data-label="Started"><?= date('h:i A', strtotime($sess['start_time'])) ?></td>
+                <td data-label="Booked Until">
                     <?php if ($sess['rental_mode'] === 'hourly' && $sess['planned_minutes']):
                         $bookedEndDt = new DateTime($sess['start_time'], new DateTimeZone('Asia/Manila'));
                         $bookedEndDt->modify('+' . $sess['planned_minutes'] . ' minutes');
@@ -95,7 +95,7 @@
                         <span style="color:#f1e1aa;font-weight:700"><?= $bookedEndDt->format('h:i A') ?></span>
                     <?php else: ?>—<?php endif; ?>
                 </td>
-                <td><span class="session-timer"
+                <td data-label="Elapsed / Remaining"><span class="session-timer"
                     data-start="<?= $sess['start_time'] ?>"
                     data-planned="<?= $sess['planned_minutes'] ?? '' ?>"
                     data-session-id="<?= $sess['session_id'] ?>"
@@ -106,7 +106,7 @@
                     data-booked-minutes="<?= (int)($sess['planned_minutes'] ?? 0) ?>"
                     data-customer="<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>"
                     data-unit="<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>">—</span></td>
-                <td>
+                <td data-label="Actions">
                     <button class="btn-dang btn-sm" title="End & Collect Payment"
                         onclick="openEndSessionModal(
                         <?= $sess['session_id'] ?>,

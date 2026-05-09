@@ -75,7 +75,7 @@
             </h3>
         </div>
         <div style="overflow-x:auto;">
-            <table class="data-table">
+            <table class="data-table table-cards">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -90,35 +90,35 @@
                 <tbody>
                     <?php foreach ($pendingUserReschedules as $pr): ?>
                         <tr>
-                            <td style="color:#888;">#<?= $pr['reservation_id'] ?></td>
-                            <td>
+                            <td data-label="#" style="color:#888;">#<?= $pr['reservation_id'] ?></td>
+                            <td data-label="Customer">
                                 <strong style="color:#f0f0f0;"><?= htmlspecialchars($pr['customer_name']) ?></strong>
                                 <div style="color:#888; font-size: 11px; margin-top: 1px;">
                                     <?= htmlspecialchars((!empty($pr['customer_phone']) && $pr['customer_phone'] !== $pr['customer_email']) ? $pr['customer_phone'] : '—') ?>
                                 </div>
                                 <div style="color:#888; font-size: 11px;"><?= htmlspecialchars($pr['customer_email'] ?? '—') ?></div>
                             </td>
-                            <td>
+                            <td data-label="Console">
                                 <?= htmlspecialchars($pr['console_type']) ?>
                                 <?php if (!empty($pr['unit_number'])): ?>
                                     <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($pr['unit_number']) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td style="color:#aaa;">
+                            <td data-label="Requested From" style="color:#aaa;">
                                 <?= date('M d, Y', strtotime($pr['old_date'])) ?><br>
                                 <span style="font-size:11px;"><?= date('h:i A', strtotime($pr['old_time'])) ?></span>
                             </td>
-                            <td>
+                            <td data-label="Requested To">
                                 <strong style="color:#20c8a1;"><?= date('M d, Y', strtotime($pr['new_date'])) ?></strong><br>
                                 <span style="font-size:11px;color:#20c8a1;"><?= date('h:i A', strtotime($pr['new_time'])) ?></span>
                             </td>
-                            <td>
+                            <td data-label="Reason">
                                 <span style="font-size:12px;color:#f1a83c;font-weight:600;">User Request</span>
                                 <?php if ($pr['reason_detail']): ?>
                                     <br><span style="font-size:11px;color:#888;"><?= htmlspecialchars($pr['reason_detail']) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td>
+                            <td data-label="Actions">
                                 <div style="display:flex;gap:6px;">
                                     <button class="btn-prim btn-sm" title="Approve"
                                         onclick="adminRespondReschedule(<?= $pr['reschedule_id'] ?>, 'approve')">
@@ -176,7 +176,7 @@
             </div>
         <?php else: ?>
             <div style="overflow-x:auto;">
-                <table class="data-table" id="resTable">
+                <table class="data-table table-cards" id="resTable">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -200,22 +200,22 @@
                             $sc = $statusColors[$r['status']] ?? ['bg' => 'rgba(100,100,100,.1)', 'text' => '#888', 'border' => 'rgba(100,100,100,.2)'];
                         ?>
                             <tr style="<?= $isToday ? 'background:rgba(32,200,161,.03);' : '' ?>">
-                                <td style="color:#888;">#<?= $r['reservation_id'] ?></td>
-                                <td style="white-space:nowrap;">
+                                <td data-label="#" style="color:#888;">#<?= $r['reservation_id'] ?></td>
+                                <td data-label="Date & Time" style="white-space:nowrap;">
                                     <?php if ($isToday): ?>
                                         <span style="color:#20c8a1;font-size:10px;font-weight:700;display:block;">TODAY</span>
                                     <?php endif; ?>
                                     <?= date('M d, Y', strtotime($r['reserved_date'])) ?><br>
                                     <span style="color:#888;font-size:11px;"><?= date('h:i A', strtotime($r['reserved_time'])) ?></span>
                                 </td>
-                                <td>
+                                <td data-label="Customer">
                                     <div style="font-weight:600;color:#f0f0f0;"><?= htmlspecialchars($r['customer_name']) ?></div>
                                     <div style="color:#888; font-size: 11px; margin-top: 1px;">
                                         <?= htmlspecialchars((!empty($r['customer_phone']) && $r['customer_phone'] !== $r['customer_email']) ? $r['customer_phone'] : '—') ?>
                                     </div>
                                     <div style="color:#888; font-size: 11px;"><?= htmlspecialchars($r['customer_email'] ?? '—') ?></div>
                                 </td>
-                                <td>
+                                <td data-label="Console">
                                     <?= htmlspecialchars($r['console_type']) ?>
                                     <?php if ($r['unit_number']): ?>
                                         <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
