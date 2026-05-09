@@ -103,13 +103,13 @@ if (!in_array($res['status'], ['pending', 'reserved'])) {
 // reservation_id was created by the customer themselves.
 $chk = $conn->prepare(
     "SELECT reschedule_id FROM reservation_reschedules
-      WHERE reservation_id = ? AND rescheduled_by = ? AND status != 'rejected'
+      WHERE reservation_id = ? AND status != 'rejected'
       LIMIT 1"
 );
-$chk->bind_param('ii', $res_id, $uid);
+$chk->bind_param('i', $res_id);
 $chk->execute();
 if ($chk->get_result()->num_rows > 0) {
-    echo json_encode(['success' => false, 'message' => 'You have already used your one-time reschedule for this reservation.']);
+    echo json_encode(['success' => false, 'message' => 'This reservation has already been rescheduled or has a pending request. Only one reschedule is permitted per reservation.']);
     exit;
 }
 

@@ -483,9 +483,9 @@ if (!empty($myReservations)) {
     $uid_r = (int)$user['user_id'];
     $rStmt = $conn->prepare(
         "SELECT DISTINCT reservation_id FROM reservation_reschedules
-          WHERE user_id = ? AND rescheduled_by = ?"
+          WHERE user_id = ? AND status != 'rejected'"
     );
-    $rStmt->bind_param('ii', $uid_r, $uid_r);
+    $rStmt->bind_param('i', $uid_r);
     $rStmt->execute();
     foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
         $rescheduledIds[$row['reservation_id']] = true;
@@ -2052,7 +2052,7 @@ if (!empty($_GET['console'])) {
                                     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                         <?php if ($alreadyResched): ?>
                                             <button class="res-action-btn res-action-resched" disabled
-                                                title="You have already used your one-time reschedule for this reservation."
+                                                title="This reservation has already been rescheduled once."
                                                 style="opacity:.45;cursor:not-allowed;">
                                                 <i class="fas fa-calendar-alt"></i> Rescheduled
                                             </button>

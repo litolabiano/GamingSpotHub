@@ -1329,6 +1329,8 @@ function fmtMins(int $m): string {
                 document.getElementById('rcmReason').value = '';
 
                 document.getElementById('rescheduleConfirmModal').style.display = 'flex';
+                document.getElementById('rcmError').style.display = 'none';
+                document.getElementById('rcmReason').style.borderColor = 'rgba(95,133,218,.3)';
                 checkIfPropPast();
             }
 
@@ -1376,6 +1378,8 @@ function fmtMins(int $m): string {
                 dateInput.value = dateInput.dataset.original;
                 timeSelect.value = document.getElementById('rcmTime').dataset.original;
                 
+                document.getElementById('rcmError').style.display = 'none';
+                document.getElementById('rcmReason').style.borderColor = 'rgba(95,133,218,.3)';
                 updateRcmTimePicker();
             }
 
@@ -1432,15 +1436,32 @@ function fmtMins(int $m): string {
                     time = document.getElementById('rcmTime').value;
                     reason = document.getElementById('rcmReason').value.trim();
 
-                    if (!date) { showDashToast('Please select a date.', 'error'); return; }
-                    if (!time) { showDashToast('Please select a time.', 'error'); return; }
-                    if (!reason) { showDashToast('Please provide a reason for the reschedule.', 'error'); return; }
+                    const errDiv = document.getElementById('rcmError');
+                    const errText = document.getElementById('rcmErrorText');
+
+                    if (!date) {
+                        errText.textContent = 'Please select a date.';
+                        errDiv.style.display = 'block';
+                        return;
+                    }
+                    if (!time) {
+                        errText.textContent = 'Please select a time.';
+                        errDiv.style.display = 'block';
+                        return;
+                    }
+                    if (!reason) { 
+                        document.getElementById('rcmReason').style.borderColor = '#fb566b';
+                        errText.textContent = 'Please provide a reason for the reschedule.';
+                        errDiv.style.display = 'block';
+                        return; 
+                    }
                     
                     // Strictly later check
                     const propDate = document.getElementById('rcmDate').dataset.original;
                     const propTime = document.getElementById('rcmTime').dataset.original;
                     if (date < propDate || (date === propDate && time <= propTime)) {
-                        showDashToast('Your alternative schedule must be later than the admin\'s proposal.', 'error');
+                        errText.textContent = 'Your alternative schedule must be later than the admin\'s proposal.';
+                        errDiv.style.display = 'block';
                         return;
                     }
                 }
@@ -1970,7 +1991,7 @@ function fmtMins(int $m): string {
                                 $rTime        = substr($r['reserved_time'], 0, 5);
                                 $rConsole     = htmlspecialchars($r['console_type']);
                                 $rConsoleId   = (int)($r['console_id'] ?? 0);
-                                $alreadyResched = !empty($userRescheduledIds[$rid]);
+                                $alreadyResched = !empty($allRescheduledIds[$rid]);
                             ?>
                             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                 <?php if ($pendingAdminResched): ?>
@@ -1985,6 +2006,8 @@ function fmtMins(int $m): string {
                                         <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn" style="background:rgba(95,133,218,.15);border:1px solid rgba(95,133,218,.4);color:#5f85da;font-size:11px;padding:4px 10px;">
                                             <i class="fas fa-calendar-alt"></i> Reschedule
                                         </button>
+                                    <?php else: ?>
+                                        <span style="font-size:10px;color:var(--muted);font-style:italic;"><i class="fas fa-info-circle"></i> Rescheduled once</span>
                                     <?php endif; ?>
                                     <button onclick="openCancelModal(this)" data-id="<?= $rid ?>" class="cd-btn" style="background:rgba(251,86,107,.15);border:1px solid rgba(251,86,107,.4);color:#fb566b;font-size:11px;padding:4px 10px;">
                                         <i class="fas fa-times"></i> Cancel
@@ -2142,6 +2165,10 @@ function fmtMins(int $m): string {
                             <strong style="color:#fb566b;">No-Refund Policy:</strong>
                             Payments are non-refundable. No refund will be issued for this cancellation.
                         </span>
+                    </div>
+
+                    <div id="cancelError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);">
+                        <i class="fas fa-exclamation-circle"></i> <span id="cancelErrorText"></span>
                     </div>
 
                     <div style="display:flex;gap:10px;">
@@ -3221,6 +3248,9 @@ function openCancelModal(btn) {
     // Reset modal to step 1
     document.getElementById('cancelReasonType').value   = '';
     document.getElementById('cancelReasonDetail').value = '';
+    document.getElementById('cancelReasonType').style.borderColor = '';
+    document.getElementById('cancelReasonDetail').style.borderColor = '';
+    document.getElementById('cancelError').style.display = 'none';
     document.getElementById('cancelDetailLabel').textContent = 'Additional Details (Optional)';
     document.getElementById('cancelStep1').style.display = 'block';
     document.getElementById('cancelStep2').style.display = 'none';
@@ -3243,13 +3273,23 @@ document.getElementById('cancelReasonType')?.addEventListener('change', function
 function cancelStep1Next() {
     const reasonType   = document.getElementById('cancelReasonType').value;
     const reasonDetail = document.getElementById('cancelReasonDetail').value.trim();
+    const errDiv       = document.getElementById('cancelError');
+    const errText      = document.getElementById('cancelErrorText');
+
+    document.getElementById('cancelReasonType').style.borderColor = '';
+    document.getElementById('cancelReasonDetail').style.borderColor = '';
+    errDiv.style.display = 'none';
 
     if (!reasonType) {
-        showDashToast('Please select a reason for cancellation.', 'error');
+        document.getElementById('cancelReasonType').style.borderColor = '#fb566b';
+        errText.textContent = 'Please select a reason for cancellation.';
+        errDiv.style.display = 'block';
         return;
     }
     if (reasonType === 'other' && !reasonDetail) {
-        showDashToast('Please describe your reason for cancellation.', 'error');
+        document.getElementById('cancelReasonDetail').style.borderColor = '#fb566b';
+        errText.textContent = 'Please describe your reason for cancellation.';
+        errDiv.style.display = 'block';
         document.getElementById('cancelReasonDetail').focus();
         return;
     }
@@ -3309,7 +3349,13 @@ function submitCancelReservation() {
                     location.reload();
                 }, 800);
             } else {
-                showDashToast(data.message || 'Could not cancel reservation.', 'error');
+                document.getElementById('cancelStep2').style.display = 'none';
+                document.getElementById('cancelStep1').style.display = 'block';
+                const errDiv = document.getElementById('cancelError');
+                const errText = document.getElementById('cancelErrorText');
+                errText.textContent = data.message || 'Could not cancel reservation.';
+                errDiv.style.display = 'block';
+
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-times"></i> Yes, Cancel It';
             }
@@ -3487,6 +3533,10 @@ if (mainNav) {
 
         <input type="hidden" id="reqExtMins" value="">
 
+        <div id="reqExtError" style="display:none; color:#fb566b; font-size:12px; margin-bottom:14px; background:rgba(251,86,107,.1); padding:10px; border-radius:8px; border:1px solid rgba(251,86,107,.2);">
+            <i class="fas fa-exclamation-circle"></i> <span id="reqExtErrorText"></span>
+        </div>
+
         <button id="reqExtSubmitBtn" onclick="submitReqExt()"
                 disabled
                 style="width:100%;padding:13px;border-radius:10px;
@@ -3518,6 +3568,7 @@ function openReqExtModal() {
     document.querySelectorAll('.req-ext-opt').forEach(b => b.classList.remove('selected'));
     document.getElementById('reqExtMins').value = '';
     document.getElementById('reqExtCostBox').style.display = 'none';
+    document.getElementById('reqExtError').style.display = 'none';
     const btn = document.getElementById('reqExtSubmitBtn');
     btn.disabled = true;
     btn.style.opacity = '.5';
@@ -3540,6 +3591,7 @@ function selectExtOpt(el) {
     document.getElementById('reqExtMins').value = mins;
     document.getElementById('reqExtCostDisplay').textContent = '₱ ' + cost;
     document.getElementById('reqExtCostBox').style.display = 'block';
+    document.getElementById('reqExtError').style.display = 'none';
     const btn = document.getElementById('reqExtSubmitBtn');
     btn.disabled = false;
     btn.style.opacity = '1';
@@ -3573,7 +3625,10 @@ function submitReqExt() {
                     return d;
                 })());
             } else {
-                showDashToast(data.message || 'Could not send request.', 'error');
+                const errDiv = document.getElementById('reqExtError');
+                const errText = document.getElementById('reqExtErrorText');
+                errText.textContent = data.message || 'Could not send request.';
+                errDiv.style.display = 'block';
                 btn.style.opacity = '1';
             }
         })
@@ -3737,6 +3792,9 @@ function openUserRescheduleModal(id, date, time, consoleType, consoleId) {
 
 function closeUserRescheduleModal() {
     document.getElementById('userRescheduleModal').style.display = 'none';
+    document.getElementById('reschedConsole').style.borderColor = '';
+    document.getElementById('reschedDate').style.borderColor = '';
+    document.getElementById('reschedTime').style.borderColor = '';
 }
 
 function submitUserReschedule(e) {
@@ -3749,7 +3807,12 @@ function submitUserReschedule(e) {
     const time = document.getElementById('reschedTime').value;
     const consSel = document.getElementById('reschedConsole');
     const opt = consSel.options[consSel.selectedIndex];
+    document.getElementById('reschedConsole').style.borderColor = '';
+    document.getElementById('reschedDate').style.borderColor = '';
+    document.getElementById('reschedTime').style.borderColor = '';
+
     if (!opt || !opt.value) {
+        consSel.style.borderColor = '#fb566b';
         err.textContent = 'Please select a console unit.';
         err.style.display = 'block';
         return;
@@ -3758,6 +3821,8 @@ function submitUserReschedule(e) {
     const consoleType = opt.dataset.type;
 
     if (!rid || !date || !time) {
+        if(!date) document.getElementById('reschedDate').style.borderColor = '#fb566b';
+        if(!time) document.getElementById('reschedTime').style.borderColor = '#fb566b';
         err.textContent = 'Please fill out all required fields.';
         err.style.display = 'block';
         return;
@@ -4058,7 +4123,7 @@ function togglePwVisibility(inputId, btnId) {
             <div style="margin-bottom:14px;">
                 <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                               text-transform:uppercase;letter-spacing:.6px;">Your Preferred Date *</label>
-                <input type="date" id="rcmDate" onchange="updateRcmTimePicker()"
+                <input type="date" id="rcmDate" onchange="this.style.borderColor = ''; document.getElementById('rcmError').style.display='none'; updateRcmTimePicker()"
                     style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                            color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                            font-family:inherit;outline:none;box-sizing:border-box;">
@@ -4068,6 +4133,7 @@ function togglePwVisibility(inputId, btnId) {
                 <label style="font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:6px;
                               text-transform:uppercase;letter-spacing:.6px;">Preferred Time *</label>
                 <select id="rcmTime"
+                    onchange="this.style.borderColor = ''; document.getElementById('rcmError').style.display='none';"
                     style="width:100%;background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.3);
                            color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;
                            font-family:inherit;outline:none;">
@@ -4082,9 +4148,13 @@ function togglePwVisibility(inputId, btnId) {
                 <label style="font-size:11px;font-weight:700;color:#fb566b;display:block;margin-bottom:6px;
                               text-transform:uppercase;letter-spacing:.6px;">Reason for change *</label>
                 <textarea id="rcmReason" rows="2" placeholder="Explain why you need this schedule..."
+                    oninput="this.style.borderColor = ''; document.getElementById('rcmError').style.display='none';"
                     style="width:100%;background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.25);
                            color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:13px;
                            font-family:inherit;outline:none;box-sizing:border-box;resize:none;"></textarea>
+                <div id="rcmError" style="display:none; color:#fb566b; font-size:12px; margin-top:6px; font-weight:600;">
+                    <i class="fas fa-exclamation-circle"></i> <span id="rcmErrorText"></span>
+                </div>
             </div>
 
             <div style="display:flex;gap:10px;">

@@ -111,11 +111,12 @@ try {
                         reason        = 'user_request',
                         reason_detail = ?,
                         initiated_by  = 'user',
+                        rescheduled_by = ?,
                         seen_by_user  = 1,
                         created_at    = NOW()
                   WHERE reschedule_id = ?"
             );
-            $mark->bind_param('sssi', $finalDate, $finalTime, $userReason, $rescheduleId);
+            $mark->bind_param('sssii', $finalDate, $finalTime, $userReason, $user_id, $rescheduleId);
             if (!$mark->execute()) {
                 throw new Exception('Failed to update reschedule request.');
             }
