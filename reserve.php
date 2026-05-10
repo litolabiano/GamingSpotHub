@@ -1312,6 +1312,25 @@ if (!empty($_GET['console'])) {
         background: rgba(251,86,107,.15);
         color: #fb566b;
     }
+    /* ── Unlimited session state ── */
+    .unit-card.unlimited {
+        opacity: 0.55;
+        cursor: not-allowed;
+        border-color: rgba(241,168,60,.25);
+        background: rgba(241,168,60,.04);
+        pointer-events: none;
+    }
+    .unit-card.unlimited .uc-icon  { color: #f1a83c; }
+    .unit-card.unlimited .uc-name  { color: #aaa; }
+    .unit-card.unlimited .uc-status {
+        color: #f1a83c;
+        font-size: 10px;
+        line-height: 1.3;
+    }
+    .unit-card.unlimited .uc-controllers {
+        background: rgba(241,168,60,.12);
+        color: #f1a83c;
+    }
     
     .no-pref-btn {
         width: 100%;
@@ -2933,36 +2952,52 @@ function fetchUnitAvailability(dateV, timeV, retryCount = 0) {
             // Collect all units and build cards
             if (data.units && data.units.length > 0) {
                 data.units.forEach((u, idx) => {
-                    const isAvail = u.status === 'available';
-                    const iconClass = isAvail ? 'fas fa-check-square' : 'fas fa-times-circle';
-                    const statusText = isAvail ? 'Available' : 'Unavailable';
-                    const cardClass = isAvail ? 'available' : 'unavailable';
-                    
+                    const isAvail   = u.status === 'available';
+                    const isUnlim   = u.status === 'unlimited';
+
+                    let iconClass, statusText, cardClass;
+                    if (isUnlim) {
+                        iconClass  = 'fas fa-infinity';
+                        statusText = 'In Use (Unlimited)';
+                        cardClass  = 'unlimited';
+                    } else if (isAvail) {
+                        iconClass  = 'fas fa-check-square';
+                        statusText = 'Available';
+                        cardClass  = 'available';
+                    } else {
+                        iconClass  = 'fas fa-times-circle';
+                        statusText = 'Unavailable';
+                        cardClass  = 'unavailable';
+                    }
+
                     let selectedClass = '';
                     if (originalValue && originalValue == u.id && isAvail) {
                         selectedClass = 'selected';
                         stillAvailable = true;
                     }
-                    
+
                     const pageIdx = Math.floor(idx / 4);
-                    
+
                     const card = document.createElement('div');
                     card.className = `unit-card ${cardClass} ${selectedClass}`;
                     card.setAttribute('data-unit-page', pageIdx);
                     card.setAttribute('data-unit-id', u.id);
+
                     if (isAvail) {
                         card.onclick = () => selectUnit(u.id, false, u.unit);
                     } else {
-                        card.title = u.conflict || 'Unavailable';
+                        // Not selectable — set a tooltip for context
+                        card.title = u.conflict || (isUnlim ? 'Occupied all day (Unlimited session)' : 'Unavailable');
+                        card.onclick = null;
                     }
-                    
+
                     card.innerHTML = `
                         <div class="uc-icon"><i class="${iconClass}"></i></div>
                         <div class="uc-name">#${u.name || u.type + '-' + u.unit}</div>
                         <div class="uc-status">${statusText}</div>
                         <div class="uc-controllers"><i class="fas fa-gamepad"></i> ${u.controllers} Controllers</div>
                     `;
-                    
+
                     grid.appendChild(card);
                 });
                 

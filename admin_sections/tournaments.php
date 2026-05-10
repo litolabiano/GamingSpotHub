@@ -396,12 +396,6 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         <i class="fas fa-info-circle"></i> Prize pool is dependent on how many players join.
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Max Participants</label>
-                    <div style="background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#5f85da; line-height:1.4;">
-                        <i class="fas fa-infinity"></i> Unlimited participants allowed.
-                    </div>
-                </div>
             </div>
             <div class="form-group">
                 <label>Announcement / Description</label>
@@ -513,12 +507,6 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         <i class="fas fa-info-circle"></i> Prize pool is dependent on how many players join.
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Max Participants</label>
-                    <div style="background:rgba(95,133,218,.1); border:1px solid rgba(95,133,218,.2); padding:10px 12px; border-radius:8px; font-size:12px; color:#5f85da; line-height:1.4;">
-                        <i class="fas fa-infinity"></i> Unlimited participants allowed.
-                    </div>
-                </div>
             </div>
             <div class="form-group">
                 <label>Announcement / Description</label>
@@ -537,9 +525,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
 <div class="modal" id="addParticipantModal">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3 class="modal-title">
-                <i class="fas fa-user-plus" style="color:#b37bec;margin-right:8px;"></i> Add Participant
-            </h3>
+            <h3 class="modal-title">Add Participant</h3>
             <button class="modal-close" onclick="closeModal('addParticipant')">&times;</button>
         </div>
         <form method="POST" id="addParticipantForm">
@@ -723,11 +709,13 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
         btnActive.style.color = '#0a0f1c';
         btnArchived.style.background = 'transparent';
         btnArchived.style.color = '#888';
+        BulkManager.init(''); // Clear bulk bar when switching to active
     } else {
         btnArchived.style.background = 'var(--clr-gold)';
         btnArchived.style.color = '#0a0f1c';
         btnActive.style.background = 'transparent';
         btnActive.style.color = '#888';
+        BulkManager.init('participants'); // Initialize for archived participants
     }
 
     if (currentTname) document.getElementById('drawerTournamentName').textContent = currentTname;
@@ -745,8 +733,10 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
                     `<div class="empty-state"><i class="fas fa-users"></i><p>No ${viewType} participants found.</p></div>`;
                 return;
             }
-            let html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
-                '<th style="white-space:nowrap;">#</th><th style="white-space:nowrap;">Name</th><th style="white-space:nowrap;">IGN</th><th style="white-space:nowrap;">Contact</th><th style="white-space:nowrap;">Registered</th><th style="white-space:nowrap;">Payment</th><th style="white-space:nowrap;">Proof</th><th style="white-space:nowrap;">Action</th>' +
+            const isArchived = (viewType === 'archived');
+            let html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>';
+            if (isArchived) html += '<th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>';
+            html += '<th style="white-space:nowrap;">#</th><th style="white-space:nowrap;">Name</th><th style="white-space:nowrap;">IGN</th><th style="white-space:nowrap;">Contact</th><th style="white-space:nowrap;">Registered</th><th style="white-space:nowrap;">Payment</th><th style="white-space:nowrap;">Proof</th><th style="white-space:nowrap;">Action</th>' +
                 '</tr></thead><tbody>';
             data.participants.forEach((p, i) => {
                 const isPaid    = p.payment_status === 'paid';
@@ -786,8 +776,9 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
                         </div>`;
                 }
 
-                html += `<tr>
-                    <td style="color:#888">${i + 1}</td>
+                html += '<tr>';
+                if (isArchived) html += `<td><input type="checkbox" class="bulk-check" data-id="${p.participant_id}" onclick="BulkManager.toggle(${p.participant_id}, this.checked)"></td>`;
+                html += `<td style="color:#888">${i + 1}</td>
                     <td style="font-weight:600;color:#fff">${dispName}<br><span style="font-size:11px;color:#555;">${escHtml(p.email)}</span></td>
                     <td style="color:#b37bec;font-size:12px;">${p.ign ? escHtml(p.ign) : '<span style="color:#555;">—</span>'}</td>
                     <td style="color:#888;font-size:12px;">${p.contact_number ? escHtml(p.contact_number) : '<span style="color:#555;">—</span>'}</td>

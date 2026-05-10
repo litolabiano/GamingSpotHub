@@ -895,7 +895,7 @@ function endSingleControllerEarly(int $session_id, int $controller_id, int $staf
         $targetRow = null;
         $allIds    = [];
         foreach ($rows as $row) {
-            if (preg_match('/IDs:\s*([\d,\s]+)/', $row['description'], $m)) {
+            if (preg_match('/ID(?:s)?:\s*([\d,\s]+)/', $row['description'], $m)) {
                 $ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($m[1])))));
                 if (in_array($controller_id, $ids, true)) {
                     $targetRow = $row;
@@ -972,15 +972,8 @@ function endSingleControllerEarly(int $session_id, int $controller_id, int $staf
             $originalCost = round($totalCost / $numCtrls, 2);
         }
 
-        // ── 5. Prorate cost to elapsed time ───────────────────────────────
-        $proratedCost = 0.0;
-        if (in_array($controller_id, $otIds, true)) {
-            $proratedCost = computeControllerOpenTimeFeeForDuration($elapsed, $rate);
-        } elseif ($originalCost > 0) {
-            $bookedMins   = (int) round(($originalCost / $rate) * 60);
-            $billMins     = min($bookedMins, $elapsed);
-            $proratedCost = round($rate * ($billMins / 60), 2);
-        }
+        // ── 5. Prorate cost to elapsed time (₱10/30m rule) ────────────────
+        $proratedCost = computeControllerOpenTimeFeeForDuration($elapsed, $rate);
 
         $refundAmt = max(0.0, round($originalCost - $proratedCost, 2));
 
@@ -1119,31 +1112,8 @@ function computeTimedCost(int $minutes): float {
  * driven by the controller's hourly rate (matches admin.js _controllerOpenTimeFee).
  */
 function computeControllerOpenTimeFeeForDuration(int $total_minutes, float $controller_hourly_rate): float {
-    $total_minutes = max(0, $total_minutes);
-    if ($total_minutes === 0 || $controller_hourly_rate <= 0) {
-        return 0.0;
-    }
-    $rules  = getPricingRules();
-    $bp     = (int) $rules['bonus_paid_minutes'];
-    $bf     = (int) $rules['bonus_free_minutes'];
-    $ref    = (float) ($rules['hourly_rate'] ?? 0);
-    $brScale = $ref > 0.00001 ? ($controller_hourly_rate / $ref) : 1.0;
-    $ctrlR  = $controller_hourly_rate;
-
-    $cyclePay = $bp / 60 * $ctrlR;
-    $cycleLen = $bp + $bf;
-    $full     = intdiv($total_minutes, $cycleLen);
-    $cost     = $full * $cyclePay;
-    $rem      = $total_minutes % $cycleLen;
-
-    if ($rem > $bp) {
-        $cost += $cyclePay;
-    } else {
-        $sub = computePartialPeriodCost($rem % 60) * $brScale;
-        $cost += (int) floor($rem / 60) * $ctrlR + $sub;
-    }
-
-    return round((float) $cost, 2);
+    if ($total_minutes < 5) return 0.0;
+    return (float)(floor(($total_minutes + 25) / 30) * 10);
 }
 
 /**
@@ -1233,7 +1203,7 @@ function rebuildControllerRentalLineForEarlyEnd(string $description, float $prev
     $desc            = trim($description);
 
     $ids = [];
-    if (preg_match('/IDs:\s*([\d,\s]+)/', $desc, $m)) {
+    if (preg_match('/ID(?:s)?:\s*([\d,\s]+)/', $desc, $m)) {
         $ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($m[1])))));
     }
     if ($ids === []) {
@@ -1294,27 +1264,8 @@ function rebuildControllerRentalLineForEarlyEnd(string $description, float $prev
             return null;
         }
 
-        $amt = 0.0;
-
-        if (isset($fix_parts[$cid])) {
-            $orig      = $fix_parts[$cid];
-            $orig_mins = (int) round(($orig / $rate) * 60);
-            $bill_mins = min($orig_mins, $elapsed_minutes);
-            $amt       = round($rate * ($bill_mins / 60), 2);
-        } elseif (in_array($cid, $ot_ids, true)) {
-            $amt = computeControllerOpenTimeFeeForDuration($elapsed_minutes, $rate);
-        } elseif ($mins_map !== []) {
-            $book      = $mins_map[$i] ?? $mins_map[0];
-            $bill_mins = min($book, $elapsed_minutes);
-            $amt       = round($rate * ($bill_mins / 60), 2);
-        } elseif (count($ids) === 1 && $previous_cost > 0 && $fix_parts === [] && $ot_ids === []) {
-            $orig_mins = (int) round(($previous_cost / $rate) * 60);
-            $bill_mins = min(max(0, $orig_mins), $elapsed_minutes);
-            $amt       = round($rate * ($bill_mins / 60), 2);
-        } else {
-            return null;
-        }
-
+        // Standardized ₱10/30m rule for all returns
+        $amt = computeControllerOpenTimeFeeForDuration($elapsed_minutes, $rate);
         $per_controller[$cid] = $amt;
     }
 

@@ -42,4 +42,16 @@ if ($uid <= 0) {
 }
 
 $result = endSingleControllerEarly($session_id, $controller_id, $uid);
+
+if ($result['success']) {
+    // ── 6. Record the transaction ──────────────────────────────────────────
+    $finalFee = (float)($result['prorated_cost'] ?? 0);
+    // Even if 0, we might want to record it as a 'completed' transaction of 0 
+    // to show it was processed, but usually we only record if > 0.
+    if ($finalFee > 0) {
+        $label = $result['controller_label'] ?? ('Controller #' . $controller_id);
+        recordTransaction($session_id, $uid, $finalFee, 'completed', 'Final Controller Rental Fee (' . $label . ')');
+    }
+}
+
 echo json_encode($result);

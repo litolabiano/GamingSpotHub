@@ -79,6 +79,15 @@ try {
         }
     }
 
+    // ── Unlimited sessions: collect console IDs blocked for the ENTIRE day ──
+    // An active Unlimited session occupies the unit until shop closing (no fixed end).
+    $unlimitedBlockedIds = [];
+    foreach ($activeSessions as $sess) {
+        if ($sess['mode'] === 'unlimited') {
+            $unlimitedBlockedIds[] = $sess['console_id'];
+        }
+    }
+
     // 3. Fetch all potentially conflicting reservations on that day
     $sqlRes = "SELECT reservation_id, console_id, reserved_time, planned_minutes, rental_mode, u.full_name AS customer_name
                FROM reservations r
@@ -113,6 +122,24 @@ try {
     $units = [];
     foreach ($allConsoles as $c) {
         $cid = (int)$c['console_id'];
+
+        // ── Units with active Unlimited session: visible but unselectable ──
+        // They appear as cards labeled "In Use (Unlimited)" so users know why
+        // the unit is occupied, but they cannot be selected.
+        if (in_array($cid, $unlimitedBlockedIds, true)) {
+            $units[] = [
+                'id'          => $cid,
+                'unit'        => $c['unit_number'],
+                'name'        => $c['console_name'],
+                'type'        => $c['console_type'],
+                'rate'        => (float)$c['hourly_rate'],
+                'controllers' => (int)$c['controller_count'],
+                'status'      => 'unlimited',   // special sentinel
+                'conflict'    => 'Occupied all day — active Unlimited session in progress'
+            ];
+            continue;
+        }
+
         $isAvailable = true;
         $conflictMsg = null;
 
@@ -122,14 +149,15 @@ try {
                 if ($sess['end']) {
                     if ($requestedStart < $sess['end'] && $requestedEnd > $sess['start']) {
                         $isAvailable = false;
-                        $conflictMsg = "Console in use until " . $sess['end']->format('g:i A');
+                        $conflictMsg = 'Console in use until ' . $sess['end']->format('g:i A');
                         break;
                     }
                 } else {
+                    // Open Time: block only if requested slot overlaps current moment
                     $now = new DateTime('now', new DateTimeZone('Asia/Manila'));
                     if ($requestedStart < $now) {
                         $isAvailable = false;
-                        $conflictMsg = "Console currently in use (Open Time)";
+                        $conflictMsg = 'Console currently in use (Open Time)';
                         break;
                     }
                 }
@@ -138,14 +166,14 @@ try {
 
         if (!$isAvailable) {
             $units[] = [
-                'id' => $cid,
-                'unit' => $c['unit_number'],
-                'name' => $c['console_name'],
-                'type' => $c['console_type'],
-                'rate' => (float)$c['hourly_rate'],
+                'id'          => $cid,
+                'unit'        => $c['unit_number'],
+                'name'        => $c['console_name'],
+                'type'        => $c['console_type'],
+                'rate'        => (float)$c['hourly_rate'],
                 'controllers' => (int)$c['controller_count'],
-                'status' => 'in_use',
-                'conflict' => $conflictMsg
+                'status'      => 'in_use',
+                'conflict'    => $conflictMsg
             ];
             continue;
         }

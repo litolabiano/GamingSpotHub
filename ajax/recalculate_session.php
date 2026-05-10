@@ -148,5 +148,5 @@ echo json_encode([
     'duration_minutes' => $duration,
     'duration_display' => $duration > 0 ? $duration . ' min' : '< 1 min',
     'total_cost'       => $total_cost,
-    'cost_display'     => '₱' . number_format($total_cost, 2),
+    'cost_display'     => '₱' . number_format($total_cost, 0),
 ]);

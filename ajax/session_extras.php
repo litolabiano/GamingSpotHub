@@ -31,7 +31,7 @@ if (!$session_id) {
 }
 
 $stmt = $conn->prepare(
-    "SELECT description, extra_cost, request_type
+    "SELECT description, extra_cost, request_type, created_at
      FROM additional_requests
      WHERE session_id = ? AND status = 'approved'
      ORDER BY created_at ASC"
@@ -54,7 +54,7 @@ foreach ($rows as $row) {
 
     // Extract controller IDs
     $ids = [];
-    if (preg_match('/IDs:\s*([\d,\s]+)/', $desc, $m)) {
+    if (preg_match('/ID(?:s)?:\s*([\d,\s]+)/', $desc, $m)) {
         $ids = array_values(array_filter(array_map('intval', preg_split('/\s*,\s*/', trim($m[1])))));
     }
     if ($ids === []) {
@@ -99,6 +99,7 @@ foreach ($rows as $row) {
             'hourly_rate'   => $rate,
             'original_cost' => $ctrlCost,
             'is_ended'      => $isEnded,
+            'rented_at'     => $row['created_at'],
         ];
     }
 }

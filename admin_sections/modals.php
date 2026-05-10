@@ -43,6 +43,27 @@
 
     </div>
 </div>
+
+<!-- ════ BULK ACTION BAR ════════════════════════════════════════════════════ -->
+<div id="bulkBar" class="bulk-bar">
+    <div style="display:flex;align-items:center;gap:12px;border-right:1px solid rgba(255,255,255,0.1);padding-right:20px;margin-right:4px;">
+        <div id="bulkCount" class="bulk-count-pill">0</div>
+        <div style="font-size:13px;font-weight:600;color:#aaa;">Selected</div>
+    </div>
+    
+    <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-sec btn-sm" onclick="BulkManager.execute('restore')" style="border-color:rgba(32,200,161,.3);color:#20c8a1;">
+            <i class="fas fa-rotate-left"></i> Restore
+        </button>
+        <button type="button" class="btn-dang btn-sm" onclick="BulkManager.execute('delete')">
+            <i class="fas fa-trash-alt"></i> Delete Permanently
+        </button>
+    </div>
+
+    <button type="button" onclick="BulkManager.clear()" class="bulk-close-btn" title="Clear selection">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
 <style>
 @keyframes gspotConfirmIn {
     from { opacity:0; transform:scale(.88) translateY(12px); }
@@ -86,6 +107,78 @@
     transition:.15s;line-height:1;
 }
 .modal-close:hover { background:rgba(251,86,107,.15);border-color:rgba(251,86,107,.4);color:#fb566b; }
+
+/* ── Bulk Bar ─────────────────────────────────────────────────────── */
+.bulk-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: rgba(10, 15, 28, 0.9);
+    border: 1px solid rgba(95, 133, 218, 0.3);
+    padding: 10px 18px;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 10000;
+    transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s;
+    opacity: 0;
+    pointer-events: none;
+}
+.bulk-bar.active {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+.bulk-close-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #888;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    margin-left: 10px;
+    font-size: 14px;
+}
+.bulk-close-btn:hover {
+    background: rgba(251, 86, 107, 0.15);
+    border-color: rgba(251, 86, 107, 0.4);
+    color: #fb566b;
+    transform: rotate(90deg);
+}
+.bulk-count-pill {
+    background: linear-gradient(135deg, var(--clr-prim), #4d72c4);
+    color: #fff;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 12px;
+    box-shadow: 0 0 10px rgba(95,133,218,0.4);
+}
+.bulk-check {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--clr-prim);
+}
+.bulk-master {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--clr-prim);
+}
 .modal-body { padding:20px 24px 24px; }
 /* Inputs & Selects */
 .modal-body .form-group { margin-bottom:16px; }
@@ -1162,6 +1255,284 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
     </div>
 </div>
 
+<!-- ── EXTEND CONTROLLER MODAL ────────────────────────────────────────── -->
+<div class="modal" id="extendControllerModal">
+    <div class="modal-content" style="max-width:440px;">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-gamepad" style="color:#20c8a1;margin-right:8px"></i>Extend Controller Rental
+            </h3>
+            <button class="modal-close" onclick="closeModal('extendController')">&times;</button>
+        </div>
+
+        <!-- Rental Info -->
+        <div style="background:rgba(32,200,161,.08); border:1px solid rgba(32,200,161,.2); border-radius:10px; padding:14px; margin-bottom:20px; font-size:14px;">
+            <div id="extCtrlSummary" style="font-weight:700; color:#eee; margin-bottom:4px;">—</div>
+            <div style="font-size:13px; color:#888;">
+                Current duration: <strong id="extCtrlCurrentDuration" style="color:#20c8a1;">—</strong>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label style="margin-bottom:12px; display:block; font-size:13px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.5px;">Select Additional Time</label>
+            <div id="extCtrlDurationPicker" class="duration-button-grid">
+                <!-- Buttons injected by calculateAvailableControllerExtensions() -->
+            </div>
+        </div>
+
+        <!-- Confirmation Preview -->
+        <div id="extCtrlConfirmSection" style="display:none; margin-top:20px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:16px;">
+            <div style="font-size:13px; color:#888; margin-bottom:10px;">Extension Details:</div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
+                <span style="color:#aaa;">Additional Time:</span>
+                <strong id="extCtrlAddMinutes" style="color:#20c8a1;">—</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
+                <span style="color:#aaa;">New End Time:</span>
+                <strong id="extCtrlNewEndTime" style="color:#20c8a1;">—</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:14px;">
+                <span style="color:#aaa;">Additional Fee:</span>
+                <strong id="extCtrlAddFee" style="color:#f1e1aa;">—</strong>
+            </div>
+            
+            <input type="hidden" id="extCtrlCsrf" value="<?= csrfToken() ?>">
+            
+            <button type="button" class="btn-prim btn-full" onclick="submitExtendController()" style="height:46px; font-weight:700;">
+                Confirm Extension
+            </button>
+        </div>
+
+        <div id="extCtrlError" style="display:none; margin-top:15px; background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.2); border-radius:8px; padding:10px; color:#fb566b; font-size:13px; text-align:center;">
+            <i class="fas fa-exclamation-circle"></i> <span id="extCtrlErrorText"></span>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Grid for duration buttons */
+.duration-button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+.duration-btn {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px;
+    padding: 10px;
+    color: #eee;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+}
+.duration-btn:hover:not(:disabled) {
+    background: rgba(32,200,161,.1);
+    border-color: rgba(32,200,161,.3);
+    color: #20c8a1;
+}
+.duration-btn.selected {
+    background: #20c8a1;
+    border-color: #20c8a1;
+    color: #08101c;
+}
+.duration-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+</style>
+
+<script>
+/**
+ * ── EXTEND CONTROLLER RENTAL ──────────────────────────────────────────────
+ */
+function openExtendControllerModal(sessionId, customerLabel, unitNumber, currentMins, endsTs, qty) {
+    const modal = document.getElementById('extendControllerModal');
+    if (!modal) return;
+
+    // Reset state
+    document.getElementById('extCtrlSummary').textContent = `Session #${sessionId} — ${customerLabel} (Console ${unitNumber})`;
+    
+    const h = Math.floor(currentMins / 60), m = currentMins % 60;
+    document.getElementById('extCtrlCurrentDuration').textContent = 
+        currentMins ? ((h ? h+'h ' : '') + (m ? m+'m' : '')) : '—';
+
+    document.getElementById('extCtrlConfirmSection').style.display = 'none';
+    document.getElementById('extCtrlError').style.display = 'none';
+
+    // Store state
+    modal.dataset.sessionId = sessionId;
+    modal.dataset.currentMins = currentMins;
+    modal.dataset.endsTs = endsTs || 0;
+    modal.dataset.qty = qty || 1;
+
+    calculateAvailableControllerExtensions();
+    openModal('extendController');
+}
+
+function calculateAvailableControllerExtensions() {
+    const picker = document.getElementById('extCtrlDurationPicker');
+    const modal = document.getElementById('extendControllerModal');
+    if (!picker || !modal) return;
+    picker.innerHTML = '';
+    
+    const options = [
+        { label: '30 min', mins: 30 }, { label: '1 hr', mins: 60 },
+        { label: '1h 30m', mins: 90 }, { label: '2 hrs', mins: 120 },
+        { label: '2h 30m', mins: 150 }, { label: '3 hrs', mins: 180 },
+        { label: '3h 30m', mins: 210 }, { label: '4 hrs', mins: 240 },
+        { label: '4h 30m', mins: 270 }, { label: '5 hrs', mins: 300 }
+    ];
+
+    const now = new Date();
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0); // Midnight tonight
+    
+    // Calculate the start of the extension
+    const endsTs = parseInt(modal.dataset.endsTs) || 0;
+    const currentEnd = endsTs ? new Date(endsTs * 1000) : now;
+    
+    // The extension effectively starts at the LATER of 'now' or the 'current end time'
+    const extensionStart = new Date(Math.max(now.getTime(), currentEnd.getTime()));
+    
+    // Max allowable additional minutes before hitting midnight
+    const maxPossibleMins = Math.floor((midnight.getTime() - extensionStart.getTime()) / 60000);
+
+    let availableCount = 0;
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'duration-btn';
+        const qty = parseInt(modal.dataset.qty) || 1;
+        const price = (opt.mins / 30) * 10 * qty;
+        btn.textContent = `${opt.label} — ₱${Math.round(price)}`;
+        
+        if (opt.mins > maxPossibleMins) {
+            btn.disabled = true;
+            btn.title = "Exceeds 12:00 AM closing time";
+        } else {
+            availableCount++;
+            btn.onclick = () => {
+                document.querySelectorAll('#extCtrlDurationPicker .duration-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                
+                document.getElementById('extCtrlConfirmSection').style.display = 'block';
+                document.getElementById('extCtrlAddMinutes').textContent = `+ ${opt.label}`;
+                
+                // Show the end time relative to the extension start
+                const newEnd = new Date(extensionStart.getTime() + opt.mins * 60000);
+                document.getElementById('extCtrlNewEndTime').textContent = newEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('extCtrlAddFee').textContent = `₱${Math.round(price)}`;
+                
+                modal.dataset.selectedMins = opt.mins;
+                modal.dataset.calculatedEnd = newEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            };
+        }
+        picker.appendChild(btn);
+    });
+
+    if (availableCount === 0) {
+        const msg = document.createElement('div');
+        msg.style.cssText = 'grid-column: 1/-1; padding:12px; background:rgba(241,168,60,.1); border:1px solid rgba(241,168,60,.2); border-radius:8px; color:#f1a83c; font-size:12px; text-align:center;';
+        msg.innerHTML = '<i class="fas fa-calendar-times"></i> No extensions available — would exceed 12:00 AM.';
+        picker.appendChild(msg);
+    }
+}
+
+let _extCtrlInFlight = false;
+function submitExtendController() {
+    if (_extCtrlInFlight) return;
+
+    const modal = document.getElementById('extendControllerModal');
+    const sessionId = modal.dataset.sessionId;
+    const additionalMins = modal.dataset.selectedMins;
+    const csrf = document.getElementById('extCtrlCsrf').value;
+    const btn = document.querySelector('#extCtrlConfirmSection button');
+    
+    if (!sessionId || !additionalMins) return;
+
+    _extCtrlInFlight = true;
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    fd.append('additional_minutes', additionalMins);
+    fd.append('csrf_token', csrf);
+
+    fetch('ajax/extend_controller_rental.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Success feedback
+            const addTimeStr = document.getElementById('extCtrlAddMinutes').textContent.replace('+ ', '');
+            const endTimeStr = data.new_ends_at_str || modal.dataset.calculatedEnd || 'the updated time';
+            
+            const msg = `Success! Rental extended by ${addTimeStr}. New end time: ${endTimeStr}.`;
+            if (typeof showAdminToast === 'function') {
+                showAdminToast(msg, 'success');
+            } else if (typeof showInlineToast === 'function') {
+                showInlineToast(msg, 'success');
+            } else {
+                alert(msg);
+            }
+
+            closeModal('extendController');
+
+            // 1. Surgical UI update for immediate effect
+            const sid = sessionId;
+            const durEl = document.getElementById(`cr-dur-${sid}`);
+            const endsEl = document.getElementById(`cr-ends-display-${sid}`);
+            const feeEl = document.getElementById(`cr-fee-${sid}`);
+            const extBtn = document.querySelector(`button[onclick*="openExtendControllerModal(${sid},"]`);
+
+            if (durEl) durEl.textContent = data.new_dur_str;
+            if (endsEl) {
+                const badge = endsEl.querySelector('span');
+                if (badge && badge.textContent.includes('OVERDUE')) badge.remove();
+                endsEl.childNodes[0].textContent = ' ' + data.new_ends_at_str + ' ';
+                endsEl.style.color = '#20c8a1'; 
+            }
+            if (feeEl) feeEl.textContent = '₱' + data.new_total_cost_fmt;
+
+            // Update the button onclick so subsequent opens use correct base
+            if (extBtn) {
+                const oldOnclick = extBtn.getAttribute('onclick');
+                // Pattern: openExtendControllerModal(ID, 'Name', 'Console', OLD_MINS, OLD_TS, QTY)
+                const updatedOnclick = oldOnclick.replace(/, (\d+), (\d+|null), (\d+)\)$/, `, ${data.new_total_mins}, ${data.new_ends_ts}, $3)`);
+                extBtn.setAttribute('onclick', updatedOnclick);
+            }
+
+            // 2. Full section refresh in background
+            if (typeof window.gspotRefreshSection === 'function') {
+                window.gspotRefreshSection('sessions');
+            }
+            
+            _extCtrlInFlight = false;
+        } else {
+            _extCtrlInFlight = false;
+            const errorDiv = document.getElementById('extCtrlError');
+            document.getElementById('extCtrlErrorText').textContent = data.message;
+            errorDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        btn.disabled = false;
+        btn.textContent = originalText;
+    })
+    .finally(() => {
+        _extCtrlInFlight = false;
+    });
+}
+</script>
+
 <script>
 /* ── Extend Session Modal ──────────────────────────────────────────── */
 function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, rentalMode) {
@@ -1780,18 +2151,28 @@ function adminResSync() {
                     let foundMatch = false;
                     
                     data.units.forEach(u => {
-                        if (u.status === 'available') {
-                            const opt = document.createElement('option');
-                            opt.value = u.id;
-                            opt.dataset.type = u.type;
-                            opt.dataset.rate = u.rate;
+                        const opt = document.createElement('option');
+                        opt.value = u.id;
+                        opt.dataset.type = u.type;
+                        opt.dataset.rate = u.rate;
+
+                        if (u.status === 'unlimited') {
+                            // Visible but unselectable — active Unlimited session
+                            opt.disabled = true;
+                            opt.textContent = `#${u.unit} — ${u.type} — 🔒 In Use (Unlimited)`;
+                            opt.style.color = '#888';
+                        } else if (u.status === 'available') {
                             opt.textContent = `#${u.unit} — ${u.type} (₱${Math.round(u.rate)}/hr)`;
                             if (u.id == currentVal) {
                                 opt.selected = true;
                                 foundMatch = true;
                             }
-                            conSel.appendChild(opt);
+                        } else {
+                            // Other unavailable states — skip
+                            return;
                         }
+
+                        conSel.appendChild(opt);
                     });
 
                     // If previously selected unit is no longer available
@@ -2391,4 +2772,410 @@ function openEditControllerModal(id, unit, rate, notes) {
     document.getElementById('editCtrlNotes').value = notes;
     openModal('editController');
 }
+
+/**
+ * Bulk Action Management logic
+ */
+window.BulkManager = {
+    selectedIds: [],
+    currentAction: '', // e.g. 'consoles', 'controllers', 'participants', etc.
+    
+    init(actionType) {
+        if (this.currentAction !== actionType) {
+            this.selectedIds = [];
+            this.currentAction = actionType;
+        }
+        this.clear();
+    },
+    
+    clear() {
+        this.selectedIds = [];
+        // Force uncheck all checkboxes in the DOM
+        document.querySelectorAll('.bulk-check').forEach(cb => cb.checked = false);
+        const master = document.querySelector('.bulk-master');
+        if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+        }
+        this.updateUI();
+    },
+    
+    toggle(id, checked) {
+        id = String(id);
+        if (checked) {
+            if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+        } else {
+            this.selectedIds = this.selectedIds.filter(i => i !== id);
+        }
+        this.updateUI();
+    },
+    
+    toggleAll(checked) {
+        const checks = document.querySelectorAll('.bulk-check');
+        checks.forEach(cb => {
+            cb.checked = checked;
+            const id = cb.getAttribute('data-id');
+            if (checked) {
+                if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+            } else {
+                this.selectedIds = this.selectedIds.filter(i => i !== id);
+            }
+        });
+        this.updateUI();
+    },
+    
+    updateUI() {
+        const bar = document.getElementById('bulkBar');
+        const countEl = document.getElementById('bulkCount');
+        if (!bar || !countEl) return;
+        
+        countEl.textContent = this.selectedIds.length;
+        if (this.selectedIds.length > 0) {
+            bar.classList.add('active');
+        } else {
+            bar.classList.remove('active');
+        }
+        
+        // Update master checkbox state
+        const master = document.querySelector('.bulk-master');
+        if (master) {
+            const allChecks = document.querySelectorAll('.bulk-check');
+            if (allChecks.length === 0) {
+                master.checked = false;
+                master.indeterminate = false;
+                return;
+            }
+            const checkedCount = Array.from(allChecks).filter(c => c.checked).length;
+            master.checked = (checkedCount === allChecks.length);
+            master.indeterminate = (checkedCount > 0 && checkedCount < allChecks.length);
+        }
+    },
+    
+    execute(action) {
+        if (this.selectedIds.length === 0) return;
+        
+        const actionMap = {
+            'restore': 'bulk_restore_' + this.currentAction,
+            'delete': 'bulk_delete_' + this.currentAction
+        };
+        
+        const isDelete = (action === 'delete');
+        const verb = isDelete ? 'Permanently Delete' : 'Restore';
+        const msg = `Are you sure you want to ${verb.toUpperCase()} ${this.selectedIds.length} selected ${this.currentAction.replace(/_/g, ' ')}? This action is irreversible for deletions!`;
+        
+        gspotConfirm(msg, () => {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = actionMap[action];
+            form.appendChild(actionInput);
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = (typeof _CSRF !== 'undefined') ? _CSRF : '';
+            form.appendChild(csrfInput);
+            
+            this.selectedIds.forEach(id => {
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'ids[]';
+                idInput.value = id;
+                form.appendChild(idInput);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        }, { danger: isDelete, yesLabel: verb });
+    }
+};
+<!-- ── End Controller Rental Summary Modal ─────────────────────────────── -->
+<div class="modal" id="endControllerSummaryModal">
+    <div class="modal-content" style="max-width:440px;">
+        <div class="modal-header">
+            <h3 style="display:flex;align-items:center;gap:10px;">
+                <i class="fas fa-file-invoice-dollar" style="color:#f1a83c;"></i>
+                Payment Summary
+            </h3>
+            <button class="modal-close" onclick="closeModal('endControllerSummary')">&times;</button>
+        </div>
+        <div class="modal-body" id="endControllerSummaryBody">
+            <div style="background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:20px; margin-bottom:15px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 20px;">
+                    <div>
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Controllers</div>
+                        <div id="ecs-controllers" style="font-weight:700; color:#fff;">1x Controller</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Console</div>
+                        <div id="ecs-console" style="font-weight:700; color:#f1a83c;">PS5-04</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Rented At</div>
+                        <div id="ecs-rented" style="font-weight:600; color:#ccc;">10:45 AM</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Ended At</div>
+                        <div id="ecs-ended" style="font-weight:600; color:#ccc;">01:45 PM</div>
+                    </div>
+                </div>
+                
+                <div id="ecs-breakdown" style="display:none; margin-top:20px; padding-top:15px; border-top:1px dashed rgba(255,255,255,.15);">
+                    <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Individual Breakdown</div>
+                    <div id="ecs-breakdown-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                </div>
+                
+                <div style="margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,.05); display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">Total Duration</div>
+                        <div id="ecs-duration" style="font-weight:700; color:#8aa4e8; font-size:16px;">3h 0m</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">Final Fee</div>
+                        <div id="ecs-total-fee" style="font-weight:900; color:#20c8a1; font-size:24px;">₱60</div>
+                    </div>
+                </div>
+            </div>
+            
+            <p style="font-size:12px; color:#888; line-height:1.5; margin:0; text-align:center;">
+                Review the payment summary above. Clicking <strong>Confirm End</strong> will record the payment and return controllers to inventory.
+            </p>
+        </div>
+        <div class="modal-footer" style="display:flex; gap:10px;">
+            <button type="button" class="btn-sec" style="flex:1;" onclick="closeModal('endControllerSummary')">Cancel</button>
+            <button type="button" class="btn-prim" style="flex:1.5;" id="ecsConfirmBtn">
+                <i class="fas fa-check-circle"></i> Confirm End
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * AJAX Finalization for ending controller rental(s)
+ * sid      = session_id
+ * finalFee = total confirmed fee for all controllers being ended
+ */
+function confirmEndControllerRental(sid, finalFee) {
+    const btn = document.getElementById('ecsConfirmBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
+
+    const fd = new FormData();
+    fd.append('csrf_token', window._CSRF || window.GSPOT_CSRF || '');
+    fd.append('session_id', String(sid));
+    fd.append('final_fee', String(finalFee));
+
+    fetch('ajax/end_controller_rental_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (window.showToast) window.showToast(data.message || 'Controller rental ended.', 'success');
+                else if (window.showInlineToast) window.showInlineToast(data.message || 'Controller rental ended.', 'success');
+
+                closeModal('endControllerSummary');
+
+                // ── 1. Remove individual controller rows from End Session modal ──
+                const panel = document.getElementById('ctrlPerRowList');
+                if (panel) {
+                    panel.querySelectorAll('[id^="ctrlRow_"]').forEach(function(row) {
+                        row.style.transition = 'opacity 0.35s ease';
+                        row.style.opacity = '0';
+                        setTimeout(function() { row.remove(); }, 350);
+                    });
+                }
+
+                // Also hide the End ALL button since all controllers are now ended
+                const endAllBtn = document.getElementById('endAllCtrlBtn');
+                if (endAllBtn) endAllBtn.style.display = 'none';
+
+                // ── 2. Re-open End Session modal to fully refresh controller panel ──
+                const endModalEl = document.getElementById('endSessionModal');
+                let ctx = {};
+                try { ctx = JSON.parse(endModalEl ? endModalEl.dataset.endSessionCtx || '{}' : '{}'); } catch(e) {}
+
+                if (ctx.sessionId && typeof openEndSessionModal === 'function') {
+                    setTimeout(function() {
+                        openEndSessionModal(
+                            ctx.sessionId, ctx.customerName, ctx.unitNumber,
+                            ctx.mode, ctx.startTs, ctx.plannedMinutes,
+                            ctx.upfrontPaid, ctx.reservationDownpayment,
+                            ctx.unlimitedRate, ctx.sourceReservationId
+                        );
+                    }, 800);
+                }
+
+                // ── 3. Remove from Active Controller Rentals table (if visible) ──
+                const tableRow = document.getElementById('cr-row-' + sid);
+                if (tableRow) {
+                    tableRow.style.opacity = '0';
+                    tableRow.style.transition = 'opacity 0.4s ease';
+                    setTimeout(() => tableRow.remove(), 400);
+                }
+
+                // ── 4. Background section refresh ──
+                if (typeof gspotRefreshSection === 'function') {
+                    setTimeout(function() { gspotRefreshSection('sessions'); }, 1000);
+                }
+            } else {
+                alert(data.message || 'Failed to end rental.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End';
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Network error.');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End';
+            }
+        });
+}
+
+/** ── Transaction Detail Modal ── */
+function closeTxDetailModal() {
+    const modal = document.getElementById('txDetailModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function openTransactionDetailModal(txId) {
+    const modal = document.getElementById('txDetailModal');
+    const body  = document.getElementById('txDetailBody');
+    if (!modal || !body) return;
+
+    modal.style.display = 'flex';
+    body.innerHTML = `
+        <div class="loading-spinner" style="padding:40px 0; text-align:center;">
+            <i class="fas fa-circle-notch fa-spin" style="font-size:24px;color:#20c8a1;"></i>
+            <p style="margin-top:12px;color:#888;font-size:13px;">Fetching breakdown...</p>
+        </div>`;
+
+    fetch(`ajax/get_transaction_detail.php?id=${txId}`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                body.innerHTML = `<div style="padding:20px;color:#fb566b;text-align:center;">${data.message}</div>`;
+                return;
+            }
+
+            const tx = data.tx;
+            const bd = data.breakdown;
+
+            let html = `
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <div>
+                            <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Transaction</div>
+                            <div style="font-size:18px;color:#fff;font-weight:800;">#${tx.id}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Date & Time</div>
+                            <div style="font-size:13px;color:#aaa;">${tx.date}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:14px; margin-bottom:20px;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                            <div>
+                                <label style="display:block;font-size:10px;color:#666;text-transform:uppercase;font-weight:700;margin-bottom:2px;">Customer</label>
+                                <div style="color:#eee;font-weight:600;">${tx.customer}</div>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:10px;color:#666;text-transform:uppercase;font-weight:700;margin-bottom:2px;">Console Unit</label>
+                                <div style="color:#eee;font-weight:600;">${tx.console}</div>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:10px;color:#666;text-transform:uppercase;font-weight:700;margin-bottom:2px;">Payment Method</label>
+                                <div style="color:#20c8a1;font-weight:600;">${tx.method}</div>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:10px;color:#666;text-transform:uppercase;font-weight:700;margin-bottom:2px;">Status</label>
+                                <div style="color:#f1a83c;font-weight:600;">${tx.status}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="border-top:1px dashed rgba(255,255,255,.1); padding-top:16px;">
+                    <h4 style="font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700;">Financial Breakdown</h4>`;
+
+            if (bd && bd.session_mode) {
+                html += `
+                    <!-- Session Base -->
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;">
+                        <span style="color:#888;">${bd.session_mode}</span>
+                        <span style="color:#fff;font-weight:600;">₱${Math.round(bd.base_cost)}</span>
+                    </div>`;
+
+                // Controllers
+                if (bd.controllers && bd.controllers.length > 0) {
+                    bd.controllers.forEach(ctrl => {
+                        html += `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; padding-left:12px;">
+                            <span style="color:#666;"><i class="fas fa-gamepad" style="font-size:10px;margin-right:4px;"></i> ${ctrl.label} (${ctrl.duration})</span>
+                            <span style="color:#eee;">₱${Math.round(ctrl.fee)}</span>
+                        </div>`;
+                    });
+                }
+
+                // Reservation Fee Deduction
+                if (bd.reservation_fee > 0) {
+                    html += `
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; margin-bottom:8px; font-size:13px;">
+                        <span style="color:#fb566b;">Reservation Fee (Deduction)</span>
+                        <span style="color:#fb566b;font-weight:600;">-₱${Math.round(bd.reservation_fee)}</span>
+                    </div>`;
+                }
+
+                html += `
+                    <div style="margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,.07); display:flex; justify-content:space-between; align-items:baseline;">
+                        <span style="font-weight:700; color:#fff; font-size:14px;">Total Calculated Cost</span>
+                        <span style="font-size:22px; color:#20c8a1; font-weight:800;">₱${Math.round(bd.final_total)}</span>
+                    </div>
+                    <div style="text-align:right; font-size:11px; color:#555; margin-top:4px;">Actual transaction amount: ₱${Math.round(tx.amount)}</div>`;
+            } else {
+                html += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
+                        <span style="color:#888;">Recorded Amount</span>
+                        <span style="color:#20c8a1;font-weight:800;font-size:20px;">₱${Math.round(tx.amount)}</span>
+                    </div>
+                    <div style="font-size:12px;color:#555;font-style:italic;">Note: ${tx.note || 'No additional details available for this record.'}</div>`;
+            }
+
+            html += `</div>`;
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            body.innerHTML = `<div style="padding:20px;color:#fb566b;text-align:center;">Network error: ${err.message}</div>`;
+        });
+}
 </script>
+
+<div class="modal-overlay" id="txDetailModal" style="display:none;">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-file-invoice-dollar" style="color:#20c8a1;margin-right:8px;"></i>Transaction Details</h3>
+            <button class="modal-close" onclick="closeTxDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="txDetailBody">
+            <div class="loading-spinner" style="padding:40px 0; text-align:center;">
+                <i class="fas fa-circle-notch fa-spin" style="font-size:24px;color:#20c8a1;"></i>
+                <p style="margin-top:12px;color:#888;font-size:13px;">Fetching breakdown...</p>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content:center;">
+            <button class="btn-sec" onclick="closeTxDetailModal()">Close Detail</button>
+        </div>
+    </div>
+</div>
+
+

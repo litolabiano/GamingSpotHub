@@ -645,7 +645,14 @@ function rescheduleSync() {
         
         let availableCount = 0;
         data.units.forEach(u => {
-            if (u.status === 'available') {
+            if (u.status === 'unlimited') {
+                // Visible but unselectable — active Unlimited session
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.disabled = true;
+                opt.textContent = `🔒 #${u.unit} — ${u.name || u.type} (In Use — Unlimited)`;
+                unitInput.appendChild(opt);
+            } else if (u.status === 'available') {
                 const opt = document.createElement('option');
                 opt.value = u.id;
                 opt.textContent = `#${u.unit} — ${u.name || u.type}`;

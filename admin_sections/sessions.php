@@ -273,11 +273,11 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                     </span>
                                 <?php endif; ?>
                             </td>
-                            <td data-label="Paid So Far" style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 2) ?></td>
+                            <td data-label="Paid So Far" style="color:#20c8a1;font-weight:700;">₱<?= number_format($psPaid, 0) ?></td>
                             <td data-label="Balance Owed">
                                 <span style="background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);
                                  padding:3px 10px;border-radius:6px;font-weight:700;font-size:13px;">
-                                    ₱<?= number_format($psOwed, 2) ?> due
+                                    ₱<?= number_format($psOwed, 0) ?> due
                                 </span>
                             </td>
                             <td data-label="Action">
@@ -453,7 +453,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 : '—' ?>
                         </td>
                 <td data-label="Cost" class="cost-cell">
-                            <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 2) : '—' ?>
+                            <?= $sess['total_cost'] ? '₱' . number_format($sess['total_cost'], 0) : '—' ?>
                         </td>
 
                         <td data-label="Status"><span class="badge <?= $sess['status'] ?>"><?= ucfirst($sess['status']) ?></span></td>
@@ -593,7 +593,14 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 $endsTs  = $cr['max_mins'] > 0 ? ($rentedTs + $cr['max_mins'] * 60) : null;
                                 $isExpired = $endsTs && time() > $endsTs;
                             ?>
-                            <tr>
+                            <tr id="cr-row-<?= $cr['session_id'] ?>"
+                                data-id="<?= $cr['session_id'] ?>" 
+                                data-status="1" 
+                                data-mode="hourly" 
+                                data-planned="<?= (int)$cr['max_mins'] ?>" 
+                                data-start="<?= (int)$rentedTs ?>"
+                                data-qty="<?= (int)$cr['qty'] ?>"
+                                data-is-controller-rental="1">
                             <td data-label="Session">#<?= $cr['session_id'] ?></td>
                             <td data-label="Customer">
                                     <?php if ((int)$cr['user_id'] === WALKIN_USER_ID): ?>
@@ -611,27 +618,29 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         <?= $cr['qty'] ?>× Controller<?= $cr['qty'] > 1 ? 's' : '' ?>
                                     </span>
                                 </td>
-                            <td data-label="Duration"><?= $durStr ?></td>
+                            <td data-label="Duration" id="cr-dur-<?= $cr['session_id'] ?>"><?= $durStr ?></td>
                             <td data-label="Rented At"><?= date('h:i A', $rentedTs) ?></td>
                             <td data-label="Ends At">
                                     <?php if ($endsTs): ?>
-                                        <span style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
-                                            <?= date('h:i A', $endsTs) ?>
+                                        <span id="cr-ends-display-<?= $cr['session_id'] ?>" style="color:<?= $isExpired ? '#fb566b' : '#20c8a1' ?>;font-weight:700;">
+                                             <?= date('h:i A', $endsTs) ?>
                                             <?php if ($isExpired): ?>
                                                 <span style="font-size:10px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:4px;padding:1px 5px;margin-left:4px;">OVERDUE</span>
                                             <?php endif; ?>
                                         </span>
+                                        <div class="remaining-countdown" style="margin-top:2px;"></div>
                                     <?php else: ?>
                                         <span style="color:#888;">—</span>
                                     <?php endif; ?>
                                 </td>
-                            <td data-label="Fee" style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 2) ?></td>
+                            <td data-label="Fee" id="cr-fee-<?= $cr['session_id'] ?>" style="color:#f1e1aa;font-weight:700;">₱<?= number_format($cr['total_cost'], 0) ?></td>
                             <td data-label="Action">
-                                <button type="button" class="btn-sec btn-sm" title="Re-rate add-on to elapsed time and return controllers"
-                                        onclick="gspotEndControllerRentalEarly(<?= (int) $cr['session_id'] ?>)"
-                                        style="white-space:nowrap;">
-                                    <i class="fas fa-hand-holding"></i> End add-on
+                                <button type="button" class="btn-sec btn-sm" title="Extend duration"
+                                        onclick="openExtendControllerModal(<?= (int)$cr['session_id'] ?>, '<?= sessionCustomerLabel($cr, true) ?>', '<?= htmlspecialchars(addslashes($cr['unit_number'])) ?>', <?= (int)$cr['max_mins'] ?>, <?= $endsTs ? (int)$endsTs : 'null' ?>, <?= (int)$cr['qty'] ?>)"
+                                        style="white-space:nowrap; margin-right:4px;">
+                                    <i class="fas fa-clock"></i> Extend
                                 </button>
+
                             </td>
                             </tr>
                         <?php endforeach; ?>
@@ -1102,7 +1111,7 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
             window._sessionsRemainingTimerInterval = null;
         }
 
-        const rows = document.querySelectorAll('#sessionsTable tbody tr');
+        const rows = document.querySelectorAll('#sessionsTable tbody tr, #ctrlRentalsTable tbody tr');
         
         function updateTimers() {
             const now = Math.floor(Date.now() / 1000);
@@ -1142,8 +1151,23 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             row.classList.remove('ending-soon-highlight');
                         }
                     }
-                } else {
                     row.dataset.remaining = "9999999";
+                }
+
+                // ── Real-time Controller Fee Update ──
+                if (row.dataset.isControllerRental === '1') {
+                    const qty = parseInt(row.dataset.qty) || 1;
+                    const start = parseInt(row.dataset.start);
+                    const elapsedMins = Math.floor((now - start) / 60);
+                    // Rule: 5-34m = 10, 35-64m = 20, etc. (per controller)
+                    // Formula: floor((mins + 25) / 30) * 10
+                    const feePerCtrl = Math.floor((elapsedMins + 25) / 30) * 10;
+                    const totalFee = Math.max(0, qty * feePerCtrl);
+                    
+                    const feeEl = document.getElementById(`cr-fee-${row.dataset.id}`);
+                    if (feeEl) {
+                        feeEl.textContent = '₱' + totalFee;
+                    }
                 }
             });
 
