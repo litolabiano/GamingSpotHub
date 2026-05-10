@@ -822,29 +822,7 @@ function denyExtension($extension_id, $denied_by, $note = null) {
     return ['success' => false, 'message' => 'Pending extension not found.'];
 }
 
-/**
- * Used for both Open Time billing and Hourly overtime calculation.
 
- *
- * Brackets: 1–4 min = ₱0 (grace), 5–19 min = ₱20,
- *           20–34 min = ₱40, 35–49 min = ₱60, 50–59 min = ₱80.
- */
-function computePartialPeriodCost($minutes) {
-    if ($minutes <= 0) return 0;
-    
-    $rules = getPricingRules();
-    $tiers = $rules['pricing_tiers'] ?? [];
-    
-    // Sort just in case, but getPricingRules already orders by min_minutes
-    foreach ($tiers as $tier) {
-        if ($minutes >= $tier['min'] && $minutes <= $tier['max']) {
-            return $tier['charge'];
-        }
-    }
-    
-    // Fallback to hourly rate if no tier matches (shouldn't happen with 0-59 covered)
-    return $rules['hourly_rate'];
-}
 
 /**
  * Staff: end ONE specific controller's rental early on an active session.
@@ -1074,39 +1052,26 @@ function endSingleControllerEarly(int $session_id, int $controller_id, int $staf
 }
 
 /**
- * Compute cost for any duration using DB-driven bracket billing with
- * a FREE bonus every N paid minutes.
- *
- * Reads bonus_paid_minutes and bonus_free_minutes from system_settings.
- * Cycle = (bonus_paid_minutes + bonus_free_minutes) total minutes.
- *
- * Examples (default 120/30 rule):
- *   2:00 paid = ₱160,  2:30 (free zone) = ₱160,  4:00 paid = ₱320
+ * New 15-minute interval pricing formula:
+ * - 1-4 mins: Free (₱0)
+ * - 5+ mins: Billing starts in 15-minute intervals (unit_cost = rate / 4)
+ * - Formula: ceil((minutes - 4) / 15) * unit_cost
  */
-function computeTimedCost(int $minutes): float {
+function computeTimedCost(int $minutes, float $rate = null): float {
     $minutes = max(0, $minutes);
-    if ($minutes === 0) return 0.0;
+    if ($minutes <= 0) return 0.0;
 
-    $rules    = getPricingRules();
-    $bp       = $rules['bonus_paid_minutes'];   // e.g. 120
-    $bf       = $rules['bonus_free_minutes'];   // e.g. 30
-    $rate     = $rules['hourly_rate'];          // e.g. 80
-    $cyclePay = $bp / 60 * $rate;              // e.g. ₱160 per cycle
-    $cycleLen = $bp + $bf;                     // e.g. 150 total min/cycle
-
-    $fullCycles = (int) floor($minutes / $cycleLen);
-    $cost       = $fullCycles * $cyclePay;
-    $remainder  = $minutes % $cycleLen;
-
-    if ($remainder > $bp) {
-        // Inside the free window — charge the full paid block
-        $cost += $cyclePay;
-    } else {
-        // Inside the paid window — hourly bracket billing
-        $cost += (int) floor($remainder / 60) * $rate + computePartialPeriodCost($remainder % 60);
+    if ($rate === null) {
+        $rules = getPricingRules();
+        $rate  = (float) $rules['hourly_rate'];
     }
 
-    return (float) $cost;
+    if ($minutes <= 4) return 0.0;
+
+    $unitRate  = $rate / 4.0;
+    $intervals = ceil(($minutes - 4.0) / 15.0);
+
+    return (float) ($intervals * $unitRate);
 }
 
 /**
@@ -1395,11 +1360,11 @@ function endControllerRentalEarly(int $session_id, int $staff_user_id): array {
  * Compute the cost for an INITIAL session start (incorporates the ₱50 min charge).
  * Applies the ₱10 surcharge over the standard ₱80/hr (₱40/30m) rate for the first 30m.
  */
-function computeInitialSessionCost(int $total_minutes): float {
+function computeInitialSessionCost(int $total_minutes, float $rate = null): float {
     if ($total_minutes <= 0) return 0.0;
     $rules = getPricingRules();
-    $standardCost = computeTimedCost($total_minutes);
-    // We ensure it's at least the session_min_charge (₱50), but don't arbitrarily add ₱10 for > 30 min
+    $standardCost = computeTimedCost($total_minutes, $rate);
+    // Ensure it's at least the session_min_charge if configured
     return (float) max($rules['session_min_charge'], $standardCost);
 }
 
@@ -1420,22 +1385,19 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
                 $overtime = $duration_minutes - $planned_minutes;
 
                 if ($overtime <= 0) {
-                    // Ended on time or early — charge for ACTUAL time used, not planned duration.
-                    // This prevents a 1h45m booking ended after 2 minutes from billing ₱140.
-                    return computeTimedCost($duration_minutes);
+                    // Ended on time or early — charge for ACTUAL time used
+                    return computeTimedCost($duration_minutes, $hourly_rate);
                 }
 
-                // computeTimedCost handles bonus-free cycles; raw multiplication
-                // incorrectly bills free bonus minutes at full rate.
-                $base_cost = computeInitialSessionCost((int)$planned_minutes);
-                return $base_cost + computeTimedCost($overtime);
+                $base_cost = computeInitialSessionCost((int)$planned_minutes, $hourly_rate);
+                return $base_cost + computeTimedCost($overtime, $hourly_rate);
             }
             // No pre-booking data: fall back to open-time (initial session) pricing
-            return computeInitialSessionCost($duration_minutes);
+            return computeInitialSessionCost($duration_minutes, $hourly_rate);
 
 
         case 'open_time':
-            return computeTimedCost($duration_minutes);
+            return computeTimedCost($duration_minutes, $hourly_rate);
 
         case 'unlimited':
             return (float) $unlimited_rate;

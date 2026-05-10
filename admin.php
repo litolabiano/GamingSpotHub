@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Good Spot Gaming Hub - Admin Dashboard
  * Live database-connected management panel for Owner & Shopkeeper roles.
@@ -3531,41 +3531,30 @@ function getConsoleRate() {
         || PRICING.hourly_rate;
 }
 
-function _bracketCost(partialMin) {
-    if (partialMin <= 0) return 0;
-    const rate  = getConsoleRate();
-    const tiers = PRICING.pricing_tiers || [];
-    for (let i = 0; i < tiers.length; i++) {
-        if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
-            return tiers[i].charge;
-        }
-    }
-    return rate;
-}
+
+/**
+ * New 15-minute interval pricing formula:
+ * - 1-4 mins: Free (₱0)
+ * - 5+ mins: Billing starts in 15-minute intervals (unit_cost = rate / 4)
+ * - Formula: Math.ceil((totalMin - 4) / 15) * unit_cost
+ */
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const bp       = PRICING.bonus_paid_minutes;  // e.g. 120
-    const bf       = PRICING.bonus_free_minutes;  // e.g. 30
-    const rate     = getConsoleRate();            // per-type rate from console_types
-    const cyclePay = bp / 60 * rate;
-    const cycleLen = bp + bf;
-    const full     = Math.floor(totalMin / cycleLen);
-    const rem      = totalMin % cycleLen;
-    let cost       = full * cyclePay;
-    if (rem > bp) {
-        cost += cyclePay;  // inside the free window - charge the full paid block
-    } else {
-        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
-    }
-    return cost;
+    const rate = getConsoleRate();
+    if (totalMin <= 4) return 0;
+
+    const unitRate  = rate / 4.0;
+    const intervals = Math.ceil((totalMin - 4.0) / 15.0);
+
+    return intervals * unitRate;
 }
 function _hourlyCost(duration, planned) {
     const overtime = duration - planned;
     if (overtime <= 0) {
-        // Early or exact end â€” bill only actual elapsed time
+        // Early or exact end — bill only actual elapsed time
         return duration <= 0 ? 0 : _timedCost(duration);
     }
-    // Overtime â€” base (planned cost) + overtime brackets
+    // Overtime — base (planned cost) + overtime intervals
     const base = planned <= 30 ? PRICING.session_min_charge : _timedCost(planned);
     return base + _timedCost(overtime);
 }
@@ -3575,9 +3564,9 @@ let _endModalTimer = null;   // holds the live-update interval
 // Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
 let _pendingRefundArgs = null;
 
-/* â”€â”€ Session-end audio alert (Web Audio API - no file needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ── Session-end audio alert (Web Audio API - no file needed) ──────────
 Plays a short 3-beep chime when the admin confirms ending a session.
-Uses the browserâ€™s built-in synthesis - works offline, no CDN required.
+Uses the browser's built-in synthesis - works offline, no CDN required.
 */
 function playSessionEndSound() {
     try {
