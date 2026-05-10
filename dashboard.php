@@ -57,7 +57,7 @@ $rescheduleStmt = $conn->prepare(
             ct.type_name AS console_type, c.unit_number
        FROM reservation_reschedules rs
        JOIN reservations r ON rs.reservation_id = r.reservation_id
-       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.console_type_id
        LEFT JOIN consoles c ON rs.console_id = c.console_id
       WHERE rs.user_id = ? AND rs.seen_by_user = 0
       ORDER BY rs.created_at DESC"
@@ -91,7 +91,7 @@ $stmt = $conn->prepare(
     "SELECT gs.*, c.console_name, ct.type_name AS console_type, c.unit_number
        FROM gaming_sessions gs
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE gs.user_id = ? AND gs.status = 'active'
       ORDER BY gs.start_time DESC LIMIT 1"
 );
@@ -148,7 +148,7 @@ $favStmt = $conn->prepare(
     "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM gaming_sessions gs
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE gs.user_id = ? AND gs.status = 'completed'
       GROUP BY ct.type_name
       ORDER BY cnt DESC LIMIT 1"
@@ -246,7 +246,7 @@ $cancelLog = $conn->prepare(
             r.downpayment_amount
        FROM reservation_cancellations rc
        JOIN reservations r ON rc.reservation_id = r.reservation_id
-       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
       WHERE rc.user_id = ?
       ORDER BY rc.cancelled_at DESC
       LIMIT 50"
