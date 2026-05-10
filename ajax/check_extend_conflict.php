@@ -37,7 +37,7 @@ $sessStmt = $conn->prepare(
             c.unit_number, ct.type_name AS console_type
        FROM gaming_sessions gs
        JOIN consoles c      ON gs.console_id    = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE gs.session_id = ? AND gs.status = 'active'"
 );
 $sessStmt->bind_param('i', $session_id);
