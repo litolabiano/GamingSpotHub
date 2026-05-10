@@ -1,0 +1,17 @@
+CREATE TABLE `controllers` (
+  `controller_id` int(11) NOT NULL AUTO_INCREMENT,
+  `controller_type_id` int(11) DEFAULT NULL,
+  `unit_number` varchar(50) NOT NULL,
+  `hourly_rate` decimal(10,2) NOT NULL DEFAULT 20.00,
+  `status` enum('available','in_use','maintenance','archived') NOT NULL DEFAULT 'available',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `console_type_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`controller_id`),
+  UNIQUE KEY `unit_number` (`unit_number`),
+  KEY `fk_controllers_ctrlt` (`console_type_id`),
+  KEY `fk_controllers_type` (`controller_type_id`),
+  CONSTRAINT `fk_controllers_console` FOREIGN KEY (`console_type_id`) REFERENCES `console_types` (`console_type_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_controllers_type` FOREIGN KEY (`controller_type_id`) REFERENCES `controller_types` (`controller_type_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

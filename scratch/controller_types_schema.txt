@@ -1,0 +1,9 @@
+CREATE TABLE `controller_types` (
+  `controller_type_id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_name` varchar(50) NOT NULL,
+  `console_type_id` int(11) DEFAULT NULL COMMENT 'FK -> console_types.type_id',
+  `is_archived` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`controller_type_id`),
+  UNIQUE KEY `type_name` (`type_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=108 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
