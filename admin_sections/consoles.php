@@ -55,7 +55,7 @@
 
         <div class="console-grid" id="consoleGrid">
         <?php foreach ($allConsoles as $con): ?>
-            <div class="console-card <?= $con['status'] ?>">
+            <div class="console-card <?= $con['status'] ?>" id="console-card-<?= $con['console_id'] ?>">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
                     <?php
                         $typeLower = strtolower($con['console_type']);
@@ -83,7 +83,12 @@
                     $ctrlCountForType = (int)$ctrlCountQ->get_result()->fetch_assoc()['n'];
                 ?>
                 <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:2px;">
-                    <i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> <?= $ctrlCountForType ?> Controller<?= $ctrlCountForType != 1 ? 's' : '' ?> Available
+                    <i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> 
+                    Includes <?= (int)$con['controller_count'] ?> Controller<?= $con['controller_count'] != 1 ? 's' : '' ?>
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:2px;">
+                    <i class="fas fa-info-circle" style="font-size:10px;margin-right:4px;"></i>
+                    <?= $ctrlCountForType ?> Available in Inventory
                 </div>
 
                 <?php
@@ -122,7 +127,7 @@
                 <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
-                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= (int)($con['controller_count'] ?? 2) ?>)"                                class="btn-sec btn-sm">
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= (int)($con['controller_count'] ?? 2) ?>, <?= (float)$con['hourly_rate'] ?>)" class="btn-sec btn-sm">
                             <i class="fas fa-edit"></i> Edit Console
                         </button>
 
@@ -184,7 +189,7 @@
     </div>
 
     <!-- Archived Consoles Section -->
-    <div id="archivedConsolesSection" style="display:none;">
+    <div id="archivedConsolesSection" class="bulk-scope" style="display:none;">
         <div class="page-header" style="align-items:center;">
             <div class="page-title-group" style="flex:1;">
                 <h2 class="page-title"><i class="fas fa-archive" style="color:#fb566b;margin-right:10px;"></i>Archived Consoles</h2>
@@ -201,7 +206,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>
+                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"></th>
                         <th>Unit Number</th>
                         <th>Console Name</th>
                         <th>Console Type</th>
@@ -212,7 +217,7 @@
                 <tbody>
                 <?php foreach ($archivedConsoles as $con): ?>
                     <tr>
-                        <td><input type="checkbox" class="bulk-check" data-id="<?= $con['console_id'] ?>" onclick="BulkManager.toggle(<?= $con['console_id'] ?>, this.checked)"></td>
+                        <td><input type="checkbox" class="bulk-check" data-id="<?= $con['console_id'] ?>" onclick="BulkManager.toggle(<?= $con['console_id'] ?>, this.checked, this)"></td>
                         <td><strong style="color:#fff;"><?= htmlspecialchars($con['unit_number']) ?></strong></td>
                         <td><?= htmlspecialchars($con['console_name']) ?></td>
                         <td>
@@ -406,13 +411,13 @@
             if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
             unset($_res);
         ?>
-        <div id="archivedControllersSection" style="display:none;margin-top:20px;">
+        <div id="archivedControllersSection" class="bulk-scope" style="display:none;margin-top:20px;">
             <div style="background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.15);border-radius:12px;padding:20px;">
                 <h3 style="margin:0 0 15px;color:#fb566b;font-size:16px;">Archived Controllers</h3>
                 <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>
+                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"></th>
                         <th>Unit Number</th>
                         <th>Type</th>
                         <th>Rate</th>
@@ -422,7 +427,7 @@
                 <tbody>
                 <?php foreach ($archivedControllers as $ctrl): ?>
                     <tr>
-                        <td><input type="checkbox" class="bulk-check" data-id="<?= $ctrl['controller_id'] ?>" onclick="BulkManager.toggle(<?= $ctrl['controller_id'] ?>, this.checked)"></td>
+                        <td><input type="checkbox" class="bulk-check" data-id="<?= $ctrl['controller_id'] ?>" onclick="BulkManager.toggle(<?= $ctrl['controller_id'] ?>, this.checked, this)"></td>
                         <td><strong style="color:#fff;"><?= htmlspecialchars($ctrl['unit_number']) ?></strong></td>
                         <td><?= htmlspecialchars($ctrl['controller_type']) ?></td>
                         <td style="color:#f1e1aa;font-weight:600;">₱<?= number_format($ctrl['hourly_rate'], 2) ?></td>
@@ -493,6 +498,10 @@
                     <input type="text" name="unit_number" class="form-control" required maxlength="20" placeholder="e.g. PS5-01">
                 </div>
                 <div class="form-group">
+                    <label>Custom Hourly Rate (₱) <span style="color:#888;font-size:11px;">(Optional override)</span></label>
+                    <input type="number" name="hourly_rate" class="form-control" min="0" step="0.01" placeholder="Leave empty for type default">
+                </div>
+                <div class="form-group">
                     <label>Default Controllers Included</label>
                     <input type="number" name="controller_count" class="form-control" required min="0" max="4" value="2">
                 </div>
@@ -514,7 +523,7 @@
             <h3><i class="fas fa-edit" style="color:#8aa4e8;margin-right:8px;"></i>Edit Console</h3>
             <span class="modal-close" onclick="closeModal('editConsole')"><i class="fas fa-times"></i></span>
         </div>
-        <form method="POST" action="admin.php#consoles" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';">
+        <form id="editConsoleForm" onsubmit="submitEditConsole(event)">
             <input type="hidden" name="action" value="edit_console">
             <?= csrfField() ?>
             <input type="hidden" name="console_id" id="editConsoleId">
@@ -538,9 +547,14 @@
                            class="form-control" required maxlength="20">
                 </div>
                 <div class="form-group">
+                    <label>Custom Hourly Rate (₱) <span style="color:#888;font-size:11px;">(Optional override)</span></label>
+                    <input type="number" name="hourly_rate" id="editConsoleRate"
+                           class="form-control" min="0" step="0.01" placeholder="Leave empty for type default">
+                </div>
+                <div class="form-group">
                     <label>Default Controllers Included</label>
                     <input type="number" name="controller_count" id="editConsoleControllers"
-                           class="form-control" required min="0" max="4" value="2">
+                           class="form-control" required min="0" max="4">
                 </div>
 
             </div>
@@ -589,13 +603,100 @@
 </div>
 
 <script>
-function openEditConsoleModal(id, name, type, unit, controllerCount) {
+function openEditConsoleModal(id, name, type, unit, controllerCount, hourlyRate) {
     document.getElementById('editConsoleId').value   = id;
     document.getElementById('editConsoleName').value = name;
     document.getElementById('editConsoleType').value = type;
     document.getElementById('editConsoleUnit').value = unit;
     document.getElementById('editConsoleControllers').value = controllerCount;
+    document.getElementById('editConsoleRate').value = hourlyRate || '';
+    
+    // Reset button state
+    const subBtn = document.querySelector('#editConsoleForm button[type=submit]');
+    subBtn.disabled = false;
+    subBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    
     openModal('editConsole');
+}
+
+async function submitEditConsole(e) {
+    e.preventDefault();
+    const form = e.target;
+    const subBtn = form.querySelector('button[type=submit]');
+    const formData = new FormData(form);
+    
+    subBtn.disabled = true;
+    subBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    
+    try {
+        const response = await fetch('ajax/edit_console_unit.php', {
+            method: 'POST',
+            body: formData
+        });
+        const res = await response.json();
+        
+        if (res.success) {
+            if (window.showToast) window.showToast(res.message, 'success');
+            else alert(res.message);
+            
+            // Update the card in the UI
+            updateConsoleCardUI(res.data);
+            
+            closeModal('editConsole');
+        } else {
+            if (window.showToast) window.showToast(res.message, 'error');
+            else alert('Error: ' + res.message);
+            subBtn.disabled = false;
+            subBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An unexpected error occurred.');
+        subBtn.disabled = false;
+        subBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    }
+}
+
+function updateConsoleCardUI(data) {
+    const card = document.getElementById('console-card-' + data.console_id);
+    if (!card) return;
+    
+    // Update basic info
+    card.querySelector('.console-unit').textContent = data.unit_number;
+    card.querySelector('.console-name').textContent = data.console_name;
+    
+    // Update rate
+    const rateEl = card.querySelector('.console-rate');
+    if (rateEl) {
+        rateEl.innerHTML = `<i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> ${parseFloat(data.effective_rate).toFixed(2)}/hr`;
+    }
+    
+    // Update Type badge if needed (simplified: just text)
+    const typeBadge = card.querySelector('.console-type-badge');
+    if (typeBadge) {
+        // Find icon based on type (we'd need a mapping or the icon from the server)
+        // For now, let's just update the text part
+        const icon = typeBadge.querySelector('i');
+        typeBadge.innerHTML = '';
+        if (icon) typeBadge.appendChild(icon);
+        typeBadge.appendChild(document.createTextNode(' ' + data.console_type));
+    }
+    
+    // Update "Includes X Controllers"
+    // Find the div that starts with "Includes"
+    const infoDivs = card.querySelectorAll('div[style*="font-size:12px"]');
+    infoDivs.forEach(div => {
+        if (div.textContent.trim().startsWith('Includes')) {
+            div.innerHTML = `<i class="fa-solid fa-gamepad" style="font-size:10px;margin-right:4px;"></i> 
+                             Includes ${parseInt(data.controller_count)} Controller${parseInt(data.controller_count) != 1 ? 's' : ''}`;
+        }
+    });
+
+    // Update the Edit button's onclick to reflect new values
+    const editBtn = card.querySelector('.console-edit-row button');
+    if (editBtn) {
+        editBtn.setAttribute('onclick', `openEditConsoleModal(${data.console_id}, '${data.console_name.replace(/'/g, "\\'")}', ${data.console_type_id}, '${data.unit_number.replace(/'/g, "\\'")}', ${data.controller_count}, ${data.effective_rate})`);
+    }
 }
 
 </script>
@@ -724,31 +825,38 @@ function toggleArchiveSection(showArchive) {
 
                 <!-- Archived Console Types -->
                 <?php if (!empty($archivedConsoleTypes)): ?>
-                <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;display:block;margin-bottom:12px;border-top:1px solid rgba(255,255,255,.05);padding-top:15px;">Archived Console Types</label>
-                <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
-                    <?php foreach ($archivedConsoleTypes as $ct): ?>
-                        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['console_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['console_type_id'] ?>, this.checked)">
-                                <i class="fas fa-desktop" style="color:#888;font-size:12px;"></i>
-                                <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                <div class="bulk-scope">
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-top:1px solid rgba(255,255,255,.05); padding-top:15px;">
+                        <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;margin:0;">Archived Console Types</label>
+                        <label style="font-size:11px; color:#888; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"> SELECT ALL
+                        </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
+                        <?php foreach ($archivedConsoleTypes as $ct): ?>
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <input type="checkbox" class="bulk-check" data-id="<?= $ct['console_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['console_type_id'] ?>, this.checked, this)">
+                                    <i class="fas fa-desktop" style="color:#888;font-size:12px;"></i>
+                                    <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <form method="POST" action="admin.php#consoles">
+                                        <input type="hidden" name="action" value="restore_console_type">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
+                                        <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
+                                    </form>
+                                    <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
+                                        <input type="hidden" name="action" value="delete_console_type">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
+                                        <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
+                                    </form>
+                                </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <form method="POST" action="admin.php#consoles">
-                                    <input type="hidden" name="action" value="restore_console_type">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
-                                    <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
-                                </form>
-                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
-                                    <input type="hidden" name="action" value="delete_console_type">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
-                                    <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
                 <?php endif; ?>
             </div><!-- /#panelConsole -->
@@ -811,31 +919,38 @@ function toggleArchiveSection(showArchive) {
 
                 <!-- Archived Controller Types -->
                 <?php if (!empty($archivedCtrlTypes)): ?>
-                <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;display:block;margin-bottom:12px;border-top:1px solid rgba(255,255,255,.05);padding-top:15px;">Archived Controller Types</label>
-                <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
-                    <?php foreach ($archivedCtrlTypes as $ct): ?>
-                        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['controller_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['controller_type_id'] ?>, this.checked)">
-                                <i class="fas fa-gamepad" style="color:#888;font-size:12px;"></i>
-                                <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                <div class="bulk-scope">
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-top:1px solid rgba(255,255,255,.05); padding-top:15px;">
+                        <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;margin:0;">Archived Controller Types</label>
+                        <label style="font-size:11px; color:#888; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"> SELECT ALL
+                        </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto;padding-right:5px;margin-bottom:15px;">
+                        <?php foreach ($archivedCtrlTypes as $ct): ?>
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <input type="checkbox" class="bulk-check" data-id="<?= $ct['controller_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['controller_type_id'] ?>, this.checked, this)">
+                                    <i class="fas fa-gamepad" style="color:#888;font-size:12px;"></i>
+                                    <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <form method="POST" action="admin.php#consoles">
+                                        <input type="hidden" name="action" value="restore_controller_type">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
+                                        <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
+                                    </form>
+                                    <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
+                                        <input type="hidden" name="action" value="delete_controller_type">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
+                                        <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
+                                    </form>
+                                </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <form method="POST" action="admin.php#consoles">
-                                    <input type="hidden" name="action" value="restore_controller_type">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
-                                    <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
-                                </form>
-                                <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
-                                    <input type="hidden" name="action" value="delete_controller_type">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
-                                    <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
                 <?php endif; ?>
             </div><!-- /#panelController -->

@@ -705,42 +705,90 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
     const btnArchived = document.getElementById('btnTabArchived');
     
     if (viewType === 'active') {
-        btnActive.style.background = 'var(--clr-mint)';
-        btnActive.style.color = '#0a0f1c';
-        btnArchived.style.background = 'transparent';
-        btnArchived.style.color = '#888';
-        BulkManager.init(''); // Clear bulk bar when switching to active
+        if (btnActive) {
+            btnActive.style.background = 'var(--clr-mint)';
+            btnActive.style.color = '#0a0f1c';
+        }
+        if (btnArchived) {
+            btnArchived.style.background = 'transparent';
+            btnArchived.style.color = '#888';
+        }
+        if (window.BulkManager) BulkManager.init(''); 
     } else {
-        btnArchived.style.background = 'var(--clr-gold)';
-        btnArchived.style.color = '#0a0f1c';
-        btnActive.style.background = 'transparent';
-        btnActive.style.color = '#888';
-        BulkManager.init('participants'); // Initialize for archived participants
+        if (btnArchived) {
+            btnArchived.style.background = 'var(--clr-gold)';
+            btnArchived.style.color = '#0a0f1c';
+        }
+        if (btnActive) {
+            btnActive.style.background = 'transparent';
+            btnActive.style.color = '#888';
+        }
+        if (window.BulkManager) BulkManager.init('participants'); 
     }
 
-    if (currentTname) document.getElementById('drawerTournamentName').textContent = currentTname;
-    document.getElementById('drawerContent').innerHTML =
-        '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>';
+    const titleEl = document.getElementById('drawerTournamentName');
+    if (titleEl) titleEl.textContent = currentTname || 'Tournament Participants';
+
+    const contentEl = document.getElementById('drawerContent');
+    if (contentEl) {
+        contentEl.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading participants...</p></div>';
+    }
+
     const drawer = document.getElementById('participantsDrawer');
-    drawer.style.display = 'block';
-    drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (drawer) {
+        drawer.style.display = 'block';
+        drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     fetch(`ajax/get_tournament_participants.php?tournament_id=${tournamentId}&status=${viewType}`)
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('Network response was not ok');
+            return r.json();
+        })
         .then(data => {
+            if (!data.success && data.message) throw new Error(data.message);
+            
             if (!data.participants || data.participants.length === 0) {
-                document.getElementById('drawerContent').innerHTML =
-                    `<div class="empty-state"><i class="fas fa-users"></i><p>No ${viewType} participants found.</p></div>`;
+                if (contentEl) {
+                    contentEl.innerHTML = `<div class="empty-state"><i class="fas fa-users"></i><p>No ${viewType} participants found for this tournament.</p></div>`;
+                }
                 return;
             }
+
             const isArchived = (viewType === 'archived');
-            let html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>';
-            if (isArchived) html += '<th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>';
+            let html = '';
+            
+            if (isArchived && window.BulkManager) {
+                html += `
+                <div class="bulk-scope">
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-top:1px solid rgba(255,255,255,.05); padding-top:15px;">
+                        <label style="font-size:12px;font-weight:700;color:#fb566b;text-transform:uppercase;margin:0;">Archived Registrants</label>
+                        <label style="font-size:11px; color:#888; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"> SELECT ALL
+                        </label>
+                    </div>`;
+            }
+
+            html += '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>';
+            if (isArchived && window.BulkManager) {
+                html += '<th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked, this)"></th>';
+            }
             html += '<th style="white-space:nowrap;">#</th><th style="white-space:nowrap;">Name</th><th style="white-space:nowrap;">IGN</th><th style="white-space:nowrap;">Contact</th><th style="white-space:nowrap;">Registered</th><th style="white-space:nowrap;">Payment</th><th style="white-space:nowrap;">Proof</th><th style="white-space:nowrap;">Action</th>' +
                 '</tr></thead><tbody>';
+
             data.participants.forEach((p, i) => {
                 const isPaid    = p.payment_status === 'paid';
-                const dispName  = p.walkin_name ? `${escHtml(p.full_name)} <span style="font-size:10px;color:#f1a83c;background:rgba(241,168,60,.12);padding:2px 6px;border-radius:10px;margin-left:4px;">Walk-in: ${escHtml(p.walkin_name)}</span>` : escHtml(p.full_name);
+                
+                // Enhanced walk-in name display
+                let dispName = '';
+                if (p.walkin_name) {
+                    const primaryName = p.full_name ? escHtml(p.full_name) : `<strong>${escHtml(p.walkin_name)}</strong>`;
+                    const badge = `<span style="font-size:10px;color:#f1a83c;background:rgba(241,168,60,.12);padding:2px 6px;border-radius:10px;margin-left:4px;">Walk-in${p.full_name ? ': ' + escHtml(p.walkin_name) : ''}</span>`;
+                    dispName = primaryName + badge;
+                } else {
+                    dispName = escHtml(p.full_name || 'Unknown');
+                }
+
                 const feePaid   = p.entry_fee > 0 ? '₱' + parseFloat(p.entry_fee).toLocaleString() : 'FREE';
                 const proofHtml = p.paymongo_source_id
                     ? `<span style="color:#20c8a1;font-size:11px;font-weight:700;"><i class="fas fa-check-circle"></i> GCash Paid (${feePaid})</span><br><span style="font-size:10px;color:#444;">${escHtml(p.paymongo_source_id)}</span>`
@@ -777,9 +825,11 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
                 }
 
                 html += '<tr>';
-                if (isArchived) html += `<td><input type="checkbox" class="bulk-check" data-id="${p.participant_id}" onclick="BulkManager.toggle(${p.participant_id}, this.checked)"></td>`;
+                if (isArchived && window.BulkManager) {
+                    html += `<td><input type="checkbox" class="bulk-check" data-id="${p.participant_id}" onclick="BulkManager.toggle(${p.participant_id}, this.checked, this)"></td>`;
+                }
                 html += `<td style="color:#888">${i + 1}</td>
-                    <td style="font-weight:600;color:#fff">${dispName}<br><span style="font-size:11px;color:#555;">${escHtml(p.email)}</span></td>
+                    <td style="font-weight:600;color:#fff">${dispName}<br><span style="font-size:11px;color:#555;">${escHtml(p.email || '')}</span></td>
                     <td style="color:#b37bec;font-size:12px;">${p.ign ? escHtml(p.ign) : '<span style="color:#555;">—</span>'}</td>
                     <td style="color:#888;font-size:12px;">${p.contact_number ? escHtml(p.contact_number) : '<span style="color:#555;">—</span>'}</td>
                     <td style="color:#888;font-size:12px;">${p.registration_date}</td>
@@ -798,11 +848,20 @@ function viewParticipants(tournamentId, tournamentName, viewType = 'active') {
                 </tr>`;
             });
             html += '</tbody></table></div>';
-            document.getElementById('drawerContent').innerHTML = html;
+            if (isArchived) html += '</div>'; // Close bulk-scope
+            if (contentEl) contentEl.innerHTML = html;
         })
-        .catch(() => {
-            document.getElementById('drawerContent').innerHTML =
-                '<div class="empty-state"><i class="fas fa-exclamation-triangle" style="color:#fb566b;"></i><p>Failed to load participants.</p></div>';
+        .catch(err => {
+            console.error('[Tournament Registrants Error]', err);
+            if (contentEl) {
+                contentEl.innerHTML =
+                    `<div class="empty-state">
+                        <i class="fas fa-exclamation-triangle" style="color:#fb566b;"></i>
+                        <p>Failed to load participants.</p>
+                        <span style="font-size:11px;color:#666;">${err.message}</span>
+                        <button class="btn-sec btn-sm" style="margin-top:10px;" onclick="viewParticipants(${tournamentId}, '', '${viewType}')">Retry</button>
+                    </div>`;
+            }
         });
 }
 

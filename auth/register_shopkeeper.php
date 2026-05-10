@@ -248,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label class="terms-checkbox-label" for="agree_terms">
                                 <input type="checkbox" id="agree_terms" name="agree_terms" required>
                                 <span class="terms-checkbox-custom"></span>
-                                <span>I agree to the <a href="../terms.php" target="_blank" style="color:var(--sk-accent)">Staff Code of Conduct</a> and Hub Policies.</span>
+                                <span>I agree to the <a href="../terms.php#section-13-staff-code-of-conduct" style="color:var(--sk-accent); font-weight:bold; text-decoration:underline;">STAFF CODE OF CONDUCT</a> and Hub Policies.</span>
                             </label>
                         </div>
 

@@ -372,7 +372,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $controller_count = (int)($_POST['controller_count'] ?? 2);
-                if (addConsole($name, $type_id, $unit_number, $controller_count)) {
+                $hourly_rate = !empty($_POST['hourly_rate']) ? (float)$_POST['hourly_rate'] : null;
+                if (addConsole($name, $type_id, $unit_number, $controller_count, $hourly_rate)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                     
@@ -406,10 +407,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $controller_count = (int)($_POST['controller_count'] ?? 2);
+                $hourly_rate = !empty($_POST['hourly_rate']) ? (float)$_POST['hourly_rate'] : null;
+
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ? WHERE console_id = ?"
+                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ?, hourly_rate = ? WHERE console_id = ?"
                 );
-                $stmt->bind_param('sisii', $name, $type_id, $unit, $controller_count, $console_id);
+                $stmt->bind_param('sisidi', $name, $type_id, $unit, $controller_count, $hourly_rate, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
@@ -446,41 +449,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-
-    // BULK ACTIONS FOR CONSOLES
-    elseif ($action === 'bulk_restore_consoles') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id) {
-                    updateConsoleStatus($id, 'available');
-                    $count++;
-                }
-            }
-            $message = "Restored {$count} consoles.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Restore Consoles", "Restored {$count} consoles (IDs: " . implode(',', $ids) . ")");
-        }
-    }
-    elseif ($action === 'bulk_delete_consoles') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id) {
-                    $res = deleteConsole($id);
-                    if ($res['success']) $count++;
-                }
-            }
-            $message = "Permanently deleted {$count} consoles.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Delete Consoles", "Permanently deleted {$count} consoles (IDs: " . implode(',', $ids) . ")");
-        }
-    }
-
     // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
@@ -555,34 +523,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $message = 'Failed to permanently delete console type.';
             $messageType = 'error';
-        }
-    }
-
-    // BULK ACTIONS FOR CONSOLE TYPES
-    elseif ($action === 'bulk_restore_console_types') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id && restoreConsoleType($id)) $count++;
-            }
-            $message = "Restored {$count} console types.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Restore Console Types", "Restored {$count} console types (IDs: " . implode(',', $ids) . ")");
-        }
-    }
-    elseif ($action === 'bulk_delete_console_types') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id && deleteConsoleType($id)) $count++;
-            }
-            $message = "Permanently deleted {$count} console types.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Delete Console Types", "Permanently deleted {$count} console types (IDs: " . implode(',', $ids) . ")");
         }
     }
 
@@ -756,47 +696,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Controller deleted permanently.';
                 $messageType = 'success';
                 logActivity($user['user_id'], "Controller Unit", "Permanently deleted Controller ID #{$ctrl_id}");
-            }
-        }
-    }
-
-    // BULK ACTIONS FOR CONTROLLERS
-    elseif ($action === 'bulk_restore_controllers') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id) {
-                    $stmt = $conn->prepare("UPDATE controllers SET status='available' WHERE controller_id=?");
-                    $stmt->bind_param('i', $id);
-                    if ($stmt->execute()) $count++;
-                }
-            }
-            $message = "Restored {$count} controllers.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Restore Controllers", "Restored {$count} controllers (IDs: " . implode(',', $ids) . ")");
-        }
-    }
-    elseif ($action === 'bulk_delete_controllers') {
-        if ($user['role'] !== 'owner') {
-            $message = 'Only the owner can permanently delete controllers.';
-            $messageType = 'error';
-        } else {
-            $ids = $_POST['ids'] ?? [];
-            if (!empty($ids) && is_array($ids)) {
-                $count = 0;
-                foreach ($ids as $id) {
-                    $id = (int)$id;
-                    if ($id) {
-                        $stmt = $conn->prepare("DELETE FROM controllers WHERE controller_id=?");
-                        $stmt->bind_param('i', $id);
-                        if ($stmt->execute()) $count++;
-                    }
-                }
-                $message = "Permanently deleted {$count} controllers.";
-                $messageType = 'success';
-                logActivity($user['user_id'], "Bulk Delete Controllers", "Permanently deleted {$count} controllers (IDs: " . implode(',', $ids) . ")");
             }
         }
     }
@@ -1067,6 +966,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
+    // ── BULK ACTIONS (ARCHIVE MANAGEMENT) ─────────────────────────────────────
+    elseif (strpos($action, 'bulk_') === 0) {
+        $ids = $_POST['ids'] ?? [];
+        if (empty($ids)) {
+            $message = 'No items selected for bulk action.';
+            $messageType = 'error';
+        } else {
+            $count = count($ids);
+            $idList = implode(',', array_map('intval', $ids));
+            $successCount = 0;
+            
+            // BULK CONSOLES
+            if ($action === 'bulk_restore_consoles') {
+                $stmt = $conn->prepare("UPDATE consoles SET status = 'available' WHERE console_id IN ($idList)");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Restored {$successCount} archived consoles.");
+                    $message = "Successfully restored {$successCount} consoles.";
+                    $messageType = 'success';
+                }
+            }
+            elseif ($action === 'bulk_delete_consoles') {
+                $stmt = $conn->prepare("DELETE FROM consoles WHERE console_id IN ($idList) AND status = 'archived'");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Permanently deleted {$successCount} archived consoles.");
+                    $message = "Permanently deleted {$successCount} consoles.";
+                    $messageType = 'success';
+                }
+            }
+            
+            // BULK CONTROLLERS
+            elseif ($action === 'bulk_restore_controllers') {
+                $stmt = $conn->prepare("UPDATE controllers SET status = 'available' WHERE controller_id IN ($idList)");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Restored {$successCount} archived controllers.");
+                    $message = "Successfully restored {$successCount} controllers.";
+                    $messageType = 'success';
+                }
+            }
+            elseif ($action === 'bulk_delete_controllers') {
+                $stmt = $conn->prepare("DELETE FROM controllers WHERE controller_id IN ($idList) AND status = 'archived'");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Permanently deleted {$successCount} archived controllers.");
+                    $message = "Permanently deleted {$successCount} controllers.";
+                    $messageType = 'success';
+                }
+            }
+            
+            // BULK CONSOLE TYPES
+            elseif ($action === 'bulk_restore_console_types') {
+                $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE console_type_id IN ($idList)");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Restored {$successCount} archived console types.");
+                    $message = "Successfully restored {$successCount} console types.";
+                    $messageType = 'success';
+                }
+            }
+            elseif ($action === 'bulk_delete_console_types') {
+                $stmt = $conn->prepare("DELETE FROM console_types WHERE console_type_id IN ($idList) AND is_archived = 1");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Permanently deleted {$successCount} archived console types.");
+                    $message = "Permanently deleted {$successCount} console types.";
+                    $messageType = 'success';
+                }
+            }
+            
+            // BULK CONTROLLER TYPES
+            elseif ($action === 'bulk_restore_controller_types') {
+                $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE controller_type_id IN ($idList)");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Restored {$successCount} archived controller types.");
+                    $message = "Successfully restored {$successCount} controller types.";
+                    $messageType = 'success';
+                }
+            }
+            elseif ($action === 'bulk_delete_controller_types') {
+                $stmt = $conn->prepare("DELETE FROM controller_types WHERE controller_type_id IN ($idList) AND is_archived = 1");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Permanently deleted {$successCount} archived controller types.");
+                    $message = "Permanently deleted {$successCount} controller types.";
+                    $messageType = 'success';
+                }
+            }
+            
+            // BULK TOURNAMENT PARTICIPANTS
+            elseif ($action === 'bulk_restore_participants') {
+                $stmt = $conn->prepare("UPDATE tournament_participants SET status = 'active', removed_at = NULL WHERE participant_id IN ($idList)");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Restored {$successCount} archived tournament participants.");
+                    $message = "Successfully restored {$successCount} participants.";
+                    $messageType = 'success';
+                }
+            }
+            elseif ($action === 'bulk_delete_participants') {
+                $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id IN ($idList) AND status = 'archived'");
+                if ($stmt->execute()) {
+                    $successCount = $conn->affected_rows;
+                    logActivity($user['user_id'], "Bulk Action", "Permanently deleted {$successCount} archived tournament participants.");
+                    $message = "Permanently deleted {$successCount} participants.";
+                    $messageType = 'success';
+                }
+            }
+            
+            if ($successCount === 0 && !isset($message)) {
+                $message = "Bulk action failed or no changes made.";
+                $messageType = 'error';
+            }
+        }
+    }
+
     // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
 
     // CREATE TOURNAMENT (Admin Only)
@@ -1252,42 +1269,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message     = 'Invalid tournament or customer.';
                 $messageType = 'error';
             }
-        }
-    }
-
-    // BULK ACTIONS FOR TOURNAMENT PARTICIPANTS
-    elseif ($action === 'bulk_restore_participants') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id) {
-                    $stmt = $conn->prepare("UPDATE tournament_participants SET status='active' WHERE participant_id=?");
-                    $stmt->bind_param('i', $id);
-                    if ($stmt->execute()) $count++;
-                }
-            }
-            $message = "Restored {$count} participants.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Restore Participants", "Restored {$count} participants (IDs: " . implode(',', $ids) . ")");
-        }
-    }
-    elseif ($action === 'bulk_delete_participants') {
-        $ids = $_POST['ids'] ?? [];
-        if (!empty($ids) && is_array($ids)) {
-            $count = 0;
-            foreach ($ids as $id) {
-                $id = (int)$id;
-                if ($id) {
-                    $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id=?");
-                    $stmt->bind_param('i', $id);
-                    if ($stmt->execute()) $count++;
-                }
-            }
-            $message = "Permanently deleted {$count} participants.";
-            $messageType = 'success';
-            logActivity($user['user_id'], "Bulk Delete Participants", "Permanently deleted {$count} participants (IDs: " . implode(',', $ids) . ")");
         }
     }
 
@@ -1889,8 +1870,64 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         }
         .admin-dropdown-item:hover { background:rgba(255,255,255,.06); color:#fff; }
         .admin-dropdown-danger { color:var(--clr-coral) !important; }
-        .admin-dropdown-danger:hover { background:rgba(251,86,107,.1) !important; }
+        .admin-dropdown-danger:hover { background:rgba(251,86,107,1) !important; }
         .user-avatar-lg { width:42px; height:42px; font-size:16px; flex-shrink:0; }
+
+        /* Bulk Action Bar */
+        .bulk-bar {
+            position: fixed;
+            bottom: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            min-width: 320px;
+            background: linear-gradient(135deg, #0d1b3e, #08101c);
+            border: 1px solid rgba(32, 200, 161, .4);
+            border-radius: 20px;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,.6);
+            z-index: 100000;
+            transition: bottom .35s cubic-bezier(.175, .885, .32, 1.275), opacity .3s;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .bulk-bar.active {
+            bottom: 30px;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .bulk-count-badge {
+            background: rgba(32, 200, 161, .15);
+            color: #20c8a1;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 13px;
+            border: 1px solid rgba(32, 200, 161, .3);
+        }
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .bulk-btn {
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: .2s;
+        }
+        .bulk-btn-restore { background: #20c8a1; color: #0a0f1c; }
+        .bulk-btn-restore:hover { background: #1ab38f; transform: translateY(-2px); }
+        .bulk-btn-delete { background: rgba(251, 86, 107, .15); color: #fb566b; border: 1px solid rgba(251, 86, 107, .3); }
+        .bulk-btn-delete:hover { background: #fb566b; color: #fff; transform: translateY(-2px); }
     </style>
 </head>
 <body>
@@ -2098,6 +2135,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <!-- ── JavaScript ── -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
+window.GSPOT_CSRF = '<?= csrfToken() ?>';
+window._CSRF = window.GSPOT_CSRF;
+
 // ── Admin user dropdown (Moved to top for reliability) ──
 (function () {
     const btn      = document.getElementById('adminUserBtn');
@@ -4076,9 +4116,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                      + '</div>';
 
             // Per-controller rows
-            html += '<div id="ctrlPerRowList" style="display:flex;flex-direction:column;gap:8px;">';
-            // Per-controller rows
-            html += '<div id="ctrlPerRowList" style="display:flex;flex-direction:column;gap:8px;">';
+            html += '  <div id="ctrlPerRowList" style="display:flex; flex-direction:column; gap:8px;">';
             activeCtrlRows.forEach(function(cr) {
                 // Real-time calculation
                 const rentedAt = new Date(cr.rented_at.replace(/-/g, "/"));
@@ -4122,6 +4160,14 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                       + '</div>';
             });
             html += '</div>';
+
+            if (activeCtrlRows.length > 1) {
+                html += '<div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.08);">'
+                      + '  <button type="button" id="endAllCtrlBtn" class="btn-dang" style="width:100%; padding:10px; font-size:12px; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:8px;">'
+                      + '    <i class="fas fa-power-off"></i> End ALL controllers now'
+                      + '  </button>'
+                      + '</div>';
+            }
 
 
 
@@ -5440,5 +5486,18 @@ function _addNotifItems(newItems) {
     }, 5000);
 })();
 </script>
+
+<div class="bulk-bar" id="bulkBar">
+    <div class="bulk-count-badge"><span id="bulkCount">0</span> Selected</div>
+    <div class="bulk-actions">
+        <button class="bulk-btn bulk-btn-restore" onclick="BulkManager.execute('restore')">
+            <i class="fas fa-rotate-left"></i> Restore Selected
+        </button>
+        <button class="bulk-btn bulk-btn-delete" onclick="BulkManager.execute('delete')">
+            <i class="fas fa-trash-alt"></i> Delete Permanently
+        </button>
+    </div>
+</div>
+
 </body>
 </html>
