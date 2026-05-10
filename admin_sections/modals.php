@@ -2646,9 +2646,10 @@ function adminDpChange() {
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <form method="POST">
+        <form id="addControllerForm" onsubmit="submitAddController(event)">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add_controller">
+            <div id="addControllerError" style="display:none;margin:15px;padding:12px;border-radius:8px;background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.2);color:#fb566b;font-size:13px;"></div>
 
 
             <div class="modal-body">
@@ -2662,11 +2663,12 @@ function adminDpChange() {
                     <div class="form-group">
                         <label>Controller Type *</label>
                     <select name="controller_type_id" required
-                            onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
+                            onchange="const opt = this.options[this.selectedIndex]; this.form.controller_type.value = opt.dataset.name; this.form.console_type_id.value = opt.dataset.consoleTypeId;">
                         <option value="" disabled selected>— Select Type —</option>
                         <?php foreach ($controllerTypes as $ct): ?>
-                            <option value="<?= $ct['console_type_id'] ?>"
-                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>">
+                            <option value="<?= $ct['controller_type_id'] ?>"
+                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>"
+                                    data-console-type-id="<?= (int)$ct['console_type_id'] ?>">
                                 <?= htmlspecialchars($ct['type_name']) ?>
                                 <?php if (!empty($ct['parent_console_name'])): ?>
                                     (<?= htmlspecialchars($ct['parent_console_name']) ?>)
@@ -2674,8 +2676,9 @@ function adminDpChange() {
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <!-- Hidden: keeps the type name in sync for the legacy controller_type text column -->
+                    <!-- Hidden: keeps the type name and console type ID in sync -->
                     <input type="hidden" name="controller_type" value="">
+                    <input type="hidden" name="console_type_id" value="">
                 </div>
                 </div>
 

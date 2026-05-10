@@ -102,13 +102,44 @@
                 </select>
 
                 <!-- Admin Filter -->
-                <select class="asb-select" id="logAdminFilter" style="width:140px;">
-                    <option value="">All Admins</option>
+                <select class="asb-select" id="logAdminFilter" style="width:160px;">
+                    <option value="">All</option>
+                    <option value="role:owner">Admins</option>
+                    <option value="role:shopkeeper">Shopkeepers</option>
+                    <option value="role:customer">Users</option>
+                    
                     <?php
-                    $admins = $conn->query("SELECT DISTINCT u.full_name FROM activity_logs l JOIN users u ON l.user_id = u.user_id ORDER BY u.full_name ASC");
-                    while($adm = $admins->fetch_assoc()) {
-                        echo '<option value="'.htmlspecialchars($adm['full_name']).'">'.htmlspecialchars($adm['full_name']).'</option>';
+                    // Fetch all users who have performed an action
+                    $usersQuery = "SELECT DISTINCT u.user_id, u.full_name, u.role 
+                                   FROM activity_logs l 
+                                   JOIN users u ON l.user_id = u.user_id 
+                                   ORDER BY u.role, u.full_name ASC";
+                    $usersResult = $conn->query($usersQuery);
+                    
+                    $groups = ['owner' => [], 'shopkeeper' => [], 'customer' => []];
+                    while ($u = $usersResult->fetch_assoc()) {
+                        $roleKey = $u['role'];
+                        if (isset($groups[$roleKey])) {
+                            $groups[$roleKey][] = $u;
+                        }
                     }
+                    
+                    $roleLabels = [
+                        'owner' => ['label' => 'ADMINS', 'display' => 'Admin'],
+                        'shopkeeper' => ['label' => 'SHOPKEEPERS', 'display' => 'Shopkeeper'],
+                        'customer' => ['label' => 'USERS', 'display' => 'User']
+                    ];
+                    
+                    foreach ($groups as $role => $users):
+                        if (empty($users)) continue;
+                        echo '<optgroup label="' . $roleLabels[$role]['label'] . '">';
+                        foreach ($users as $u):
+                            echo '<option value="' . htmlspecialchars($u['full_name']) . '">' 
+                                 . htmlspecialchars($u['full_name']) . ' — ' . $roleLabels[$role]['display'] 
+                                 . '</option>';
+                        endforeach;
+                        echo '</optgroup>';
+                    endforeach;
                     ?>
                 </select>
 
@@ -137,7 +168,7 @@
                 <tbody>
                     <?php
                     $logQuery = $conn->query(
-                        "SELECT l.*, u.full_name AS admin_name 
+                        "SELECT l.*, u.full_name AS admin_name, u.role 
                          FROM activity_logs l 
                          JOIN users u ON l.user_id = u.user_id 
                          ORDER BY l.created_at DESC 
@@ -148,7 +179,7 @@
                         while ($l = $logQuery->fetch_assoc()):
                             $rawDate = date('Y-m-d', strtotime($l['created_at']));
                     ?>
-                        <tr data-date="<?= $rawDate ?>" data-action="<?= htmlspecialchars($l['action']) ?>" data-admin="<?= htmlspecialchars($l['admin_name']) ?>">
+                        <tr data-date="<?= $rawDate ?>" data-action="<?= htmlspecialchars($l['action']) ?>" data-admin="<?= htmlspecialchars($l['admin_name']) ?>" data-role="<?= $l['role'] ?>">
                             <td style="color:#888;font-size:12px;">
                                 <span style="display:none;"><?= $l['created_at'] ?></span><!-- for sorting if needed -->
                                 <?= date('M d, Y', strtotime($l['created_at'])) ?><br>
@@ -220,11 +251,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const rowDate = row.dataset.date;
             const rowAction = row.dataset.action;
             const rowAdmin = row.dataset.admin;
+            const rowRole = row.dataset.role;
             const rowText = row.innerText.toLowerCase();
 
             const matchQ = !q || rowText.includes(q);
             const matchAct = !act || rowAction === act;
-            const matchAdm = !adm || rowAdmin === adm;
+            
+            let matchAdm = true;
+            if (adm) {
+                if (adm.startsWith('role:')) {
+                    const targetRole = adm.split(':')[1];
+                    matchAdm = rowRole === targetRole;
+                } else {
+                    matchAdm = rowAdmin === adm;
+                }
+            }
+
             const matchFrom = !from || rowDate >= from;
             const matchTo = !to || rowDate <= to;
 

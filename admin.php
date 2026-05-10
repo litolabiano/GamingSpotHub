@@ -598,11 +598,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hourly_rate = (float)($_POST['hourly_rate'] ?? 20.00);
 
         // Validate: must match a real controller type by ID
-        $validTypeIds = array_column(getControllerTypes(true), 'type_id');
+        $validTypeIds = array_column(getControllerTypes(true), 'controller_type_id');
+        $console_typeId = !empty($_POST['console_type_id']) ? (int)$_POST['console_type_id'] : null;
+
         if ($ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
-            // Also get the type name for the legacy column
-            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['console_type_id'] === $ctrl_typeId))[0] ?? null;
-            $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
+            // If console_typeId was not passed in hidden field, fetch it from DB
+            if (!$console_typeId) {
+                $pRes = $conn->prepare("SELECT console_type_id FROM controller_types WHERE controller_type_id = ?");
+                $pRes->bind_param('i', $ctrl_typeId); $pRes->execute();
+                $pRow = $pRes->get_result()->fetch_assoc();
+                if ($pRow) $console_typeId = $pRow['console_type_id'];
+            }
 
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
             $dupCheck->bind_param('s', $ctrl_unit); $dupCheck->execute();
@@ -611,13 +617,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $stmt = $conn->prepare(
-                    "INSERT INTO controllers (controller_type_id, console_type_id, unit_number, hourly_rate, notes) VALUES (?,?,?,?,?)"
+                    "INSERT INTO controllers (controller_type_id, console_type_id, unit_number, hourly_rate, notes, status) VALUES (?,?,?,?,?,'available')"
                 );
-                $stmt->bind_param('iisds', $ctrl_typeId, $ctrl_typeId, $ctrl_unit, $hourly_rate, $ctrl_notes);
+                $stmt->bind_param('iisds', $ctrl_typeId, $console_typeId, $ctrl_unit, $hourly_rate, $ctrl_notes);
                 if ($stmt->execute()) {
                     $message = 'Controller added successfully.';
                     $messageType = 'success';
-                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_type}, Unit: {$ctrl_unit}");
+                    logActivity($user['user_id'], "Controller unit", "Added new controller: {$ctrl_unit} (ID: {$ctrl_typeId})");
                 } else {
                     $message = 'Failed to add controller: ' . $conn->error;
                     $messageType = 'error';
