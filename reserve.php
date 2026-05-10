@@ -451,8 +451,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Reservation must be at least 1 hour from now.';
     } elseif (!$error && (int)date('H', strtotime($reserved_time)) < 12) {
         $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
-    } elseif (!$error && $reserved_time > '23:00') {
-        $error = 'Reservations must be no later than 11:00 PM.';
+    } elseif (!$error && $reserved_time > '23:30') {
+        $error = 'Reservations must be no later than 11:30 PM.';
     } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
         $error = 'You must read and agree to the No-Refund Policy before submitting.';
     }

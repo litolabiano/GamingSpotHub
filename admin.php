@@ -953,8 +953,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
 
-    // CREATE TOURNAMENT
+    // CREATE TOURNAMENT (Admin Only)
     elseif ($action === 'create_tournament') {
+        if ($user['role'] === 'shopkeeper') {
+            $message = 'Access Denied: Shopkeepers cannot create tournaments.';
+            $messageType = 'error';
+        } else {
         $name         = trim($_POST['tournament_name'] ?? '');
         $game         = trim($_POST['game_name']       ?? '');
         $console_type = $_POST['console_type']         ?? '';
@@ -992,11 +996,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to create tournament: ' . $conn->error;
                 $messageType = 'error';
             }
+            }
         }
     }
 
-    // EDIT TOURNAMENT
+    // EDIT TOURNAMENT (Admin Only)
     elseif ($action === 'edit_tournament') {
+        if ($user['role'] === 'shopkeeper') {
+            $message = 'Access Denied: Shopkeepers cannot edit tournaments.';
+            $messageType = 'error';
+        } else {
         $tid          = (int)($_POST['tournament_id'] ?? 0);
         $name         = trim($_POST['tournament_name'] ?? '');
         $game         = trim($_POST['game_name']       ?? '');
@@ -1032,11 +1041,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Failed to update tournament: ' . $conn->error;
                 $messageType = 'error';
             }
+            }
         }
     }
 
-    // UPDATE TOURNAMENT STATUS
+    // UPDATE TOURNAMENT STATUS (Admin Only)
     elseif ($action === 'update_tournament_status') {
+        if ($user['role'] === 'shopkeeper') {
+            $message = 'Access Denied: Shopkeepers cannot change tournament status.';
+            $messageType = 'error';
+        } else {
         $tid        = (int)($_POST['tournament_id'] ?? 0);
         $new_status = $_POST['new_status'] ?? '';
         $allowed    = ['upcoming', 'scheduled', 'ongoing', 'completed', 'cancelled'];
@@ -1051,6 +1065,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $message = 'Invalid tournament or status.';
             $messageType = 'error';
+            }
         }
     }
 
@@ -1787,7 +1802,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <div class="nav-item" data-tooltip="Reports" onclick="showPage('reports', this)">
         <i class="fas fa-chart-bar"></i><span>Reports</span>
     </div>
-    <?php if ($user['role'] !== 'shopkeeper'): ?>
     <div class="nav-item" data-tooltip="Tournaments" onclick="showPage('tournaments', this)">
         <i class="fas fa-trophy"></i><span>Tournaments</span>
         <?php
@@ -1798,7 +1812,6 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         <span <?= $navBadge ?>><?= $openTourCount ?></span>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
 
     <?php if ($user['role'] === 'owner'): ?>
     <div class="nav-item" data-tooltip="Activity Logs" onclick="showPage('activity_logs', this)">
@@ -1921,7 +1934,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php include __DIR__ . '/admin_sections/reservations.php'; ?>
 <?php include __DIR__ . '/admin_sections/transactions.php'; ?>
 <?php include __DIR__ . '/admin_sections/reports.php'; ?>
-<?php if ($user['role'] !== 'shopkeeper'): include __DIR__ . '/admin_sections/tournaments.php'; endif; ?>
+<?php include __DIR__ . '/admin_sections/tournaments.php'; ?>
 
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/activity_logs.php'; endif; ?>
 <?php if ($user['role'] === 'owner'): include __DIR__ . '/admin_sections/blocked_dates.php'; endif; ?>
@@ -1951,7 +1964,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 function showPage(page, el) {
     // ── Role-Based Access Check ──
     const userRole = '<?= $user['role'] ?>';
-    const restricted = ['consoles', 'tournaments', 'activity_logs', 'blocked_dates', 'settings'];
+    const restricted = ['consoles', 'activity_logs', 'blocked_dates', 'settings'];
     if (userRole === 'shopkeeper' && restricted.includes(page)) {
         console.warn('[GSpot Access] Shopkeeper access denied to:', page);
         // Redirect to dashboard if attempting restricted page
@@ -2146,7 +2159,7 @@ var _currentSection = 'dashboard';
     
     // Filter valid pages based on role
     const allowedPages = validPages.filter(p => {
-        if (userRole === 'shopkeeper' && ['consoles', 'tournaments', 'settings'].includes(p)) return false;
+        if (userRole === 'shopkeeper' && ['consoles', 'settings'].includes(p)) return false;
         return true;
     });
 
@@ -2849,36 +2862,46 @@ function recalcAdminControllerFee() {
     if (typeof _syncStartBtn === 'function') _syncStartBtn();
 }
 
-/* Recompute cost labels in the duration dropdown using the currently selected
-   console's hourly rate. Called on console change. */
-function _refreshDurationLabels() {
-    const rate    = getConsoleRate();
+/**
+ * Recompute cost labels in any duration dropdown using a given hourly rate.
+ */
+function refreshDurationLabels(selectId, rate) {
     const minChg  = PRICING.session_min_charge;
     const bp      = PRICING.bonus_paid_minutes;
     const bf      = PRICING.bonus_free_minutes;
-    const sel     = document.getElementById('durationSelect');
+    const sel     = document.getElementById(selectId);
     if (!sel) return;
+
     Array.from(sel.options).forEach(function(opt) {
         const paid = parseInt(opt.value);
         if (!paid) return;
+
         const bonus = Math.floor(paid / bp) * bf;
         const total = paid + bonus;
         opt.dataset.total = String(total);
-        const cost  = paid <= 30 ? minChg : paid / 60 * rate;
+        const cost  = paid <= 30 ? minChg : (paid / 60 * rate);
         opt.dataset.cost = cost.toFixed(2);
-        // Update visible label text: "Xh Ym — ₱NNN"
-        const paidH = Math.floor(paid / 60);
-        const paidM = paid % 60;
-        let label = (paidH ? paidH + 'h ' : '') + (paidM ? paidM + 'm' : '');
+
+        // Human-readable format: "1h 30m" or "1h" or "30m"
+        const h = Math.floor(paid / 60), m = paid % 60;
+        let label = (h ? h + 'h' : '') + (h && m ? ' ' : '') + (m ? m + 'm' : '');
+
         let bonusLabel = '';
         if (bonus > 0) {
             const bH = Math.floor(bonus / 60), bM = bonus % 60;
-            bonusLabel = ' (+' + (bH ? bH + 'h ' : '') + (bM ? bM + 'm' : '') + ')';
+            const bStr = (bH ? bH + 'h' : '') + (bH && bM ? ' ' : '') + (bM ? bM + 'm' : '');
+            bonusLabel = ' (+' + bStr + ')';
         }
-        opt.textContent = label + ' — ₱' + Math.round(cost) + bonusLabel;
+        opt.textContent = label + ' \u2014 \u20b1' + Math.round(cost) + bonusLabel;
     });
+}
+
+/* Recompute cost labels in the Start Session duration dropdown. */
+function _refreshDurationLabels() {
+    refreshDurationLabels('durationSelect', getConsoleRate());
     // Refresh the preview if a duration is already selected
-    if (sel.value) updateSessionPreview();
+    const sel = document.getElementById('durationSelect');
+    if (sel && sel.value) updateSessionPreview();
 }
 
 /* Show/hide payment method when the optional checkbox is toggled */

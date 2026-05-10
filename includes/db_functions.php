@@ -189,8 +189,8 @@ function getHourlyDurationOptions(?array $rules = null): array {
         $fmtMin = function(int $m): string {
             $h = intdiv($m, 60); $r = $m % 60;
             if ($h && $r) return "{$h}h {$r}m";
-            if ($h)       return "{$h}" . ($h === 1 ? ' hr' : ' hrs');
-            return "{$r} min";
+            if ($h)       return "{$h}h";
+            return "{$r}m";
         };
 
         $options[] = [
@@ -200,7 +200,7 @@ function getHourlyDurationOptions(?array $rules = null): array {
             'bonus'       => $bonus,
             'label_paid'  => $fmtMin($paid),
             'label_total' => $fmtMin($total),
-            'label_bonus' => $bonus > 0 ? '+' . $fmtMin($bonus) . ' free' : '',
+            'label_bonus' => $bonus > 0 ? ' (+' . $fmtMin($bonus) . ')' : '',
         ];
     }
     return $options;
@@ -1823,6 +1823,16 @@ function createReservation(
 
     if (isDateBlocked($reserved_date)) {
         return ['success' => false, 'message' => 'The selected date is currently blocked for reservations. Please choose another date.'];
+    }
+
+    // ── Opening Hours Validation (12:00 PM - 12:00 AM) ────────────────────────
+    $hour = (int)date('H', strtotime($reserved_time));
+    if ($hour < 12) {
+        return ['success' => false, 'message' => 'Reservations can only be made from 12:00 PM (noon) onwards.'];
+    }
+    // Last possible start time is 11:30 PM (23:30)
+    if ($reserved_time > '23:30') {
+        return ['success' => false, 'message' => 'Reservations must be no later than 11:30 PM.'];
     }
 
 

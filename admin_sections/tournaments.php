@@ -10,9 +10,11 @@
         <h2 class="page-title"><i class="fas fa-trophy" style="color:#f1a83c;margin-right:10px;"></i>Tournaments</h2>
         <p class="page-subtitle">Create tournaments and manage participant registrations</p>
     </div>
+    <?php if ($user['role'] !== 'shopkeeper'): ?>
     <button class="btn-prim" onclick="openModal('createTournament')">
         <i class="fas fa-plus"></i> New Tournament
     </button>
+    <?php endif; ?>
 
 </div>
 
@@ -172,14 +174,17 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                     </button>
 
                     <!-- Edit Tournament -->
+                    <?php if ($user['role'] !== 'shopkeeper'): ?>
                     <button class="btn-sec btn-sm"
                         onclick='openEditTournament(<?= json_encode($t) ?>)'
                         title="Edit Tournament">
                         <i class="fas fa-edit"></i>
                     </button>
+                    <?php endif; ?>
 
 
                     <!-- Status switch buttons -->
+                    <?php if ($user['role'] !== 'shopkeeper'): ?>
                     <?php if ($t['status'] === 'upcoming'): ?>
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="action" value="update_tournament_status">
@@ -235,6 +240,7 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
                         </button>
 
                     </form>
+                    <?php endif; ?>
                     <?php endif; ?>
 
                     <!-- Add Participant -->
@@ -536,12 +542,15 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
             </h3>
             <button class="modal-close" onclick="closeModal('addParticipant')">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" id="addParticipantForm">
             <input type="hidden" name="action" value="admin_register_participant">
             <?= csrfField() ?>
             <input type="hidden" name="tournament_id" id="addParticipantTournamentId">
-            <div style="margin-bottom:14px;font-size:13px;color:#888;">
-                Tournament: <strong id="addParticipantTournamentName" style="color:#fff;"></strong>
+            <div style="margin-bottom:20px; padding:12px 16px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); border-radius:10px; display:flex; align-items:center; gap:10px;">
+                <i class="fas fa-trophy" style="color:#f1a83c; font-size:14px;"></i>
+                <div style="font-size:12px; color:#888;">
+                    TOURNAMENT: <strong id="addParticipantTournamentName" style="color:#fff; text-transform:uppercase; letter-spacing:.5px;"></strong>
+                </div>
             </div>
 
             <!-- Mode toggle -->
@@ -562,50 +571,78 @@ $totalParticipants  = array_sum(array_column($allTournaments, 'registered_count'
             <!-- Registered customer fields -->
             <div id="registeredFields">
                 <div class="form-group">
-                    <label>Select Customer *</label>
-                    <select name="user_id" id="customerSelect">
-                        <option value="" disabled selected>— Pick a customer —</option>
-                        <?php foreach ($customers as $c): ?>
-                        <option value="<?= $c['user_id'] ?>"><?= htmlspecialchars($c['full_name']) ?> (<?= htmlspecialchars($c['email']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label>SELECT CUSTOMER *</label>
+                    <div class="cs-wrap" id="tpWrap">
+                        <input type="hidden" name="user_id" id="tpUserId">
+                        
+                        <div class="cs-input-row">
+                            <input type="text" id="tpQuery" class="cs-input" 
+                                   placeholder="Search customer by name or email…" autocomplete="off"
+                                   oninput="csSearch('tp')"
+                                   onkeydown="csKeyNav(event, 'tp')">
+                            <button type="button" class="cs-clear" id="tpClear" onclick="csDeselect('tp')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="cs-dropdown" id="tpDropdown" role="listbox"></div>
+
+                        <div class="cs-selected" id="tpSelected">
+                            <div class="cs-selected-avatar" id="tpSelAvatar"></div>
+                            <div class="cs-selected-info">
+                                <div class="cs-selected-name" id="tpSelName"></div>
+                                <div class="cs-selected-email" id="tpSelEmail"></div>
+                            </div>
+                            <button type="button" class="cs-deselect" onclick="csDeselect('tp')" title="Change customer">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Inline validation error -->
+                    <div class="cs-hint" id="tpHint" style="display:none;">
+                        <i class="fas fa-exclamation-circle"></i> Please select a registered customer to continue.
+                    </div>
                 </div>
             </div>
 
             <!-- Walk-in fields -->
             <div id="walkinFields" style="display:none;">
                 <div class="form-group">
-                    <label>Full Name *</label>
+                    <label>FULL NAME *</label>
                     <input type="text" name="walkin_name" id="walkinNameInput" placeholder="e.g. Juan Dela Cruz">
                 </div>
             </div>
 
             <!-- Shared fields -->
             <div class="form-group">
-                <label>IGN (In-Game Name)</label>
+                <label>IGN (IN-GAME NAME)</label>
                 <input type="text" name="ign" placeholder="e.g. DarkFist99">
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label>Contact Number</label>
+                    <label>CONTACT NUMBER</label>
                     <input type="text" name="contact_number" placeholder="09XXXXXXXXX">
                 </div>
                 <div class="form-group">
-                    <label>Payment Status</label>
+                    <label>PAYMENT STATUS</label>
                     <select name="payment_status">
-                        <option value="pending">Pending</option>
+                        <option value="pending" selected>Pending</option>
                         <option value="paid">Paid</option>
                     </select>
                 </div>
             </div>
+
             <div class="form-group">
-                <label>Notes</label>
-                <input type="text" name="notes" placeholder="Optional remark…">
+                <label>NOTES</label>
+                <textarea name="notes" rows="2" placeholder="Optional remarks..."></textarea>
             </div>
 
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);">
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08);">
                 <button type="button" class="btn-sec" onclick="closeModal('addParticipant')">Cancel</button>
-                <button type="submit" class="btn-prim"><i class="fas fa-user-plus"></i> Register</button>
+                <button type="submit" class="btn-prim" id="tpSubmitBtn">
+                    <i class="fas fa-user-plus"></i> Register
+                </button>
             </div>
 
         </form>
@@ -848,8 +885,15 @@ function setParticipantMode(mode) {
     document.getElementById('registeredFields').style.display = isWalkin ? 'none' : '';
     document.getElementById('walkinFields').style.display     = isWalkin ? '' : 'none';
     // Required attributes
-    document.getElementById('customerSelect').required   = !isWalkin;
-    document.getElementById('walkinNameInput').required  = isWalkin;
+    if (!isWalkin) {
+        // Searchable widget validation is handled on submit; clear walkin name
+        document.getElementById('walkinNameInput').required = false;
+        document.getElementById('walkinNameInput').value = '';
+    } else {
+        document.getElementById('walkinNameInput').required = true;
+        // Deselect registered customer to avoid cross-pollution
+        if (typeof csDeselect === 'function') csDeselect('tp');
+    }
     // Button styles
     const btnReg    = document.getElementById('modeRegistered');
     const btnWalkin = document.getElementById('modeWalkin');
