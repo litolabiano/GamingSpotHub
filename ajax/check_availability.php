@@ -56,7 +56,7 @@ if ($date === $today) {
                 $end = clone $start;
                 $end->modify("+{$s['planned_minutes']} minutes");
             }
-            $activeSessions[(int)$s['console_id']][] = ['start' => $start, 'end' => $end];
+            $activeSessions[(int)$s['console_id']][] = ['start' => $start, 'end' => $end, 'mode' => $s['rental_mode']];
         }
     }
 }
@@ -81,18 +81,23 @@ $summary = [];
 foreach ($allConsoles as $c) {
     $cid  = (int)$c['console_id'];
     $type = $c['console_type'];
-    
+
     if (!isset($summary[$type])) {
         $summary[$type] = ['total' => 0, 'available' => 0, 'confirmed_count' => 0];
     }
     $summary[$type]['total']++;
 
-    $isConflicted = false;
+    $isConflicted        = false;
     $isConfirmedConflict = false;
 
     // Check sessions
     if (isset($activeSessions[$cid])) {
         foreach ($activeSessions[$cid] as $sess) {
+            // Unlimited session: unit is fully occupied for the entire day
+            if (($sess['mode'] ?? '') === 'unlimited') {
+                $isConflicted = true;
+                break;
+            }
             if ($sess['end']) {
                 if ($requestedStart < $sess['end'] && $requestedEnd > $sess['start']) {
                     $isConflicted = true;

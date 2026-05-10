@@ -447,6 +447,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // BULK ACTIONS FOR CONSOLES
+    elseif ($action === 'bulk_restore_consoles') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id) {
+                    updateConsoleStatus($id, 'available');
+                    $count++;
+                }
+            }
+            $message = "Restored {$count} consoles.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Restore Consoles", "Restored {$count} consoles (IDs: " . implode(',', $ids) . ")");
+        }
+    }
+    elseif ($action === 'bulk_delete_consoles') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id) {
+                    $res = deleteConsole($id);
+                    if ($res['success']) $count++;
+                }
+            }
+            $message = "Permanently deleted {$count} consoles.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Delete Consoles", "Permanently deleted {$count} consoles (IDs: " . implode(',', $ids) . ")");
+        }
+    }
+
     // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
@@ -521,6 +555,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $message = 'Failed to permanently delete console type.';
             $messageType = 'error';
+        }
+    }
+
+    // BULK ACTIONS FOR CONSOLE TYPES
+    elseif ($action === 'bulk_restore_console_types') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id && restoreConsoleType($id)) $count++;
+            }
+            $message = "Restored {$count} console types.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Restore Console Types", "Restored {$count} console types (IDs: " . implode(',', $ids) . ")");
+        }
+    }
+    elseif ($action === 'bulk_delete_console_types') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id && deleteConsoleType($id)) $count++;
+            }
+            $message = "Permanently deleted {$count} console types.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Delete Console Types", "Permanently deleted {$count} console types (IDs: " . implode(',', $ids) . ")");
         }
     }
 
@@ -694,6 +756,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Controller deleted permanently.';
                 $messageType = 'success';
                 logActivity($user['user_id'], "Controller Unit", "Permanently deleted Controller ID #{$ctrl_id}");
+            }
+        }
+    }
+
+    // BULK ACTIONS FOR CONTROLLERS
+    elseif ($action === 'bulk_restore_controllers') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id) {
+                    $stmt = $conn->prepare("UPDATE controllers SET status='available' WHERE controller_id=?");
+                    $stmt->bind_param('i', $id);
+                    if ($stmt->execute()) $count++;
+                }
+            }
+            $message = "Restored {$count} controllers.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Restore Controllers", "Restored {$count} controllers (IDs: " . implode(',', $ids) . ")");
+        }
+    }
+    elseif ($action === 'bulk_delete_controllers') {
+        if ($user['role'] !== 'owner') {
+            $message = 'Only the owner can permanently delete controllers.';
+            $messageType = 'error';
+        } else {
+            $ids = $_POST['ids'] ?? [];
+            if (!empty($ids) && is_array($ids)) {
+                $count = 0;
+                foreach ($ids as $id) {
+                    $id = (int)$id;
+                    if ($id) {
+                        $stmt = $conn->prepare("DELETE FROM controllers WHERE controller_id=?");
+                        $stmt->bind_param('i', $id);
+                        if ($stmt->execute()) $count++;
+                    }
+                }
+                $message = "Permanently deleted {$count} controllers.";
+                $messageType = 'success';
+                logActivity($user['user_id'], "Bulk Delete Controllers", "Permanently deleted {$count} controllers (IDs: " . implode(',', $ids) . ")");
             }
         }
     }
@@ -1149,6 +1252,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message     = 'Invalid tournament or customer.';
                 $messageType = 'error';
             }
+        }
+    }
+
+    // BULK ACTIONS FOR TOURNAMENT PARTICIPANTS
+    elseif ($action === 'bulk_restore_participants') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id) {
+                    $stmt = $conn->prepare("UPDATE tournament_participants SET status='active' WHERE participant_id=?");
+                    $stmt->bind_param('i', $id);
+                    if ($stmt->execute()) $count++;
+                }
+            }
+            $message = "Restored {$count} participants.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Restore Participants", "Restored {$count} participants (IDs: " . implode(',', $ids) . ")");
+        }
+    }
+    elseif ($action === 'bulk_delete_participants') {
+        $ids = $_POST['ids'] ?? [];
+        if (!empty($ids) && is_array($ids)) {
+            $count = 0;
+            foreach ($ids as $id) {
+                $id = (int)$id;
+                if ($id) {
+                    $stmt = $conn->prepare("DELETE FROM tournament_participants WHERE participant_id=?");
+                    $stmt->bind_param('i', $id);
+                    if ($stmt->execute()) $count++;
+                }
+            }
+            $message = "Permanently deleted {$count} participants.";
+            $messageType = 'success';
+            logActivity($user['user_id'], "Bulk Delete Participants", "Permanently deleted {$count} participants (IDs: " . implode(',', $ids) . ")");
         }
     }
 
@@ -1975,6 +2114,8 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
 // ── Navigation ──
 function showPage(page, el) {
+    // Clear any active bulk selection when switching pages
+    if (window.BulkManager) window.BulkManager.init('');
     // ── Role-Based Access Check ──
     const userRole = '<?= $user['role'] ?>';
     const restricted = ['consoles', 'activity_logs', 'blocked_dates', 'settings'];
@@ -2090,10 +2231,15 @@ var _currentSection = 'dashboard';
     if (topbarLeft) topbarLeft.appendChild(dot);
 
     function isModalOpen() {
+        // Prevent refresh if items are selected for bulk action
+        if (window.BulkManager && window.BulkManager.selectedIds.length > 0) return true;
+
         // Check any visible modal - don't refresh while admin is interacting
         var modals = document.querySelectorAll('.modal, [id$="Modal"], [id*="modal"]');
         for (var i = 0; i < modals.length; i++) {
-            var s = modals[i].style;
+            var m = modals[i];
+            if (m.classList.contains('active')) return true;
+            var s = window.getComputedStyle(m);
             if (s.display === 'flex' || s.display === 'block') return true;
         }
         return false;
@@ -2104,15 +2250,35 @@ var _currentSection = 'dashboard';
         return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
     }
 
-    function refreshSection() {
-        var section = _currentSection;
+    function refreshSection(sectionOverride) {
+        var section = sectionOverride || _currentSection;
         if (!refreshable.includes(section)) return;
-        if (isModalOpen() || isInputFocused()) return; // don't interrupt user
-        if (_refreshInFlight) return; // prevent request pile-ups when server/session is slow
+        
+        // When forcing a refresh (override), we skip modal/input checks
+        if (!sectionOverride && (isModalOpen() || isInputFocused())) return; 
+        
+        if (_refreshInFlight) return; // prevent request pile-ups
 
-        // Dim dot while fetching
         dot.style.background = '#888';
         _refreshInFlight = true;
+
+        var container = document.getElementById(section);
+        if (!container) {
+            _refreshInFlight = false;
+            return;
+        }
+
+        // ── Preserve UI State (Filters, Search, etc.) ──
+        // We find all "admin search bar" inputs and selects within this section.
+        var stateMap = {};
+        container.querySelectorAll('.asb-input, .asb-select').forEach(function(el) {
+            if (el.id) {
+                stateMap[el.id] = {
+                    value: el.value,
+                    focused: (document.activeElement === el)
+                };
+            }
+        });
 
         fetch('ajax/live_section.php?section=' + encodeURIComponent(section), { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
@@ -2120,27 +2286,38 @@ var _currentSection = 'dashboard';
                 dot.style.background = '#20c8a1';
                 if (!data.html) return;
 
-                var container = document.getElementById(section);
-                if (!container) return;
+                // When forcing refresh, we still avoid replacing if input is focused to be safe
+                // (Unless it's a specific manual override refresh)
+                if (!sectionOverride && isInputFocused()) return;
 
-                // Don't replace if user just opened a modal or focused an input
-                if (isModalOpen() || isInputFocused()) return;
-
-                // Replace inner content
                 container.innerHTML = data.html;
 
-                // Subtle flash to signal update
+                // ── Restore UI State ──
+                for (var id in stateMap) {
+                    var el = document.getElementById(id);
+                    if (el) {
+                        el.value = stateMap[id].value;
+                        // Trigger events so the filter logic (in sessions.php) re-runs on the new HTML
+                        var eventType = el.tagName === 'SELECT' ? 'change' : 'input';
+                        el.dispatchEvent(new Event(eventType));
+                        if (stateMap[id].focused) el.focus();
+                    }
+                }
+
                 container.classList.add('live-refreshing');
                 setTimeout(function() { container.classList.remove('live-refreshing'); }, 450);
             })
             .catch(function() {
-                dot.style.background = '#fb566b'; // red on error
+                dot.style.background = '#fb566b';
                 setTimeout(function() { dot.style.background = '#20c8a1'; }, 3000);
             })
             .finally(function() {
                 _refreshInFlight = false;
             });
     }
+
+    // Expose globally
+    window.gspotRefreshSection = refreshSection;
 
     // Start after 5s, then every 12s
     setTimeout(function() {
@@ -2738,6 +2915,12 @@ function onAdminControllerToggle() {
     recalcAdminControllerFee();
 }
 
+function getControllerFeeByMins(mins) {
+    if (mins <= 0) return 0;
+    // Rule: 5-34m = 10, 35-64m = 20, etc. (increment by 10 for every additional 30-minute block)
+    return Math.floor((mins + 25) / 30) * 10;
+}
+
 function _adminCtrlCostPreview(ctrl, mins) {
     const selId = ctrl === 1 ? 'controllerSelect' : 'controllerSelect2';
     const prevId = `adminCtrlCostPreview${ctrl}`;
@@ -2752,7 +2935,7 @@ function _adminCtrlCostPreview(ctrl, mins) {
     
     if (getControllerRentalMode(ctrl) === 'open_time') {
         if (rate > 0) {
-            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(225,225,245,.92);">Open Time controller: charged at session end for full elapsed time (&#8369;${rate.toFixed(2)}/hr), same timing structure as console open time.</span>`;
+            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(225,225,245,.92);">Open Time controller: charged at session end for full elapsed time (&#8369;${Math.round(rate)}/hr), same timing structure as console open time.</span>`;
             prev.style.display = 'block';
         } else {
             prev.style.display = 'none';
@@ -2760,7 +2943,8 @@ function _adminCtrlCostPreview(ctrl, mins) {
         return;
     }
     if (rate > 0 && mins > 0) {
-        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${rate.toFixed(2)}/hr &times; ${lbl} = <strong>&#8369;${(rate*mins/60).toFixed(2)}</strong>`;
+        const fee = getControllerFeeByMins(mins);
+        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${Math.round(rate)}/hr rule &times; ${lbl} = <strong>&#8369;${Math.round(fee)}</strong>`;
         prev.style.display = 'block';
     } else if (mins > 0) {
         prev.innerHTML = `<i class="fas fa-clock" style="margin-right:4px;"></i>Select a unit above to see cost.`;
@@ -2854,21 +3038,21 @@ function recalcAdminControllerFee() {
         if (sel1 && sel1.selectedIndex > 0) {
             rate1 = parseFloat(sel1.options[sel1.selectedIndex].dataset.rate) || 0;
             if (cm1 !== 'open_time' && mins1 > 0) {
-                totalFee += rate1 * (mins1 / 60);
+                totalFee += getControllerFeeByMins(mins1);
             }
         }
         if (count > 1 && sel2 && sel2.selectedIndex > 0) {
             const rate2 = parseFloat(sel2.options[sel2.selectedIndex].dataset.rate) || 0;
             if (cm2 !== 'open_time' && mins2 > 0) {
-                totalFee += rate2 * (mins2 / 60);
+                totalFee += getControllerFeeByMins(mins2);
             }
         }
     }
     
-    if (feeInput) feeInput.value = totalFee;
+    if (feeInput) feeInput.value = Math.round(totalFee);
     
     if (rateDisp) {
-        rateDisp.innerHTML = rate1 > 0 ? `+&#8369;${rate1.toFixed(2)}/hr` : '';
+        rateDisp.innerHTML = rate1 > 0 ? `+&#8369;${Math.round(rate1)}/hr` : '';
     }
     
     if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
@@ -3893,58 +4077,105 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
             // Per-controller rows
             html += '<div id="ctrlPerRowList" style="display:flex;flex-direction:column;gap:8px;">';
+            // Per-controller rows
+            html += '<div id="ctrlPerRowList" style="display:flex;flex-direction:column;gap:8px;">';
             activeCtrlRows.forEach(function(cr) {
-                const costLabel = cr.original_cost > 0 ? '₱' + cr.original_cost.toFixed(2) + ' booked' : 'Open Time';
-                html += '<div id="ctrlRow_' + cr.controller_id + '" style="display:flex;align-items:center;gap:10px;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:10px 14px;">'
-                      + '<i class="fas fa-gamepad" style="color:#8aa4e8;font-size:14px;flex-shrink:0;"></i>'
-                      + '<div style="flex:1;min-width:0;">'
-                      + '<div style="font-weight:700;color:#f0f0f0;font-size:13px;">' + cr.label + '</div>'
-                      + '<div style="font-size:11px;color:#888;margin-top:2px;">' + costLabel + '</div>'
-                      + '</div>'
-                      + '<button type="button" class="btn-sec btn-sm ctrl-single-end-btn" data-cid="' + cr.controller_id + '" style="white-space:nowrap;font-size:11px;padding:7px 12px;">'
-                      + '<i class="fas fa-hand-holding"></i> End Now'
-                      + '</button>'
+                // Real-time calculation
+                const rentedAt = new Date(cr.rented_at.replace(/-/g, "/"));
+                const elapsedMins = Math.max(0, Math.floor((Date.now() - rentedAt) / 60000));
+                const fee = Math.floor((elapsedMins + 25) / 30) * 10;
+                
+                const durH = Math.floor(elapsedMins / 60);
+                const durM = elapsedMins % 60;
+                const durStr = (durH > 0 ? durH + 'h ' : '') + durM + 'm';
+                const rentedStr = rentedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                const endedStr  = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+                html += '<div id="ctrlRow_' + cr.controller_id + '" style="display:flex;flex-direction:column;gap:10px;background:rgba(95,133,218,.07);border:1px solid rgba(95,133,218,.2);border-radius:10px;padding:12px 14px;">'
+                      + '  <div style="display:flex;align-items:center;gap:10px;">'
+                      + '    <i class="fas fa-gamepad" style="color:#8aa4e8;font-size:14px;flex-shrink:0;"></i>'
+                      + '    <div style="flex:1;min-width:0;">'
+                      + '      <div style="font-weight:700;color:#f0f0f0;font-size:13px;">' + cr.label + '</div>'
+                      + '      <div style="font-size:11px;color:#20c8a1;margin-top:2px;font-weight:600;">Actual fee: ₱' + fee + ' <span style="color:#666;font-weight:400;">(Used ' + durStr + ')</span></div>'
+                      + '    </div>'
+                      + '    <button type="button" class="btn-sec btn-sm ctrl-single-prepare-btn" '
+                      + '       data-cid="' + cr.controller_id + '" '
+                      + '       data-label="' + cr.label + '" '
+                      + '       data-rented="' + rentedStr + '" '
+                      + '       data-ended="' + endedStr + '" '
+                      + '       data-fee="' + fee + '" '
+                      + '       data-duration="' + durStr + '" '
+                      + '       style="white-space:nowrap;font-size:11px;padding:7px 12px;">'
+                      + '      <i class="fas fa-hand-holding"></i> End Now'
+                      + '    </button>'
+                      + '  </div>'
+                      + '  <div id="ctrlSummary_' + cr.controller_id + '" style="display:none; margin-top:5px; padding-top:10px; border-top:1px dashed rgba(255,255,255,.1);">'
+                      + '     <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; font-size:10px; color:#aaa; text-transform:uppercase;">'
+                      + '        <div>Rented At</div><div>Ended At</div>'
+                      + '        <div style="color:#eee; font-weight:600;">' + rentedStr + '</div><div style="color:#eee; font-weight:600;">' + endedStr + '</div>'
+                      + '     </div>'
+                      + '     <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">'
+                      + '        <button type="button" class="ctrl-single-cancel-btn" data-cid="' + cr.controller_id + '" style="background:none; border:none; color:#fb566b; font-size:11px; cursor:pointer; padding:0;">Cancel</button>'
+                      + '        <button type="button" class="btn-prim btn-sm ctrl-single-confirm-btn" data-cid="' + cr.controller_id + '" data-fee="' + fee + '" style="font-size:11px; padding:5px 15px;">Confirm End · ₱' + fee + '</button>'
+                      + '     </div>'
+                      + '  </div>'
                       + '</div>';
             });
             html += '</div>';
 
-            // "End ALL" shortcut only when > 1 active controller
-            if (activeCtrlRows.length > 1) {
-                html += '<button type="button" id="endAllCtrlBtn" class="btn-sec btn-sm" style="margin-top:10px;width:100%;font-size:11px;padding:7px 0;">'
-                      + '<i class="fas fa-hand-holding-heart"></i> End ALL controllers now'
-                      + '</button>';
-            }
+
 
             ctrlEarlyPanel.innerHTML = html;
 
             // Wire up per-controller buttons
-            ctrlEarlyPanel.querySelectorAll('.ctrl-single-end-btn').forEach(function(btn) {
+            ctrlEarlyPanel.querySelectorAll('.ctrl-single-prepare-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const cid = btn.dataset.cid;
+                    const summary = document.getElementById('ctrlSummary_' + cid);
+                    if (summary) {
+                        btn.style.display = 'none';
+                        summary.style.display = 'block';
+                    }
+                });
+            });
+
+            ctrlEarlyPanel.querySelectorAll('.ctrl-single-cancel-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const cid = btn.dataset.cid;
+                    const summary = document.getElementById('ctrlSummary_' + cid);
+                    const prepareBtn = ctrlEarlyPanel.querySelector('.ctrl-single-prepare-btn[data-cid="' + cid + '"]');
+                    if (summary && prepareBtn) {
+                        summary.style.display = 'none';
+                        prepareBtn.style.display = 'block';
+                    }
+                });
+            });
+
+            ctrlEarlyPanel.querySelectorAll('.ctrl-single-confirm-btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     const cid = parseInt(btn.dataset.cid, 10);
+                    const fee = btn.dataset.fee;
                     if (!cid) return;
+                    
                     btn.disabled = true;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    
                     const fd = new FormData();
                     fd.append('csrf_token', window.GSPOT_CSRF || '');
                     fd.append('session_id', String(sessionId));
                     fd.append('controller_id', String(cid));
+                    
                     fetch('ajax/end_single_controller_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
                         .then(function(r) { return r.json(); })
                         .then(function(data) {
                             const row = document.getElementById('ctrlRow_' + cid);
                             if (data.success) {
-                                const refund = parseFloat(data.refund_amount || 0);
                                 if (row) {
-                                    const refundBadge = refund > 0
-                                        ? '<span style="font-size:11px;background:rgba(251,86,107,.15);color:#fb566b;border:1px solid rgba(251,86,107,.3);border-radius:6px;padding:2px 8px;margin-left:8px;">'
-                                          + '<i class="fas fa-undo-alt" style="margin-right:3px;"></i>Refund ₱' + refund.toFixed(2) + '</span>'
-                                        : '';
                                     row.style.opacity = '0.5';
-                                    row.querySelector('.ctrl-single-end-btn').outerHTML =
-                                        '<span style="font-size:11px;color:#20c8a1;font-weight:700;white-space:nowrap;">'
-                                        + '<i class="fas fa-check-circle" style="margin-right:4px;"></i>Ended' + refundBadge + '</span>';
+                                    row.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:40px;width:100%;color:#20c8a1;font-weight:700;font-size:12px;">'
+                                                  + '<i class="fas fa-check-circle" style="margin-right:6px;"></i> Controller Ended & Payment Recorded</div>';
                                 }
-                                // Refresh the modal costs to reflect the new extras total
+                                // Refresh modal context after short delay
                                 let ctx = {};
                                 try { ctx = JSON.parse(endModalEl.dataset.endSessionCtx || '{}'); } catch(e) {}
                                 setTimeout(function() {
@@ -3954,17 +4185,17 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                                         ctx.upfrontPaid, ctx.reservationDownpayment,
                                         ctx.unlimitedRate, ctx.sourceReservationId
                                     );
-                                }, 600);
+                                }, 1500);
                             } else {
                                 btn.disabled = false;
-                                btn.innerHTML = '<i class="fas fa-hand-holding"></i> End Now';
-                                showInlineToast(data.message || 'Failed.', 'error');
+                                btn.innerHTML = 'Confirm End · ₱' + fee;
+                                alert(data.message || 'Failed.');
                             }
                         })
                         .catch(function() {
                             btn.disabled = false;
-                            btn.innerHTML = '<i class="fas fa-hand-holding"></i> End Now';
-                            showInlineToast('Network error.', 'error');
+                            btn.innerHTML = 'Confirm End · ₱' + fee;
+                            alert('Network error.');
                         });
                 });
             });
@@ -3973,8 +4204,55 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             const endAllBtn = document.getElementById('endAllCtrlBtn');
             if (endAllBtn) {
                 endAllBtn.addEventListener('click', function() {
-                    if (!confirm('End ALL controller add-ons now? Fees will be recalculated to elapsed session time and all controllers returned to available.')) return;
-                    gspotEndControllerRentalEarly(sessionId);
+                    // Recalculate fees at the exact moment of click
+                    const now = new Date();
+                    const endedStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                    
+                    const items = activeCtrlRows.map(function(cr) {
+                        const rentedAt = new Date(cr.rented_at.replace(/-/g, '/'));
+                        const elapsed  = Math.max(0, Math.floor((now - rentedAt) / 60000));
+                        const fee      = elapsed < 5 ? 0 : Math.floor((elapsed + 25) / 30) * 10;
+                        const h = Math.floor(elapsed / 60), m = elapsed % 60;
+                        const durStr = (h > 0 ? h + 'h ' : '') + m + 'm';
+                        const rentedStr = rentedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                        return { label: cr.label, fee: fee, durStr: durStr, rentedStr: rentedStr, elapsed: elapsed };
+                    });
+                    
+                    const totalFee = items.reduce(function(sum, it) { return sum + it.fee; }, 0);
+                    
+                    // Populate Payment Summary modal
+                    const set = function(elId, val) { const el = document.getElementById(elId); if (el) el.textContent = val; };
+                    set('ecs-controllers', items.length + 'x Controller' + (items.length > 1 ? 's' : ''));
+                    set('ecs-console', unitNumber);
+                    set('ecs-rented', items.length === 1 ? items[0].rentedStr : 'Multiple');
+                    set('ecs-ended', endedStr);
+                    set('ecs-duration', items.length === 1 ? items[0].durStr : '—');
+                    set('ecs-total-fee', '₱' + totalFee);
+                    
+                    // Show per-controller breakdown
+                    const breakdown = document.getElementById('ecs-breakdown');
+                    const breakdownList = document.getElementById('ecs-breakdown-list');
+                    if (breakdown && breakdownList) {
+                        breakdown.style.display = 'block';
+                        breakdownList.innerHTML = items.map(function(it) {
+                            return '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">' +
+                                   '  <span style="color:#aaa;"><i class="fas fa-gamepad" style="font-size:10px;margin-right:5px;"></i>' + it.label + ' <span style="color:#666;">(' + it.durStr + ')</span></span>' +
+                                   '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
+                                   '</div>';
+                        }).join('');
+                    }
+                    
+                    // Wire Confirm button to fire the AJAX end for ALL controllers
+                    const confirmBtn = document.getElementById('ecsConfirmBtn');
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End All · ₱' + totalFee;
+                        confirmBtn.onclick = function() {
+                            confirmEndControllerRental(sessionId, totalFee);
+                        };
+                    }
+                    
+                    openModal('endControllerSummary');
                 });
             }
 
@@ -3988,36 +4266,84 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 }
 
 /** Active Controller Rentals table + quick actions */
-function gspotEndControllerRentalEarly(sid) {
+function gspotEndControllerRentalEarly(sid, items) {
     const id = parseInt(sid, 10) || 0;
     if (!id) return;
-    if (!confirm('End controller add-on for this session now? Re-rates to elapsed time and returns controllers to available.')) {
-        return;
-    }
-    const fd = new FormData();
-    fd.append('csrf_token', window.GSPOT_CSRF || '');
-    fd.append('session_id', String(id));
-    fetch('ajax/end_controller_rental_early.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.success) {
-                if (typeof showInlineToast === 'function') {
-                    showInlineToast(data.message || 'Controller add-on ended.', 'success');
-                } else {
-                    alert(data.message || 'Done.');
-                }
-                location.reload();
-            } else {
-                if (typeof showInlineToast === 'function') {
-                    showInlineToast(data.message || 'Failed.', 'error');
-                } else {
-                    alert(data.message || 'Failed.');
-                }
+
+    // Find the row to get current data
+    const row = document.getElementById('cr-row-' + id);
+    if (!row) return;
+
+    const rentedTs = parseInt(row.getAttribute('data-start'), 10) || 0;
+    const qty      = parseInt(row.getAttribute('data-qty'), 10) || 1;
+    const consoleUnit = row.cells[2].innerText.trim();
+    const customer    = row.cells[1].innerText.trim();
+    const rentedStr   = row.cells[5].innerText.trim(); // Rented At column
+
+    if (!rentedTs) return;
+
+    const now = new Date();
+    const nowTs = Math.floor(now.getTime() / 1000);
+    const elapsedMins = Math.max(0, Math.floor((nowTs - rentedTs) / 60));
+
+    // Billing rule: floor((mins + 25) / 30) * 10 per controller
+    // 5-34m = 10, 35-64m = 20...
+    const feePerCtrl = Math.floor((elapsedMins + 25) / 30) * 10;
+    const totalFee   = items ? items.reduce((sum, it) => sum + it.fee, 0) : (qty * feePerCtrl);
+
+    // Formatting duration
+    const h = Math.floor(elapsedMins / 60);
+    const m = elapsedMins % 60;
+    const durStr = (h > 0 ? h + 'h ' : '') + m + 'm';
+
+    // Formatting current time
+    const endedStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    // Populate Modal
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('ecs-controllers', qty + 'x Controller' + (qty > 1 ? 's' : ''));
+    set('ecs-console', consoleUnit);
+    set('ecs-rented', rentedStr);
+    set('ecs-ended', endedStr);
+    set('ecs-duration', durStr);
+    set('ecs-total-fee', '₱' + totalFee);
+
+    // Breakdown display
+    const breakdown = document.getElementById('ecs-breakdown');
+    const breakdownList = document.getElementById('ecs-breakdown-list');
+    if (breakdown && breakdownList) {
+        if (items && items.length > 1) {
+            breakdown.style.display = 'block';
+            breakdownList.innerHTML = items.map(function(it) {
+                return '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
+                       '  <span style="color:#aaa;">' + it.label + '</span>' +
+                       '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
+                       '</div>';
+            }).join('');
+        } else if (!items && qty > 1) {
+            breakdown.style.display = 'block';
+            breakdownList.innerHTML = '';
+            for (let i=0; i<qty; i++) {
+                breakdownList.innerHTML += 
+                    '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
+                    '  <span style="color:#aaa;">Controller ' + (i+1) + '</span>' +
+                    '  <span style="color:#fff; font-weight:600;">₱' + feePerCtrl + '</span>' +
+                    '</div>';
             }
-        })
-        .catch(function () {
-            alert('Network error.');
-        });
+        } else {
+            breakdown.style.display = 'none';
+        }
+    }
+
+    // Update Confirm Button
+    const btn = document.getElementById('ecsConfirmBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End';
+        btn.onclick = function() { confirmEndControllerRental(id, totalFee); };
+    }
+
+    openModal('endControllerSummary');
 }
 
 /* ── Pay Modal (collect outstanding balance, session continues) ──────── */

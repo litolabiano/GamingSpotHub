@@ -197,50 +197,60 @@
 
         </div>
         
-        <div class="console-grid">
-        <?php foreach ($archivedConsoles as $con): ?>
-            <div class="console-card archived" style="opacity:0.8;border-color:rgba(251,86,107,.3);background:rgba(251,86,107,.05);">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-                    <?php
-                        $badgeClass = match($con['console_type']) { 'PS5' => 'ps5', 'PS4' => 'ps4', default => 'xbox' };
-                        $icon = match($con['console_type']) { 'PS5', 'PS4' => 'playstation', 'Xbox Controller' => 'gamepad', default => 'xbox' };
-                    ?>
-                    <span class="console-type-badge <?= $badgeClass ?>">
-                        <i class="fa-solid fa-<?= $icon ?>"></i> <?= $con['console_type'] ?>
-                    </span>
-                    <span class="badge gray">Archived</span>
-                </div>
-                <div class="console-unit"><?= htmlspecialchars($con['unit_number']) ?></div>
-                <div class="console-name"><?= htmlspecialchars($con['console_name']) ?></div>
-                <div class="console-rate"><i class="fas fa-peso-sign" style="font-size:11px;opacity:.7"></i> <?= number_format($con['hourly_rate'],2) ?>/hr</div>
-                
-                <div class="console-actions" style="margin-top:15px;display:flex;gap:8px;">
-                    <form method="POST" action="admin.php#consoles" style="flex:1;">
-                        <input type="hidden" name="action" value="update_console_status">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <input type="hidden" name="status" value="available">
-                        <button type="submit" class="btn-prim btn-sm" style="width:100%;" title="Restore Console">
-                            <i class="fas fa-undo"></i> Restore
-                        </button>
-
-                    </form>
-                    
-                    <form method="POST" action="admin.php#consoles" style="flex:1;" onsubmit="return confirm('WARNING: Permanently delete this console? This cannot be undone.')">
-                        <input type="hidden" name="action" value="delete_console">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
-                        <button type="submit" class="btn-dang btn-sm" style="width:100%;" title="Permanently Delete">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-
-                    </form>
-                </div>
-            </div>
-        <?php endforeach; ?>
-        <?php if(empty($archivedConsoles)): ?>
-            <div style="grid-column:1/-1;text-align:center;padding:40px;color:#888;background:rgba(255,255,255,.02);border-radius:12px;">No archived consoles found.</div>
-        <?php endif; ?>
+        <div style="overflow-x:auto; margin-top:10px;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>
+                        <th>Unit Number</th>
+                        <th>Console Name</th>
+                        <th>Console Type</th>
+                        <th>Hourly Rate</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($archivedConsoles as $con): ?>
+                    <tr>
+                        <td><input type="checkbox" class="bulk-check" data-id="<?= $con['console_id'] ?>" onclick="BulkManager.toggle(<?= $con['console_id'] ?>, this.checked)"></td>
+                        <td><strong style="color:#fff;"><?= htmlspecialchars($con['unit_number']) ?></strong></td>
+                        <td><?= htmlspecialchars($con['console_name']) ?></td>
+                        <td>
+                            <span style="background:rgba(95,133,218,.15);color:#5f85da;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;">
+                                <?= htmlspecialchars($con['console_type']) ?>
+                            </span>
+                        </td>
+                        <td style="color:#f1e1aa;font-weight:600;">₱<?= number_format($con['hourly_rate'], 2) ?></td>
+                        <td>
+                            <div style="display:flex;gap:5px;justify-content:flex-end;">
+                                <form method="POST" action="admin.php#consoles" style="display:inline;">
+                                    <input type="hidden" name="action" value="update_console_status">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
+                                    <input type="hidden" name="status" value="available">
+                                    <button type="submit" class="btn-sec btn-sm" title="Restore Console" style="padding:4px 8px;">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="admin.php#consoles" style="display:inline;" onsubmit="return confirm('WARNING: Permanently delete this console? This cannot be undone.')">
+                                    <input type="hidden" name="action" value="delete_console">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="console_id" value="<?= $con['console_id'] ?>">
+                                    <button type="submit" class="btn-dang btn-sm" title="Permanently Delete" style="padding:4px 8px;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if(empty($archivedConsoles)): ?>
+                    <tr>
+                        <td colspan="6" style="text-align:center;padding:40px;color:#888;">No archived consoles found.</td>
+                    </tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -316,7 +326,7 @@
                 <tbody>
                 <?php if (empty($allControllers)): ?>
                     <tr>
-                        <td colspan="6" style="text-align:center;padding:40px;color:#555;">
+                        <td colspan="7" style="text-align:center;padding:40px;color:#555;">
                             <i class="fa-solid fa-gamepad" style="font-size:28px;display:block;margin-bottom:10px;opacity:.3;"></i>
                             No controllers found.
                         </td>
@@ -396,64 +406,56 @@
             if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
             unset($_res);
         ?>
-        <div style="margin-top:20px;">
-            <button onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'block':'none'"
-                    style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;padding:0;">
-                <i class="fas fa-archive" style="margin-right:5px;"></i>
-                Show <?= count($archivedControllers) ?> archived controller(s)
-            </button>
-            <div style="display:none;margin-top:12px;">
-                <?php if (empty($archivedControllers)): ?>
-                    <div style="padding:20px;text-align:center;color:#666;background:rgba(255,255,255,.02);border-radius:8px;border:1px dashed rgba(255,255,255,.1);">
-                        No controllers have been archived yet.
-                    </div>
-                <?php else: ?>
-                <table class="data-table" style="width:100%;opacity:.6;border-collapse:collapse;">
-                    <thead>
-                        <tr style="background:rgba(10,33,81,.6);">
-                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Unit #</th>
-                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Name</th>
-                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Rate</th>
-                            <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($archivedControllers as $ctrl): ?>
-                        <tr style="border-top:1px solid rgba(255,255,255,.05);">
-                            <td style="padding:12px 16px;font-weight:700;color:#f1a83c;"><?= htmlspecialchars($ctrl['unit_number']) ?></td>
-                            <td style="padding:12px 16px;color:#f0f0f0;"><?= htmlspecialchars($ctrl['controller_type'] ?? 'Unknown') ?></td>
-                            <td style="padding:12px 16px;color:#20c8a1;">₱<?= number_format($ctrl['hourly_rate'], 2) ?>/hr</td>
-                            <td style="padding:12px 16px;">
-                                <div style="display:flex;gap:6px;">
-                                    <form method="POST" action="admin.php#consoles" style="display:inline;">
-                                        <?= csrfField() ?>
-                                        <input type="hidden" name="action" value="update_controller_status">
-                                        <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
-                                        <input type="hidden" name="status" value="available">
-                                        <button type="submit" class="btn-prim btn-sm" style="padding:5px 12px; font-size:12px;">
-                                            <i class="fas fa-undo"></i> Restore
-                                        </button>
-
-                                    </form>
-                                    <?php if ($user['role'] === 'owner'): ?>
-                                    <form method="POST" action="admin.php#consoles" style="display:inline;"
-                                          onsubmit="return confirm('Permanently delete this controller? This cannot be undone.')">
-                                        <?= csrfField() ?>
-                                        <input type="hidden" name="action" value="delete_controller">
-                                        <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
-                                        <button type="submit" class="btn-dang btn-sm" style="padding:5px 10px; font-size:12px;">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-
-                                    </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+        <div id="archivedControllersSection" style="display:none;margin-top:20px;">
+            <div style="background:rgba(251,86,107,.05);border:1px solid rgba(251,86,107,.15);border-radius:12px;padding:20px;">
+                <h3 style="margin:0 0 15px;color:#fb566b;font-size:16px;">Archived Controllers</h3>
+                <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"><input type="checkbox" class="bulk-master" onclick="BulkManager.toggleAll(this.checked)"></th>
+                        <th>Unit Number</th>
+                        <th>Type</th>
+                        <th>Rate</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($archivedControllers as $ctrl): ?>
+                    <tr>
+                        <td><input type="checkbox" class="bulk-check" data-id="<?= $ctrl['controller_id'] ?>" onclick="BulkManager.toggle(<?= $ctrl['controller_id'] ?>, this.checked)"></td>
+                        <td><strong style="color:#fff;"><?= htmlspecialchars($ctrl['unit_number']) ?></strong></td>
+                        <td><?= htmlspecialchars($ctrl['controller_type']) ?></td>
+                        <td style="color:#f1e1aa;font-weight:600;">₱<?= number_format($ctrl['hourly_rate'], 2) ?></td>
+                        <td>
+                            <div style="display:flex;gap:5px;justify-content:flex-end;">
+                                <form method="POST" action="admin.php#consoles" style="display:inline;">
+                                    <input type="hidden" name="action" value="update_controller_status">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                    <input type="hidden" name="status" value="available">
+                                    <button type="submit" class="btn-sec btn-sm" title="Restore Controller" style="padding:4px 8px;">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="admin.php#consoles" style="display:inline;" onsubmit="return confirm('WARNING: Permanently delete this controller? This cannot be undone.')">
+                                    <input type="hidden" name="action" value="delete_controller">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="controller_id" value="<?= $ctrl['controller_id'] ?>">
+                                    <button type="submit" class="btn-dang btn-sm" title="Permanently Delete" style="padding:4px 8px;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if(empty($archivedControllers)): ?>
+                    <tr>
+                        <td colspan="5" style="text-align:center;padding:40px;color:#888;">No archived controllers found.</td>
+                    </tr>
                 <?php endif; ?>
+                </tbody>
+            </table>
             </div>
         </div>
     </div>
@@ -600,10 +602,16 @@ function openEditConsoleModal(id, name, type, unit, controllerCount) {
 
 <script>
 function toggleArchiveSection(showArchive) {
-    document.getElementById('activeConsolesSection').style.display = showArchive ? 'none' : 'block';
-    const ctrlSection = document.getElementById('activeControllersSection');
-    if(ctrlSection) ctrlSection.style.display = showArchive ? 'none' : 'block';
-    document.getElementById('archivedConsolesSection').style.display = showArchive ? 'block' : 'none';
+    document.getElementById('activeConsolesSection').style.display    = showArchive ? 'none' : 'block';
+    document.getElementById('activeControllersSection').style.display = showArchive ? 'none' : 'block';
+    document.getElementById('archivedConsolesSection').style.display   = showArchive ? 'block' : 'none';
+    document.getElementById('archivedControllersSection').style.display = showArchive ? 'block' : 'none';
+    
+    if (showArchive) {
+        BulkManager.init('consoles');
+    } else {
+        BulkManager.init('');
+    }
 }
 
 /* ── Consoles live search + status filter + pagination ─────────────────────── */
@@ -721,6 +729,7 @@ function toggleArchiveSection(showArchive) {
                     <?php foreach ($archivedConsoleTypes as $ct): ?>
                         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
                             <div style="display:flex;align-items:center;gap:10px;">
+                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['type_id'] ?>, this.checked)">
                                 <i class="fas fa-desktop" style="color:#888;font-size:12px;"></i>
                                 <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
                             </div>
@@ -807,6 +816,7 @@ function toggleArchiveSection(showArchive) {
                     <?php foreach ($archivedCtrlTypes as $ct): ?>
                         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
                             <div style="display:flex;align-items:center;gap:10px;">
+                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['type_id'] ?>, this.checked)">
                                 <i class="fas fa-gamepad" style="color:#888;font-size:12px;"></i>
                                 <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
                             </div>
@@ -851,6 +861,13 @@ function switchTypeTab(tab) {
     document.getElementById('tabConsole').style.color         = tab === 'console'    ? '#20c8a1' : '#888';
     document.getElementById('tabController').style.background = tab === 'controller' ? 'rgba(95,133,218,.2)'   : 'rgba(255,255,255,.04)';
     document.getElementById('tabController').style.color      = tab === 'controller' ? '#8aa4e8' : '#888';
+    
+    // Initialize BulkManager for the specific type
+    if (tab === 'console') {
+        BulkManager.init('console_types');
+    } else {
+        BulkManager.init('controller_types');
+    }
 }
 
 function promptEditConsoleType(id, currentName, currentRate) {

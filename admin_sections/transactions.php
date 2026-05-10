@@ -14,7 +14,7 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-value">₱<?= number_format($finStats['today_revenue'] ?? 0, 0) ?></div>
                     <div class="stat-label">Today's Revenue</div>
                 </div>
                 <div class="stat-icon revenue"><i class="fas fa-peso-sign"></i></div>
@@ -24,7 +24,7 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-value">₱<?= number_format($finStats['monthly_revenue'] ?? 0, 0) ?></div>
                     <div class="stat-label">This Month's Revenue</div>
                 </div>
                 <div class="stat-icon sessions"><i class="fas fa-calendar-alt"></i></div>
@@ -34,7 +34,7 @@
         <div class="stat-card">
             <div class="stat-card-header">
                 <div>
-                    <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 2) ?></div>
+                    <div class="stat-value">₱<?= number_format($finStats['total_revenue'] ?? 0, 0) ?></div>
                     <div class="stat-label">All-Time Revenue</div>
                 </div>
                 <div class="stat-icon bookings"><i class="fas fa-chart-bar"></i></div>
@@ -197,7 +197,7 @@
                 $pmSrcId  = $t['paymongo_source_id']  ?? null;
                 $pmId     = $pmPayId ?: $pmSrcId;  // prefer payment_id, fallback to session_id
             ?>
-            <tr>
+            <tr onclick="openTransactionDetailModal(<?= (int)$t['transaction_id'] ?>)" style="cursor:pointer;">
                 <td data-label="#">#<?= $t['transaction_id'] ?></td>
                 <td data-label="Customer"><?= htmlspecialchars($t['customer_name']) ?></td>
                 <td data-label="Console"><?= htmlspecialchars($t['unit_number']) ?></td>
@@ -209,7 +209,7 @@
                     default       => ucfirst($t['rental_mode'])
                 } ?></td>
                 <td data-label="Amount" style="color:<?= (float)$t['amount'] < 0 ? '#fb566b' : '#20c8a1' ?>;font-weight:700">
-                    <?= (float)$t['amount'] < 0 ? '-' : '' ?>₱<?= number_format(abs((float)$t['amount']), 2) ?>
+                    <?= (float)$t['amount'] < 0 ? '-' : '' ?>₱<?= number_format(abs((float)$t['amount']), 0) ?>
                 </td>
                 <td data-label="Method"><span class="badge pending"><?= ucfirst($t['payment_method']) ?></span></td>
                 <td data-label="PayMongo ID" style="font-size:11px;">
