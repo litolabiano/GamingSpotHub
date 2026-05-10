@@ -612,7 +612,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ARCHIVE CONTROLLER TYPE
     elseif ($action === 'archive_controller_type') {
-        $typeId = (int)($_POST['console_type_id'] ?? 0);
+        $typeId = (int)($_POST['controller_type_id'] ?? 0);
         if ($typeId && archiveControllerType($typeId)) {
             $message = 'Controller type archived successfully.';
             $messageType = 'success';
@@ -625,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // RESTORE CONTROLLER TYPE
     elseif ($action === 'restore_controller_type') {
-        $typeId = (int)($_POST['console_type_id'] ?? 0);
+        $typeId = (int)($_POST['controller_type_id'] ?? 0);
         if ($typeId && restoreControllerType($typeId)) {
             $message = 'Controller type restored successfully.';
             $messageType = 'success';
@@ -638,7 +638,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // PERMANENTLY DELETE CONTROLLER TYPE
     elseif ($action === 'delete_controller_type') {
-        $typeId = (int)($_POST['console_type_id'] ?? 0);
+        $typeId = (int)($_POST['controller_type_id'] ?? 0);
         if ($typeId && deleteControllerType($typeId)) {
             $message = 'Controller type permanently removed.';
             $messageType = 'success';
@@ -1369,7 +1369,7 @@ $archivedControllers = [];
 $_res = $conn->query("
     SELECT c.*, ct.type_name AS controller_type 
     FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id 
     WHERE c.status != 'archived' 
     ORDER BY c.unit_number
 ");
@@ -1378,7 +1378,7 @@ if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_res = $conn->query("
     SELECT c.*, ct.type_name AS controller_type 
     FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id 
     WHERE c.status = 'archived' 
     ORDER BY c.unit_number
 ");
@@ -1388,7 +1388,7 @@ if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_avRes = $conn->query("
     SELECT c.controller_id, ct.type_name AS controller_type, c.unit_number 
     FROM controllers c
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id 
     WHERE c.status = 'available' 
     ORDER BY c.unit_number
 ");

@@ -59,9 +59,9 @@ $consoles = $consolesResult ? $consolesResult->fetch_all(MYSQLI_ASSOC) : [];
 // Controllers (needed by consoles section)
 $allControllers      = [];
 $archivedControllers = [];
-$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id WHERE c.status != 'archived' ORDER BY c.unit_number");
+$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id WHERE c.status != 'archived' ORDER BY c.unit_number");
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
-$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id WHERE c.status = 'archived' ORDER BY c.unit_number");
+$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id WHERE c.status = 'archived' ORDER BY c.unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 unset($_res);
 

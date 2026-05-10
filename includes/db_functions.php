@@ -2083,9 +2083,9 @@ function getUpcomingReservations($days = null) {
                LEFT JOIN consoles c ON r.console_id = c.console_id
                LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
                LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.controller_type_id
                LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.controller_type_id
               WHERE r.reserved_date BETWEEN ? AND ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2103,9 +2103,9 @@ function getUpcomingReservations($days = null) {
                LEFT JOIN consoles c ON r.console_id = c.console_id
                LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
                LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.controller_type_id
                LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.controller_type_id
               WHERE r.reserved_date >= ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2129,9 +2129,9 @@ function getMyReservations($user_id) {
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
            LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.controller_type_id
            LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.controller_type_id
           WHERE r.user_id = ?
           ORDER BY r.reserved_date DESC, r.reserved_time DESC"
     );
@@ -2171,9 +2171,9 @@ function getCancelledReservations() {
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
            LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.controller_type_id
            LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.controller_type_id
            LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
           WHERE r.status IN ('cancelled', 'no_show')
           ORDER BY r.updated_at DESC"
@@ -2329,7 +2329,7 @@ function addControllerType(string $typeName, ?int $consoleTypeId = null): bool {
 /** Archive a controller type. */
 function archiveControllerType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE Controller_type_id = ?");
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE controller_type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2337,7 +2337,7 @@ function archiveControllerType(int $typeId): bool {
 /** Restore an archived controller type. */
 function restoreControllerType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE Controller_type_id = ?");
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE controller_type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2348,8 +2348,8 @@ function restoreControllerType(int $typeId): bool {
  */
 function deleteControllerType(int $typeId): bool {
     global $conn;
-    $conn->query("UPDATE controllers SET console_type_id = NULL WHERE console_type_id = $typeId");
-    $stmt = $conn->prepare("DELETE FROM controller_types WHERE Controller_type_id = ?");
+    $conn->query("UPDATE controllers SET controller_type_id = NULL WHERE controller_type_id = $typeId");
+    $stmt = $conn->prepare("DELETE FROM controller_types WHERE controller_type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }

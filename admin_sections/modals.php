@@ -539,7 +539,7 @@ $ctrlRes = $conn->query(
     "SELECT cs.type_name AS console_type,
             c.controller_id, c.unit_number, c.hourly_rate
        FROM controllers c
-       JOIN controller_types ct ON ct.Controller_type_id = c.controller_type_id
+       JOIN controller_types ct ON ct.controller_type_id = c.controller_type_id
        JOIN console_types cs ON cs.console_type_id = ct.console_type_id
        WHERE c.status = 'available'
        ORDER BY c.unit_number ASC"

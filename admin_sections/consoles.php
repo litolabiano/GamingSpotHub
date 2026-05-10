@@ -74,7 +74,7 @@
                     // Count available controllers for this console type
                     $ctrlCountQ = $conn->prepare(
                         "SELECT COUNT(*) AS n FROM controllers ct
-                         JOIN controller_types ctt ON ct.controller_type_id = ctt.Controller_type_id
+                         JOIN controller_types ctt ON ct.controller_type_id = ctt.controller_type_id
                          WHERE ct.status = 'available'
                            AND ctt.console_type_id = ?"
                     );
@@ -261,7 +261,7 @@
         $_res = $conn->query("
             SELECT c.*, ct.type_name AS controller_type, cs.type_name AS console_type 
             FROM controllers c 
-            LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
+            LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id 
             LEFT JOIN console_types cs ON ct.console_type_id = cs.console_type_id 
             WHERE c.status != 'archived' 
             ORDER BY c.unit_number
@@ -398,7 +398,7 @@
             $_res = $conn->query("
                 SELECT c.*, ct.type_name AS controller_type, cs.type_name AS console_type 
                 FROM controllers c 
-                LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
+                LEFT JOIN controller_types ct ON c.controller_type_id = ct.controller_type_id 
                 LEFT JOIN console_types cs ON ct.console_type_id = cs.console_type_id 
                 WHERE c.status = 'archived' 
                 ORDER BY c.unit_number
@@ -565,7 +565,7 @@
         <form method="POST" action="admin.php#consoles" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';">
             <input type="hidden" name="action" value="edit_console_type">
             <?= csrfField() ?>
-            <input type="hidden" name="type_id" id="editConsoleTypeId">
+            <input type="hidden" name="console_type_id" id="editConsoleTypeId">
             <div class="modal-body">
                 <div class="form-group">
                     <label>Console Type Name</label>
@@ -711,7 +711,7 @@ function toggleArchiveSection(showArchive) {
                                     <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this console type? All associated consoles will be moved to ARCHIVE.');">
                                         <input type="hidden" name="action" value="archive_console_type">
                                         <?= csrfField() ?>
-                                        <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                        <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
                                         <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
                                             <i class="fas fa-archive"></i>
                                         </button>
@@ -737,13 +737,13 @@ function toggleArchiveSection(showArchive) {
                                 <form method="POST" action="admin.php#consoles">
                                     <input type="hidden" name="action" value="restore_console_type">
                                     <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                    <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
                                     <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
                                 </form>
                                 <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
                                     <input type="hidden" name="action" value="delete_console_type">
                                     <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                    <input type="hidden" name="console_type_id" value="<?= $ct['console_type_id'] ?>">
                                     <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
                                 </form>
                             </div>
@@ -799,7 +799,7 @@ function toggleArchiveSection(showArchive) {
                                 <form method="POST" action="admin.php#consoles" onsubmit="return confirm('Archive this controller type?')">
                                     <input type="hidden" name="action" value="archive_controller_type">
                                     <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                    <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
                                     <button type="submit" title="Archive Type" style="background:none;border:none;color:#f1a83c;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
                                         <i class="fas fa-archive"></i>
                                     </button>
@@ -816,7 +816,7 @@ function toggleArchiveSection(showArchive) {
                     <?php foreach ($archivedCtrlTypes as $ct): ?>
                         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.03);opacity:0.8;">
                             <div style="display:flex;align-items:center;gap:10px;">
-                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['console_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['console_type_id'] ?>, this.checked)">
+                                <input type="checkbox" class="bulk-check" data-id="<?= $ct['controller_type_id'] ?>" onclick="BulkManager.toggle(<?= $ct['controller_type_id'] ?>, this.checked)">
                                 <i class="fas fa-gamepad" style="color:#888;font-size:12px;"></i>
                                 <span style="font-weight:500;font-size:13px;color:#aaa;"><?= htmlspecialchars($ct['type_name']) ?></span>
                             </div>
@@ -824,13 +824,13 @@ function toggleArchiveSection(showArchive) {
                                 <form method="POST" action="admin.php#consoles">
                                     <input type="hidden" name="action" value="restore_controller_type">
                                     <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                    <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
                                     <button type="submit" title="Restore" style="background:none;border:none;color:#20c8a1;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-undo"></i></button>
                                 </form>
                                 <form method="POST" action="admin.php#consoles" onsubmit="return confirm('PERMANENTLY DELETE this type? This is irreversible.');">
                                     <input type="hidden" name="action" value="delete_controller_type">
                                     <?= csrfField() ?>
-                                    <input type="hidden" name="type_id" value="<?= $ct['console_type_id'] ?>">
+                                    <input type="hidden" name="controller_type_id" value="<?= $ct['controller_type_id'] ?>">
                                     <button type="submit" title="Delete Permanently" style="background:none;border:none;color:#fb566b;cursor:pointer;font-size:14px;" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'"><i class="fas fa-trash-alt"></i></button>
                                 </form>
                             </div>
