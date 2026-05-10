@@ -446,8 +446,8 @@ $ctrlRes = $conn->query(
     "SELECT cs.type_name AS console_type,
             c.controller_id, c.unit_number, c.hourly_rate
        FROM controllers c
-       JOIN controller_types ct ON ct.Controller_type_id = c.controller_type_id
-       JOIN console_types cs ON cs.console_type_id = ct.console_type_id
+       JOIN controller_types ct ON ct.type_id = c.controller_type_id
+       JOIN console_types cs ON cs.type_id = ct.console_type_id
        WHERE c.status = 'available'
        ORDER BY c.unit_number ASC"
 );
@@ -2284,7 +2284,7 @@ function adminDpChange() {
                             onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
                         <option value="" disabled selected>— Select Type —</option>
                         <?php foreach ($controllerTypes as $ct): ?>
-                            <option value="<?= $ct['Controller_type_id'] ?>"
+                            <option value="<?= $ct['type_id'] ?>"
                                     data-name="<?= htmlspecialchars($ct['type_name']) ?>">
                                 <?= htmlspecialchars($ct['type_name']) ?>
                                 <?php if (!empty($ct['parent_console_name'])): ?>

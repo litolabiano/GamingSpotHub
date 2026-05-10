@@ -18,7 +18,7 @@ $isOpen = ($oTime < $cTime) ? ($nowTime >= $oTime && $nowTime < $cTime) : ($nowT
 $statusText = $isOpen ? 'Now Open' : 'Currently Closed';
 $displayHours = date('gA', strtotime($openTime)) . ' – ' . date('gA', strtotime($closeTime));
 
-$r = $conn->query("SELECT DISTINCT ct.type_name AS console_type FROM consoles c JOIN console_types ct ON c.console_type_id = ct.console_type_id WHERE c.status != 'archived' ORDER BY ct.type_name");
+$r = $conn->query("SELECT DISTINCT ct.type_name AS console_type FROM consoles c JOIN console_types ct ON c.console_type_id = ct.type_id WHERE c.status != 'archived' ORDER BY ct.type_name");
 $consoleTypes = []; while ($row = $r->fetch_assoc()) $consoleTypes[] = $row['console_type'];
 if (count($consoleTypes) > 1) { $last = array_pop($consoleTypes); $consoleList = implode(', ', $consoleTypes).' & '.$last; }
 else $consoleList = $consoleTypes[0] ?? 'console';

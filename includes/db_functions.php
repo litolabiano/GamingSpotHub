@@ -214,7 +214,7 @@ function getConsoles($status = null, $type = null) {
     global $conn;
     $sql = "SELECT c.*, ct.type_name AS console_type, ct.hourly_rate
             FROM consoles c 
-            LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id 
+            LEFT JOIN console_types ct ON c.console_type_id = ct.type_id 
             WHERE 1=1";
     $params = [];
     $types = "";
@@ -295,7 +295,7 @@ function deleteConsole($console_id) {
     $stmt = $conn->prepare("
         SELECT c.console_name, c.unit_number, ct.type_name 
         FROM consoles c 
-        LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id 
+        LEFT JOIN console_types ct ON c.console_type_id = ct.type_id 
         WHERE c.console_id = ?
     ");
     $stmt->bind_param("i", $console_id);
@@ -380,7 +380,7 @@ function startSession($user_id, $console_id, $rental_mode, $created_by, $planned
     // Get the console's hourly rate from console_types (via FK)
     $stmt = $conn->prepare(
         "SELECT ct.hourly_rate FROM consoles c
-         JOIN console_types ct ON c.console_type_id = ct.console_type_id
+         JOIN console_types ct ON c.console_type_id = ct.type_id
          WHERE c.console_id = ? AND c.status = 'available'"
     );
     $stmt->bind_param("i", $console_id);
@@ -1505,7 +1505,7 @@ function getActiveSessions() {
             FROM gaming_sessions gs
             JOIN users u ON gs.user_id = u.user_id
             JOIN consoles c ON gs.console_id = c.console_id
-            LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
+            LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
             LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
             WHERE gs.status = 'active'
             ORDER BY gs.start_time DESC";
@@ -1522,7 +1522,7 @@ function getUserSessionHistory($user_id, $limit = 20) {
         "SELECT gs.*, c.console_name, ct.type_name AS console_type
          FROM gaming_sessions gs
          JOIN consoles c      ON gs.console_id    = c.console_id
-         LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
+         LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
          WHERE gs.user_id = ?
          ORDER BY gs.start_time DESC
          LIMIT ?"
@@ -1714,7 +1714,7 @@ function getConsoleUsageReport($date_from, $date_to) {
                 COALESCE(SUM(gs.duration_minutes), 0) AS total_minutes,
                 COALESCE(SUM(gs.total_cost), 0) AS total_revenue
          FROM consoles c
-         LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
+         LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
          LEFT JOIN gaming_sessions gs ON c.console_id = gs.console_id
               AND gs.status = 'completed'
               AND DATE(gs.start_time) BETWEEN ? AND ?
@@ -1846,14 +1846,14 @@ function createReservation(
     $controller_fee    = $with_controller ? (float)$controller_fee : 0.0;
 
     // Lookup console_type_id
-    $ctQ = $conn->prepare("SELECT console_type_id FROM console_types WHERE type_name = ? AND is_archived = 0");
+    $ctQ = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0");
     $ctQ->bind_param('s', $console_type);
     $ctQ->execute();
     $ctRow = $ctQ->get_result()->fetch_assoc();
     if (!$ctRow) {
         return ['success' => false, 'message' => 'Invalid console type: ' . htmlspecialchars($console_type)];
     }
-    $console_type_id = (int)$ctRow['console_type_id'];
+    $console_type_id = (int)$ctRow['type_id'];
 
     $stmt = $conn->prepare(
         "INSERT INTO reservations
@@ -2130,11 +2130,11 @@ function getUpcomingReservations($days = null) {
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
-               LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+               LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
                LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
                LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
               WHERE r.reserved_date BETWEEN ? AND ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2150,11 +2150,11 @@ function getUpcomingReservations($days = null) {
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
-               LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+               LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
                LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
                LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
               WHERE r.reserved_date >= ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2176,11 +2176,11 @@ function getMyReservations($user_id) {
                 ctrl2.unit_number AS ctrl2_unit, ctrl2_t.type_name AS ctrl2_type
            FROM reservations r
            LEFT JOIN consoles c ON r.console_id = c.console_id
-           LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+           LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
            LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
            LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
           WHERE r.user_id = ?
           ORDER BY r.reserved_date DESC, r.reserved_time DESC"
     );
@@ -2218,11 +2218,11 @@ function getCancelledReservations() {
            FROM reservations r
            JOIN users u ON r.user_id = u.user_id
            LEFT JOIN consoles c ON r.console_id = c.console_id
-           LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+           LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
            LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
-           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.Controller_type_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
            LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
-           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.Controller_type_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
            LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
           WHERE r.status IN ('cancelled', 'no_show')
           ORDER BY r.updated_at DESC"
@@ -2304,7 +2304,7 @@ function archiveConsoleType(int $typeId): bool {
     global $conn;
     $conn->begin_transaction();
     try {
-        $stmtName = $conn->prepare("SELECT type_name FROM console_types WHERE console_type_id = ?");
+        $stmtName = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
         $stmtName->bind_param("i", $typeId);
         $stmtName->execute();
         $row = $stmtName->get_result()->fetch_assoc();
@@ -2312,7 +2312,7 @@ function archiveConsoleType(int $typeId): bool {
 
         $typeName = $row['type_name'];
         $conn->prepare("UPDATE consoles SET status = 'archived' WHERE console_type_id = ?")->execute([$typeId]) ;
-        $s = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE console_type_id = ?");
+        $s = $conn->prepare("UPDATE console_types SET is_archived = 1 WHERE type_id = ?");
         $s->bind_param("i", $typeId); $s->execute();
         $conn->commit(); return true;
     } catch (Exception $e) { $conn->rollback(); return false; }
@@ -2321,7 +2321,7 @@ function archiveConsoleType(int $typeId): bool {
 /** Restore an archived console type. */
 function restoreConsoleType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE console_type_id = ?");
+    $stmt = $conn->prepare("UPDATE console_types SET is_archived = 0 WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2329,7 +2329,7 @@ function restoreConsoleType(int $typeId): bool {
 /** Permanently delete a console type. */
 function deleteConsoleType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("DELETE FROM console_types WHERE console_type_id = ?");
+    $stmt = $conn->prepare("DELETE FROM console_types WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2357,7 +2357,7 @@ function getControllerTypes(bool $onlyActive = true, ?int $consoleTypeId = null)
     $res = $conn->query(
         "SELECT ct.*, c.type_name AS parent_console_name
          FROM controller_types ct
-         LEFT JOIN console_types c ON c.console_type_id = ct.console_type_id
+         LEFT JOIN console_types c ON c.type_id = ct.console_type_id
          $where
          ORDER BY ct.type_name ASC"
     );
@@ -2378,7 +2378,7 @@ function addControllerType(string $typeName, ?int $consoleTypeId = null): bool {
 /** Archive a controller type. */
 function archiveControllerType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE console_type_id = ?");
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 1 WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2386,7 +2386,7 @@ function archiveControllerType(int $typeId): bool {
 /** Restore an archived controller type. */
 function restoreControllerType(int $typeId): bool {
     global $conn;
-    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE console_type_id = ?");
+    $stmt = $conn->prepare("UPDATE controller_types SET is_archived = 0 WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }
@@ -2398,7 +2398,7 @@ function restoreControllerType(int $typeId): bool {
 function deleteControllerType(int $typeId): bool {
     global $conn;
     $conn->query("UPDATE controllers SET console_type_id = NULL WHERE console_type_id = $typeId");
-    $stmt = $conn->prepare("DELETE FROM controller_types WHERE console_type_id = ?");
+    $stmt = $conn->prepare("DELETE FROM controller_types WHERE type_id = ?");
     $stmt->bind_param("i", $typeId);
     return $stmt->execute();
 }

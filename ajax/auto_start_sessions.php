@@ -51,7 +51,7 @@ $stmt = $conn->prepare(
             r.rental_mode, r.planned_minutes, r.reserved_date, r.reserved_time,
             r.downpayment_amount
        FROM reservations r
-       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.status = 'reserved'
         AND CONCAT(r.reserved_date, ' ', r.reserved_time) <= ?
         AND CONCAT(r.reserved_date, ' ', r.reserved_time) >= ?

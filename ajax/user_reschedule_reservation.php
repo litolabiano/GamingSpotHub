@@ -83,7 +83,7 @@ $stmt = $conn->prepare(
             r.reserved_date, r.reserved_time, r.status, r.downpayment_amount,
             r.controller_id, r.controller_id_2
        FROM reservations r
-       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.reservation_id = ? AND r.user_id = ?"
 );
 $stmt->bind_param('ii', $res_id, $uid);
@@ -125,7 +125,7 @@ $newSlotEnd   = $newSlotStart + 7200; // 2h safety window for open/unlimited
 
 $avail = $conn->prepare(
     "SELECT r.reservation_id FROM reservations r
-       JOIN console_types ct ON r.console_type_id = ct.console_type_id
+       JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE ct.type_name = ?
         AND r.reserved_date = ?
         AND r.status IN ('pending','reserved')
@@ -160,7 +160,7 @@ $old_ctrl_2_id    = $res['controller_id_2'];
 // Resolve new console_type name → ID
 $new_type_id = $old_type_id;
 if ($new_console_type) {
-    $tStmt = $conn->prepare("SELECT console_type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
+    $tStmt = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
     $tStmt->bind_param('s', $new_console_type);
     $tStmt->execute();
     $tRow = $tStmt->get_result()->fetch_assoc();

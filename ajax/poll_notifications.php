@@ -22,7 +22,7 @@ $stmt1 = $conn->prepare("
            r.reserved_date, r.reserved_time, r.created_at AS event_time
     FROM reservations r
     JOIN users u ON r.user_id = u.user_id
-    LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+    LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
     WHERE r.created_at > ? AND r.created_by = r.user_id
 ");
 $stmt1->bind_param('s', $lastDate);
@@ -38,7 +38,7 @@ $stmt2 = $conn->prepare("
     FROM reservation_reschedules rs
     JOIN users u ON rs.user_id = u.user_id
     JOIN reservations r ON rs.reservation_id = r.reservation_id
-    LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+    LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
     WHERE rs.created_at > ? AND rs.initiated_by = 'user'
 ");
 $stmt2->bind_param('s', $lastDate);
@@ -54,7 +54,7 @@ $stmt3 = $conn->prepare("
     FROM reservation_cancellations c
     JOIN users u ON c.user_id = u.user_id
     JOIN reservations r ON c.reservation_id = r.reservation_id
-    LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+    LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
     WHERE c.cancelled_at > ? AND c.cancelled_by = 'user'
 ");
 $stmt3->bind_param('s', $lastDate);

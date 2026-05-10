@@ -50,7 +50,7 @@ $stmt = $conn->prepare(
             u.email, u.full_name
        FROM reservation_reschedules rs
        JOIN users u ON rs.user_id = u.user_id
-       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.console_type_id
+       LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
       WHERE rs.reschedule_id = ?
         AND rs.user_id       = ?
         AND rs.status        = 'pending'

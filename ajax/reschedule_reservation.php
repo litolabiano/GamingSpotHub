@@ -63,7 +63,7 @@ $stmt = $conn->prepare(
             u.email, u.full_name
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
-       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.reservation_id = ? AND r.status IN ('pending','reserved')"
 );
 $stmt->bind_param('i', $reservation_id);
@@ -87,7 +87,7 @@ $user_id          = (int)$res['user_id'];
 // Resolve new console_type name → ID
 $new_type_id = $old_type_id; // default: keep old type
 if ($new_console_type) {
-    $tStmt = $conn->prepare("SELECT console_type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
+    $tStmt = $conn->prepare("SELECT type_id FROM console_types WHERE type_name = ? AND is_archived = 0 LIMIT 1");
     $tStmt->bind_param('s', $new_console_type);
     $tStmt->execute();
     $tRow = $tStmt->get_result()->fetch_assoc();
