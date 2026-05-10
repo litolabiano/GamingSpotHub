@@ -33,6 +33,8 @@ $new_date         = trim($_POST['new_date'] ?? '');
 $new_time         = trim($_POST['new_time'] ?? '');
 $new_console_type = trim($_POST['console_type'] ?? '');
 $new_console_id   = (int)($_POST['console_id'] ?? 0) ?: null;
+$new_ctrl_1_id    = (int)($_POST['controller_id'] ?? 0) ?: null;
+$new_ctrl_2_id    = (int)($_POST['controller_id_2'] ?? 0) ?: null;
 
 
 
@@ -78,7 +80,8 @@ $stmt = $conn->prepare(
     "SELECT r.reservation_id, r.user_id, r.console_type_id,
             ct.type_name AS console_type,
             r.console_id, r.rental_mode, r.planned_minutes,
-            r.reserved_date, r.reserved_time, r.status, r.downpayment_amount
+            r.reserved_date, r.reserved_time, r.status, r.downpayment_amount,
+            r.controller_id, r.controller_id_2
        FROM reservations r
        LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
       WHERE r.reservation_id = ? AND r.user_id = ?"
@@ -151,6 +154,8 @@ $old_date         = $res['reserved_date'];
 $old_time         = $res['reserved_time'];
 $old_console_id   = $res['console_id'];
 $old_type_id      = $res['console_type_id'];
+$old_ctrl_1_id    = $res['controller_id'];
+$old_ctrl_2_id    = $res['controller_id_2'];
 
 // Resolve new console_type name → ID
 $new_type_id = $old_type_id;
@@ -184,16 +189,16 @@ try {
     $log = $conn->prepare(
         "INSERT INTO reservation_reschedules
             (reservation_id, user_id, 
-             old_date, old_time, old_console_id, old_console_type_id,
-             new_date, new_time, console_id, new_console_type_id,
+             old_date, old_time, old_console_id, old_console_type_id, old_controller_id, old_controller_id_2,
+             new_date, new_time, console_id, new_console_type_id, new_controller_id, new_controller_id_2,
              reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 'pending', 1)"
     );
     $log->bind_param(
-        'iissiissiissi',
+        'iissiiiissiiiissi',
         $res_id, $uid,
-        $old_date, $old_time, $old_console_id, $old_type_id,
-        $new_date, $new_time, $new_console_id, $new_type_id,
+        $old_date, $old_time, $old_console_id, $old_type_id, $old_ctrl_1_id, $old_ctrl_2_id,
+        $new_date, $new_time, $new_console_id, $new_type_id, $new_ctrl_1_id, $new_ctrl_2_id,
         $reason, $reason_detail,
         $uid
     );

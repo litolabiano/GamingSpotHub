@@ -26,6 +26,8 @@ $new_date         = trim($_POST['new_date']       ?? '');
 $new_time         = trim($_POST['new_time']       ?? '');
 $new_console_type = trim($_POST['console_type']    ?? '');
 $new_console_id   = (int)($_POST['console_id']    ?? 0) ?: null;
+$new_ctrl_1_id    = (int)($_POST['controller_id'] ?? 0) ?: null;
+$new_ctrl_2_id    = (int)($_POST['controller_id_2'] ?? 0) ?: null;
 $reason           = trim($_POST['reason']         ?? 'other');
 $reason_detail    = trim($_POST['reason_detail']  ?? '') ?: null;
 
@@ -56,7 +58,7 @@ if ($new_time < '12:00' || $new_time > '23:00') {
 // Fetch current reservation
 $stmt = $conn->prepare(
     "SELECT r.reservation_id, r.user_id, r.reserved_date, r.reserved_time, r.status,
-            r.console_id, r.console_type_id,
+            r.console_id, r.console_type_id, r.controller_id, r.controller_id_2,
             ct.type_name AS console_type,
             u.email, u.full_name
        FROM reservations r
@@ -78,6 +80,8 @@ $old_time         = $res['reserved_time'];
 $old_console_type = $res['console_type'];
 $old_console_id   = $res['console_id'];
 $old_type_id      = $res['console_type_id'];
+$old_ctrl_1_id    = $res['controller_id'];
+$old_ctrl_2_id    = $res['controller_id_2'];
 $user_id          = (int)$res['user_id'];
 
 // Resolve new console_type name → ID
@@ -125,6 +129,8 @@ try {
                     new_time              = ?,
                     console_id            = ?,
                     new_console_type_id   = ?,
+                    new_controller_id     = ?,
+                    new_controller_id_2   = ?,
                     reason                = ?,
                     reason_detail         = ?,
                     rescheduled_by        = ?,
@@ -134,8 +140,8 @@ try {
               WHERE reschedule_id         = ?"
         );
         $log->bind_param(
-            'ssiissii',
-            $new_date, $new_time, $new_console_id, $new_type_id,
+            'ssiiiissii',
+            $new_date, $new_time, $new_console_id, $new_type_id, $new_ctrl_1_id, $new_ctrl_2_id,
             $reason, $reason_detail, $staff_id, $existingId
         );
     } else {
@@ -143,16 +149,16 @@ try {
         $log = $conn->prepare(
             "INSERT INTO reservation_reschedules
                 (reservation_id, user_id,
-                 old_date, old_time, old_console_id, old_console_type_id,
-                 new_date, new_time, console_id, new_console_type_id,
+                 old_date, old_time, old_console_id, old_console_type_id, old_controller_id, old_controller_id_2,
+                 new_date, new_time, console_id, new_console_type_id, new_controller_id, new_controller_id_2,
                  reason, reason_detail, rescheduled_by, initiated_by, status, seen_by_user)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'admin', 'pending', 0)"
         );
         $log->bind_param(
-            'iissiissiissi',
+            'iissiiiissiiiissi',
             $reservation_id, $user_id,
-            $old_date, $old_time, $old_console_id, $old_type_id,
-            $new_date, $new_time, $new_console_id, $new_type_id,
+            $old_date, $old_time, $old_console_id, $old_type_id, $old_ctrl_1_id, $old_ctrl_2_id,
+            $new_date, $new_time, $new_console_id, $new_type_id, $new_ctrl_1_id, $new_ctrl_2_id,
             $reason, $reason_detail,
             $staff_id
         );

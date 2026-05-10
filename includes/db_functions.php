@@ -2124,11 +2124,17 @@ function getUpcomingReservations($days = null) {
         $until = (new DateTime("+{$days} days", new DateTimeZone('Asia/Manila')))->format('Y-m-d');
         $stmt = $conn->prepare(
             "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
-                    c.unit_number, c.console_name
+                    c.unit_number, c.console_name,
+                    ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type,
+                    ctrl2.unit_number AS ctrl2_unit, ctrl2_t.type_name AS ctrl2_type
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
                LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+               LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
+               LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
               WHERE r.reserved_date BETWEEN ? AND ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2138,11 +2144,17 @@ function getUpcomingReservations($days = null) {
         // Show ALL future reservations (no upper bound)
         $stmt = $conn->prepare(
             "SELECT r.*, ct.type_name AS console_type, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
-                    c.unit_number, c.console_name
+                    c.unit_number, c.console_name,
+                    ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type,
+                    ctrl2.unit_number AS ctrl2_unit, ctrl2_t.type_name AS ctrl2_type
                FROM reservations r
                JOIN users u ON r.user_id = u.user_id
                LEFT JOIN consoles c ON r.console_id = c.console_id
                LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+               LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
+               LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
+               LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
+               LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
               WHERE r.reserved_date >= ?
                 AND r.status IN ('pending','reserved')
               ORDER BY r.reserved_date ASC, r.reserved_time ASC"
@@ -2200,11 +2212,17 @@ function getCancelledReservations() {
         "SELECT r.*, u.full_name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
                 c.unit_number, c.console_name, ct.type_name AS console_type,
                 rc.cancel_reason_type, rc.cancel_reason_detail,
-                rc.cancelled_at
+                rc.cancelled_at,
+                ctrl.unit_number AS ctrl_unit, ctrl_t.type_name AS ctrl_type,
+                ctrl2.unit_number AS ctrl2_unit, ctrl2_t.type_name AS ctrl2_type
            FROM reservations r
            JOIN users u ON r.user_id = u.user_id
            LEFT JOIN consoles c ON r.console_id = c.console_id
            LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+           LEFT JOIN controllers ctrl ON r.controller_id = ctrl.controller_id
+           LEFT JOIN controller_types ctrl_t ON ctrl.controller_type_id = ctrl_t.type_id
+           LEFT JOIN controllers ctrl2 ON r.controller_id_2 = ctrl2.controller_id
+           LEFT JOIN controller_types ctrl2_t ON ctrl2.controller_type_id = ctrl2_t.type_id
            LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
           WHERE r.status IN ('cancelled', 'no_show')
           ORDER BY r.updated_at DESC"

@@ -43,8 +43,10 @@ $stmt = $conn->prepare(
             rs.new_date, rs.new_time,
             rs.console_id   AS new_console_id,
             rs.new_console_type_id,
+            rs.new_controller_id, rs.new_controller_id_2,
             ct.type_name    AS new_console_type,
             rs.old_date, rs.old_time,
+            rs.old_controller_id, rs.old_controller_id_2,
             u.email, u.full_name
        FROM reservation_reschedules rs
        JOIN users u ON rs.user_id = u.user_id
@@ -67,6 +69,8 @@ $proposedTime        = $row['new_time'];
 $newConsoleId        = !empty($row['new_console_id'])       ? (int)$row['new_console_id']       : null;
 $newConsoleTypeId    = !empty($row['new_console_type_id'])  ? (int)$row['new_console_type_id']  : null;
 $newConsoleType      = !empty($row['new_console_type'])     ? $row['new_console_type']           : null;
+$newControllerId     = !empty($row['new_controller_id'])    ? (int)$row['new_controller_id']     : (!empty($row['old_controller_id']) ? (int)$row['old_controller_id'] : null);
+$newControllerId2    = !empty($row['new_controller_id_2'])  ? (int)$row['new_controller_id_2']   : (!empty($row['old_controller_id_2']) ? (int)$row['old_controller_id_2'] : null);
 
 $conn->begin_transaction();
 try {
@@ -130,15 +134,26 @@ try {
 
         // ── DIRECT CONFIRMATION ─────────────────────────────────────────────
         // If the user accepted the admin's exact proposal, finalize it.
+        $num_controllers = ($newControllerId ? 1 : 0) + ($newControllerId2 ? 1 : 0);
+        $with_controller = $num_controllers > 0 ? 1 : 0;
+        
+        $setStmt = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'controller_rental_fee'");
+        $ctrlRate = $setStmt && $setStmt->num_rows > 0 ? (float)$setStmt->fetch_assoc()['setting_value'] : 20.0;
+        $controller_fee = $num_controllers * $ctrlRate;
+
         $upd = $conn->prepare(
             "UPDATE reservations
                 SET reserved_date = ?, reserved_time = ?,
                     console_type_id = IFNULL(?, console_type_id),
                     console_id    = ?,
+                    controller_id = ?,
+                    controller_id_2 = ?,
+                    with_controller = ?,
+                    controller_fee = ?,
                     status        = 'reserved', updated_at = NOW()
               WHERE reservation_id = ?"
         );
-        $upd->bind_param('ssiii', $finalDate, $finalTime, $newConsoleTypeId, $newConsoleId, $reservationId);
+        $upd->bind_param('ssiiiiidi', $finalDate, $finalTime, $newConsoleTypeId, $newConsoleId, $newControllerId, $newControllerId2, $with_controller, $controller_fee, $reservationId);
         $upd->execute();
         $upd->close();
 

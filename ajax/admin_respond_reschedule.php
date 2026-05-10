@@ -23,7 +23,9 @@ if (!$reschedule_id || !in_array($action, ['approve', 'reject'])) {
 $stmt = $conn->prepare(
     "SELECT rs.reservation_id, rs.status as rs_status, 
              rs.new_date, rs.new_time, rs.console_id, rs.new_console_type_id,
+             rs.new_controller_id, rs.new_controller_id_2,
              rs.old_date, rs.old_time, rs.old_console_id, rs.old_console_type_id,
+             rs.old_controller_id, rs.old_controller_id_2,
              r.status as r_status
       FROM reservation_reschedules rs
       JOIN reservations r ON rs.reservation_id = r.reservation_id
@@ -53,11 +55,21 @@ try {
         $upd_rs->bind_param('i', $reschedule_id);
         $upd_rs->execute();
 
-        $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
-        $upd_r->bind_param('ssiii', $res['new_date'], $res['new_time'], $res['new_console_type_id'], $res['console_id'], $reservation_id);
+        $newCtrl1 = $res['new_controller_id'] ?? $res['old_controller_id'];
+        $newCtrl2 = $res['new_controller_id_2'] ?? $res['old_controller_id_2'];
+
+        $num_controllers = ($newCtrl1 ? 1 : 0) + ($newCtrl2 ? 1 : 0);
+        $with_controller = $num_controllers > 0 ? 1 : 0;
+        
+        $setStmt = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'controller_rental_fee'");
+        $ctrlRate = $setStmt && $setStmt->num_rows > 0 ? (float)$setStmt->fetch_assoc()['setting_value'] : 20.0;
+        $controller_fee = $num_controllers * $ctrlRate;
+
+        $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, controller_id = ?, controller_id_2 = ?, with_controller = ?, controller_fee = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
+        $upd_r->bind_param('ssiiiiidi', $res['new_date'], $res['new_time'], $res['new_console_type_id'], $res['console_id'], $newCtrl1, $newCtrl2, $with_controller, $controller_fee, $reservation_id);
         $upd_r->execute();
 
-        $message = 'Reschedule request approved. The reservation schedule, console type, and unit assignment have been updated.';
+        $message = 'Reschedule request approved. The reservation schedule, console type, and unit assignments have been updated.';
 
         logActivity($user['user_id'], "Reschedule Approve", "Approved reschedule request #{$reschedule_id} for Reservation #{$reservation_id}");
     } else {
@@ -66,8 +78,8 @@ try {
         $upd_rs->bind_param('i', $reschedule_id);
         $upd_rs->execute();
 
-        $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
-        $upd_r->bind_param('ssiii', $res['old_date'], $res['old_time'], $res['old_console_type_id'], $res['old_console_id'], $reservation_id);
+        $upd_r = $conn->prepare("UPDATE reservations SET reserved_date = ?, reserved_time = ?, console_type_id = ?, console_id = ?, controller_id = ?, controller_id_2 = ?, status = 'reserved', updated_at = NOW() WHERE reservation_id = ?");
+        $upd_r->bind_param('ssiiiii', $res['old_date'], $res['old_time'], $res['old_console_type_id'], $res['old_console_id'], $res['old_controller_id'], $res['old_controller_id_2'], $reservation_id);
         $upd_r->execute();
 
         $message = 'Reschedule request rejected. The reservation remains on its original schedule.';

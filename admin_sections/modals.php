@@ -1597,6 +1597,22 @@ function denyExt(extId) {
                         ?>
                     </select>
                     <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 12:00 PM – 12:00 AM</p>
+        </div>
+            </div>
+            
+            <!-- Controllers -->
+            <div style="display:flex;gap:12px;margin-bottom:15px;" id="adminResCtrlWrapper">
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <label style="font-weight:600;font-size:13px;margin-bottom:6px;color:#d0d8f0;">Controller Unit 1</label>
+                    <select name="controller_id" id="adminResCtrl1" class="admin-ctrl-dur-select" onchange="updateAdminResCtrlDropdowns()" disabled>
+                        <option value="">— None —</option>
+                    </select>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <label style="font-weight:600;font-size:13px;margin-bottom:6px;color:#d0d8f0;">Controller Unit 2</label>
+                    <select name="controller_id_2" id="adminResCtrl2" class="admin-ctrl-dur-select" onchange="updateAdminResCtrlDropdowns()" disabled>
+                        <option value="">— None —</option>
+                    </select>
                 </div>
             </div>
             <div id="adminResConflictBox" style="display:none; margin-bottom:15px; padding:12px; border-radius:10px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); color:#fb566b; font-size:13px;">
@@ -1743,6 +1759,10 @@ function adminResSync() {
         conSel.disabled = true;
         conSel.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
         if (box) box.style.display = 'none';
+        
+        window._adminResAvailableControllers = [];
+        renderAdminResControllers('');
+        
         return;
     }
 
@@ -1788,10 +1808,16 @@ function adminResSync() {
                         if (box) box.style.display = 'none';
                         btn.disabled = false;
                     }
+                    
+                    window._adminResAvailableControllers = data.controllers || [];
+                    renderAdminResControllers(type);
                 }
             });
         return;
     }
+
+    // Update Controllers based on current console type
+    renderAdminResControllers(type);
 
     // If a console is selected, double-check it's still valid
     if (cid && date && time) {
@@ -1819,6 +1845,71 @@ function adminResSync() {
     }
 }
 
+function renderAdminResControllers(type) {
+    const c1 = document.getElementById('adminResCtrl1');
+    const c2 = document.getElementById('adminResCtrl2');
+    
+    if (!type || !window._adminResAvailableControllers) {
+        c1.disabled = true;
+        c2.disabled = true;
+        c1.innerHTML = '<option value="">— None —</option>';
+        c2.innerHTML = '<option value="">— None —</option>';
+        return;
+    }
+    
+    const current1 = c1.value;
+    const current2 = c2.value;
+    
+    let html = '<option value="">— None —</option>';
+    let availableCount = 0;
+    
+    window._adminResAvailableControllers.forEach(c => {
+        if (c.console_type_name === type) {
+            const opt = document.createElement('option');
+            opt.value = c.controller_id;
+            opt.textContent = `#${c.unit_number} — ${c.type_name}`;
+            html += opt.outerHTML;
+            availableCount++;
+        }
+    });
+    
+    c1.innerHTML = html;
+    c2.innerHTML = html;
+    
+    if (availableCount > 0) {
+        c1.disabled = false;
+        c2.disabled = false;
+        
+        // Restore selections if still valid
+        Array.from(c1.options).forEach(opt => { if (opt.value === current1) opt.selected = true; });
+        Array.from(c2.options).forEach(opt => { if (opt.value === current2) opt.selected = true; });
+    } else {
+        c1.innerHTML = '<option value="">— No controllers available —</option>';
+        c2.innerHTML = '<option value="">— No controllers available —</option>';
+        c1.disabled = true;
+        c2.disabled = true;
+    }
+    
+    updateAdminResCtrlDropdowns();
+}
+
+function updateAdminResCtrlDropdowns() {
+    const c1 = document.getElementById('adminResCtrl1');
+    const c2 = document.getElementById('adminResCtrl2');
+    const val1 = c1.value;
+    const val2 = c2.value;
+    
+    Array.from(c1.options).forEach(opt => {
+        opt.disabled = opt.value && opt.value === val2;
+    });
+    Array.from(c2.options).forEach(opt => {
+        opt.disabled = opt.value && opt.value === val1;
+    });
+    
+    // Recalculate downpayment if controllers affect cost
+    adminResCalcDownpayment();
+}
+
 /* Calculates 50% of the selected duration cost and fills the downpayment field */
 function adminResCalcDownpayment() {
     const durSel = document.getElementById('adminResPlannedMins');
@@ -1840,6 +1931,13 @@ function adminResCalcDownpayment() {
         const unlimRate = parseFloat(<?= json_encode(getSetting('unlimited_rate') ?: 300) ?>);
         totalSessionCost = unlimRate;
     }
+    
+    // Add extra controllers to the cost
+    const c1 = document.getElementById('adminResCtrl1');
+    const c2 = document.getElementById('adminResCtrl2');
+    const extraFee = parseFloat(<?= json_encode(getSetting('extra_controller_fee') ?: 0) ?>);
+    if (c1 && c1.value) totalSessionCost += extraFee;
+    if (c2 && c2.value) totalSessionCost += extraFee;
 
     if (totalSessionCost <= 0 && mode !== 'open_time') {
         dpGroup.style.display  = 'none';

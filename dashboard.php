@@ -2441,7 +2441,7 @@ function fmtMins(int $m): string {
                             </button>
                         <?php elseif ($r['status'] === 'reserved'): ?>
                             <?php if (!$alreadyResched): ?>
-                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>)" class="cd-btn cd-btn-blue" style="font-size:11px;">
+                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= $rConsole ?>', <?= $rConsoleId ?>, <?= $r['with_controller'] ?: 0 ?>, <?= $r['controller_id'] ?: 'null' ?>, <?= $r['controller_id_2'] ?: 'null' ?>)" class="cd-btn cd-btn-blue" style="font-size:11px;">
                                 <i class="fas fa-calendar-alt"></i> Reschedule
                             </button>
                             <?php endif; ?>
@@ -2450,7 +2450,7 @@ function fmtMins(int $m): string {
                             </button>
                         <?php else: ?>
                             <?php if (!$alreadyResched): ?>
-                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>')" class="cd-btn cd-btn-blue" style="font-size:11px;">
+                            <button onclick="openUserRescheduleModal(<?= $rid ?>, '<?= $rDate ?>', '<?= $rTime ?>', '<?= addslashes($rConsole) ?>', null, <?= $r['with_controller'] ?: 0 ?>, <?= $r['controller_id'] ?: 'null' ?>, <?= $r['controller_id_2'] ?: 'null' ?>)" class="cd-btn cd-btn-blue" style="font-size:11px;">
                                 <i class="fas fa-calendar-alt"></i> Reschedule
                             </button>
                             <?php else: ?>
@@ -4110,7 +4110,7 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
                 
                 <div style="margin-bottom:12px;">
                     <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Unit</label>
-                    <select id="reschedConsole" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
+                    <select id="reschedConsole" onchange="reschedSyncControllers()" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
                         <option value="" disabled selected>— Select console unit —</option>
                         <?php foreach (getAvailableConsoles() as $con): ?>
                             <option value="<?= $con['console_id'] ?>" data-type="<?= htmlspecialchars($con['console_type']) ?>">
@@ -4125,13 +4125,30 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
                         <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Date</label>
                         <input type="date" id="reschedDate" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required 
                                min="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d', strtotime('+1 month')) ?>"
-                               onchange="buildReschedTimeSelect()">
+                               onchange="buildReschedTimeSelect(); reschedSyncControllers();">
                     </div>
                     <div style="flex:1;">
                         <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Time</label>
-                        <select id="reschedTime" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
+                        <select id="reschedTime" onchange="reschedSyncControllers()" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;" required>
                             <!-- options built via js -->
                         </select>
+                    </div>
+                </div>
+
+                <div id="reschedControllerSection" style="display:none;margin-bottom:20px;">
+                    <div style="display:flex;gap:12px;margin-bottom:12px;">
+                        <div style="flex:1;">
+                            <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Controller Unit 1</label>
+                            <select id="reschedController1" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;">
+                                <option value="" selected>— None —</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;" id="reschedController2Wrap">
+                            <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">New Controller Unit 2</label>
+                            <select id="reschedController2" style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#f0f0f0;padding:11px 12px;border-radius:10px;font-size:13px;font-family:inherit;outline:none;">
+                                <option value="" selected>— None —</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -4195,8 +4212,74 @@ function buildReschedTimeSelect() {
     });
 }
 
-function openUserRescheduleModal(id, date, time, consoleType, consoleId) {
+let currentReschedCtrl1 = null;
+let currentReschedCtrl2 = null;
+let currentReschedWithCtrl = 0;
+
+function reschedSyncControllers() {
+    const selC = document.getElementById('reschedConsole');
+    const opt = selC.options[selC.selectedIndex];
+    const date = document.getElementById('reschedDate').value;
+    const time = document.getElementById('reschedTime').value;
+    const resId = document.getElementById('reschedResId').value;
+    const c1 = document.getElementById('reschedController1');
+    const c2 = document.getElementById('reschedController2');
+
+    if (!opt || !opt.dataset.type || !date || !time) {
+        document.getElementById('reschedControllerSection').style.display = 'none';
+        c1.innerHTML = '<option value="" selected>— Select Date & Time first —</option>';
+        c2.innerHTML = '<option value="" selected>— Select Date & Time first —</option>';
+        return;
+    }
+    
+    document.getElementById('reschedControllerSection').style.display = 'block';
+    const cType = opt.dataset.type;
+
+    fetch(`ajax/check_unit_availability.php?date=${date}&time=${time}&console_type=${encodeURIComponent(cType)}&exclude_res_id=${resId}`)
+    .then(r => r.json())
+    .then(data => {
+        c1.innerHTML = '<option value="" selected>— None —</option>';
+        c2.innerHTML = '<option value="" selected>— None —</option>';
+        
+        if (data.controllers && data.controllers.length > 0) {
+            data.controllers.forEach(c => {
+                if (c.console_type_name === cType) {
+                    const o1 = document.createElement('option');
+                    o1.value = c.controller_id;
+                    o1.textContent = `#${c.unit_number} — ${c.type_name}`;
+                    if (c.controller_id == currentReschedCtrl1) o1.selected = true;
+                    c1.appendChild(o1);
+
+                    const o2 = document.createElement('option');
+                    o2.value = c.controller_id;
+                    o2.textContent = `#${c.unit_number} — ${c.type_name}`;
+                    if (c.controller_id == currentReschedCtrl2) o2.selected = true;
+                    c2.appendChild(o2);
+                }
+            });
+        }
+        
+        const updateCtrlDropdowns = () => {
+            const val1 = c1.value;
+            const val2 = c2.value;
+            Array.from(c1.options).forEach(opt => {
+                opt.disabled = opt.value && opt.value === val2;
+            });
+            Array.from(c2.options).forEach(opt => {
+                opt.disabled = opt.value && opt.value === val1;
+            });
+        };
+        c1.onchange = updateCtrlDropdowns;
+        c2.onchange = updateCtrlDropdowns;
+        updateCtrlDropdowns();
+    }).catch(e => console.error("Error fetching controllers:", e));
+}
+
+function openUserRescheduleModal(id, date, time, consoleType, consoleId, withCtrl, ctrl1, ctrl2) {
     document.getElementById('reschedResId').value = id;
+    currentReschedWithCtrl = withCtrl;
+    currentReschedCtrl1 = ctrl1;
+    currentReschedCtrl2 = ctrl2;
     
     const selC = document.getElementById('reschedConsole');
     if (consoleId) {
@@ -4223,6 +4306,8 @@ function openUserRescheduleModal(id, date, time, consoleType, consoleId) {
             break;
         }
     }
+
+    reschedSyncControllers();
 
     document.getElementById('reschedError').style.display = 'none';
     document.getElementById('userRescheduleModal').style.display = 'flex';
@@ -4256,6 +4341,15 @@ function submitUserReschedule(e) {
         return;
     }
 
+    const c1Val = document.getElementById('reschedController1').value;
+    const c2Val = document.getElementById('reschedController2').value;
+
+    if (c1Val && c2Val && c1Val === c2Val) {
+        err.textContent = 'Please select two different controller units.';
+        err.style.display = 'block';
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     err.style.display = 'none';
@@ -4266,6 +4360,8 @@ function submitUserReschedule(e) {
     fd.append('new_time', time);
     fd.append('console_id', consoleId);
     fd.append('console_type', consoleType);
+    fd.append('controller_id', c1Val || '');
+    fd.append('controller_id_2', c2Val || '');
 
     fetch('ajax/user_reschedule_reservation.php', { method: 'POST', body: fd })
     .then(r => r.json())

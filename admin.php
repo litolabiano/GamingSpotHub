@@ -819,16 +819,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dp_amount    = (float)($_POST['downpayment_amount'] ?? 0);
         $dp_method    = $dp_amount > 0 ? ($_POST['downpayment_method'] ?? null) : null;
         $console_id   = (int)($_POST['console_id'] ?? 0) ?: null;
+        
+        $controller_id = (int)($_POST['controller_id'] ?? 0) ?: null;
+        $controller_id_2 = (int)($_POST['controller_id_2'] ?? 0) ?: null;
+        
+        $controller_fee = 0.0;
+        if ($controller_id || $controller_id_2) {
+            $base_fee = (float)getSetting('extra_controller_fee');
+            if ($controller_id) $controller_fee += $base_fee;
+            if ($controller_id_2) $controller_fee += $base_fee;
+        }
 
         if ($uid && $ctype && $rmode && $rdate && $rtime) {
             $result = createReservation($uid, $ctype, $rmode, $pmins, $rdate, $rtime,
-                                        $notes ?: null, $dp_amount, $dp_method, $console_id);
+                                        $notes ?: null, $dp_amount, $dp_method, $console_id,
+                                        null, $controller_id, $controller_id_2, $controller_fee);
             $message     = $result['success'] ? 'Reservation added.' : 'Error: ' . $result['message'];
             $messageType = $result['success'] ? 'success' : 'error';
 
             if ($result['success']) {
                 $logMsg = "Created new Reservation #{$result['reservation_id']} for User #{$uid} on {$rdate} {$rtime}. Console Type: {$ctype}";
                 if ($console_id) $logMsg .= " (Console Unit #{$console_id})";
+                if ($controller_id) $logMsg .= " w/ Controller 1 (#$controller_id)";
+                if ($controller_id_2) $logMsg .= " w/ Controller 2 (#$controller_id_2)";
                 logActivity($user['user_id'], "Add Reservation", $logMsg);
             }
         } else {

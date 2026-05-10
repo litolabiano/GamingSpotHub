@@ -183,6 +183,7 @@
                             <th>Date &amp; Time</th>
                             <th>Customer</th>
                             <th>Console</th>
+                            <th>Controllers</th>
                             <th>Mode</th>
                             <th>Payment</th>
                             <th>Status</th>
@@ -219,6 +220,29 @@
                                     <?= htmlspecialchars($r['console_type']) ?>
                                     <?php if ($r['unit_number']): ?>
                                         <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Controllers">
+                                    <?php if (!empty($r['with_controller'])): ?>
+                                        <span style="font-size:12px;color:#f0f0f0;white-space:nowrap;">
+                                            <i class="fas fa-gamepad" style="color:#f1a83c;margin-right:4px;"></i>
+                                            <?= htmlspecialchars($r['ctrl_type'] ?? 'Controller') ?>
+                                            <?php if (!empty($r['ctrl_unit'])): ?>
+                                                <span style="color:#20c8a1;font-size:11px;font-weight:700;margin-left:4px;">#<?= htmlspecialchars($r['ctrl_unit']) ?></span>
+                                            <?php endif; ?>
+                                        </span>
+                                        <?php if (!empty($r['controller_id_2'])): ?>
+                                            <br>
+                                            <span style="font-size:12px;color:#f0f0f0;white-space:nowrap;">
+                                                <i class="fas fa-gamepad" style="color:#f1a83c;margin-right:4px;"></i>
+                                                <?= htmlspecialchars($r['ctrl2_type'] ?? 'Controller') ?>
+                                                <?php if (!empty($r['ctrl2_unit'])): ?>
+                                                    <span style="color:#20c8a1;font-size:11px;font-weight:700;margin-left:4px;">#<?= htmlspecialchars($r['ctrl2_unit']) ?></span>
+                                                <?php endif; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span style="color:#555;font-size:12px;">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td style="color:#aaa;">
@@ -304,6 +328,7 @@
                             <th>Date &amp; Time</th>
                             <th>Customer</th>
                             <th>Console</th>
+                            <th>Controllers</th>
                             <th>Mode</th>
                             <th>Downpayment</th>
                             <th>Cancelled By</th>
@@ -329,6 +354,29 @@
                                     <?= htmlspecialchars($r['console_type']) ?>
                                     <?php if (!empty($r['unit_number'])): ?>
                                         <br><span style="color:#20c8a1;font-size:11px;font-weight:700;"><?= htmlspecialchars($r['unit_number']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Controllers">
+                                    <?php if (!empty($r['with_controller'])): ?>
+                                        <span style="font-size:12px;color:#f0f0f0;white-space:nowrap;">
+                                            <i class="fas fa-gamepad" style="color:#f1a83c;margin-right:4px;"></i>
+                                            <?= htmlspecialchars($r['ctrl_type'] ?? 'Controller') ?>
+                                            <?php if (!empty($r['ctrl_unit'])): ?>
+                                                <span style="color:#20c8a1;font-size:11px;font-weight:700;margin-left:4px;">#<?= htmlspecialchars($r['ctrl_unit']) ?></span>
+                                            <?php endif; ?>
+                                        </span>
+                                        <?php if (!empty($r['controller_id_2'])): ?>
+                                            <br>
+                                            <span style="font-size:12px;color:#f0f0f0;white-space:nowrap;">
+                                                <i class="fas fa-gamepad" style="color:#f1a83c;margin-right:4px;"></i>
+                                                <?= htmlspecialchars($r['ctrl2_type'] ?? 'Controller') ?>
+                                                <?php if (!empty($r['ctrl2_unit'])): ?>
+                                                    <span style="color:#20c8a1;font-size:11px;font-weight:700;margin-left:4px;">#<?= htmlspecialchars($r['ctrl2_unit']) ?></span>
+                                                <?php endif; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span style="color:#555;font-size:12px;">—</span>
                                     <?php endif; ?>
                                 </td>
                                 <td style="color:#aaa;">
@@ -508,6 +556,32 @@
             <div id="rescheduleUnitStatus" style="font-size:11px;color:#888;margin-top:4px;">Select date & time to check unit availability</div>
         </div>
 
+        <div style="display:flex;gap:12px;margin-bottom:20px;">
+            <!-- Controller 1 (Dynamic) -->
+            <div id="rescheduleCtrl1Wrapper" style="flex:1; display:flex; flex-direction:column;">
+                <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;" id="rescheduleCtrl1Label">New Controller Unit 1</label>
+                <select id="rescheduleCtrl1" style="
+                    width:100%;background:rgba(10,33,81,.7);
+                    border:1px solid rgba(95,133,218,.3);
+                    color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                    font-size:14px;font-family:inherit;outline:none;">
+                    <option value="" selected>— None —</option>
+                </select>
+            </div>
+
+            <!-- Controller 2 (Dynamic) -->
+            <div id="rescheduleCtrl2Wrapper" style="flex:1; display:flex; flex-direction:column;">
+                <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;" id="rescheduleCtrl2Label">New Controller Unit 2</label>
+                <select id="rescheduleCtrl2" style="
+                    width:100%;background:rgba(10,33,81,.7);
+                    border:1px solid rgba(95,133,218,.3);
+                    color:#f0f0f0;padding:11px 14px;border-radius:10px;
+                    font-size:14px;font-family:inherit;outline:none;">
+                    <option value="" selected>— None —</option>
+                </select>
+            </div>
+        </div>
+
         <!-- Buttons -->
         <div style="display:flex;gap:10px;">
             <button type="button" class="btn-prim" id="rescheduleSubmitBtn" onclick="submitReschedule()" style="flex:1;">
@@ -544,6 +618,12 @@ function rescheduleSync() {
         unitInput.disabled = true;
         unitInput.innerHTML = '<option value="" disabled selected>— Select Date & Time first —</option>';
         statLabel.textContent = 'Awaiting date and time selection...';
+        
+        document.getElementById('rescheduleCtrl1').disabled = true;
+        document.getElementById('rescheduleCtrl1').innerHTML = '<option value="">— None —</option>';
+        document.getElementById('rescheduleCtrl2').disabled = true;
+        document.getElementById('rescheduleCtrl2').innerHTML = '<option value="">— None —</option>';
+        
         return;
     }
 
@@ -587,6 +667,63 @@ function rescheduleSync() {
             submitBtn.disabled = false;
             submitBtn.style.opacity = '1';
         }
+        
+        // Handle Controllers — always populate, always show, "None" is a valid choice
+        const ctrl1Select = document.getElementById('rescheduleCtrl1');
+        const ctrl2Select = document.getElementById('rescheduleCtrl2');
+
+        ctrl1Select.disabled = false;
+        ctrl2Select.disabled = false;
+
+        const currentCtrl1Id = ctrl1Select.dataset.initialUnitId;
+        const currentCtrl2Id = ctrl2Select.dataset.initialUnitId;
+
+        let ctrl1Html = '<option value="">— None —</option>';
+        let ctrl2Html = '<option value="">— None —</option>';
+        let availableCtrl = 0;
+
+        if (data.controllers && data.controllers.length > 0) {
+            data.controllers.forEach(c => {
+                if (c.console_type_name === type) {
+                    const opt1 = document.createElement('option');
+                    opt1.value = c.controller_id;
+                    opt1.textContent = `#${c.unit_number} — ${c.type_name}`;
+                    if (c.controller_id == currentCtrl1Id) opt1.selected = true;
+                    ctrl1Html += opt1.outerHTML;
+
+                    const opt2 = document.createElement('option');
+                    opt2.value = c.controller_id;
+                    opt2.textContent = `#${c.unit_number} — ${c.type_name}`;
+                    if (c.controller_id == currentCtrl2Id) opt2.selected = true;
+                    ctrl2Html += opt2.outerHTML;
+
+                    availableCtrl++;
+                }
+            });
+        }
+
+        ctrl1Select.innerHTML = ctrl1Html;
+        ctrl2Select.innerHTML = ctrl2Html;
+
+        if (availableCtrl === 0) {
+            ctrl1Select.innerHTML = '<option value="">— No controllers available —</option>';
+            ctrl2Select.innerHTML = '<option value="">— No controllers available —</option>';
+        }
+
+        // Prevent same unit selected for both
+        const updateCtrlDropdowns = () => {
+            const val1 = ctrl1Select.value;
+            const val2 = ctrl2Select.value;
+            Array.from(ctrl1Select.options).forEach(opt => {
+                opt.disabled = opt.value && opt.value === val2;
+            });
+            Array.from(ctrl2Select.options).forEach(opt => {
+                opt.disabled = opt.value && opt.value === val1;
+            });
+        };
+        ctrl1Select.onchange = updateCtrlDropdowns;
+        ctrl2Select.onchange = updateCtrlDropdowns;
+        updateCtrlDropdowns();
     })
     .catch(err => {
         console.error(err);
@@ -636,7 +773,7 @@ function updateRescheduleTimes() {
 // Set up real-time past time blocking
 setInterval(updateRescheduleTimes, 30000); // Check every 30 seconds
 
-function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType, oldUnitId) {
+function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType, oldUnitId, ctrl1Id = 0, ctrl1Type = '', ctrl2Id = 0, ctrl2Type = '') {
     document.getElementById('rescheduleResId').value = resId;
     document.getElementById('rescheduleResSubtitle').textContent =
         'Reservation #' + resId + ' — ' + customerName;
@@ -656,6 +793,28 @@ function openRescheduleModal(resId, customerName, oldDate, oldTime, consoleType,
     
     typeInput.value = consoleType;
     dateInput.value = oldDate;
+    
+    // Set up controller elements
+    const ctrl1Select = document.getElementById('rescheduleCtrl1');
+    const ctrl2Select = document.getElementById('rescheduleCtrl2');
+    
+    ctrl1Select.dataset.initialUnitId = ctrl1Id || '';
+    ctrl2Select.dataset.initialUnitId = ctrl2Id || '';
+    
+    // Always show controller sections — admin can assign, change, or remove
+    document.getElementById('rescheduleCtrl1Wrapper').style.display = 'flex';
+    document.getElementById('rescheduleCtrl2Wrapper').style.display = 'flex';
+    
+    if (ctrl1Id) {
+        document.getElementById('rescheduleCtrl1Label').textContent = `New Unit for ${ctrl1Type}`;
+    } else {
+        document.getElementById('rescheduleCtrl1Label').textContent = 'New Controller Unit 1';
+    }
+    if (ctrl2Id) {
+        document.getElementById('rescheduleCtrl2Label').textContent = `New Unit for ${ctrl2Type}`;
+    } else {
+        document.getElementById('rescheduleCtrl2Label').textContent = 'New Controller Unit 2';
+    }
     
     // Update times list before setting value to ensure it's not blocked if it's in the past
     updateRescheduleTimes();
@@ -688,12 +847,16 @@ function submitReschedule() {
     const type   = document.getElementById('rescheduleConsoleType').value;
     const unitId = document.getElementById('rescheduleUnit').value;
     
+    const ctrl1Id  = document.getElementById('rescheduleCtrl1').value;
+    const ctrl2Id  = document.getElementById('rescheduleCtrl2').value;
+    
     if (!reason) { alert('Please select a reason.'); return; }
     if (reason === 'other' && !detail) { alert('Please describe the reason.'); return; }
     if (!date)   { alert('Please select a new date.'); return; }
     if (!time)   { alert('Please select a new time.'); return; }
     if (!type)   { alert('Please select a console type.'); return; }
     if (!unitId) { alert('Please select a console unit.'); return; }
+    if (ctrl1Id && ctrl2Id && ctrl1Id === ctrl2Id) { alert('Controller 1 and Controller 2 must be different units.'); return; }
     
     const oldDate = document.getElementById('rescheduleDate').dataset.oldDate;
     const oldTime = document.getElementById('rescheduleTime').dataset.oldTime;
@@ -712,7 +875,9 @@ function submitReschedule() {
             new_date: date, 
             new_time: time, 
             console_type: type, 
-            console_id: unitId 
+            console_id: unitId,
+            controller_id: ctrl1Id,
+            controller_id_2: ctrl2Id
         })
     })
     .then(async r => {
