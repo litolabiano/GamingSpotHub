@@ -43,7 +43,7 @@ try {
     // 1. Get all active (non-archived, non-maintenance) consoles
     $sql = "SELECT c.console_id, c.unit_number, c.console_name, c.status, c.controller_count, ct.type_name AS console_type, ct.hourly_rate
             FROM consoles c
-            JOIN console_types ct ON c.console_type_id = ct.type_id
+            JOIN console_types ct ON c.console_type_id = ct.console_type_id
             WHERE c.status != 'archived' AND c.status != 'maintenance'";
     if ($console_type) {
         $sql .= " AND ct.type_name = '" . $conn->real_escape_string($console_type) . "'";
@@ -206,8 +206,8 @@ try {
                        ct.type_name AS type_name, ct.console_type_id, c.hourly_rate,
                        cs.type_name AS console_type_name
                   FROM controllers c
-                  JOIN controller_types ct ON ct.type_id = c.controller_type_id
-                  JOIN console_types cs    ON cs.type_id = ct.console_type_id
+                  JOIN controller_types ct ON ct.Controller_type_id = c.controller_type_id
+                  JOIN console_types cs ON cs.console_type_id = ct.console_type_id
                  WHERE c.status = 'available'
                  ORDER BY cs.type_name, ct.type_name, c.unit_number";
     $ctrlRes = $conn->query($sqlCtrl);

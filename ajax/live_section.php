@@ -53,15 +53,15 @@ if ($sRes) {
 }
 
 // Consoles
-$consolesResult = $conn->query("SELECT c.*, ct.type_name AS console_type FROM consoles c LEFT JOIN console_types ct ON c.console_type_id = ct.type_id ORDER BY ct.type_name, c.unit_number");
+$consolesResult = $conn->query("SELECT c.*, ct.type_name AS console_type FROM consoles c LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id ORDER BY ct.type_name, c.unit_number");
 $consoles = $consolesResult ? $consolesResult->fetch_all(MYSQLI_ASSOC) : [];
 
 // Controllers (needed by consoles section)
 $allControllers      = [];
 $archivedControllers = [];
-$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id WHERE c.status != 'archived' ORDER BY c.unit_number");
+$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id WHERE c.status != 'archived' ORDER BY c.unit_number");
 if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
-$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id WHERE c.status = 'archived' ORDER BY c.unit_number");
+$_res = $conn->query("SELECT c.*, ct.type_name AS controller_type FROM controllers c LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id WHERE c.status = 'archived' ORDER BY c.unit_number");
 if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 unset($_res);
 
@@ -146,7 +146,7 @@ $rsQ = $conn->query(
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
        LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
       WHERE gs.status IN ('active','paused')
       ORDER BY gs.start_time DESC"
@@ -160,7 +160,7 @@ $csQ = $conn->query(
        FROM gaming_sessions gs
        JOIN users u ON gs.user_id = u.user_id
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE gs.status = 'completed'
       ORDER BY gs.end_time DESC LIMIT 50"
 );
@@ -178,7 +178,7 @@ $crQ = $conn->query(
        FROM reservations r
        JOIN users u ON r.user_id = u.user_id
        LEFT JOIN consoles c ON r.console_id = c.console_id
-       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
        LEFT JOIN reservation_cancellations rc ON rc.reservation_id = r.reservation_id
       WHERE r.status IN ('cancelled', 'no_show')
       ORDER BY r.updated_at DESC LIMIT 30"
@@ -282,7 +282,7 @@ $rbcQ = $conn->query(
        FROM transactions t
        JOIN gaming_sessions gs ON t.session_id = gs.session_id
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE t.type = 'payment'
       GROUP BY ct.type_name"
 );
@@ -293,7 +293,7 @@ $tuQ = $conn->query(
     "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM gaming_sessions gs
        JOIN consoles c ON gs.console_id = c.console_id
-       LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
       WHERE gs.status = 'completed'
       GROUP BY ct.type_name"
 );

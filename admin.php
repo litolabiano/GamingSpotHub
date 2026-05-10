@@ -500,11 +500,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // EDIT CONSOLE TYPE
     elseif ($action === 'edit_console_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         $typeName = trim($_POST['type_name'] ?? '');
         $hourlyRate = (float)($_POST['hourly_rate'] ?? 0);
         if ($typeId && $typeName && $hourlyRate >= 0) {
-            $stmt = $conn->prepare("UPDATE console_types SET type_name = ?, hourly_rate = ? WHERE type_id = ?");
+            $stmt = $conn->prepare("UPDATE console_types SET type_name = ?, hourly_rate = ? WHERE console_type_id = ?");
             $stmt->bind_param('sdi', $typeName, $hourlyRate, $typeId);
             if ($stmt->execute()) {
                 $message = 'Console type updated successfully.';
@@ -521,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ARCHIVE CONSOLE TYPE
     elseif ($action === 'archive_console_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && archiveConsoleType($typeId)) {
             $message = 'Console type archived. Associated consoles have been moved to the Archive section.';
             $messageType = 'success';
@@ -534,7 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // RESTORE CONSOLE TYPE
     elseif ($action === 'restore_console_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && restoreConsoleType($typeId)) {
             $message = 'Console type restored successfully.';
             $messageType = 'success';
@@ -547,7 +547,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // PERMANENTLY DELETE CONSOLE TYPE
     elseif ($action === 'delete_console_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && deleteConsoleType($typeId)) {
             $message = 'Console type permanently removed.';
             $messageType = 'success';
@@ -595,7 +595,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (addControllerType($typeName, $consoleTypeId)) {
                 $parentNote = '';
                 if ($consoleTypeId) {
-                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE type_id = ?");
+                    $pRes = $conn->prepare("SELECT type_name FROM console_types WHERE console_type_id = ?");
                     $pRes->bind_param('i', $consoleTypeId); $pRes->execute();
                     $pRow = $pRes->get_result()->fetch_assoc();
                     if ($pRow) $parentNote = ' (for ' . htmlspecialchars($pRow['type_name']) . ')';
@@ -612,7 +612,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ARCHIVE CONTROLLER TYPE
     elseif ($action === 'archive_controller_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && archiveControllerType($typeId)) {
             $message = 'Controller type archived successfully.';
             $messageType = 'success';
@@ -625,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // RESTORE CONTROLLER TYPE
     elseif ($action === 'restore_controller_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && restoreControllerType($typeId)) {
             $message = 'Controller type restored successfully.';
             $messageType = 'success';
@@ -638,7 +638,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // PERMANENTLY DELETE CONTROLLER TYPE
     elseif ($action === 'delete_controller_type') {
-        $typeId = (int)($_POST['type_id'] ?? 0);
+        $typeId = (int)($_POST['console_type_id'] ?? 0);
         if ($typeId && deleteControllerType($typeId)) {
             $message = 'Controller type permanently removed.';
             $messageType = 'success';
@@ -661,7 +661,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $validTypeIds = array_column(getControllerTypes(true), 'type_id');
         if ($ctrl_typeId && in_array($ctrl_typeId, $validTypeIds) && $ctrl_unit) {
             // Also get the type name for the legacy column
-            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['type_id'] === $ctrl_typeId))[0] ?? null;
+            $typeRow = array_values(array_filter(getControllerTypes(true), fn($t) => (int)$t['console_type_id'] === $ctrl_typeId))[0] ?? null;
             $ctrl_type = $typeRow ? $typeRow['type_name'] : $ctrl_type;
 
             $dupCheck = $conn->prepare("SELECT controller_id FROM controllers WHERE unit_number = ?");
@@ -1369,7 +1369,7 @@ $archivedControllers = [];
 $_res = $conn->query("
     SELECT c.*, ct.type_name AS controller_type 
     FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
     WHERE c.status != 'archived' 
     ORDER BY c.unit_number
 ");
@@ -1378,7 +1378,7 @@ if ($_res) $allControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_res = $conn->query("
     SELECT c.*, ct.type_name AS controller_type 
     FROM controllers c 
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
     WHERE c.status = 'archived' 
     ORDER BY c.unit_number
 ");
@@ -1388,7 +1388,7 @@ if ($_res) $archivedControllers = $_res->fetch_all(MYSQLI_ASSOC);
 $_avRes = $conn->query("
     SELECT c.controller_id, ct.type_name AS controller_type, c.unit_number 
     FROM controllers c
-    LEFT JOIN controller_types ct ON c.controller_type_id = ct.type_id 
+    LEFT JOIN controller_types ct ON c.controller_type_id = ct.Controller_type_id 
     WHERE c.status = 'available' 
     ORDER BY c.unit_number
 ");
@@ -1406,7 +1406,7 @@ $stmt = $conn->prepare(
      FROM gaming_sessions gs
      JOIN users u ON gs.user_id = u.user_id
      JOIN consoles c ON gs.console_id = c.console_id
-     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+     LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
      LEFT JOIN reservations r ON r.reservation_id = gs.source_reservation_id
      ORDER BY
          CASE WHEN gs.status = 'active' THEN 0 ELSE 1 END ASC,
@@ -1442,7 +1442,7 @@ $purStmt = $conn->query(
      JOIN reservations r ON rs.reservation_id = r.reservation_id
      JOIN users u ON rs.user_id = u.user_id
      LEFT JOIN consoles c ON rs.console_id = c.console_id
-     LEFT JOIN console_types ct ON rs.new_console_type_id = ct.type_id
+     LEFT JOIN console_types ct ON rs.new_console_type_id = ct.console_type_id
      WHERE rs.status = 'pending' AND rs.initiated_by = 'user'
      ORDER BY rs.created_at ASC"
 );
@@ -1566,7 +1566,7 @@ $cancelByConsole = $conn->query(
     "SELECT ct.type_name AS console_type, COUNT(*) AS cnt
        FROM reservation_cancellations rc
        JOIN reservations r ON rc.reservation_id = r.reservation_id
-       LEFT JOIN console_types ct ON r.console_type_id = ct.type_id
+       LEFT JOIN console_types ct ON r.console_type_id = ct.console_type_id
       GROUP BY ct.type_name
       ORDER BY cnt DESC"
 )->fetch_all(MYSQLI_ASSOC);
@@ -1650,7 +1650,7 @@ for ($i = 6; $i >= 0; $i--) {
 $typeUsage = $conn->query(
     "SELECT ct.type_name AS console_type, COUNT(gs.session_id) AS cnt
      FROM consoles c
-     LEFT JOIN console_types ct ON c.console_type_id = ct.type_id
+     LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id
      LEFT JOIN gaming_sessions gs ON c.console_id = gs.console_id AND gs.status = 'completed'
      GROUP BY ct.type_name"
 )->fetch_all(MYSQLI_ASSOC);

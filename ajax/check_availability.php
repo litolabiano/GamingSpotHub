@@ -38,7 +38,7 @@ $today = date('Y-m-d');
 // 1. Get all consoles and types
 $sql = "SELECT c.console_id, c.status, ct.type_name AS console_type
         FROM consoles c
-        JOIN console_types ct ON c.console_type_id = ct.type_id
+        JOIN console_types ct ON c.console_type_id = ct.console_type_id
         WHERE c.status != 'archived' AND c.status != 'maintenance'
         ORDER BY ct.type_name, c.unit_number";
 $res = $conn->query($sql);
