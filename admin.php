@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Good Spot Gaming Hub - Admin Dashboard
  * Live database-connected management panel for Owner & Shopkeeper roles.
@@ -25,7 +25,7 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ── CSRF guard - all admin POST actions require a valid token ──────────
+    // â”€â”€ CSRF guard - all admin POST actions require a valid token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!verifyCsrf($message, $messageType)) {
         // verifyCsrf() has already populated $message/$messageType; skip all actions
         $action = '';
@@ -44,14 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Please select a console and rental mode.';
             $messageType = 'error';
         } elseif ($rental_mode === 'unlimited' && (!isset($_POST['unlimited_tendered']) || (float)$_POST['unlimited_tendered'] < $unlim_rate)) {
-            $message = 'Payment of ₱' . number_format($unlim_rate, 2) . ' is required upfront for Unlimited sessions. Please ensure sufficient amount is tendered.';
+            $message = 'Payment of â‚±' . number_format($unlim_rate, 2) . ' is required upfront for Unlimited sessions. Please ensure sufficient amount is tendered.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
             $pr = getPricingRules();
-            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
+            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat â‚±' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
             $skip_start_session = false;
@@ -110,9 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($result['success']) {
         $controller_upfront_addon = 0.0;
 
-        // ── Persist controller rental fee to additional_requests (always, ──────
-        // ── regardless of whether upfront was collected). endSession()    ──────
-        // ── and the End Session modal both read from this table.          ──────
+        // â”€â”€ Persist controller rental fee to additional_requests (always, â”€â”€â”€â”€â”€â”€
+        // â”€â”€ regardless of whether upfront was collected). endSession()    â”€â”€â”€â”€â”€â”€
+        // â”€â”€ and the End Session modal both read from this table.          â”€â”€â”€â”€â”€â”€
         if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
             $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
             $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
@@ -206,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             null
         );
         $cost = number_format($upfront_cost, 2);
-        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+        $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
 
     } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
         $pr           = getPricingRules();
@@ -225,18 +225,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
             $tendered,
             $shortfall,
-            $shortfall ? 'Short payment at session start - short by ₱' . number_format($shortfall, 2) : null
+            $shortfall ? 'Short payment at session start - short by â‚±' . number_format($shortfall, 2) : null
         );
         $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
         $cost      = number_format($upfront_cost, 2);
         if ($shortfall !== null && $shortfall > 0) {
             $tendFmt  = number_format($tendered, 2);
             $shortFmt = number_format($shortfall, 2);
-            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
-                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
+            $message  = "Session #" . $result['session_id'] . " started. â‚±{$tendFmt} collected upfront via "
+                      . ucfirst($start_payment_method) . " (short by â‚±{$shortFmt}).";
             $messageType = 'warning';
         } else {
-            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+            $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
         }
 
     } else {
@@ -299,8 +299,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Short payment - record only what was tendered
                         $actualCollected = $tendered_amount;
                         $shortfall       = round($remaining - $tendered_amount, 2);
-                        $paymentNote     = 'Short payment - collected ₱' . number_format($tendered_amount, 2)
-                                         . ', short by ₱' . number_format($shortfall, 2);
+                        $paymentNote     = 'Short payment - collected â‚±' . number_format($tendered_amount, 2)
+                                         . ', short by â‚±' . number_format($shortfall, 2);
                     } else {
                         $paymentNote = 'Balance payment collected at session end';
                     }
@@ -320,19 +320,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($shortfall !== null && $shortfall > 0) {
                     $shortFmt    = number_format($shortfall, 2);
                     $tenderedFmt = number_format($tendered_amount, 2);
-                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} - still ₱{$shortFmt} outstanding.";
+                    $message     = "Session ended. Total: â‚±{$total}. Collected â‚±{$tenderedFmt} - still â‚±{$shortFmt} outstanding.";
                     $messageType = 'warning';
                 } elseif ($remaining > 0) {
                     $due     = number_format($remaining, 2);
-                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
+                    $message = "Session ended. Duration: {$mins} min. Total: â‚±{$total} (prepaid â‚±{$paid} + collected â‚±{$due}).";
                     $messageType = 'success';
                 } else {
-                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront - no extra charge.";
+                    $message     = "Session ended. Duration: {$mins} min. Total: â‚±{$total}. Fully paid upfront - no extra charge.";
                     $messageType = 'success';
                 }
 
                 // Activity Log
-                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: ₱{$total}.";
+                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: â‚±{$total}.";
                 logActivity($user['user_id'], "End Session", $logDet);
             } else {
                 $message     = 'Could not end session: ' . $result['message'];
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unit_number = trim($_POST['unit_number'] ?? '');
         
         if ($name && $type_id && $unit_number) {
-            // ── DUPLICATE CHECK: Ensure Unit Number is unique ────────────────
+            // â”€â”€ DUPLICATE CHECK: Ensure Unit Number is unique â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $checkStmt = $conn->prepare("SELECT console_id FROM consoles WHERE unit_number = ?");
             $checkStmt->bind_param("s", $unit_number);
             $checkStmt->execute();
@@ -449,7 +449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-    // ── CONSOLE TYPE ACTIONS ──────────────────────────────────────────────────
+    // â”€â”€ CONSOLE TYPE ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ADD CONSOLE TYPE
     elseif ($action === 'add_console_type') {
         $typeName = trim($_POST['type_name'] ?? '');
@@ -526,7 +526,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── CONTROLLER TYPE ACTIONS ───────────────────────────────────────────────
+    // â”€â”€ CONTROLLER TYPE ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ADD CONTROLLER TYPE
     elseif ($action === 'add_controller_type') {
         $typeName      = trim($_POST['type_name'] ?? '');
@@ -589,7 +589,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── CONTROLLER (UNIT) ACTIONS ─────────────────────────────────────────────
+    // â”€â”€ CONTROLLER (UNIT) ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     elseif ($action === 'add_controller') {
         $ctrl_type   = trim($_POST['controller_type'] ?? '');  // legacy text field
         $ctrl_typeId = !empty($_POST['controller_type_id']) ? (int)$_POST['controller_type_id'] : null;
@@ -706,7 +706,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // SAVE SETTINGS — owner only
+    // SAVE SETTINGS â€” owner only
     elseif ($action === 'save_settings') {
         if ($user['role'] !== 'owner') {
             $message = 'Access denied. Only the owner can change settings.';
@@ -744,7 +744,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // CANCEL RESERVATION (admin-initiated → cancelled_by = 'admin')
+    // CANCEL RESERVATION (admin-initiated â†’ cancelled_by = 'admin')
     elseif ($action === 'cancel_reservation') {
         $res_id       = (int)($_POST['reservation_id'] ?? 0);
         $allowedCancelReasons = ['schedule_change','found_alternative','budget_issue',
@@ -771,7 +771,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('i', $res_id);
             $stmt->execute();
 
-            // ── Log to reservation_cancellations audit table ──────────────
+            // â”€â”€ Log to reservation_cancellations audit table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $logFetch = $conn->prepare(
                 "SELECT user_id FROM reservations WHERE reservation_id = ?"
             );
@@ -916,7 +916,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ? round($balanceDue - $tendered, 2) : null;
 
         if (!$session_id || $balanceDue <= 0) {
-            $message = 'Invalid payment - balance must be greater than ₱0.';
+            $message = 'Invalid payment - balance must be greater than â‚±0.';
             $messageType = 'error';
         } else {
             $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
@@ -928,23 +928,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
                     $user['user_id'], $tendered, $shortfall,
                     $shortfall
-                        ? 'Partial payment - collected ₱' . number_format($actualCollected, 2)
-                          . ', short by ₱' . number_format($shortfall, 2)
-                          . ' of ₱' . number_format($balanceDue, 2) . ' balance'
+                        ? 'Partial payment - collected â‚±' . number_format($actualCollected, 2)
+                          . ', short by â‚±' . number_format($shortfall, 2)
+                          . ' of â‚±' . number_format($balanceDue, 2) . ' balance'
                         : 'Balance payment collected'
                 );
                 if ($shortfall !== null && $shortfall > 0) {
-                    $message = 'Collected ₱' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
-                             . '. Still short by ₱' . number_format($shortfall, 2) . '.';
+                    $message = 'Collected â‚±' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
+                             . '. Still short by â‚±' . number_format($shortfall, 2) . '.';
                     $messageType = 'warning';
                 } else {
-                    $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
+                    $message = 'Payment of â‚±' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
                     $messageType = 'success';
                 }
 
                 // Activity Log
-                $payNote = "Recorded payment of ₱" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
-                if ($shortfall) $payNote .= ". Short by ₱" . number_format($shortfall, 2);
+                $payNote = "Recorded payment of â‚±" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
+                if ($shortfall) $payNote .= ". Short by â‚±" . number_format($shortfall, 2);
                 logActivity($user['user_id'], "Record Payment", $payNote);
             } else {
                 $message = 'Session not found or already ended.';
@@ -961,7 +961,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // PROCESS REFUND for cancelled reservations is handled at lines 266–306 above.
+    // PROCESS REFUND for cancelled reservations is handled at lines 266â€“306 above.
 
     // NOTE: Session extension is handled exclusively through ajax/extend_session.php
     // which calls extendSession() - applying bonus minutes and recording a transaction.
@@ -972,7 +972,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // ── BULK ACTIONS (ARCHIVE MANAGEMENT) ─────────────────────────────────────
+    // â”€â”€ BULK ACTIONS (ARCHIVE MANAGEMENT) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     elseif (strpos($action, 'bulk_') === 0) {
         $ids = $_POST['ids'] ?? [];
         if (empty($ids)) {
@@ -1090,7 +1090,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── TOURNAMENT ACTIONS ──────────────────────────────────────────────────
+    // â”€â”€ TOURNAMENT ACTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // CREATE TOURNAMENT (Admin Only)
     elseif ($action === 'create_tournament') {
@@ -1220,7 +1220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $staff_id     = (int)($user['user_id'] ?? 0);
 
         if ($mode === 'walkin') {
-            // ── Walk-in: no user account required ────────────────────────────
+            // â”€â”€ Walk-in: no user account required â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $walkin_name = trim($_POST['walkin_name'] ?? '');
             if ($tid && $walkin_name) {
                 $uid = 0; // walk-in system user
@@ -1244,7 +1244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             }
         } else {
-            // ── Registered customer ───────────────────────────────────────────
+            // â”€â”€ Registered customer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             $uid = (int)($_POST['user_id'] ?? 0);
             if ($tid && $uid) {
                 // Application-level duplicate check (uk_tp_entry was removed to support multiple walk-ins)
@@ -1283,7 +1283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
-// ─── DATA FETCHING ──────────────────────────────────────────────────────────
+// â”€â”€â”€ DATA FETCHING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Dashboard stats
 $today = getOperatingDay();
@@ -1300,9 +1300,9 @@ $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
 
-// ── Controller Rental status per active console ──────────────────────────────
+// â”€â”€ Controller Rental status per active console â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Maps console_id => [ qty => int, total_cost => float, session_id => int ]
-// Rows tagged [ENDED] are excluded — they represent returned controllers.
+// Rows tagged [ENDED] are excluded â€” they represent returned controllers.
 $ctrlRentalByConsole = [];
 $crQ = $conn->query(
     "SELECT gs.console_id,
@@ -1350,7 +1350,7 @@ if ($crQ) {
     }
 }
 
-// ── Controllers ──────────────────────────────────────────────────────────────
+// â”€â”€ Controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $allControllers      = [];
 $archivedControllers = [];
 $_res = $conn->query("
@@ -1495,13 +1495,13 @@ foreach ($recentSessions as $sess) {
     if ($sess['status'] === 'active') {
         // For hourly sessions: show in Pending if not fully paid.
         // computeHourlySessionBaseCost() reverses the free-bonus so 4hr+1hr-free
-        // sessions correctly report ₱320 base (not ₱400).
-        // Include sessions with ₱0 upfront (need to collect full amount at end).
+        // sessions correctly report â‚±320 base (not â‚±400).
+        // Include sessions with â‚±0 upfront (need to collect full amount at end).
         if ($sess['rental_mode'] === 'hourly' && !empty($sess['planned_minutes'])) {
             $baseCost = computeHourlySessionBaseCost((int)$sess['planned_minutes']);
             $extras   = (float)($sess['approved_extras'] ?? 0);
             if ($paidSoFar >= $baseCost + $extras - 0.01) {
-                continue; // Fully paid — not a pending balance
+                continue; // Fully paid â€” not a pending balance
             }
         } elseif ($sess['rental_mode'] === 'unlimited') {
             continue; // Unlimited: flat rate already handled, skip
@@ -1527,7 +1527,7 @@ foreach ($recentSessions as $sess) {
 // Console usage (all time)
 $usageReport = getConsoleUsageReport('2020-01-01', $today);
 
-// ── Cancellation Analytics (for Reports tab) ──────────────────────────────────
+// â”€â”€ Cancellation Analytics (for Reports tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Overall counts
 $cancelStatsRow = $conn->query(
@@ -1664,9 +1664,9 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     <script src="assets/js/admin_search.js"></script>
     <script>window.GSPOT_CSRF = <?= json_encode(csrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;</script>
     <style>
-        /* ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ 
+        /* â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
            ADMIN DESIGN SYSTEM - CSS Custom Properties
-        ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═  */
+        â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â•  */
         :root {
             --clr-mint:    #20c8a1;
             --clr-blue:    #5f85da;
@@ -1685,7 +1685,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             --shadow-card: 0 4px 24px rgba(0,0,0,.35);
         }
 
-        /* ── Global Dark Selects ── */
+        /* â”€â”€ Global Dark Selects â”€â”€ */
         select, .res-input {
             background-color: #0d1b3e !important;
             color: #fff !important;
@@ -1715,7 +1715,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             cursor: pointer !important;
         }
 
-        /* ── Flash messages ── */
+        /* â”€â”€ Flash messages â”€â”€ */
         .flash-msg {
             position: fixed; top: 80px; right: 20px; z-index: 9999;
             padding: 14px 20px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
@@ -1729,23 +1729,23 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         .flash-msg.warning { background: rgba(241,168,60,.15);  border: 1px solid rgba(241,168,60,.4);  color: var(--clr-gold); }
         @keyframes slideInRight { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 
-        /* ── Status dots ── */
+        /* â”€â”€ Status dots â”€â”€ */
         .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
         .status-dot.available   { background:var(--clr-mint); box-shadow:0 0 6px rgba(32,200,161,.5); }
         .status-dot.in_use      { background:var(--clr-blue); }
         .status-dot.maintenance { background:var(--clr-coral); }
 
-        /* ── Console type badges ── */
+        /* â”€â”€ Console type badges â”€â”€ */
         .console-type-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; letter-spacing:.3px; }
         .console-type-badge.ps5  { background:rgba(95,133,218,.18); color:#8aa4e8; border:1px solid rgba(95,133,218,.3); }
         .console-type-badge.ps4  { background:rgba(241,168,60,.15);  color:#f1a83c; border:1px solid rgba(241,168,60,.3); }
         .console-type-badge.xbox { background:rgba(32,200,161,.18);  color:#20c8a1; border:1px solid rgba(32,200,161,.3); }
 
-        /* ── Session timer ── */
+        /* â”€â”€ Session timer â”€â”€ */
         .session-timer { font-family: monospace; font-size: 13px; color: var(--clr-cream); font-weight: 700; }
         .session-timer.stale { color: var(--clr-coral); font-size:11px; font-weight:500; }
 
-        /* ── Page header pattern ── */
+        /* â”€â”€ Page header pattern â”€â”€ */
         .page-header {
             display: flex; align-items: flex-start; justify-content: space-between;
             flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
@@ -1758,7 +1758,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
             font-size: 13px; color: var(--clr-muted); margin: 0;
         }
 
-        /* ── Form layout ── */
+        /* â”€â”€ Form layout â”€â”€ */
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
         .form-group { margin-bottom:16px; }
         .form-group label {
@@ -1779,7 +1779,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         .form-check input { width:auto; accent-color:var(--clr-mint); }
         .form-hint { font-size:11px; color:#666; margin-top:5px; }
 
-        /* ── Stat cards ── */
+        /* â”€â”€ Stat cards â”€â”€ */
         .stat-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
         .stat-change.up { color:var(--clr-mint); font-size:12px; }
         .stat-icon {
@@ -1792,7 +1792,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         .stat-icon.bookings { background:rgba(179,123,236,.15); color:var(--clr-purple); }
         .stat-icon.consoles { background:rgba(241,225,170,.15); color:var(--clr-cream); }
 
-        /* ── Console cards ── */
+        /* â”€â”€ Console cards â”€â”€ */
         .console-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
         .console-card {
             background:var(--clr-surface); border:1px solid var(--clr-border);
@@ -1809,12 +1809,12 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         .console-rate  { font-size:13px; color:var(--clr-cream); margin-bottom:14px; font-weight:600; }
         .console-actions { display:flex; gap:6px; flex-wrap:wrap; }
 
-        /* ── Data table ── */
+        /* â”€â”€ Data table â”€â”€ */
         .data-table thead tr { background:rgba(10,33,81,.6); }
         .data-table tbody tr { transition:background .15s; }
         .data-table tbody tr:hover { background:rgba(95,133,218,.06); }
 
-        /* ── Badge ── */
+        /* â”€â”€ Badge â”€â”€ */
         .badge {
             display:inline-block; padding:3px 10px; border-radius:20px;
             font-size:11px; font-weight:700; letter-spacing:.4px; white-space:nowrap;
@@ -1828,25 +1828,25 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
         .badge.maintenance{ background:rgba(251,86,107,.2);  color:var(--clr-coral); }
         .badge.installed  { background:rgba(179,123,236,.2); color:var(--clr-purple); }
 
-        /* ── Empty state ── */
+        /* â”€â”€ Empty state â”€â”€ */
         .empty-state { text-align:center; padding:48px 20px; color:#444; }
         .empty-state i { font-size:40px; margin-bottom:14px; display:block; opacity:.5; }
         .empty-state p { margin:4px 0; font-size:14px; }
 
-        /* ── Responsive ── */
+        /* â”€â”€ Responsive â”€â”€ */
         @media (max-width:768px) { .form-row { grid-template-columns:1fr; } }
         @media (min-width:769px) {
             .menu-toggle { display:none !important; }
             .sidebar-close-btn { display:none !important; visibility:hidden !important; }
         }
 
-        /* ── Sidebar hamburger ── */
+        /* â”€â”€ Sidebar hamburger â”€â”€ */
         .sidebar-hamburger .sidebar-ham-icon {
             font-size: 14px; color: rgba(255,255,255,0.55); transition: color 0.2s ease; width: auto;
         }
         .sidebar-hamburger:hover .sidebar-ham-icon { color: var(--clr-mint); }
 
-        /* ── Admin user dropdown ── */
+        /* â”€â”€ Admin user dropdown â”€â”€ */
         .admin-user-dropdown { position:relative; }
         .admin-user-toggle {
             display:flex; align-items:center; gap:10px;
@@ -1947,7 +1947,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 <?php endif; ?>
 
 
-<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -2022,7 +2022,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
 </div>
 
-<!-- ── Top Bar ──────────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="topbar">
     <div class="topbar-left">
         <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
@@ -2030,7 +2030,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     </div>
     <div class="topbar-right">
 
-        <!-- ── Bell Notification Icon ──────────────────────────────────── -->
+        <!-- â”€â”€ Bell Notification Icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
         <div class="notif-bell-wrap" id="notifBellWrap" style="position:relative;">
             <button id="notifBellBtn" onclick="toggleNotifDropdown()"
                 title="Reservations"
@@ -2120,7 +2120,7 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
     </div>
 </div>
 
-<!-- ── Main Content ──────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div class="main-content">
 
 <?php include __DIR__ . '/admin_sections/dashboard.php'; ?>
@@ -2138,13 +2138,13 @@ $initMaxResId = (int)$initResRow->fetch_assoc()['max_id'];
 
 </div><!-- /.main-content -->
 <?php include __DIR__ . '/admin_sections/modals.php'; ?>
-<!-- ── JavaScript ── -->
+<!-- â”€â”€ JavaScript â”€â”€ -->
 <script src="assets/libs/aos/aos.js"></script>
 <script>
 window.GSPOT_CSRF = '<?= csrfToken() ?>';
 window._CSRF = window.GSPOT_CSRF;
 
-// ── Admin user dropdown (Moved to top for reliability) ──
+// â”€â”€ Admin user dropdown (Moved to top for reliability) â”€â”€
 (function () {
     const btn      = document.getElementById('adminUserBtn');
     const dropdown = document.getElementById('adminUserDropdown');
@@ -2158,11 +2158,11 @@ window._CSRF = window.GSPOT_CSRF;
     });
 })();
 
-// ── Navigation ──
+// â”€â”€ Navigation â”€â”€
 function showPage(page, el) {
     // Clear any active bulk selection when switching pages
     if (window.BulkManager) window.BulkManager.init('');
-    // ── Role-Based Access Check ──
+    // â”€â”€ Role-Based Access Check â”€â”€
     const userRole = '<?= $user['role'] ?>';
     const restricted = ['consoles', 'activity_logs', 'blocked_dates', 'settings'];
     if (userRole === 'shopkeeper' && restricted.includes(page)) {
@@ -2209,7 +2209,7 @@ function showPage(page, el) {
     // Persist active page in URL hash so reloads stay on the same section
     history.replaceState(null, '', '#' + page);
 
-    // ── Unified Console Colors (global) ──────────────────────────────────────
+    // â”€â”€ Unified Console Colors (global) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Used by Charts. Must be defined BEFORE renderCharts() can run.
     if (typeof window.getConsoleColor !== 'function') {
         window.getConsoleColor = function(label) {
@@ -2250,7 +2250,7 @@ function showPage(page, el) {
 // track which section is currently visible (for live-refresh)
 var _currentSection = 'dashboard';
 
-// ── Live Section Refresh ─────────────────────────────────────────────────────
+// â”€â”€ Live Section Refresh â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Every 12 seconds, re-fetches the active section's rendered HTML from the server
 // and updates the DOM - keeps reservations, sessions, dashboard etc. live without reload.
 (function () {
@@ -2314,7 +2314,7 @@ var _currentSection = 'dashboard';
             return;
         }
 
-        // ── Preserve UI State (Filters, Search, etc.) ──
+        // â”€â”€ Preserve UI State (Filters, Search, etc.) â”€â”€
         // We find all "admin search bar" inputs and selects within this section.
         var stateMap = {};
         container.querySelectorAll('.asb-input, .asb-select').forEach(function(el) {
@@ -2338,7 +2338,7 @@ var _currentSection = 'dashboard';
 
                 container.innerHTML = data.html;
 
-                // ── Restore UI State ──
+                // â”€â”€ Restore UI State â”€â”€
                 for (var id in stateMap) {
                     var el = document.getElementById(id);
                     if (el) {
@@ -2373,7 +2373,7 @@ var _currentSection = 'dashboard';
     }, 5000);
 
     // Also refresh immediately when switching to a refreshable section
-    // ── Start Session Modal ──
+    // â”€â”€ Start Session Modal â”€â”€
     var _origShowPage = window.showPage;
     window.showPage = function(page, el) {
         _currentSection = page;
@@ -2460,7 +2460,7 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeSidebar();
 });
 
-// ── Start Session Modal ──
+// â”€â”€ Start Session Modal â”€â”€
 function onRentalModeChange() {
     const mode            = document.getElementById('rentalModeSelect').value;
     const group           = document.getElementById('durationPickerGroup');
@@ -2575,7 +2575,7 @@ function restrictStartSessionDuration() {
     }
 }
 
-/** Paid minutes to total play (paid + bonus) — mirrors PHP paidToTotalMinutes; requires global PRICING. */
+/** Paid minutes to total play (paid + bonus) â€” mirrors PHP paidToTotalMinutes; requires global PRICING. */
 function jsPaidToTotalMinutes(paid) {
     if (typeof PRICING === 'undefined') return paid;
     const p = parseInt(paid, 10) || 0;
@@ -2590,7 +2590,7 @@ function jsPaidToTotalMinutes(paid) {
 var ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI = 720;
 
 /**
- * Same bonus/bracket timing as console open-time (_timedCost): use controller ₱/hr on paid blocks
+ * Same bonus/bracket timing as console open-time (_timedCost): use controller â‚±/hr on paid blocks
  * and scale tier/bracket peso amounts vs the selected console reference rate.
  */
 function _controllerOpenTimeFee(totalMin, controllerHourlyRate) {
@@ -2658,7 +2658,7 @@ function onAdminCtrlRentalModeChange(ctrl) {
     if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
 }
 
-/** Sync controller rental mode to console mode: Unlimited console → hourly add-on (+ 12h default elsewhere); OT → OT. */
+/** Sync controller rental mode to console mode: Unlimited console â†’ hourly add-on (+ 12h default elsewhere); OT â†’ OT. */
 function syncControllerRentalModesFromSession() {
     const m = document.getElementById('rentalModeSelect')?.value || 'hourly';
     ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(function (id) {
@@ -2672,7 +2672,7 @@ function syncControllerRentalModesFromSession() {
     });
 }
 
-/** Unlimited console sessions: preset non–Open-Time controller durations to 12h (until staff changes). */
+/** Unlimited console sessions: preset nonâ€“Open-Time controller durations to 12h (until staff changes). */
 function applyTwelveHourForUnlimitedConsoleSession(force) {
     const sessMode = document.getElementById('rentalModeSelect')?.value || '';
     const tog      = document.getElementById('controllerRentalToggle');
@@ -2822,7 +2822,7 @@ function getStartSessionControllerDurationError() {
     return '';
 }
 
-/* ── Controller Rental: Xbox-only ─────────────────────────────────────────────
+/* â”€â”€ Controller Rental: Xbox-only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Hides/shows the controller rental checkbox depending on the selected
 console type. Only Xbox units support controller rentals.
 */
@@ -2868,21 +2868,21 @@ function onConsoleChange() {
         
         // Populate specific controller select
         if (cSelect) {
-            cSelect.innerHTML = '<option value="" disabled selected>— Select Controller 1 —</option>';
+            cSelect.innerHTML = '<option value="" disabled selected>â€” Select Controller 1 â€”</option>';
             const cSelect2 = document.getElementById('controllerSelect2');
-            if (cSelect2) cSelect2.innerHTML = '<option value="" disabled selected>— Select Controller 2 —</option>';
+            if (cSelect2) cSelect2.innerHTML = '<option value="" disabled selected>â€” Select Controller 2 â€”</option>';
             ctrlList.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.id;
                 opt.dataset.rate = c.rate;
-                opt.textContent = `${c.unit} (+₱${c.rate}/hr)`;
+                opt.textContent = `${c.unit} (+â‚±${c.rate}/hr)`;
                 cSelect.appendChild(opt);
                 
                 if (cSelect2) {
                     const opt2 = document.createElement('option');
                     opt2.value = c.id;
                     opt2.dataset.rate = c.rate;
-                    opt2.textContent = `${c.unit} (+₱${c.rate}/hr)`;
+                    opt2.textContent = `${c.unit} (+â‚±${c.rate}/hr)`;
                     cSelect2.appendChild(opt2);
                 }
             });
@@ -3177,7 +3177,7 @@ function toggleStartPaymentFields(checkbox) {
     _syncStartBtn();
 }
 
-/* ── Change calculator ──
+/* â”€â”€ Change calculator â”€â”€
    tenderedId  : id of the amount-tendered input
    displayId   : id of the change display div
    costHolderId: id of element whose textContent/value holds the amount due
@@ -3204,14 +3204,14 @@ function calcChange(tenderedId, displayId, costHolderId) {
         disp.style.background = 'rgba(32,200,161,.15)';
         disp.style.border     = '1px solid rgba(32,200,161,.3)';
         disp.style.color      = '#20c8a1';
-        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>â‚±${change.toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'none';
         if (payShortNotice) payShortNotice.style.display = 'none';
     } else {
         disp.style.background = 'rgba(251,86,107,.15)';
         disp.style.border     = '1px solid rgba(251,86,107,.3)';
         disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient - short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient - short by <strong>â‚±${Math.abs(change).toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'block';
         if (payShortNotice) payShortNotice.style.display = 'block';
     }
@@ -3287,7 +3287,7 @@ function syncTenderedAndSubmit(e) {
             input.style.borderColor = '#fb566b';
             input.style.boxShadow   = '0 0 0 3px rgba(251,86,107,.25)';
             input.focus();
-            input.setAttribute('placeholder', '⚠ Enter amount tendered');
+            input.setAttribute('placeholder', 'âš  Enter amount tendered');
             return false;
         }
     }
@@ -3331,7 +3331,7 @@ function updateSessionPreview() {
     if (costHolder) costHolder.textContent = cost.toFixed(2);
 
     document.getElementById('previewEndTime').textContent = endStr;
-    document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
+    document.getElementById('previewCost').textContent    = 'â‚±' + cost.toFixed(2);
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
     if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
@@ -3352,14 +3352,14 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('startSessionForm').addEventListener('submit', function (e) {
         const mode = document.getElementById('rentalModeSelect').value;
 
-        // ── Validation 1: hourly requires a duration ──────────────────────
+        // â”€â”€ Validation 1: hourly requires a duration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (mode === 'hourly' && !document.getElementById('durationSelect').value) {
             e.preventDefault();
             showInlineToast('Please select a duration for the hourly session.', 'error');
             return;
         }
 
-        // ── Validation 2: short payment guard ─────────────────────────────
+        // â”€â”€ Validation 2: short payment guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Hourly optional collect-now
         if (mode === 'hourly') {
             const collectNow = document.getElementById('collectNowToggle');
@@ -3399,7 +3399,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Wire up live re-validation to dismiss the error when user fixes the amount
-    // ── Modals ──
+    // â”€â”€ Modals â”€â”€
     ['startTendered','unlimTendered'].forEach(function(id) {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', function() { _clearStartShortError(); });
@@ -3436,7 +3436,7 @@ function _clearStartShortError() {
 }
 
 /**
- * _syncStartBtn — called live on every input, cost change, or mode change.
+ * _syncStartBtn â€” called live on every input, cost change, or mode change.
  * Disables the Start button if the tendered amount is empty or below the session cost.
  */
 function _syncStartBtn() {
@@ -3508,12 +3508,12 @@ document.querySelectorAll('.modal').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
 });
 
-/* ── Billing helpers - all values driven from DB via getPricingRules() ──────── *
+/* â”€â”€ Billing helpers - all values driven from DB via getPricingRules() â”€â”€â”€â”€â”€â”€â”€â”€ *
  * PRICING is injected by PHP so the JS always matches the backend.
  * _bracketCost / _timedCost are unchanged in shape - only their constants move.
  */
 const PRICING = <?= json_encode(getPricingRules()) ?>;
-// Available controllers for the rental dropdown — populated from DB on page load
+// Available controllers for the rental dropdown â€” populated from DB on page load
 const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
 /**
@@ -3562,10 +3562,10 @@ function _timedCost(totalMin) {
 function _hourlyCost(duration, planned) {
     const overtime = duration - planned;
     if (overtime <= 0) {
-        // Early or exact end — bill only actual elapsed time
+        // Early or exact end â€” bill only actual elapsed time
         return duration <= 0 ? 0 : _timedCost(duration);
     }
-    // Overtime — base (planned cost) + overtime brackets
+    // Overtime â€” base (planned cost) + overtime brackets
     const base = planned <= 30 ? PRICING.session_min_charge : _timedCost(planned);
     return base + _timedCost(overtime);
 }
@@ -3575,9 +3575,9 @@ let _endModalTimer = null;   // holds the live-update interval
 // Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
 let _pendingRefundArgs = null;
 
-/* ── Session-end audio alert (Web Audio API - no file needed) ──────────────
+/* â”€â”€ Session-end audio alert (Web Audio API - no file needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Plays a short 3-beep chime when the admin confirms ending a session.
-Uses the browser’s built-in synthesis - works offline, no CDN required.
+Uses the browserâ€™s built-in synthesis - works offline, no CDN required.
 */
 function playSessionEndSound() {
     try {
@@ -3630,12 +3630,12 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
         const h = Math.floor(currentMins / 60), m = currentMins % 60;
         document.getElementById('ebd-time-label').textContent = h ? `${h}h ${m}m` : `${m}m`;
-        document.getElementById('ebd-gross-cost').textContent = '₱' + grossTimeCost.toFixed(2);
+        document.getElementById('ebd-gross-cost').textContent = 'â‚±' + grossTimeCost.toFixed(2);
         
         const extrasRow = document.getElementById('ebd-extras-row');
         if (extras > 0) {
             extrasRow.style.display = 'flex';
-            document.getElementById('ebd-extras-cost').textContent = '₱' + extras.toFixed(2);
+            document.getElementById('ebd-extras-cost').textContent = 'â‚±' + extras.toFixed(2);
         } else {
             extrasRow.style.display = 'none';
         }
@@ -3646,7 +3646,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const pureUpfront = Math.max(0, upfrontPaid - reservationDownpayment);
         if (pureUpfront > 0) {
             upfrontRow.style.display = 'flex';
-            document.getElementById('ebd-upfront-paid').textContent = '-₱' + pureUpfront.toFixed(2);
+            document.getElementById('ebd-upfront-paid').textContent = '-â‚±' + pureUpfront.toFixed(2);
         } else {
             upfrontRow.style.display = 'none';
         }
@@ -3654,16 +3654,16 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const resRow = document.getElementById('ebd-res-row');
         if (reservationDownpayment > 0) {
             resRow.style.display = 'flex';
-            document.getElementById('ebd-res-credit').textContent = '-₱' + reservationDownpayment.toFixed(2);
+            document.getElementById('ebd-res-credit').textContent = '-â‚±' + reservationDownpayment.toFixed(2);
         } else {
             resRow.style.display = 'none';
         }
 
-        document.getElementById('ebd-final-due').textContent = '₱' + Math.max(0, finalDue).toFixed(2);
+        document.getElementById('ebd-final-due').textContent = 'â‚±' + Math.max(0, finalDue).toFixed(2);
     }
     sourceReservationId    = sourceReservationId    || 0;
 
-    // ── Reservation-source notice ─────────────────────────────────────────
+    // â”€â”€ Reservation-source notice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Show a pill inside the modal if this session was started from a reservation
     const resNotice = document.getElementById('endSessionResNotice');
     if (resNotice) {
@@ -3682,19 +3682,17 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         }
     }
 
-    // ── Early-end guard (hourly only) ────────────────────────────────────
-    const earlyWarning    = document.getElementById('endEarlyWarning');
-    const earlyRemStr     = document.getElementById('endEarlyRemainingStr');
-    const earlyRefundBtn  = document.getElementById('endEarlyRefundBtn');
-    const confirmBtn      = document.getElementById('endSessionConfirmBtn');
+    // â”€â”€ Confirm button always enabled (no early-end refund flow) â”€â”€
+    const confirmBtn = document.getElementById('endSessionConfirmBtn');
+    if (confirmBtn) {
+        confirmBtn.disabled      = false;
+        confirmBtn.style.opacity = '1';
+        confirmBtn.style.cursor  = 'pointer';
+    }
 
-    // Reset guard UI first
-    earlyWarning.style.display = 'none';
-    confirmBtn.disabled        = false;
-    confirmBtn.style.opacity   = '1';
-    confirmBtn.style.cursor    = 'pointer';
+    // â”€â”€ End early-end guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    // ── Helper: drive the extras pill badge below the big cost number ─────
+    // â”€â”€ Helper: drive the extras pill badge below the big cost number â”€â”€â”€â”€â”€
     function updateExtrasTag(extrasVal, items) {
         const tag     = document.getElementById('endExtrasTag');
         const tagText = document.getElementById('endExtrasTagText');
@@ -3708,199 +3706,14 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         }
     }
 
-    if (mode === 'hourly' && plannedMinutes && startTs) {
-        const nowSec    = Math.floor(Date.now() / 1000);
-        const elapsed   = nowSec - startTs;           // total elapsed seconds
-        const remaining = (plannedMinutes * 60) - elapsed; // seconds
 
-        if (remaining > 0) {
-            // ── Remaining time label ─────────────────────────────────────
-            const remH = Math.floor(remaining / 3600);
-            const remM = Math.floor((remaining % 3600) / 60);
-            const remS = remaining % 60;
-            earlyRemStr.textContent = (remH ? remH + 'h ' : '') +
-                String(remM).padStart(2,'0') + ':' + String(remS).padStart(2,'0');
+    // â”€â”€ End early-end guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-            // ── Consumed time & cost calculation ─────────────────────────
-            // Elapsed label for the "Time Used (Xh YYm)" row in the modal
-            const elapsedMin   = Math.floor(elapsed / 60);
-            const elapsedHrs   = Math.floor(elapsedMin / 60);
-            const elapsedMRem  = elapsedMin % 60;
-            const elapsedLabel = (elapsedHrs ? elapsedHrs + 'h ' : '') +
-                                 String(elapsedMRem).padStart(2, '0') + 'm';
-            const elapsedEl = document.getElementById('endEarlyElapsedStr');
-            if (elapsedEl) elapsedEl.textContent = '(' + elapsedLabel + ')';
 
-            // ── Bracket-based billing (mirrors PHP computeTimedCost) ──────────
-            // Uses _timedCost() which already matches backend logic exactly:
-            //   1-4 min  = ₱0  (grace — avoids brutal tiny charges)
-            //   5-19 min = ₱20, 20-34 = ₱40, 35-49 = ₱60, 50-59 = ₱80
-            // Brackets automatically adjust when hourly_rate changes in Settings.
-            const maxBillable  = Math.max(0, upfrontPaid - reservationDownpayment);
-            const timeCost     = Math.min(maxBillable, _timedCost(elapsedMin));
-            const consumedCost = timeCost + extras;        // add extras (controller rental etc.)
-            const nonRefundBase = reservationDownpayment;  // non-refundable portion
-            const rawRefund    = upfrontPaid - consumedCost;
-            const refundAmt    = Math.max(0, Math.round((rawRefund - nonRefundBase) * 100) / 100);
-            const hasRefund    = refundAmt > 0;
 
-            // Time Used row: show time-only cost (not extras)
-            document.getElementById('endEarlyConsumedCost').textContent = '₱' + timeCost.toFixed(2);
-            document.getElementById('endEarlyUpfrontStr').textContent  = '₱' + upfrontPaid.toFixed(2);
-            document.getElementById('endEarlyRefundAmt').textContent   = '₱' + refundAmt.toFixed(2);
-            document.getElementById('endEarlyRefundBtnAmt').textContent = '₱' + refundAmt.toFixed(2);
 
-            // ── Show / hide Additional Fees row ──────────────────────────
-            const extrasRow   = document.getElementById('endEarlyExtrasRow');
-            const extrasAmt   = document.getElementById('endEarlyExtrasAmt');
-            const extrasLabel = document.getElementById('endEarlyExtrasLabel');
-            if (extrasRow) {
-                if (extras > 0) {
-                    extrasRow.style.display  = 'flex';
-                    extrasAmt.textContent    = '+₱' + extras.toFixed(2);
-                    // Build a compact label from extra items if available
-                    const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
-                    extrasLabel.textContent  = itemNames ? '(' + itemNames + ')' : '';
-                } else {
-                    extrasRow.style.display = 'none';
-                }
-            }
 
-            const noRefundNote   = document.getElementById('endEarlyNoRefundNote');
-            const noRefundReason = document.getElementById('endEarlyNoRefundReason');
-            if (noRefundNote) {
-                noRefundNote.style.display = hasRefund ? 'none' : 'block';
-                if (noRefundReason) {
-                    if (upfrontPaid === 0) {
-                        noRefundReason.textContent = 'Nothing was paid upfront — balance will be collected at check-out.';
-                    } else if (consumedCost > upfrontPaid) {
-                        // Customer owes MORE than they paid — flag this
-                        const stillOwed = (consumedCost - upfrontPaid).toFixed(2);
-                        noRefundReason.innerHTML =
-                            '<span style="color:#f1a83c;font-weight:700;">' +
-                            '\u20b1' + stillOwed + ' still owed</span> — consumed cost (\u20b1' +
-                            consumedCost.toFixed(2) + ') exceeds upfront paid. ' +
-                            'Collect via <strong>Pending Payments</strong> after session ends.';
-                    } else if (nonRefundBase > 0 && (upfrontPaid - consumedCost) <= nonRefundBase) {
-                        // Reservation downpayment absorbs any potential refund
-                        noRefundReason.innerHTML =
-                            'Reservation fee of <strong style="color:#fb566b;">\u20b1' + nonRefundBase.toFixed(2) +
-                            '</strong> is non-refundable — no excess amount to return.';
-                    } else {
-                        noRefundReason.textContent = 'Additional fees consume the remaining balance — no refund needed.';
-                    }
-                }
-            }
-
-            // Colour the refund amount: green if 0, red if positive
-            const refundEl = document.getElementById('endEarlyRefundAmt');
-            refundEl.style.color = hasRefund ? '#fb566b' : '#888';
-
-            // ── Show warning, disable confirm button ─────────────────────
-            earlyWarning.style.display = 'block';
-
-            if (hasRefund) {
-                // Money to return — require Refund & End flow
-                confirmBtn.disabled      = true;
-                confirmBtn.style.opacity = '0.35';
-                confirmBtn.style.cursor  = 'not-allowed';
-                earlyRefundBtn.style.display = 'flex';
-            } else {
-                // No refund (reservation fee absorbed it, or consumed >= upfront)
-                confirmBtn.disabled      = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor  = 'pointer';
-                earlyRefundBtn.style.display = 'none';
-            }
-
-            // ── Wire up "Refund & End" button ────────────────────────────
-            _pendingRefundArgs = { sessionId, customerName, unitNumber, upfrontPaid, refundAmt, consumedCost, elapsedLabel, nonRefundBase };
-
-            earlyRefundBtn.onclick = function () {
-                closeModal('endSession');
-
-                // Open the refund modal
-                openRefundModal(
-                    _pendingRefundArgs.sessionId,
-                    _pendingRefundArgs.customerName,
-                    _pendingRefundArgs.unitNumber,
-                    _pendingRefundArgs.upfrontPaid
-                );
-
-                // Set action_type for ajax/refund.php
-                document.getElementById('refundActionField').value  = 'early_end';
-                document.getElementById('refundEarlyEndFlag').value = '1';
-
-                // Pre-fill refund amount - always locked for early-end flow
-                const amtEl = document.getElementById('refundAmount');
-                if (amtEl) {
-                    amtEl.value           = _pendingRefundArgs.refundAmt.toFixed(2);
-                    amtEl.readOnly        = true;   // always read-only; amount is pre-calculated
-                    amtEl.style.opacity   = '1';
-                    amtEl.style.background  = 'rgba(32,200,161,.06)';
-                    amtEl.style.borderColor = 'rgba(32,200,161,.35)';
-                    amtEl.style.cursor      = 'not-allowed';
-                }
-
-                // Show auto-calc breakdown hint
-                const hintEl = document.getElementById('refundAutoCalcHint');
-                if (hintEl) {
-                    const paid     = _pendingRefundArgs.upfrontPaid;
-                    const consumed = _pendingRefundArgs.consumedCost;
-                    const refund   = _pendingRefundArgs.refundAmt;
-                    hintEl.style.display = 'block';
-                    if (refund > 0) {
-                        hintEl.innerHTML =
-                            '<i class="fas fa-calculator" style="margin-right:5px;color:#f1a83c;"></i>' +
-                            '<strong>\u20b1' + paid.toFixed(2) + ' paid</strong> \u2212 ' +
-                            '<strong>\u20b1' + consumed.toFixed(2) + ' consumed</strong> = ' +
-                            '<strong style="color:#fb566b;">\u20b1' + refund.toFixed(2) + ' refund</strong>';
-                        hintEl.style.color = '#f1e1aa';
-                    } else if (consumed > paid) {
-                        // Customer owes more - warn clearly
-                        const owed = (consumed - paid).toFixed(2);
-                        hintEl.innerHTML =
-                            '<i class="fas fa-triangle-exclamation" style="margin-right:5px;color:#f1a83c;"></i>' +
-                            'Consumed cost (\u20b1' + consumed.toFixed(2) + ') exceeds upfront paid (\u20b1' + paid.toFixed(2) + '). ' +
-                            '<strong style="color:#f1a83c;">\u20b1' + owed + ' still owed</strong> - will appear in Pending Payments.';
-                        hintEl.style.color = '#f1e1aa';
-                    } else {
-                        hintEl.innerHTML =
-                            '<i class="fas fa-info-circle" style="margin-right:5px;color:#888;"></i>' +
-                            'Consumed cost (\u20b1' + consumed.toFixed(2) + ') covers the full upfront amount \u2014 no refund.';
-                        hintEl.style.color = '#888';
-                    }
-                }
-
-                // Clear stale errors
-                const errMsg = document.getElementById('refundErrorMsg');
-                if (errMsg) errMsg.style.display = 'none';
-
-                // Pre-fill reason
-                const reasonEl = document.getElementById('refundReason');
-                if (reasonEl) {
-                    reasonEl.value =
-                        'Early end \u2013 used ' + _pendingRefundArgs.elapsedLabel +
-                        ' (\u20b1' + _pendingRefundArgs.consumedCost.toFixed(2) + ')' +
-                        ', refunding unused time (\u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ')';
-                }
-
-                // Show early-end notice inside refund modal
-                const earlyNote = document.getElementById('refundEarlyEndNote');
-                if (earlyNote) earlyNote.style.display = 'block';
-
-                // Update confirm button label
-                const lbl = document.getElementById('refundConfirmLabel');
-                if (lbl) {
-                    lbl.textContent = _pendingRefundArgs.refundAmt > 0
-                        ? 'Refund \u20b1' + _pendingRefundArgs.refundAmt.toFixed(2) + ' & End Session'
-                        : 'End Session (No Refund)';
-                }
-            };
-        }
-    }
-
-    // ── End early-end guard ───────────────────────────────────────────────
+    // â”€â”€ End early-end guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const panel       = document.getElementById('endCostPanel');
     const elapsedEl   = document.getElementById('endElapsed');
@@ -3964,7 +3777,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
     document.getElementById('endSessionSummary').textContent =
         `Ending session #${sessionId} - ${customerName} on ${unitNumber} (${modeLabel})`;
 
-    /* ── OPEN TIME: pay at end, show live ticking cost ── */
+    /* â”€â”€ OPEN TIME: pay at end, show live ticking cost â”€â”€ */
     if (mode === 'open_time' && startTs) {
         titleEl.innerHTML     = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session & Collect Payment';
         panel.style.display   = 'block';
@@ -3990,7 +3803,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
             // Sync cost holder + big display
             if (remaining > 0) {
-                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
+                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: â‚±' + upfrontPaid.toFixed(2) + ')' : ''}`);
             } else {
                 hideAmountDue();
                 costHolder.value = '0';
@@ -4000,15 +3813,15 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         tick();
         _endModalTimer = setInterval(tick, 1000);
 
-    /* ── HOURLY: charge actual elapsed time; overtime if beyond booked ── */
+    /* â”€â”€ HOURLY: charge actual elapsed time; overtime if beyond booked â”€â”€ */
     } else if (mode === 'hourly' && plannedMinutes) {
         const elapsed  = Math.floor((Date.now() / 1000) - startTs);
         const minutes  = Math.floor(elapsed / 60);
         const overtime = minutes - plannedMinutes; // positive = over booked time
 
         // Actual cost = what we bill RIGHT NOW based on elapsed time
-        // Early end  → _timedCost(elapsed minutes)   [matches PHP computeRentalFee early-end path]
-        // Overtime   → planned base + overtime bracket charge
+        // Early end  â†’ _timedCost(elapsed minutes)   [matches PHP computeRentalFee early-end path]
+        // Overtime   â†’ planned base + overtime bracket charge
         let cost;
         if (overtime > 0) {
             const base = upfrontPaid > 0
@@ -4016,7 +3829,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
             cost = base + _timedCost(overtime) + extras;
         } else {
-            // Early or exact end — charge only actual consumed time
+            // Early or exact end â€” charge only actual consumed time
             cost = (minutes <= 0 ? 0 : _timedCost(minutes)) + extras;
         }
 
@@ -4035,13 +3848,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 const base = upfrontPaid > 0
                     ? upfrontPaid
                     : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
-                setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
-                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
-                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
+                setAmountDue(remaining, `Total base + overtime: â‚±${cost.toFixed(2)} - Prepaid: â‚±${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (â‚±${base.toFixed(2)}).<br>`
+                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: â‚±${remaining.toFixed(2)}.</span>`;
             } else {
-                // Early end — collect actual time cost only
-                setAmountDue(remaining, `Actual time used: ${minutes}m → ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
-                noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end — charged for <strong>${minutes} min</strong> used. Collect <strong>₱${remaining.toFixed(2)}</strong> now.`;
+                // Early end â€” collect actual time cost only
+                setAmountDue(remaining, `Actual time used: ${minutes}m â†’ â‚±${cost.toFixed(2)} - Prepaid: â‚±${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end â€” charged for <strong>${minutes} min</strong> used. Collect <strong>â‚±${remaining.toFixed(2)}</strong> now.`;
             }
             
             // Update breakdown
@@ -4051,13 +3864,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
             payLabel.textContent      = 'Payment Method';
-            confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
+            confirmLbl.textContent    = `Confirm End & Collect â‚±${remaining.toFixed(2)}`;
         } else {
-            // Session fully paid (upfront ≥ actual cost)
+            // Session fully paid (upfront â‰¥ actual cost)
             hideAmountDue();
             costHolder.value = '0';
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Paid in Full';
-            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
+            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost â‚±${cost.toFixed(2)} already paid. No additional charge.`;
             payGroup.style.display    = 'none';
             prepaidNote.style.display = 'block';
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
@@ -4066,7 +3879,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             updateBreakdown(minutes, cost - extras, 0);
         }
 
-    /* ── UNLIMITED: flat rate was fully prepaid ── */
+    /* â”€â”€ UNLIMITED: flat rate was fully prepaid â”€â”€ */
     } else if (mode === 'unlimited') {
         titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Paid in Full';
         panel.style.display       = 'block';
@@ -4088,7 +3901,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         confirmLbl.textContent = 'Confirm End & Record Payment';
     }
 
-    /* ── Controller add-on: per-controller end-early panel ─────────────── */
+    /* â”€â”€ Controller add-on: per-controller end-early panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     const ctrlEarlyPanel = document.getElementById('endCtrlRentalEarlyPanel');
     const ctrlEarlyMsg   = document.getElementById('endCtrlRentalEarlyMsg');
     const endModalEl     = document.getElementById('endSessionModal');
@@ -4118,7 +3931,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             // Build header row
             let html = '<div style="font-weight:700;color:#8aa4e8;font-size:13px;margin-bottom:10px;">'
                      + '<i class="fas fa-gamepad" style="margin-right:6px;"></i> Controller add-on'
-                     + '<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px;">Return individual controllers early — fee prorated to elapsed time.</span>'
+                     + '<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px;">Return individual controllers early â€” fee prorated to elapsed time.</span>'
                      + '</div>';
 
             // Per-controller rows
@@ -4140,7 +3953,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                       + '    <i class="fas fa-gamepad" style="color:#8aa4e8;font-size:14px;flex-shrink:0;"></i>'
                       + '    <div style="flex:1;min-width:0;">'
                       + '      <div style="font-weight:700;color:#f0f0f0;font-size:13px;">' + cr.label + '</div>'
-                      + '      <div style="font-size:11px;color:#20c8a1;margin-top:2px;font-weight:600;">Actual fee: ₱' + fee + ' <span style="color:#666;font-weight:400;">(Used ' + durStr + ')</span></div>'
+                      + '      <div style="font-size:11px;color:#20c8a1;margin-top:2px;font-weight:600;">Actual fee: â‚±' + fee + ' <span style="color:#666;font-weight:400;">(Used ' + durStr + ')</span></div>'
                       + '    </div>'
                       + '    <button type="button" class="btn-sec btn-sm ctrl-single-prepare-btn" '
                       + '       data-cid="' + cr.controller_id + '" '
@@ -4160,7 +3973,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                       + '     </div>'
                       + '     <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">'
                       + '        <button type="button" class="ctrl-single-cancel-btn" data-cid="' + cr.controller_id + '" style="background:none; border:none; color:#fb566b; font-size:11px; cursor:pointer; padding:0;">Cancel</button>'
-                      + '        <button type="button" class="btn-prim btn-sm ctrl-single-confirm-btn" data-cid="' + cr.controller_id + '" data-fee="' + fee + '" style="font-size:11px; padding:5px 15px;">Confirm End · ₱' + fee + '</button>'
+                      + '        <button type="button" class="btn-prim btn-sm ctrl-single-confirm-btn" data-cid="' + cr.controller_id + '" data-fee="' + fee + '" style="font-size:11px; padding:5px 15px;">Confirm End Â· â‚±' + fee + '</button>'
                       + '     </div>'
                       + '  </div>'
                       + '</div>';
@@ -4240,13 +4053,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                                 }, 1500);
                             } else {
                                 btn.disabled = false;
-                                btn.innerHTML = 'Confirm End · ₱' + fee;
+                                btn.innerHTML = 'Confirm End Â· â‚±' + fee;
                                 alert(data.message || 'Failed.');
                             }
                         })
                         .catch(function() {
                             btn.disabled = false;
-                            btn.innerHTML = 'Confirm End · ₱' + fee;
+                            btn.innerHTML = 'Confirm End Â· â‚±' + fee;
                             alert('Network error.');
                         });
                 });
@@ -4278,8 +4091,8 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                     set('ecs-console', unitNumber);
                     set('ecs-rented', items.length === 1 ? items[0].rentedStr : 'Multiple');
                     set('ecs-ended', endedStr);
-                    set('ecs-duration', items.length === 1 ? items[0].durStr : '—');
-                    set('ecs-total-fee', '₱' + totalFee);
+                    set('ecs-duration', items.length === 1 ? items[0].durStr : 'â€”');
+                    set('ecs-total-fee', 'â‚±' + totalFee);
                     
                     // Show per-controller breakdown
                     const breakdown = document.getElementById('ecs-breakdown');
@@ -4289,7 +4102,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                         breakdownList.innerHTML = items.map(function(it) {
                             return '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">' +
                                    '  <span style="color:#aaa;"><i class="fas fa-gamepad" style="font-size:10px;margin-right:5px;"></i>' + it.label + ' <span style="color:#666;">(' + it.durStr + ')</span></span>' +
-                                   '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
+                                   '  <span style="color:#fff; font-weight:600;">â‚±' + it.fee + '</span>' +
                                    '</div>';
                         }).join('');
                     }
@@ -4298,7 +4111,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                     const confirmBtn = document.getElementById('ecsConfirmBtn');
                     if (confirmBtn) {
                         confirmBtn.disabled = false;
-                        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End All · ₱' + totalFee;
+                        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End All Â· â‚±' + totalFee;
                         confirmBtn.onclick = function() {
                             confirmEndControllerRental(sessionId, totalFee);
                         };
@@ -4358,7 +4171,7 @@ function gspotEndControllerRentalEarly(sid, items) {
     set('ecs-rented', rentedStr);
     set('ecs-ended', endedStr);
     set('ecs-duration', durStr);
-    set('ecs-total-fee', '₱' + totalFee);
+    set('ecs-total-fee', 'â‚±' + totalFee);
 
     // Breakdown display
     const breakdown = document.getElementById('ecs-breakdown');
@@ -4369,7 +4182,7 @@ function gspotEndControllerRentalEarly(sid, items) {
             breakdownList.innerHTML = items.map(function(it) {
                 return '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
                        '  <span style="color:#aaa;">' + it.label + '</span>' +
-                       '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
+                       '  <span style="color:#fff; font-weight:600;">â‚±' + it.fee + '</span>' +
                        '</div>';
             }).join('');
         } else if (!items && qty > 1) {
@@ -4379,7 +4192,7 @@ function gspotEndControllerRentalEarly(sid, items) {
                 breakdownList.innerHTML += 
                     '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
                     '  <span style="color:#aaa;">Controller ' + (i+1) + '</span>' +
-                    '  <span style="color:#fff; font-weight:600;">₱' + feePerCtrl + '</span>' +
+                    '  <span style="color:#fff; font-weight:600;">â‚±' + feePerCtrl + '</span>' +
                     '</div>';
             }
         } else {
@@ -4398,7 +4211,7 @@ function gspotEndControllerRentalEarly(sid, items) {
     openModal('endControllerSummary');
 }
 
-/* ── Pay Modal (collect outstanding balance, session continues) ──────── */
+/* â”€â”€ Pay Modal (collect outstanding balance, session continues) â”€â”€â”€â”€â”€â”€â”€â”€ */
 let _payModalTimer = null;
 
 function openPayModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, unlimitedRate) {
@@ -4478,7 +4291,7 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
             calcChange('payTendered','payChangeDisplay','payAmount');
     }
 
-    /* ── Open Time: live-ticking balance ── */
+    /* â”€â”€ Open Time: live-ticking balance â”€â”€ */
     if (mode === 'open_time' && startTs) {
         costPanel.style.display = 'block';
         var payTick = function() {
@@ -4488,55 +4301,55 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             const timeCost  = _timedCost(minutes);
             const totalCost = timeCost + extras;
-            costEl.textContent  = '₱' + totalCost.toFixed(2);
+            costEl.textContent  = 'â‚±' + totalCost.toFixed(2);
             const due = Math.max(0, totalCost - upfrontPaid);
             let sublabel = upfrontPaid > 0
-                ? 'Running cost ₱' + totalCost.toFixed(2) + ' - Already paid ₱' + upfrontPaid.toFixed(2)
+                ? 'Running cost â‚±' + totalCost.toFixed(2) + ' - Already paid â‚±' + upfrontPaid.toFixed(2)
                 : 'Cost accumulating - pay at any time';
             setPayDue(due, sublabel);
         };
         payTick();
         _payModalTimer = setInterval(payTick, 1000);
 
-    /* ── Hourly: snapshot at open time ── */
+    /* â”€â”€ Hourly: snapshot at open time â”€â”€ */
     } else if (mode === 'hourly' && plannedMinutes && startTs) {
         costPanel.style.display = 'block';
         const elapsed   = Math.floor((Date.now() / 1000) - startTs);
         const minutes   = Math.floor(elapsed / 60);
         const timeCost  = _hourlyCost(minutes, plannedMinutes);
-        const totalCost = timeCost + extras;               // → extras included
+        const totalCost = timeCost + extras;               // â†’Â extras included
         const due       = Math.max(0, totalCost - upfrontPaid);
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
-        costEl.textContent    = '₱' + totalCost.toFixed(2);
+        costEl.textContent    = 'â‚±' + totalCost.toFixed(2);
         const overtime  = Math.max(0, minutes - plannedMinutes);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
         let sublabel;
         if (overtime > 0) {
             const baseCost = plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes);
-            sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ') + ' + overtime + 'min overtime';
+            sublabel = 'Booked ' + bookedStr + ' (â‚±' + baseCost.toFixed(0) + ') + ' + overtime + 'min overtime';
         } else {
-            sublabel = 'Actual time used: ' + minutes + 'min → ₱' + timeCost.toFixed(2);
+            sublabel = 'Actual time used: ' + minutes + 'min â†’ â‚±' + timeCost.toFixed(2);
         }
-        if (upfrontPaid > 0) sublabel += ' - Prepaid ₱' + upfrontPaid.toFixed(2);
+        if (upfrontPaid > 0) sublabel += ' - Prepaid â‚±' + upfrontPaid.toFixed(2);
         if (extras > 0) {
             const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
-            sublabel += ' - +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
+            sublabel += ' - +â‚±' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
         }
         setPayDue(due, sublabel);
 
-    /* ── Unlimited: flat rate already paid; show extras if any ── */
+    /* â”€â”€ Unlimited: flat rate already paid; show extras if any â”€â”€ */
     } else if (mode === 'unlimited') {
         costPanel.style.display = 'none';
-        dueBigEl.textContent = extras > 0 ? '₱' + extras.toFixed(2) : '₱0.00';
+        dueBigEl.textContent = extras > 0 ? 'â‚±' + extras.toFixed(2) : 'â‚±0.00';
         dueBigEl.style.color = extras > 0 ? '#20c8a1' : '#888';
         dueLblEl.textContent = extras > 0
             ? 'Flat rate collected - extras outstanding'
             : 'Unlimited session - flat rate already collected at start';
         amtHidden.value = extras > 0 ? extras.toFixed(2) : '0';
         if (extras > 0) {
-            confirmLbl.textContent = 'Collect ₱' + extras.toFixed(2) + ' Balance';
+            confirmLbl.textContent = 'Collect â‚±' + extras.toFixed(2) + ' Balance';
             confirmBtn.disabled    = false;
             confirmBtn.style.opacity = '1';
         } else {
@@ -4583,7 +4396,7 @@ function syncPayBtn() {
     }
 }
 
-/* ── Refund Modal ─────────────────────────────────────────────────────── */
+/* â”€â”€ Refund Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reservationId) {
     const isRes = !!reservationId;
     const paid  = parseFloat(upfrontPaid || 0).toFixed(2);
@@ -4599,7 +4412,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     document.getElementById('refundSessionSummary').textContent = isRes
         ? 'Reservation #' + reservationId + ' - ' + customerName
         : 'Session #'     + sessionId     + ' - ' + customerName + ' on ' + unitNumber;
-    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
+    document.getElementById('refundPaidSoFar').textContent = 'â‚±' + paid;
 
     // Amount input - locked + pre-filled for reservation
     const amtInput = document.getElementById('refundAmount');
@@ -4631,7 +4444,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     openModal('refundSession');
 }
 
-/* ── Centralized Refund AJAX Submission ──────────────────────────────── */
+/* â”€â”€ Centralized Refund AJAX Submission â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function _submitRefundAjax() {
     const sessionId     = document.getElementById('refundSessionId').value;
     const reservationId = document.getElementById('refundReservationId').value;
@@ -4645,9 +4458,9 @@ function _submitRefundAjax() {
     if (isEarlyEnd) action_type = 'early_end';
 
     // Standard/manual refunds require a positive amount.
-    // early_end with ₱0 is allowed - the session ends with no refund transaction.
+    // early_end with â‚±0 is allowed - the session ends with no refund transaction.
     if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
-        _showRefundError('Please enter a refund amount greater than ₱0.');
+        _showRefundError('Please enter a refund amount greater than â‚±0.');
         return;
     }
 
@@ -4660,7 +4473,7 @@ function _submitRefundAjax() {
     gspotConfirm(confirmMsg, function () {
         const btn = document.getElementById('refundConfirmBtn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processingâ€¦';
 
         const body = new URLSearchParams({
             session_id:     sessionId     || '0',
@@ -4707,7 +4520,7 @@ function _showRefundError(msg) {
 }
 
 
-/* ── Extend Modal ─────────────────────────────────────────────────────── */
+/* â”€â”€ Extend Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes) {
     document.getElementById('extendSessionId').value = sessionId;
     document.getElementById('extendSessionSummary').textContent =
@@ -4737,7 +4550,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Ã¢”â‚¬Ã¢”â‚¬ Live Session Timers Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬Ã¢”â‚¬
+// ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ Live Session Timers ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -4747,7 +4560,7 @@ const overtimeBeeped = new WeakSet();
 // Tracks which timer elements already fired the 15-second warning beep
 const warningBeeped  = new WeakSet();
 
-/* ── Shared AudioContext ────────────────────────────────────────────────────
+/* â”€â”€ Shared AudioContext â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Browsers suspend AudioContext when it isn't created inside a user gesture.
    Keep one shared instance and call resume() before every sound so that
    setInterval-driven beeps (overtime, 15-sec warning) can always play.
@@ -4769,7 +4582,7 @@ function _getAudioCtx() {
 });
 
 /** 
- * ── LEVEL UP CHIME (Session Ending Alert) ──────────────────────────────────
+ * â”€â”€ LEVEL UP CHIME (Session Ending Alert) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * A dedicated, premium ascending arpeggio for session-related alerts.
  * Isolated from general notification sounds to ensure consistency.
  */
@@ -4813,7 +4626,7 @@ function playOvertimeBeep() {
     playLevelUpChime();
 }
 
-/* ── SOFT CHIME - plays for session-end warnings ──────────────────────────
+/* â”€â”€ SOFT CHIME - plays for session-end warnings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Replaces the emergency siren with a gentle, professional double-chime.
    Uses a pure sine wave with exponential decay for a 'bell-like' feel. */
 function playWarningBeep() {
@@ -4821,15 +4634,15 @@ function playWarningBeep() {
     playLevelUpChime();
 }
 
-/* ── SESSION ENDING ALARM MODAL ─────────────────────────────────────────────
+/* â”€â”€ SESSION ENDING ALARM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Fires at 15 s remaining for any hourly session.
-   • Covers the full screen (backdrop blocks all interaction)
-   • Cannot be dismissed by clicking outside or pressing Escape
-   • Auto-navigates the admin to the Sessions tab
-   • Offers two actions: Extend Session or End Session Now
-   • Countdown inside the modal ticks down every second
-   • Auto-dismissed when the session crosses into overtime              */
-var sessionEndingAlerts = {}; // key: el.dataset.start → modal element
+   â€¢ Covers the full screen (backdrop blocks all interaction)
+   â€¢ Cannot be dismissed by clicking outside or pressing Escape
+   â€¢ Auto-navigates the admin to the Sessions tab
+   â€¢ Offers two actions: Extend Session or End Session Now
+   â€¢ Countdown inside the modal ticks down every second
+   â€¢ Auto-dismissed when the session crosses into overtime              */
+var sessionEndingAlerts = {}; // key: el.dataset.start â†’ modal element
 
 function showSessionEndingAlert(el, remaining) {
     var key       = el.dataset.start;
@@ -4845,7 +4658,7 @@ function showSessionEndingAlert(el, remaining) {
     }
     sessionEndingAlerts[key] = true;
 
-    // ── Read session data from the timer element ─────────────────────────
+    // â”€â”€ Read session data from the timer element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     var customer     = el.dataset.customer     || 'Session';
     var unit         = el.dataset.unit         || '';
     var sessionId    = el.dataset.sessionId    || 0;
@@ -4855,11 +4668,11 @@ function showSessionEndingAlert(el, remaining) {
     var unlimRate    = parseFloat(el.dataset.unlimitedRate || 300);
     var bookedMin    = parseInt(el.dataset.bookedMinutes   || 0);
 
-    // ── Navigate to Sessions tab ──────────────────────────────────────────
+    // â”€â”€ Navigate to Sessions tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     var sessNavEl = document.querySelector('.nav-item[onclick*="\'sessions\'"]');
     if (sessNavEl) showPage('sessions', sessNavEl);
 
-    // ── Build the locked full-screen modal ───────────────────────────────
+    // â”€â”€ Build the locked full-screen modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     var overlay = document.createElement('div');
     overlay.id  = MODAL_ID;
     overlay.style.cssText =
@@ -4892,7 +4705,7 @@ function showSessionEndingAlert(el, remaining) {
             /* Headline */
             '<div style="font-size:10px;font-weight:800;letter-spacing:2.5px;' +
             'color:rgba(251,86,107,.7);text-transform:uppercase;margin-bottom:8px;">' +
-            '🚨 ALERT</div>' +
+            'ðŸš¨ ALERT</div>' +
             '<div style="font-size:22px;font-weight:900;color:#ff6060;margin-bottom:6px;' +
             'letter-spacing:-.3px;">Session Ending!</div>' +
             '<div style="font-size:14px;color:#f0c0c0;margin-bottom:20px;line-height:1.5;">' +
@@ -4945,13 +4758,13 @@ function showSessionEndingAlert(el, remaining) {
         if (bellIcon) bellIcon.style.display = '';
     }
 
-    // Extend button → open extend modal, close siren
+    // Extend button â†’ open extend modal, close siren
     document.getElementById('gspotSirenExtendBtn').addEventListener('click', function() {
         _closeSirenModal(key);
         openExtendModal(sessionId, customer, unit, bookedMin, mode);
     });
 
-    // End Now button → open end session modal, close siren
+    // End Now button â†’ open end session modal, close siren
     document.getElementById('gspotSirenEndBtn').addEventListener('click', function() {
         _closeSirenModal(key);
         // Open the modal in locked mode (prevent outside-click close)
@@ -4967,7 +4780,7 @@ function _sirenEscBlock(e) {
     }
 }
 
-// Flag: when true, the End Session modal was opened by the siren → prevent outside-click close
+// Flag: when true, the End Session modal was opened by the siren â†’ prevent outside-click close
 var _sirenTriggeredEnd = false;
 
 function _closeSirenModal(key) {
@@ -5035,10 +4848,10 @@ function updateTimers() {
         const now     = new Date();
         const elapsed = Math.floor((now - start) / 1000); // seconds
 
-        // Stale session guard (>24h open —  likely test/orphan data)
+        // Stale session guard (>24h open â€”  likely test/orphan data)
         if (elapsed > STALE_THRESHOLD) {
             el.classList.add('stale');
-            el.textContent = `⚠️ ${Math.floor(elapsed / 86400)}d old —  end session`;
+            el.textContent = `âš ï¸ ${Math.floor(elapsed / 86400)}d old â€”  end session`;
             return;
         }
 
@@ -5050,7 +4863,7 @@ function updateTimers() {
                 const m = Math.floor((remaining % 3600) / 60);
                 const s = remaining % 60;
 
-                // ── 15-second warning beep + popup (fires once per element) ───────
+                // â”€â”€ 15-second warning beep + popup (fires once per element) â”€â”€â”€â”€â”€â”€â”€
                 if (remaining <= 15 && !warningBeeped.has(el)) {
                     warningBeeped.add(el);
                     playWarningBeep();
@@ -5061,13 +4874,13 @@ function updateTimers() {
                     showSessionEndingAlert(el, remaining);
                 }
 
-                // Colour shift: amber when ≤ 60 s, red when ≤ 15 s, green otherwise
+                // Colour shift: amber when â‰¤ 60 s, red when â‰¤ 15 s, green otherwise
                 el.style.color = remaining <= 15 ? '#fb566b'
                                : remaining <= 60  ? '#f1a83c'
                                : '#20c8a1';
                 el.textContent = (h ? h + 'h ' : '') + `${pad(m)}:${pad(s)} left`;
             } else {
-                // ─ OVERTIME ─ beep once when the element first crosses the threshold
+                // â”€ OVERTIME â”€ beep once when the element first crosses the threshold
                 if (!overtimeBeeped.has(el)) {
                     overtimeBeeped.add(el);
                     playOvertimeBeep();
@@ -5128,7 +4941,7 @@ function renderCharts() {
         type: 'bar',
         data: {
             labels: revLabels,
-            datasets: [{ label: 'Revenue (₱)', data: revData,
+            datasets: [{ label: 'Revenue (â‚±)', data: revData,
                 backgroundColor: 'rgba(32,200,161,.5)', borderColor: '#20c8a1',
                 borderWidth: 2, borderRadius: 6 }]
         },
@@ -5179,7 +4992,7 @@ function renderCharts() {
                                     const value = data.datasets[0].data[i];
                                     const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
                                     return {
-                                        text: `${label} — ${value} (${percentage}%)`,
+                                        text: `${label} â€” ${value} (${percentage}%)`,
                                         fillStyle: data.datasets[0].backgroundColor[i],
                                         strokeStyle: data.datasets[0].borderColor,
                                         fontColor: '#fff',
@@ -5201,7 +5014,7 @@ function renderCharts() {
 
 AOS.init({ duration: 600, once: true });
 
-// ── Bell notification icon - styles ──
+// â”€â”€ Bell notification icon - styles â”€â”€
 (function injectNotifStyles() {
     const s = document.createElement('style');
     s.textContent = `
@@ -5292,7 +5105,7 @@ function _addNotifItems(newItems) {
             '<div style="font-weight:600;font-size:13px;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
             (r.customer_name || 'A customer') + '</div>' +
             '<div style="font-size:11px;color:#888;margin-top:1px;">' +
-            (r.console_type || '') + ' · ' + mode + (dateStr ? ' · ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
+            (r.console_type || '') + ' Â· ' + mode + (dateStr ? ' Â· ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
             '</div></div>' +
             '<span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);' +
             'border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;">Pending</span>' +
@@ -5332,14 +5145,14 @@ function _addNotifItems(newItems) {
     }
 }
 
-// ── Reservation notification poller ───────────────────────────────────
+// â”€â”€ Reservation notification poller â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Polls every 8 s. Baseline from PHP is ALWAYS authoritative at page load -
 // localStorage is only used to avoid re-alerting the same IDs within one session,
 // but NEVER to INCREASE the baseline above what the server reported.
 (function () {
     const POLL_MS = 8000;
 
-    // ── BUG FIX #1: Never let localStorage INCREASE the baseline.
+    // â”€â”€ BUG FIX #1: Never let localStorage INCREASE the baseline.
     // Old localStorage values from past sessions would block all future alerts.
     let lastTime = <?= time() ?>;
     
@@ -5374,17 +5187,17 @@ function _addNotifItems(newItems) {
             .catch(function() {});
     }
 
-    // ── BUG FIX #3: First poll at 3 s, then every 8 s (was 15 s / 30 s)
+    // â”€â”€ BUG FIX #3: First poll at 3 s, then every 8 s (was 15 s / 30 s)
     setTimeout(function() {
         poll();
         setInterval(poll, POLL_MS);
     }, 3000);
 })();
 
-// ── Unlimited Session Auto-Termination at 12:00 AM ────────────────────────
+// â”€â”€ Unlimited Session Auto-Termination at 12:00 AM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Monitors the clock every 30 s. When midnight (00:00 - 00:10) is detected,
 // calls ajax/auto_end_unlimited.php once to close all active Unlimited sessions.
-// Strictly Unlimited only — Hourly and Open Time sessions are unaffected.
+// Strictly Unlimited only â€” Hourly and Open Time sessions are unaffected.
 (function () {
     var _midnightJobFired = false;   // prevent double-firing within the same midnight window
     var POLL_MS = 30000;             // check every 30 seconds
@@ -5394,20 +5207,20 @@ function _addNotifItems(newItems) {
         var h   = now.getHours();
         var m   = now.getMinutes();
 
-        // Trigger window: 00:00 – 00:10 (covers late tab wake-ups)
+        // Trigger window: 00:00 â€“ 00:10 (covers late tab wake-ups)
         if (h !== 0 || m > 10) {
-            // Outside the midnight window — reset the flag so next midnight fires again
+            // Outside the midnight window â€” reset the flag so next midnight fires again
             if (_midnightJobFired && (h !== 0 || m > 10)) {
                 _midnightJobFired = false;
             }
             return;
         }
 
-        // Already fired this midnight window — skip
+        // Already fired this midnight window â€” skip
         if (_midnightJobFired) return;
         _midnightJobFired = true;
 
-        console.log('[GSpot] Midnight detected — triggering auto-end for Unlimited sessions…');
+        console.log('[GSpot] Midnight detected â€” triggering auto-end for Unlimited sessionsâ€¦');
 
         fetch('ajax/auto_end_unlimited.php', { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
@@ -5420,12 +5233,12 @@ function _addNotifItems(newItems) {
                     return;
                 }
 
-                // ── Build a rich notification toast ──────────────────────────
+                // â”€â”€ Build a rich notification toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 var sessionLines = (data.sessions || []).map(function(s) {
                     var h = Math.floor(s.duration_minutes / 60);
                     var m = s.duration_minutes % 60;
                     var dur = (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
-                    return '• ' + s.customer + ' (' + s.unit + ') — ' + dur + ' — ₱' + parseFloat(s.total_cost).toFixed(2);
+                    return 'â€¢ ' + s.customer + ' (' + s.unit + ') â€” ' + dur + ' â€” â‚±' + parseFloat(s.total_cost).toFixed(2);
                 }).join('\n');
 
                 var toastMsg = count + ' Unlimited session' + (count > 1 ? 's' : '') +
@@ -5437,7 +5250,7 @@ function _addNotifItems(newItems) {
                 if (window.showToast) {
                     window.showToast(
                         count + ' Unlimited session' + (count > 1 ? 's' : '') +
-                        ' auto-ended at 12:00 AM — ₱400.00 flat rate applied.',
+                        ' auto-ended at 12:00 AM â€” â‚±400.00 flat rate applied.',
                         'success'
                     );
                 } else {
@@ -5458,14 +5271,14 @@ function _addNotifItems(newItems) {
                         '<i class="fas fa-moon" style="color:#20c8a1;"></i></div>' +
                         '<div>' +
                         '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
-                        'Shop Closing — Unlimited Sessions Ended</div>' +
+                        'Shop Closing â€” Unlimited Sessions Ended</div>' +
                         '<div style="color:#aaa;font-size:12px;">' +
                         count + ' session' + (count > 1 ? 's' : '') +
-                        ' ended at 12:00 AM · ₱400.00 flat rate applied each</div>' +
+                        ' ended at 12:00 AM Â· â‚±400.00 flat rate applied each</div>' +
                         '</div>' +
                         '<button onclick="this.parentElement.parentElement.remove()" ' +
                         'style="background:none;border:none;color:#555;font-size:16px;' +
-                        'cursor:pointer;margin-left:auto;flex-shrink:0;">×</button>' +
+                        'cursor:pointer;margin-left:auto;flex-shrink:0;">Ã—</button>' +
                         '</div>';
                     document.body.appendChild(banner);
                     setTimeout(function() {

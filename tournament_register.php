@@ -136,9 +136,6 @@ if (!empty($_GET['paymongo']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
     if (!verifyCsrf($message, $messageType)) {
         // CSRF failed
-    } elseif (empty($_POST['no_refund_agreed'])) {
-        $message = 'You must agree to the Terms and Conditions before registering.';
-        $messageType = 'error';
     } else {
         $tournament_id = (int)($_POST['tournament_id'] ?? 0);
         $ign           = trim($_POST['ign'] ?? '');
@@ -645,13 +642,6 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                         Registration Fee: <span id="modal_fee_display"></span>
                     </div>
 
-                    <div class="form-group" style="margin-top:20px; background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-                        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; margin:0; text-transform:none;">
-                            <input type="checkbox" name="no_refund_agreed" value="1" required style="margin-top:4px; width:16px; height:16px; accent-color:var(--mint);">
-                            <span style="font-size:12px; line-height:1.5; color:var(--text-dim); font-weight:500;">
-                                I agree to the <a href="terms.php" target="_blank" style="color:var(--mint); text-decoration:none;">Terms & Conditions</a>. Entry fees are non-refundable. By registering, you agree to show up at the hub 30 minutes before the start time.
-                            </span>
-                        </label>
                     </div>
 
                     <button type="submit" class="btn-reg" style="width:100%; justify-content:center; padding:14px;">
