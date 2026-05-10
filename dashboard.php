@@ -3400,7 +3400,7 @@ function fmtMins(int $m): string {
                         </div>
 
                         <div class="pf-field-group">
-                            <label class="pf-label" for="pf_phone"><i class="fas fa-phone" style="color:var(--mint);width:14px;"></i> Phone Number <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+                            <label class="pf-label" for="pf_phone"><i class="fas fa-phone" style="color:var(--mint);width:14px;"></i> Phone Number <span style="color:var(--muted);font-weight:400;">*</span></label>
                             <input class="pf-input" type="tel" id="pf_phone" name="phone"
                                 value="<?= htmlspecialchars($user['phone'] ?? '') ?>"
                                 placeholder="09171234567"

@@ -224,6 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 }
+}
 
 if (!empty($_SESSION['reg_success'])) {
     $message = $_SESSION['reg_success'];
@@ -685,5 +686,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
             }
         }
     </script>
+    
 </body>
 </html>
+    
