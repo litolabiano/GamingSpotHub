@@ -646,7 +646,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
                     </div>
 
                     <button type="submit" class="btn-reg" style="width:100%; justify-content:center; padding:14px;">
-                        Confirm Registration
+                        Pay via Paymongo
                     </button>
                 </form>
             </div>

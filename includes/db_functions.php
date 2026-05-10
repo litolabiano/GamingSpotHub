@@ -212,7 +212,7 @@ function getHourlyDurationOptions(?array $rules = null): array {
  */
 function getConsoles($status = null, $type = null) {
     global $conn;
-    $sql = "SELECT c.*, ct.type_name AS console_type, ct.hourly_rate
+    $sql = "SELECT c.*, ct.type_name AS console_type, COALESCE(c.hourly_rate, ct.hourly_rate) AS hourly_rate
             FROM consoles c 
             LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id 
             WHERE 1=1";
@@ -264,11 +264,11 @@ function updateConsoleStatus($console_id, $status) {
  * Add a new console to the database.
  * $type_id is the console_types.type_id FK.
  */
-function addConsole($name, $type_id, $unit_number, $controller_count = 2) {
+function addConsole($name, $type_id, $unit_number, $controller_count = 2, $hourly_rate = null) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, controller_count, status) VALUES (?, ?, ?, ?, 'available')");
-        $stmt->bind_param("sisi", $name, $type_id, $unit_number, $controller_count);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, controller_count, hourly_rate, status) VALUES (?, ?, ?, ?, ?, 'available')");
+        $stmt->bind_param("sisid", $name, $type_id, $unit_number, $controller_count, $hourly_rate);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         return false;
@@ -276,11 +276,13 @@ function addConsole($name, $type_id, $unit_number, $controller_count = 2) {
 }
 
 /**
- * Update console controller count — kept for BC; controller_count removed from schema,
- * this now does nothing but avoids fatal errors in callers.
+ * Update console controller count.
  */
 function updateConsoleControllerCount($console_id, $count) {
-    return true; // controller_count column removed; counts derived from controllers table
+    global $conn;
+    $stmt = $conn->prepare("UPDATE consoles SET controller_count = ? WHERE console_id = ?");
+    $stmt->bind_param("ii", $count, $console_id);
+    return $stmt->execute();
 }
 
 

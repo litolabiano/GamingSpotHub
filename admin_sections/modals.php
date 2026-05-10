@@ -2792,26 +2792,30 @@ window.BulkManager = {
         this.selectedIds = [];
         // Force uncheck all checkboxes in the DOM
         document.querySelectorAll('.bulk-check').forEach(cb => cb.checked = false);
-        const master = document.querySelector('.bulk-master');
-        if (master) {
+        document.querySelectorAll('.bulk-master').forEach(master => {
             master.checked = false;
             master.indeterminate = false;
-        }
+        });
         this.updateUI();
     },
     
-    toggle(id, checked) {
+    toggle(id, checked, el) {
         id = String(id);
         if (checked) {
             if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
         } else {
             this.selectedIds = this.selectedIds.filter(i => i !== id);
         }
-        this.updateUI();
+        
+        // If el is provided, we can scope the master update to the closest table/container
+        this.updateUI(el ? el.closest('table, .modal-body, .card, .bulk-scope') : null);
     },
     
-    toggleAll(checked) {
-        const checks = document.querySelectorAll('.bulk-check');
+    toggleAll(checked, masterEl) {
+        // Scope to the nearest container to avoid selecting checkboxes in other tables
+        const container = masterEl ? masterEl.closest('table, .modal-body, .card, .bulk-scope') : document;
+        const checks = container.querySelectorAll('.bulk-check');
+        
         checks.forEach(cb => {
             cb.checked = checked;
             const id = cb.getAttribute('data-id');
@@ -2821,10 +2825,10 @@ window.BulkManager = {
                 this.selectedIds = this.selectedIds.filter(i => i !== id);
             }
         });
-        this.updateUI();
+        this.updateUI(container);
     },
     
-    updateUI() {
+    updateUI(scope) {
         const bar = document.getElementById('bulkBar');
         const countEl = document.getElementById('bulkCount');
         if (!bar || !countEl) return;
@@ -2836,19 +2840,20 @@ window.BulkManager = {
             bar.classList.remove('active');
         }
         
-        // Update master checkbox state
-        const master = document.querySelector('.bulk-master');
-        if (master) {
-            const allChecks = document.querySelectorAll('.bulk-check');
+        // Update master checkbox state(s)
+        const masters = scope ? scope.querySelectorAll('.bulk-master') : document.querySelectorAll('.bulk-master');
+        masters.forEach(master => {
+            const container = master.closest('table, .modal-body, .card, .bulk-scope') || document;
+            const allChecks = container.querySelectorAll('.bulk-check');
             if (allChecks.length === 0) {
                 master.checked = false;
                 master.indeterminate = false;
                 return;
             }
             const checkedCount = Array.from(allChecks).filter(c => c.checked).length;
-            master.checked = (checkedCount === allChecks.length);
+            master.checked = (checkedCount === allChecks.length && allChecks.length > 0);
             master.indeterminate = (checkedCount > 0 && checkedCount < allChecks.length);
-        }
+        });
     },
     
     execute(action) {

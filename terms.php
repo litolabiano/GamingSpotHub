@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Terms & Conditions — Gspot Gaming Hub</title>
-    <meta name="description" content="Terms and Conditions for Gspot Gaming Hub — rules, policies, tournament rules, and usage guidelines.">
+    <meta name="description" content="Terms and Conditions for Gspot Gaming Hub — rules, policies, reservation guidelines, and usage terms.">
     <link href="assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="assets/fonts/inter/inter.css" rel="stylesheet">
     <link href="assets/fonts/outfit/outfit.css" rel="stylesheet">
@@ -13,6 +13,7 @@
     <link href="assets/libs/aos/aos.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+        html { scroll-behavior: smooth; }
         body { background: #080e1a; }
 
         .terms-hero {
@@ -110,16 +111,16 @@
 <section class="terms-hero">
     <div class="container">
         <div class="text-center" data-aos="fade-up">
-            <span class="section-tag">Legal</span>
+            <span class="section-tag">System Policies</span>
             <h1 style="font-size:clamp(2.2rem,5vw,3.5rem);margin:16px 0 14px;">
                 Terms &amp; <span style="color:#20c8a1;">Conditions</span>
             </h1>
             <p style="color:rgba(255,255,255,.65);max-width:560px;margin:0 auto;font-size:1.05rem;line-height:1.7;">
-                Please read these terms carefully before using Gspot Gaming Hub's facilities, online reservation system, and tournament services.
+                These terms govern your use of the Gspot Gaming Hub reservation system, facilities, and services. Please read them carefully.
             </p>
             <div style="margin-top:20px;display:inline-flex;align-items:center;gap:8px;background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.3);border-radius:30px;padding:8px 18px;">
                 <i class="fas fa-circle" style="font-size:7px;color:#20c8a1;"></i>
-                <span style="font-size:13px;color:#20c8a1;font-weight:600;">Effective Date: April 25, 2026</span>
+                <span style="font-size:13px;color:#20c8a1;font-weight:600;">Effective Date: May 10, 2026</span>
             </div>
         </div>
     </div>
@@ -134,235 +135,245 @@
             <div class="col-lg-3 d-none d-lg-block">
                 <div class="toc-card" data-aos="fade-right">
                     <h6><i class="fas fa-list me-2"></i>Contents</h6>
-                    <a href="#sec-general"      class="toc-link">1. General</a>
-                    <a href="#sec-use"          class="toc-link">2. Use of Facilities</a>
-                    <a href="#sec-accounts"     class="toc-link">3. Accounts</a>
-                    <a href="#sec-rates"        class="toc-link">4. Rates &amp; Payments</a>
-                    <a href="#sec-reservations" class="toc-link">5. Reservations</a>
-                    <a href="#sec-cancel"       class="toc-link">6. Cancellations &amp; Rescheduling</a>
-                    <a href="#sec-tournaments"  class="toc-link">7. Tournaments</a>
-                    <a href="#sec-conduct"      class="toc-link">8. Code of Conduct</a>
-                    <a href="#sec-equipment"    class="toc-link">9. Equipment</a>
-                    <a href="#sec-privacy"      class="toc-link">10. Privacy</a>
-                    <a href="#sec-liability"    class="toc-link">11. Liability</a>
-                    <a href="#sec-changes"      class="toc-link">12. Changes to Terms</a>
+                    <a href="#sec-general"      class="toc-link">1. General Terms</a>
+                    <a href="#sec-reservations" class="toc-link">2. Reservations</a>
+                    <a href="#sec-sessions"     class="toc-link">3. Session Terms</a>
+                    <a href="#sec-noshow"       class="toc-link">4. No Show Policy</a>
+                    <a href="#sec-reschedule"   class="toc-link">5. Reschedule Policy</a>
+                    <a href="#sec-cancel"       class="toc-link">6. Cancellation Policy</a>
+                    <a href="#sec-tournaments"  class="toc-link">7. Tournament Terms</a>
+                    <a href="#sec-payments"     class="toc-link">8. Payment Terms</a>
+                    <a href="#sec-controllers"  class="toc-link">9. Controller Rental</a>
+                    <a href="#sec-conduct"      class="toc-link">10. User Conduct</a>
+                    <a href="#sec-accounts"     class="toc-link">11. Account Terms</a>
+                    <a href="#sec-privacy"      class="toc-link">12. Privacy Policy</a>
+                    <a href="#section-13-staff-code-of-conduct" class="toc-link">13. Staff Code of Conduct</a>
                 </div>
             </div>
 
             <!-- Content -->
             <div class="col-lg-9">
 
-                <!-- 1. General -->
+                <!-- 1. General Terms -->
                 <div class="terms-section" id="sec-general" data-aos="fade-up">
                     <div class="terms-section-header">
                         <div class="terms-icon ti-mint"><i class="fas fa-info-circle" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">1. General <span>Overview</span></h2>
-                    </div>
-                    <p>Welcome to <strong>Gspot Gaming Hub</strong> ("the Hub", "we", "us"), located in Dasmariñas, Cavite. By entering our premises, creating an account, making a reservation, or participating in any event or tournament, you ("the Customer", "Player", "User") agree to be bound by these Terms and Conditions.</p>
-                    <p>These Terms apply to all services offered by Gspot Gaming Hub, including but not limited to: console gaming rentals, advance reservations, tournaments, and any future services we may introduce.</p>
-                    <div class="hl"><i class="fas fa-info-circle me-2" style="color:#20c8a1;"></i>If you do not agree with any part of these Terms, please do not use our facilities or online services.</div>
-                </div>
-
-                <!-- 2. Use of Facilities -->
-                <div class="terms-section" id="sec-use" data-aos="fade-up">
-                    <div class="terms-section-header">
-                        <div class="terms-icon ti-blue"><i class="fas fa-gamepad" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">2. Use of Facilities <span>Rules</span></h2>
+                        <h2 class="terms-section-title">1. General Terms <span>Overview</span></h2>
                     </div>
                     <ul>
-                        <li>The Hub is open <strong>12:00 PM to 12:00 AM</strong> daily. Operating hours may change at management's discretion with prior notice.</li>
-
-                        <li>All players must pay the applicable gaming rate before or at the start of their session unless a pre-approved credit arrangement is in place.</li>
-                        <li>Food and beverages are <strong>allowed</strong> but must be kept away from consoles and equipment. Any damage caused by spills is the responsibility of the customer.</li>
-                        <li>Smoking, vaping, and the use of illegal substances are strictly <strong>prohibited</strong> inside and within the immediate vicinity of the Hub.</li>
-                        <li>Management reserves the right to deny service or remove any customer for violation of these Terms.</li>
+                        <li>Users must create and verify an account before making any reservation or joining a tournament.</li>
+                        <li>Users must provide accurate and truthful information during account registration.</li>
+                        <li>The system is operated by Gspot Gaming Hub, and all decisions made by the Admin or Shopkeeper are final.</li>
+                        <li>The shop reserves the right to update the Terms and Conditions at any time without prior notice.</li>
+                        <li>Continued use of the system after any updates constitutes acceptance of the new terms.</li>
                     </ul>
                 </div>
 
-                <!-- 3. Accounts -->
-                <div class="terms-section" id="sec-accounts" data-aos="fade-up">
-                    <div class="terms-section-header">
-                        <div class="terms-icon ti-purple"><i class="fas fa-user-shield" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">3. Accounts &amp; Membership <span>Registration</span></h2>
-                    </div>
-                    <p>Creating an account is <strong>free</strong> and allows access to the online reservation system, session history, and tournament registration.</p>
-                    <ul>
-                        <li>You must provide accurate, complete, and current information when registering.</li>
-                        <li>You are responsible for maintaining the confidentiality of your login credentials.</li>
-                        <li>You must not share your account with other individuals.</li>
-                        <li>We reserve the right to suspend or permanently ban accounts that violate these Terms.</li>
-                        <li>Walk-in customers without accounts may use the Hub on a <strong>first-come, first-served</strong> basis but cannot make advance reservations or join online tournaments.</li>
-                    </ul>
-                </div>
-
-                <!-- 4. Rates & Payments -->
-                <div class="terms-section" id="sec-rates" data-aos="fade-up">
-                    <div class="terms-section-header">
-                        <div class="terms-icon ti-gold"><i class="fas fa-peso-sign" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">4. Rates &amp; Payments <span>Pricing</span></h2>
-                    </div>
-                    <p>All prices are in <strong>Philippine Peso (₱)</strong>. Current standard rates are:</p>
-                    <table class="rate-table">
-                        <thead><tr><th>Mode</th><th>Rate</th><th>Notes</th></tr></thead>
-                        <tbody>
-                            <tr><td>First 30-min payment</td><td>₱50</td><td>Starter rate — only when first payment covers 30 min</td></tr>
-                            <tr><td>Standard hourly (1 hr+)</td><td>₱80 / hr</td><td>When first payment covers 1 hour or more</td></tr>
-                            <tr><td>30-min extension</td><td>₱40</td><td>Each additional 30-min block added after initial payment</td></tr>
-                            <tr><td>Unlimited session</td><td>₱300</td><td>Flat rate for unlimited play (subject to change)</td></tr>
-                        </tbody>
-                    </table>
-                    <div class="hl gold"><i class="fas fa-gift me-2" style="color:#f1a83c;"></i><strong>Free Time Bonus:</strong> For every <strong>2 hours</strong> paid in a single session, customers earn <strong>30 minutes of free gaming time</strong> automatically.</div>
-                    <ul>
-                        <li>Rates are subject to change. Updated rates will be posted on-site and on this website.</li>
-                        <li>Accepted payment methods: <strong>Cash</strong> and <strong>GCash</strong>.</li>
-                        <li>All payments are final once a session has begun.</li>
-                    </ul>
-                </div>
-
-                <!-- 5. Reservations -->
+                <!-- 2. Reservation Terms -->
                 <div class="terms-section" id="sec-reservations" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-teal"><i class="fas fa-calendar-check" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">5. Reservations <span>Advance Booking</span></h2>
+                        <div class="terms-icon ti-blue"><i class="fas fa-calendar-check" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">2. Reservation Terms <span>Advance Booking</span></h2>
                     </div>
                     <ul>
-                        <li>Reservations must be made at least <strong>1 hour in advance</strong> through the online reservation system.</li>
-                        <li>Reservation slots are available from <strong>12:00 PM to 11:59 PM</strong> only.</li>
-                        <li>A reservation fee (downpayment) may be collected to secure your slot. This fee is <strong>credited toward your total session cost</strong> — it is not an extra charge.</li>
-                        <li>Each customer may hold a maximum of <strong>1 active reservation</strong> at a time. You must cancel or complete your existing reservation before creating a new one.</li>
-                        <li>The Hub reserves the right to reassign a unit if the customer has not arrived within <strong>15 minutes</strong> of their reserved time without prior notice.</li>
-                        <li>Consoles under maintenance (e.g., PlayStation 4 if marked unavailable) cannot be selected for reservation until restored by management.</li>
+                        <li>Reservations can be made through the User reservation page (<code>reserve.php</code>) by selecting a console type, preferred unit, date, time, session mode, and duration.</li>
+                        <li>The availability of console units is dynamic based on the selected date and time — only units currently available for that specific slot will be shown.</li>
+                        <li>A **reservation fee** must be paid via GCash through PayMongo before a reservation is confirmed.</li>
+                        <li>The reservation fee is calculated as a **₱20.00 base fee** plus **5% of the total session cost**.</li>
+                        <li>Once payment is completed, the reservation status is immediately set to **'Reserved'**. No further admin approval is required.</li>
+                        <li>The reservation fee is **strictly non-refundable** under any circumstances, including cancellations and no-shows.</li>
+                        <li>Reservations are only permitted within the shop's operating hours: **12:00 PM to 12:00 AM**.</li>
+                        <li>Reservations can be made up to **1 month in advance** from the current date.</li>
+                        <li>Users must arrive at the shop on their reserved date and time, as the session will **auto-start** at the scheduled time.</li>
+                        <li>Users are responsible for arriving on time; late arrivals will not result in any extension of the reserved session time.</li>
+                        <li>Users must agree to these Terms and Conditions by checking the required checkbox before completing the reservation payment.</li>
                     </ul>
-                    <div class="hl info"><i class="fas fa-clock me-2" style="color:#5f85da;"></i>Reservation slots cannot be transferred to another person. The account holder must be present.</div>
                 </div>
 
-                <!-- 6. Cancellations & Rescheduling -->
+                <!-- 3. Session Terms -->
+                <div class="terms-section" id="sec-sessions" data-aos="fade-up">
+                    <div class="terms-section-header">
+                        <div class="terms-icon ti-purple"><i class="fas fa-play-circle" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">3. Session Terms <span>Gameplay Rules</span></h2>
+                    </div>
+                    <ul>
+                        <li>Reserved sessions **start automatically** at the scheduled time without manual intervention.</li>
+                        <li>Walk-in sessions can be created manually by the Admin or Shopkeeper at the counter.</li>
+                        <li>Available session modes are **Hourly** and **Unlimited**, subject to time-based restrictions.</li>
+                        <li>**Unlimited session mode** is NOT available for bookings made at 7:00 PM or later.</li>
+                        <li>Maximum session duration is restricted based on the time of booking to ensure all play ends before the 12:00 AM closing time:</li>
+                    </ul>
+                    <table class="rate-table">
+                        <thead><tr><th>Booking Time</th><th>Maximum Duration</th></tr></thead>
+                        <tbody>
+                            <tr><td>7:00 PM</td><td>5 hours</td></tr>
+                            <tr><td>7:30 PM</td><td>4 hours 30 minutes</td></tr>
+                            <tr><td>8:30 PM</td><td>3 hours 30 minutes</td></tr>
+                            <tr><td>9:00 PM</td><td>3 hours</td></tr>
+                            <tr><td>9:30 PM</td><td>2 hours 30 minutes</td></tr>
+                            <tr><td>10:30 PM</td><td>1 hour 30 minutes</td></tr>
+                            <tr><td>11:00 PM</td><td>1 hour</td></tr>
+                            <tr><td>11:30 PM</td><td>30 minutes</td></tr>
+                        </tbody>
+                    </table>
+                    <ul>
+                        <li>The session fee for hourly sessions is calculated based on the actual time consumed multiplied by the console unit's hourly rate, minus any reservation fee already paid.</li>
+                        <li>Users may request additional time during an active session through the **Request More Time** feature, subject to Admin or Shopkeeper approval.</li>
+                        <li>Controller add-ons are billed at **₱20.00 per hour** (₱10 per 30-minute block) based on actual consumed time.</li>
+                        <li>Controller rental fees are only charged if the controller has been used for **5 minutes or more**.</li>
+                    </ul>
+                </div>
+
+                <!-- 4. No Show Policy -->
+                <div class="terms-section" id="sec-noshow" data-aos="fade-up">
+                    <div class="terms-section-header">
+                        <div class="terms-icon ti-coral"><i class="fas fa-user-slash" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">4. No Show Policy <span>Forfeiture</span></h2>
+                    </div>
+                    <ul>
+                        <li>If a user does not arrive for their reservation after the session has auto-started, the staff may mark the reservation as a **No Show**.</li>
+                        <li>When marked as a No Show, the reservation fee is **automatically forfeited** and transferred to the shop's earnings.</li>
+                        <li>No penalty fee will be charged beyond the forfeiture of the reservation fee.</li>
+                        <li>The No Show button only becomes available to staff after the reservation session has auto-started.</li>
+                    </ul>
+                </div>
+
+                <!-- 5. Reschedule Policy -->
+                <div class="terms-section" id="sec-reschedule" data-aos="fade-up">
+                    <div class="terms-section-header">
+                        <div class="terms-icon ti-gold"><i class="fas fa-calendar-alt" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">5. Reschedule Policy <span>Negotiation</span></h2>
+                    </div>
+                    <ul>
+                        <li>Both the Admin and the User may initiate a reschedule request for an existing reservation.</li>
+                        <li>If the Admin proposes a new schedule, the user may confirm it or propose a **counter-proposal** with a different date/time.</li>
+                        <li>All counter-proposals from the user require a valid reason and must be for a date/time **later** than the Admin's original proposal.</li>
+                        <li>Negotiation continues until both parties agree on the final schedule.</li>
+                        <li>If the user confirms the Admin's proposal without changes, no reason is required and it is immediately finalized.</li>
+                        <li>The **'Pending'** status only applies during an active reschedule negotiation.</li>
+                        <li>Once agreed, the status returns to **'Reserved'** with the updated schedule.</li>
+                    </ul>
+                </div>
+
+                <!-- 6. Cancellation Policy -->
                 <div class="terms-section" id="sec-cancel" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-coral"><i class="fas fa-calendar-alt" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">6. Cancellations &amp; Rescheduling <span>Policy</span></h2>
+                        <div class="terms-icon ti-coral"><i class="fas fa-ban" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">6. Cancellation Policy <span>Refunds</span></h2>
                     </div>
-
-                    <div class="hl warn"><i class="fas fa-ban me-2" style="color:#fb566b;"></i>
-                        <strong>Non-Refundable Reservation Fee:</strong> All reservation fees (downpayments) are <strong>strictly non-refundable</strong> under all circumstances — including customer-initiated cancellations, no-shows, and admin-initiated cancellations. No store credit, GC, or partial refund will be issued in place of the fee.
+                    <div class="hl warn">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        **Reservation fees are strictly non-refundable** regardless of the reason for cancellation.
                     </div>
-
-                    <ul>
-                        <li><strong>30-Minute Grace Period:</strong> If you cancel your reservation within <strong>30 minutes of making it</strong>, the cancellation will <strong>not count toward your cancellation streak</strong>. This is a one-time goodwill window per booking.</li>
-                        <li><strong>3-Strike Cancellation Streak:</strong> Three (3) consecutive customer-initiated cancellations (outside the grace period) will result in a <strong>7-day online reservation ban</strong>. Walk-in access is not affected. The streak resets after a successfully completed session.</li>
-                        <li>Ban appeals may be submitted to management on a case-by-case basis.</li>
-                    </ul>
-
-                    <div class="hl" style="border-color:#20c8a1;background:rgba(32,200,161,.07);">
-                        <i class="fas fa-calendar-alt me-2" style="color:#20c8a1;"></i>
-                        <strong>Force Majeure Rescheduling:</strong> In the event of circumstances beyond anyone's control — such as <strong>typhoons, power outages, emergency declarations, or equipment failures</strong> — staff may reschedule your reservation to a new available date and time at no penalty to you. You will be notified immediately on your dashboard. Rescheduled reservations do <strong>not</strong> count as cancellations and will not affect your streak.
-                    </div>
-
-                    <ul>
-                        <li><strong>Early Session End Refund:</strong> If you have fully pre-paid for a session (e.g., 2 hours) but choose to end your session early (e.g., after 1 hour), staff will calculate and refund the unused session time proportionally. This applies to in-session payments only — not reservation downpayments.</li>
-                    </ul>
+                    <p>The shop reserves the right to cancel or reschedule any reservation at any time due to unforeseen circumstances (e.g., equipment failure, power outage).</p>
                 </div>
 
-                <!-- 7. Tournaments -->
+                <!-- 7. Tournament Terms -->
                 <div class="terms-section" id="sec-tournaments" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-gold"><i class="fas fa-trophy" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">7. Tournaments <span>Competition Rules</span></h2>
+                        <div class="terms-icon ti-teal"><i class="fas fa-trophy" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">7. Tournament Terms <span>Events</span></h2>
                     </div>
-                    <p>Gspot Gaming Hub hosts regular tournaments open to registered members. By registering for a tournament, you agree to the following:</p>
                     <ul>
-                        <li>All participants must <strong>register before the registration deadline</strong>. Late entries are not guaranteed unless approved by management.</li>
-                        <li>Tournament registration fees are <strong>non-refundable</strong> once the tournament has officially started, unless management explicitly decides otherwise.</li>
-                        <li>Players must be present at their assigned time slot. Failure to appear will result in a <strong>forfeit</strong>.</li>
-                    </ul>
-
-                    <div class="hl purple">
-                        <i class="fas fa-exclamation-circle me-2" style="color:#b37bec;"></i>
-                        <strong>Late Arrival &amp; Bracket Reset Policy:</strong> In exceptional cases, if a player arrives after the first elimination round has concluded but before the tournament significantly progresses, management may — at their sole discretion — allow a <strong>bracket reset</strong> for the affected round, provided that <strong>all existing winners of that round expressly agree</strong> to replay. This is a goodwill gesture only and is <strong>not guaranteed</strong>. It requires unanimous consent from the affected players and boss/management approval. No compensation is owed to winners who agree to reset.
-                    </div>
-
-                    <ul>
-                        <li>All tournament decisions made by the referee or management are <strong>final</strong>.</li>
-                        <li>Cheating, exploiting glitches intentionally, unsportsmanlike conduct, or any form of harassment will result in <strong>immediate disqualification</strong> and possible account suspension.</li>
-                        <li>Prize distributions (cash, credits, or other rewards) will be released on the same day or within 24 hours after the tournament concludes, subject to prize availability.</li>
-                        <li>Gspot Gaming Hub reserves the right to modify tournament formats, rules, and schedules with reasonable notice.</li>
-                        <li>Participants may not stream or record tournament matches without prior written consent from management.</li>
+                        <li>Users may register for tournaments via the User Dashboard.</li>
+                        <li>A registration fee must be paid via PayMongo before the entry is confirmed.</li>
+                        <li>Tournament prize pools are dynamic and depend on the final number of registered participants.</li>
+                        <li>There is no maximum participant limit for tournaments.</li>
+                        <li>The Admin reserves the right to remove any participant from a tournament at any time for conduct or rule violations.</li>
+                        <li>Removed participants will still see their entry in the dashboard with a status indicating removal by Admin.</li>
+                        <li>Tournament registration fees are **non-refundable**.</li>
                     </ul>
                 </div>
 
-                <!-- 8. Conduct -->
+                <!-- 8. Payment Terms -->
+                <div class="terms-section" id="sec-payments" data-aos="fade-up">
+                    <div class="terms-section-header">
+                        <div class="terms-icon ti-mint"><i class="fas fa-peso-sign" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">8. Payment Terms <span>Gateways</span></h2>
+                    </div>
+                    <ul>
+                        <li>All online reservation and tournament payments are processed through **PayMongo (via GCash)**.</li>
+                        <li>Walk-in session payments are collected in **Cash** at the counter.</li>
+                        <li>All payments are final and non-refundable, except in the specific case where a session was accidentally ended by staff and restored within the **1-hour undo window**.</li>
+                        <li>The shop is not responsible for failed or delayed payments caused by payment gateway issues.</li>
+                    </ul>
+                </div>
+
+                <!-- 9. Controller Rental Terms -->
+                <div class="terms-section" id="sec-controllers" data-aos="fade-up">
+                    <div class="terms-section-header">
+                        <div class="terms-icon ti-blue"><i class="fas fa-gamepad" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">9. Controller Rental <span>Add-ons</span></h2>
+                    </div>
+                    <ul>
+                        <li>Controller add-ons are billed at **₱20.00 per hour** (₱10 per 30-minute block).</li>
+                        <li>Fees are only applied if the controller is in use for **5 minutes or more**.</li>
+                        <li>Controller rentals cannot extend beyond the shop's closing time of 12:00 AM.</li>
+                        <li>Users are financially responsible for any damage caused to controllers during their rental period.</li>
+                    </ul>
+                </div>
+
+                <!-- 10. User Conduct -->
                 <div class="terms-section" id="sec-conduct" data-aos="fade-up">
                     <div class="terms-section-header">
                         <div class="terms-icon ti-purple"><i class="fas fa-handshake" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">8. Code of Conduct <span>Behavior</span></h2>
+                        <h2 class="terms-section-title">10. User Conduct <span>Responsibilities</span></h2>
                     </div>
-                    <p>All customers are expected to maintain a respectful environment for everyone. The following are strictly prohibited:</p>
                     <ul>
-                        <li>Verbal or physical harassment, bullying, or discrimination of any kind toward other players or staff.</li>
-                        <li>Loud or disruptive behavior that negatively impacts other customers' experience.</li>
-                        <li>Unauthorized access to other customers' accounts, consoles, or personal belongings.</li>
-                        <li>Any form of theft, vandalism, or property damage.</li>
-                        <li>Sharing or distributing offensive, illegal, or inappropriate content on Hub equipment.</li>
+                        <li>Users are responsible for the proper use and care of all console units and shop equipment.</li>
+                        <li>Any damage caused to consoles, controllers, or furniture will be the user's financial responsibility.</li>
+                        <li>Food and drinks near console units must follow the shop's specific safety regulations.</li>
+                        <li>Disruptive, abusive, or inappropriate behavior will result in immediate termination of the session without a refund.</li>
+                        <li>The shop reserves the right to ban any user who repeatedly violates shop rules.</li>
                     </ul>
-                    <div class="hl warn"><i class="fas fa-gavel me-2" style="color:#fb566b;"></i>Violations may result in immediate removal from the premises, suspension or permanent ban of your account, and/or referral to appropriate authorities.</div>
                 </div>
 
-                <!-- 9. Equipment -->
-                <div class="terms-section" id="sec-equipment" data-aos="fade-up">
+                <!-- 11. Account Terms -->
+                <div class="terms-section" id="sec-accounts" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-blue"><i class="fas fa-tv" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">9. Equipment &amp; Maintenance <span>Hardware</span></h2>
+                        <div class="terms-icon ti-gold"><i class="fas fa-user-shield" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">11. Account Terms <span>Security</span></h2>
                     </div>
                     <ul>
-                        <li>Customers must handle all consoles, controllers, and peripherals <strong>with care</strong>.</li>
-                        <li>Any damage to equipment caused by negligence, misuse, or intentional harm will be <strong>charged to the responsible party</strong> at the cost of repair or replacement.</li>
-                        <li>Consoles marked as <strong>"Under Maintenance"</strong> are not available for use or reservation until cleared by staff. Do not attempt to use a unit that has been locked or tagged as unavailable.</li>
-                        <li>Report any equipment malfunction to staff immediately. Do not attempt to self-repair any Hub equipment.</li>
-                        <li>The Hub is not responsible for saved game data loss. Customers are encouraged to back up their data to personal cloud accounts where possible.</li>
+                        <li>Users are responsible for the security and confidentiality of their account credentials.</li>
+                        <li>Accounts must not be shared with any other person.</li>
+                        <li>The shop reserves the right to suspend or ban any account in violation of these terms.</li>
+                        <li>Shopkeeper accounts are created exclusively by the Admin and do not require email verification.</li>
                     </ul>
                 </div>
 
-                <!-- 10. Privacy -->
+                <!-- 12. Privacy Policy -->
                 <div class="terms-section" id="sec-privacy" data-aos="fade-up">
                     <div class="terms-section-header">
                         <div class="terms-icon ti-teal"><i class="fas fa-shield-alt" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">10. Privacy <span>Data Policy</span></h2>
+                        <h2 class="terms-section-title">12. Privacy Policy <span>Data Collection</span></h2>
                     </div>
-                    <p>By creating an account, you consent to the collection and use of your personal information (name, email, session history) for the purpose of:</p>
+                    <p>The system collects personal information (Name, Email, Contact Number) for the sole purpose of managing reservations, sessions, and tournaments.</p>
                     <ul>
-                        <li>Managing your account and reservations.</li>
-                        <li>Sending service-related notifications (e.g., reservation confirmations).</li>
-                        <li>Improving Hub services and enforcing these Terms.</li>
-                    </ul>
-                    <div class="hl"><i class="fas fa-lock me-2" style="color:#20c8a1;"></i>We do not sell or share your personal data with third parties. Your information is stored securely and used solely for Hub operations.</div>
-                </div>
-
-                <!-- 11. Liability -->
-                <div class="terms-section" id="sec-liability" data-aos="fade-up">
-                    <div class="terms-section-header">
-                        <div class="terms-icon ti-coral"><i class="fas fa-scale-balanced" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">11. Limitation of Liability <span>Disclaimer</span></h2>
-                    </div>
-                    <ul>
-                        <li>Gspot Gaming Hub is <strong>not liable</strong> for any loss, theft, or damage to personal belongings brought into the premises.</li>
-                        <li>We are not responsible for any personal injury sustained on the premises due to the customer's own negligence.</li>
-                        <li>In cases of system outage, power failure, or equipment breakdown that interrupts a paid session, affected customers will be compensated with equivalent gaming time at management's discretion.</li>
-                        <li>The Hub's maximum liability in any dispute shall not exceed the amount paid by the customer for the specific session or service in question.</li>
+                        <li>User information will NOT be shared with third parties outside of shop operations.</li>
+                        <li>Transaction and session data may be used for internal reporting and analytics purposes.</li>
                     </ul>
                 </div>
 
-                <!-- 12. Changes -->
-                <div class="terms-section" id="sec-changes" data-aos="fade-up">
+                <!-- 13. Staff Code of Conduct -->
+                <div class="terms-section" id="section-13-staff-code-of-conduct" data-aos="fade-up">
                     <div class="terms-section-header">
-                        <div class="terms-icon ti-mint"><i class="fas fa-file-pen" style="color:#fff;"></i></div>
-                        <h2 class="terms-section-title">12. Changes to Terms <span>Updates</span></h2>
+                        <div class="terms-icon ti-blue"><i class="fas fa-user-tie" style="color:#fff;"></i></div>
+                        <h2 class="terms-section-title">Section 13 — Staff Code of Conduct <span>Professionalism</span></h2>
                     </div>
-                    <p>Gspot Gaming Hub reserves the right to update or modify these Terms and Conditions at any time. Changes will be effective upon posting to this page with an updated effective date.</p>
-                    <p>Continued use of our facilities or online services after any modification constitutes your acceptance of the new terms. We encourage you to review this page periodically.</p>
-                    <div class="hl"><i class="fas fa-envelope me-2" style="color:#20c8a1;"></i>For questions or concerns about these Terms, please visit our <a href="index.php#contact" style="color:#20c8a1;">Contact</a> page or speak with our staff directly.</div>
+                    <p>All Admins and Shopkeepers are bound by the Staff Code of Conduct to ensure the highest standard of service and operational integrity.</p>
+                    <ul>
+                        <li>Staff must maintain professionalism, honesty, and integrity in all interactions with customers and other staff members.</li>
+                        <li>All transactions, session starts, extensions, and payments must be recorded accurately through the official system interface.</li>
+                        <li>Staff are strictly prohibited from bypassing the billing engine or manually modifying database values for unauthorized purposes.</li>
+                        <li>Equipment maintenance and damage reports must be submitted promptly and truthfully.</li>
+                        <li>User privacy must be respected at all times; personal data must never be used for non-official purposes.</li>
+                        <li>Staff must follow all instructions provided by the Admin/Owner and stay updated with the latest Hub policies.</li>
+                        <li>Violations of the Staff Code of Conduct will result in immediate suspension of privileges and possible permanent account termination.</li>
+                    </ul>
                 </div>
 
-                <p class="last-updated">Last updated: April 25, 2026 &nbsp;·&nbsp; Gspot Gaming Hub, Dasmariñas, Cavite</p>
+                <p class="last-updated">Last updated: May 10, 2026 &nbsp;·&nbsp; Gspot Gaming Hub, Dasmariñas, Cavite</p>
             </div>
         </div>
     </div>
