@@ -231,7 +231,7 @@
 .cs-icon        { position:absolute;left:13px;top:50%;transform:translateY(-50%);
                   color:#5f85da;font-size:13px;pointer-events:none;z-index:1; }
 .cs-input       { width:100%;box-sizing:border-box;
-                  padding:11px 38px 11px 36px;border-radius:10px;
+                  padding:11px 38px 11px 14px;border-radius:10px;
                   border:1px solid rgba(95,133,218,.2);
                   background:rgba(255,255,255,.04);
                   color:#e8eaf6;font-size:14px;font-family:inherit;
@@ -411,8 +411,7 @@
                     <option value="<?= $opt['paid'] ?>"
                             data-cost="<?= $opt['cost'] ?>"
                             data-total="<?= $opt['total'] ?>">
-                        <?= $opt['label_paid'] ?> — ₱<?= number_format($opt['cost'], 0) ?>
-                        <?= $opt['bonus'] > 0 ? '(+' . $opt['label_bonus'] . ')' : '' ?>
+                        <?= $opt['label_paid'] ?> — ₱<?= number_format($opt['cost'], 0) ?><?= $opt['label_bonus'] ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
@@ -1463,7 +1462,6 @@ function denyExt(extId) {
                 <!-- Customer search widget (prefix: ar) -->
                 <div class="cs-wrap" id="arWrap">
                     <div class="cs-input-row">
-                        <i class="fas fa-search cs-icon"></i>
                         <input type="text" id="arQuery" class="cs-input"
                                placeholder="Search customer by name or email…"
                                autocomplete="off"
@@ -1517,7 +1515,7 @@ function denyExt(extId) {
                         <option value="<?= $opt['paid'] ?>" 
                                 data-total="<?= $opt['total'] ?>"
                                 data-cost="<?= $opt['cost'] ?>">
-                            <?= $opt['label_total'] ?> — ₱<?= round($opt['cost']) ?><?= $opt['label_bonus'] ?>
+                            <?= $opt['label_paid'] ?> — ₱<?= round($opt['cost']) ?><?= $opt['label_bonus'] ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -1536,10 +1534,9 @@ function denyExt(extId) {
                     <select name="reserved_time" id="adminResTime" required onchange="adminResSync()">
                         <option value="" disabled selected>— Select time —</option>
                         <?php 
-                        // Start at 8:00 AM, end at 11:30 PM (last slot)
-                        for ($h = 8; $h <= 23; $h++) {
-                            foreach (['00', '15', '30', '45'] as $m) {
-                                if ($h == 23 && !in_array($m, ['00', '15', '30'])) continue; 
+                        // Operating hours: 12:00 PM – 12:00 AM (midnight)
+                        for ($h = 12; $h <= 23; $h++) {
+                            foreach (['00', '30'] as $m) {
                                 $val  = sprintf('%02d:%s', $h, $m);
                                 $disp = date('g:i A', strtotime("2000-01-01 $val"));
                                 echo "<option value=\"$val\">$disp</option>\n";
@@ -1547,7 +1544,7 @@ function denyExt(extId) {
                         }
                         ?>
                     </select>
-                    <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 8:00 AM – 12:00 AM</p>
+                    <p class="field-hint warn"><i class="fas fa-clock"></i> Operating hours: 12:00 PM – 12:00 AM</p>
                 </div>
             </div>
             <div id="adminResConflictBox" style="display:none; margin-bottom:15px; padding:12px; border-radius:10px; background:rgba(251,86,107,.15); border:1px solid rgba(251,86,107,.3); color:#fb566b; font-size:13px;">
@@ -1556,12 +1553,12 @@ function denyExt(extId) {
             </div>
             <div class="form-group" id="adminDpGroup" style="display:none;">
                 <label style="display:flex;justify-content:space-between;align-items:center;">
-                    Payment Amount (&#8369;)
+                    Reservation Fee (&#8369;)
                     <span id="adminDpHint" style="font-size:11px;color:#20c8a1;font-weight:600;"></span>
                 </label>
-                <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="1"
+                <input type="number" name="downpayment_amount" id="adminDpAmount" min="0" step="0.01"
                        readonly>
-                <p class="field-hint"><i class="fas fa-lock" style="margin-right:4px;"></i>Fixed at 50% of session cost — collected to secure the booking.</p>
+                <p class="field-hint"><i class="fas fa-lock" style="margin-right:4px;"></i>Formula: ₱20 base fee + 5% of session cost.</p>
             </div>
             <div class="form-group" id="adminDpMethodGroup" style="display:none;">
                 <label>Payment Method <span class="req">*</span></label>
@@ -1623,8 +1620,14 @@ function adminResSync() {
     const conSel = document.getElementById('adminResConsoleSelect');
     const opt    = conSel.options[conSel.selectedIndex];
     const type   = opt ? (opt.dataset.type || '') : '';
+    const rate   = opt ? parseFloat(opt.dataset.rate || 0) : 0;
     const hidden = document.getElementById('adminResConsoleTypeHidden');
     if (hidden) hidden.value = type;
+
+    // Refresh duration dropdown labels with the rate of the selected console
+    if (rate > 0) {
+        refreshDurationLabels('adminResPlannedMins', rate);
+    }
 
     // 1. Recalculate Downpayment
     adminResCalcDownpayment();
@@ -1769,13 +1772,24 @@ function adminResCalcDownpayment() {
     const durSel = document.getElementById('adminResPlannedMins');
     const opt    = durSel.options[durSel.selectedIndex];
     const cost   = opt ? parseFloat(opt.dataset.cost || 0) : 0;
+    const mode   = document.getElementById('resAdminModeSelect').value;
     
     const dpGroup    = document.getElementById('adminDpGroup');
     const dpMethod   = document.getElementById('adminDpMethodGroup');
     const dpInput    = document.getElementById('adminDpAmount');
     const dpHint     = document.getElementById('adminDpHint');
 
-    if (!cost) {
+    // Base cost for non-hourly modes if needed (e.g. unlimited)
+    let totalSessionCost = 0;
+    if (mode === 'hourly') {
+        totalSessionCost = cost;
+    } else if (mode === 'unlimited') {
+        // Find the unlimited rate from settings or default
+        const unlimRate = parseFloat(<?= json_encode(getSetting('unlimited_rate') ?: 300) ?>);
+        totalSessionCost = unlimRate;
+    }
+
+    if (totalSessionCost <= 0 && mode !== 'open_time') {
         dpGroup.style.display  = 'none';
         dpMethod.style.display = 'none';
         dpInput.value          = '';
@@ -1783,10 +1797,22 @@ function adminResCalcDownpayment() {
         return;
     }
 
-    const dp = Math.ceil(cost * 0.5); // 50%, rounded up to nearest peso
+    if (mode === 'open_time') {
+        // Open time doesn't have a fixed session cost upfront, 
+        // but typically reservations still require a fee.
+        // On user side, open_time is NOT allowed for reservations.
+        // If allowed on admin side, we might need a default or skip it.
+        // Looking at reserve.php, it seems only hourly and unlimited are standard for reservations.
+        dpGroup.style.display  = 'none';
+        dpMethod.style.display = 'none';
+        return;
+    }
 
-    dpInput.value          = dp;
-    dpHint.textContent     = `50% of ₱${Math.round(cost)}`;
+    // Formula: 20 + (5% of session cost)
+    const fee = 20 + (totalSessionCost * 0.05);
+
+    dpInput.value          = fee.toFixed(2);
+    dpHint.textContent     = `₱20 + 5% of ₱${totalSessionCost.toFixed(0)}`;
     dpGroup.style.display  = 'block';
     dpMethod.style.display = 'block';
 }
@@ -1985,7 +2011,7 @@ function adminDpChange() {
 
     /* ── Close dropdown when clicking outside ─────────────────── */
     document.addEventListener('click', function (e) {
-        ['ss','ar'].forEach(function(pfx) {
+        ['ss','ar','tp'].forEach(function(pfx) {
             const wrap = $q(pfx,'Wrap');
             if (wrap && !wrap.contains(e.target)) closeDropdown(pfx);
         });
@@ -2005,6 +2031,25 @@ function adminDpChange() {
                     const inp = document.getElementById('arQuery');
                     if (inp) { inp.focus(); inp.classList.add('cs-error'); }
                     return false;
+                }
+            });
+        }
+
+        /* guard Add Participant: user_id must be set if in registered mode */
+        const tpForm = document.getElementById('addParticipantForm');
+        if (tpForm) {
+            tpForm.addEventListener('submit', function(e) {
+                const mode = document.getElementById('participantModeInput').value;
+                if (mode === 'registered') {
+                    const uid  = document.getElementById('tpUserId');
+                    const hint = document.getElementById('tpHint');
+                    if (!uid || !uid.value) {
+                        e.preventDefault();
+                        if (hint) hint.style.display = 'block';
+                        const inp = document.getElementById('tpQuery');
+                        if (inp) { inp.focus(); inp.classList.add('cs-error'); }
+                        return false;
+                    }
                 }
             });
         }
@@ -2037,6 +2082,23 @@ function adminDpChange() {
         } else if (name === 'startSession') {
             /* Reset the Start Session customer widget */
             if (typeof csDeselect === 'function') csDeselect('ss', 'walk-in');
+        } else if (name === 'addParticipant') {
+            /* Reset the Tournament Participant customer widget */
+            if (typeof csDeselect === 'function') csDeselect('tp');
+            const form = document.getElementById('addParticipantForm');
+            if (form) {
+                const ign = form.querySelector('[name="ign"]');
+                const cn  = form.querySelector('[name="contact_number"]');
+                const ps  = form.querySelector('[name="payment_status"]');
+                const nt  = form.querySelector('[name="notes"]');
+                const wn  = document.getElementById('walkinNameInput');
+                if (ign) ign.value = '';
+                if (cn)  cn.value  = '';
+                if (ps)  ps.value  = 'pending';
+                if (nt)  nt.value  = '';
+                if (wn)  wn.value  = '';
+                // Mode is reset via setParticipantMode('registered') in openAddParticipant call
+            }
         }
         if (typeof _origOpenModal === 'function') _origOpenModal(name);
     };
