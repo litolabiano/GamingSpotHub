@@ -297,7 +297,7 @@
         <!-- Stats row -->
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
             <div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.25);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
-                <div style="font-size:26px;font-weight:800;color:#20c8a1;"><?= $ctrl_available ?></div>
+                <div style="font-size:26px;font-weight:800;color:#20c8a1;" id="statCtrlAvailable"><?= $ctrl_available ?></div>
                 <div style="font-size:12px;color:#888;margin-top:2px;">Available</div>
             </div>
             <div style="background:rgba(95,133,218,.1);border:1px solid rgba(95,133,218,.25);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
@@ -309,14 +309,14 @@
                 <div style="font-size:12px;color:#888;margin-top:2px;">Maintenance</div>
             </div>
             <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 22px;text-align:center;min-width:90px;">
-                <div style="font-size:26px;font-weight:800;color:#f0f0f0;"><?= $ctrl_total ?></div>
+                <div style="font-size:26px;font-weight:800;color:#f0f0f0;" id="statCtrlTotal"><?= $ctrl_total ?></div>
                 <div style="font-size:12px;color:#888;margin-top:2px;">Total</div>
             </div>
         </div>
 
         <!-- Controllers table -->
         <div style="background:var(--clr-surface);border:1px solid var(--clr-border);border-radius:var(--radius-md);overflow:hidden;">
-            <table class="data-table" style="width:100%;border-collapse:collapse;">
+            <table class="data-table" id="activeControllersTable" style="width:100%;border-collapse:collapse;">
                 <thead>
                     <tr style="background:rgba(10,33,81,.6);">
                         <th style="padding:12px 16px;text-align:left;font-size:12px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Unit #</th>
@@ -990,5 +990,105 @@ function promptEditConsoleType(id, currentName, currentRate) {
     document.getElementById('editConsoleTypeName').value = currentName;
     document.getElementById('editConsoleTypeRate').value = parseFloat(currentRate).toFixed(2);
     openModal('editConsoleType');
+}
+
+async function submitAddController(e) {
+    e.preventDefault();
+    const form = e.target;
+    const errEl = document.getElementById('addControllerError');
+    const subBtn = form.querySelector('button[type=submit]');
+    const formData = new FormData(form);
+
+    errEl.style.display = 'none';
+    subBtn.disabled = true;
+    subBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+
+    try {
+        const response = await fetch('ajax/add_controller_unit.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const text = await response.text();
+        let res;
+        try {
+            res = JSON.parse(text);
+        } catch (jsonErr) {
+            console.error('JSON Parse Error:', jsonErr, 'Raw Response:', text);
+            throw new Error('Server returned an invalid format. Please check the logs.');
+        }
+
+        if (res.success) {
+            if (window.showToast) window.showToast(res.message, 'success');
+            else alert(res.message);
+
+            // 1. Add row to table
+            addControllerRowToTable(res.data);
+
+            // 2. Update stats
+            if (res.data.stats) {
+                document.getElementById('statCtrlTotal').textContent = res.data.stats.total;
+                document.getElementById('statCtrlAvailable').textContent = res.data.stats.available;
+            }
+
+            // 3. Reset and close
+            form.reset();
+            closeModal('addController');
+        } else {
+            errEl.textContent = res.message;
+            errEl.style.display = 'block';
+        }
+    } catch (err) {
+        console.error(err);
+        errEl.textContent = err.message || 'An unexpected error occurred.';
+        errEl.style.display = 'block';
+    } finally {
+        subBtn.disabled = false;
+        subBtn.innerHTML = '<i class="fas fa-plus"></i> Add Controller';
+    }
+}
+
+function addControllerRowToTable(data) {
+    const table = document.getElementById('activeControllersTable');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    
+    // Remove "No controllers found" row if it exists
+    const emptyRow = tbody.querySelector('.empty-row') || tbody.querySelector('td[colspan="7"]')?.parentElement;
+    if (emptyRow) emptyRow.remove();
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td style="padding:12px 16px;"><strong style="color:#fff;">${data.unit_number}</strong></td>
+        <td style="padding:12px 16px;">${data.type_name}</td>
+        <td style="padding:12px 16px;color:#20c8a1;">₱${parseFloat(data.hourly_rate).toFixed(2)}/hr</td>
+        <td style="padding:12px 16px;">
+            <span class="status-dot ${data.status}"></span>
+            ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+        </td>
+        <td style="padding:12px 16px;color:#888;font-size:13px;">${data.notes || '-'}</td>
+        <td style="padding:12px 16px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="btn-sec btn-sm" style="padding:5px 10px;font-size:12px;" 
+                        onclick="openEditControllerModal(${data.controller_id}, '${data.unit_number}', ${data.hourly_rate}, '${data.notes || ''}')">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <form method="POST" action="admin.php#consoles" style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" name="action" value="update_controller_status">
+                    <input type="hidden" name="controller_id" value="${data.controller_id}">
+                    <select name="status" onchange="this.form.submit()"
+                            style="background:rgba(10,33,81,.7);border:1px solid rgba(95,133,218,.25);
+                                   color:#f0f0f0;padding:5px 10px;border-radius:7px;font-size:13px;
+                                   font-family:inherit;cursor:pointer;">
+                        <option value="available" selected>Available</option>
+                        <option value="in_use">In Use</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="archived">Archive</option>
+                    </select>
+                </form>
+            </div>
+        </td>
+    `;
+    tbody.prepend(row);
 }
 </script>

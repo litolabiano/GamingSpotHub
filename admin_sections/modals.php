@@ -822,7 +822,6 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
                 <span style="font-weight:700;color:#f1e1aa;">From Reservation</span>
                 <span class="res-notice-id" style="font-weight:700;color:#20c8a1;margin-left:4px;"></span>
                 — upfront payment includes the reservation downpayment.
-                <span class="res-nonrefundable-note" style="display:block;margin-top:3px;font-size:11px;color:#fb566b;font-weight:600;"></span>
             </div>
         </div>
 
@@ -846,72 +845,6 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
             </div>
         </div>
 
-        <!-- ── Early-end warning (shown when hourly session still has time left) ── -->
-        <div id="endEarlyWarning" style="display:none;background:rgba(241,168,60,.12);border:1px solid rgba(241,168,60,.45);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(241,168,60,.2);border:1px solid rgba(241,168,60,.4);display:flex;align-items:center;justify-content:center;font-size:18px;color:#f1a83c;flex-shrink:0;">
-                    <i class="fas fa-hourglass-half"></i>
-                </div>
-                <div>
-                    <div style="font-weight:700;color:#f1e1aa;font-size:14px;margin-bottom:2px;">Session Time Not Yet Elapsed</div>
-                    <div style="font-size:12px;color:#aaa;">The customer still has <strong id="endEarlyRemainingStr" style="color:#f1a83c;">—</strong> remaining on their booked session.</div>
-                </div>
-            </div>
-
-            <!-- ── Refund Breakdown ── -->
-            <div id="endEarlyBreakdown" style="background:rgba(0,0,0,.25);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:10px;">
-                    <i class="fas fa-calculator" style="margin-right:5px;"></i> Refund Calculation
-                </div>
-                <!-- Row: Consumed -->
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;">
-                    <span style="color:#aaa;">
-                        <i class="fas fa-play-circle" style="color:#20c8a1;margin-right:6px;font-size:11px;"></i>
-                        Time Used <span id="endEarlyElapsedStr" style="color:#f1e1aa;font-family:monospace;font-size:12px;">(—)</span>
-                    </span>
-                    <span style="font-weight:700;color:#20c8a1;" id="endEarlyConsumedCost">₱0.00</span>
-                </div>
-                <!-- Row: Additional Fees (controller rental etc.) -->
-                <div id="endEarlyExtrasRow" style="display:none;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;">
-                    <span style="color:#aaa;">
-                        <i class="fas fa-gamepad" style="color:#8aa4e8;margin-right:6px;font-size:11px;"></i>
-                        Additional Fees <span id="endEarlyExtrasLabel" style="color:#8aa4e8;font-size:11px;"></span>
-                    </span>
-                    <span style="font-weight:700;color:#8aa4e8;" id="endEarlyExtrasAmt">+₱0.00</span>
-                </div>
-                <!-- Row: Paid -->
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07);">
-                    <span style="color:#aaa;">
-                        <i class="fas fa-receipt" style="color:#f1a83c;margin-right:6px;font-size:11px;"></i>
-                        Amount Paid Upfront
-                    </span>
-                    <span style="font-weight:700;color:#f1e1aa;" id="endEarlyUpfrontStr">₱0.00</span>
-                </div>
-                <!-- Row: Refund -->
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;">
-                    <span style="font-weight:700;color:#fff;">
-                        <i class="fas fa-undo-alt" style="color:#fb566b;margin-right:6px;font-size:12px;"></i>
-                        Refund to Customer
-                    </span>
-                    <span style="font-size:20px;font-weight:900;color:#fb566b;font-family:'Outfit',monospace;" id="endEarlyRefundAmt">₱0.00</span>
-                </div>
-                <div id="endEarlyNoRefundNote" style="display:none;margin-top:8px;font-size:12px;color:#888;text-align:right;">
-                    <i class="fas fa-info-circle"></i> <span id="endEarlyNoRefundReason">No refund — consumed cost covers or exceeds amount paid.</span>
-                </div>
-            </div>
-
-            <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#aaa;line-height:1.6;margin-bottom:12px;">
-                <i class="fas fa-info-circle" style="color:#f1a83c;margin-right:5px;"></i>
-                The customer only pays for <strong style="color:#f1e1aa;">time actually used</strong>. The refund is pre-calculated above.
-            </div>
-
-            <!-- Refund & End action -->
-            <button type="button" id="endEarlyRefundBtn" class="btn-dang btn-full" style="padding:12px;">
-                <i class="fas fa-undo-alt"></i>
-                <span>Refund <span id="endEarlyRefundBtnAmt">—</span> &amp; End Session Early</span>
-            </button>
-
-        </div>
 
 
         <!-- Cost preview panel (shown for open_time; updated live) -->
@@ -1116,72 +1049,7 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
     </div>
 </div>
 
-<!-- ════ REFUND MODAL ══════════════════════════════════════════════════════ -->
-<div class="modal" id="refundSessionModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title">
-                <i class="fas fa-undo-alt" style="color:#f1a83c;margin-right:8px"></i>Issue Refund
-            </h3>
-            <button class="modal-close" onclick="closeModal('refundSession')">&times;</button>
-        </div>
 
-        <div class="modal-body">
-        <div class="modal-banner warn" style="font-size:14px;flex-direction:column;gap:6px;">
-            <strong id="refundSessionSummary">—</strong>
-            <div style="font-size:13px;color:#888;">
-                Total paid so far: <strong id="refundPaidSoFar" style="color:#20c8a1;">₱0.00</strong>
-            </div>
-        </div>
-
-        <form method="POST" id="refundSessionForm">
-            <?= csrfField() ?>
-            <!-- action is overridden to 'early_end_session' when coming from early-end flow -->
-            <input type="hidden" name="action" id="refundActionField" value="issue_refund">
-            <input type="hidden" name="session_id" id="refundSessionId">
-            <!-- For reservation-cancellation refunds -->
-            <input type="hidden" name="reservation_id" id="refundReservationId" value="">
-            <!-- Flag set by JS when this is an early-end (refund + end) submission -->
-            <input type="hidden" name="early_end" id="refundEarlyEndFlag" value="0">
-            <div class="form-group">
-                <label>Refund Amount (₱) *</label>
-                <input type="number" name="refund_amount" id="refundAmount" min="0" step="1"
-                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:20px;font-weight:700;box-sizing:border-box;"
-                       placeholder="Enter amount to refund">
-                <div id="refundMaxNote" style="font-size:11px;color:#888;margin-top:4px;"></div>
-                <!-- Auto-calc breakdown (shown only for early-end flow) -->
-                <div id="refundAutoCalcHint" style="display:none;margin-top:8px;font-size:12px;color:#f1e1aa;
-                     background:rgba(241,168,60,.08);border:1px solid rgba(241,168,60,.2);
-                     border-radius:8px;padding:10px 12px;line-height:1.5;"></div>
-            </div>
-            <div class="form-group">
-                <label>Reason (optional)</label>
-                <input type="text" name="refund_reason" id="refundReason" maxlength="200"
-                       style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:14px;box-sizing:border-box;"
-                       placeholder="e.g. Technical issue, customer complaint…">
-            </div>
-            <div class="modal-banner danger" style="margin-bottom:16px;font-size:12px;">
-                <i class="fas fa-exclamation-triangle"></i> Refunds are recorded as negative transactions and <strong>cannot be undone</strong>.
-            </div>
-            <!-- Early-end note — shown only when triggered from early-end flow -->
-            <div id="refundEarlyEndNote" style="display:none;background:rgba(241,168,60,.1);border:1px solid rgba(241,168,60,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#f1a83c;">
-                <i class="fas fa-stop-circle" style="margin-right:5px;"></i>
-                <strong>Early End:</strong> Confirming will issue the refund above <strong>and immediately end the session</strong>.
-            </div>
-            <!-- Inline error display (populated by _showRefundError()) -->
-            <div id="refundErrorMsg" style="display:none;background:rgba(251,86,107,.12);border:1px solid rgba(251,86,107,.35);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#fb566b;">
-                <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
-                <span id="refundErrorText"></span>
-            </div>
-            <button type="button" id="refundConfirmBtn" class="btn-dang btn-full"
-                    onclick="_submitRefundAjax()">
-                <i class="fas fa-undo-alt"></i> <span id="refundConfirmLabel">Confirm Refund</span>
-            </button>
-
-        </form>
-        </div><!-- /.modal-body -->
-    </div>
-</div>
 
 <!-- ════ EXTEND SESSION MODAL ════════════════════════════════════════════ -->
 <div class="modal" id="extendSessionModal">
@@ -2646,9 +2514,10 @@ function adminDpChange() {
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <form method="POST">
+        <form id="addControllerForm" onsubmit="submitAddController(event)">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add_controller">
+            <div id="addControllerError" style="display:none;margin:15px;padding:12px;border-radius:8px;background:rgba(251,86,107,.1);border:1px solid rgba(251,86,107,.2);color:#fb566b;font-size:13px;"></div>
 
 
             <div class="modal-body">
@@ -2662,11 +2531,12 @@ function adminDpChange() {
                     <div class="form-group">
                         <label>Controller Type *</label>
                     <select name="controller_type_id" required
-                            onchange="this.form.controller_type.value = this.options[this.selectedIndex].dataset.name">
+                            onchange="const opt = this.options[this.selectedIndex]; this.form.controller_type.value = opt.dataset.name; this.form.console_type_id.value = opt.dataset.consoleTypeId;">
                         <option value="" disabled selected>— Select Type —</option>
                         <?php foreach ($controllerTypes as $ct): ?>
-                            <option value="<?= $ct['console_type_id'] ?>"
-                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>">
+                            <option value="<?= $ct['controller_type_id'] ?>"
+                                    data-name="<?= htmlspecialchars($ct['type_name']) ?>"
+                                    data-console-type-id="<?= (int)$ct['console_type_id'] ?>">
                                 <?= htmlspecialchars($ct['type_name']) ?>
                                 <?php if (!empty($ct['parent_console_name'])): ?>
                                     (<?= htmlspecialchars($ct['parent_console_name']) ?>)
@@ -2674,8 +2544,9 @@ function adminDpChange() {
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <!-- Hidden: keeps the type name in sync for the legacy controller_type text column -->
+                    <!-- Hidden: keeps the type name and console type ID in sync -->
                     <input type="hidden" name="controller_type" value="">
+                    <input type="hidden" name="console_type_id" value="">
                 </div>
                 </div>
 
@@ -2898,6 +2769,7 @@ window.BulkManager = {
         }, { danger: isDelete, yesLabel: verb });
     }
 };
+</script>
 <!-- ── End Controller Rental Summary Modal ─────────────────────────────── -->
 <div class="modal" id="endControllerSummaryModal">
     <div class="modal-content" style="max-width:440px;">

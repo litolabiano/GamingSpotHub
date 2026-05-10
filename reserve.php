@@ -453,8 +453,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Reservations can only be made from 12:00 PM (noon) onwards.';
     } elseif (!$error && $reserved_time > '23:30') {
         $error = 'Reservations must be no later than 11:30 PM.';
-    } elseif (!$error && ($_POST['no_refund_agreed'] ?? '') !== '1') {
-        $error = 'You must read and agree to the No-Refund Policy before submitting.';
     }
 
     if (!$error) {
@@ -1933,50 +1931,7 @@ if (!empty($_GET['console'])) {
 
 
 
-                    <!-- ── No-Refund Policy Acknowledgment ───────────────── -->
-                    <div id="noRefundPolicyBox" style="
-                        background:linear-gradient(135deg,rgba(251,86,107,.08),rgba(241,168,60,.06));
-                        border:1px solid rgba(251,86,107,.35);
-                        border-radius:16px;
-                        padding:20px 22px;
-                        margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                            <div style="width:38px;height:38px;border-radius:10px;
-                                background:rgba(251,86,107,.15);
-                                display:flex;align-items:center;justify-content:center;
-                                flex-shrink:0;color:#fb566b;font-size:1rem;">
-                                <i class="fas fa-ban"></i>
-                            </div>
-                            <div style="font-weight:800;color:#fb566b;font-size:14px;letter-spacing:.3px;">No-Refund Policy</div>
-                        </div>
-                        <ul style="font-size:12px;color:#ccc;line-height:1.9;margin:0 0 16px 16px;padding:0;">
-                            <li>A <strong style="color:#fff;">Reservation Fee</strong> of <strong style="color:#fff;">&#8369;20 + 5% of your session cost</strong> is required to confirm every booking.</li>
-                            <li>The reservation fee is <strong style="color:#fb566b;">non-refundable</strong> under <em>all</em> circumstances &mdash; including customer-initiated cancellations, and no-shows.</li>
-                            <li><strong style="color:#f1a83c;">15-Minute Grace Period:</strong> If you do not arrive within 15 minutes of your reserved start time, your reservation is automatically cancelled and the fee is forfeited.</li>
-                            <li>No store credit, GC, or partial refund will be issued in place of the fee.</li>
-                            <li>By paying the reservation fee you confirm you have read and accepted these terms.</li>
-                        </ul>
-                        <label id="noRefundLabel" style="
-                            display:flex;align-items:flex-start;gap:12px;
-                            cursor:pointer;
-                            background:rgba(255,255,255,.04);
-                            border:1px solid rgba(255,255,255,.1);
-                            border-radius:10px;
-                            padding:12px 14px;
-                            transition:border-color .2s,background .2s;">
-                            <input type="checkbox" id="noRefundCheck" name="no_refund_agreed" value="1"
-                                   onchange="handleNoRefundCheck(this)"
-                                   style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:#fb566b;cursor:pointer;">
-                            <span style="font-size:13px;color:#e0e0e0;line-height:1.5;">
-                                I have read, understood, and agreed to the <strong style="color:#fb566b;">No-Refund Policy</strong> above.
-                                I acknowledge that any payment I make for this reservation will not be refunded for any reason.
-                            </span>
-                        </label>
-                        <div id="noRefundError" style="display:none; color:#fb566b; font-size:12px; margin-top:12px; background:rgba(251,86,107,.1); padding:12px 14px; border-radius:10px; border:1px solid rgba(251,86,107,.2); align-items:center; gap:10px; animation: fadeIn 0.3s ease;">
-                            <i class="fas fa-exclamation-circle" style="font-size:1.1rem;"></i>
-                            <span>Please agree to the Terms and Conditions before proceeding with your payment.</span>
-                        </div>
-                    </div>
+
 
                     <div class="reserve-card" style="margin-bottom:24px;">
                         <h2><i class="fas fa-sticky-note"></i> Step 5 — Notes (Optional)</h2>
@@ -3349,33 +3304,7 @@ function selectDpMethod(method) {
     updateSummary();
 }
 
-/* ── Policy checkbox ─ no-refund must be ticked to enable Submit ───── */
-function handlePolicyChecks() {
-    const btn           = document.getElementById('submitBtn');
-    const noRefund      = document.getElementById('noRefundCheck');
-    const noRefundLabel = document.getElementById('noRefundLabel');
-    const noRefundError = document.getElementById('noRefundError');
 
-    if (noRefundLabel) {
-        if (noRefund && noRefund.checked) {
-            noRefundLabel.style.borderColor = 'rgba(32,200,161,.6)'; // Success green border
-            noRefundLabel.style.background  = 'rgba(32,200,161,.08)';
-            if (noRefundError) noRefundError.style.display = 'none';
-        } else {
-            noRefundLabel.style.borderColor = 'rgba(255,255,255,.1)';
-            noRefundLabel.style.background  = 'rgba(255,255,255,.04)';
-        }
-    }
-
-    // Button is now always clickable to trigger validation warning if unchecked
-    if (btn) {
-        btn.disabled      = false;
-        btn.style.opacity = '1';
-    }
-}
-
-/* Alias — the no-refund checkbox calls this by name */
-function handleNoRefundCheck() { handlePolicyChecks(); }
 
 /* ── Operating hours + 1-hr lead-time enforcement ──── */
 const MIN_LEAD_SECONDS = 3600; // 1 hour
@@ -3703,32 +3632,6 @@ function updateSummary() {
 
 /* ── Form validation ────────────────────────────────── */
 document.getElementById('reserveForm').addEventListener('submit', function(e) {
-    // ── T&C / No-Refund Validation ──
-    const noRefund = document.getElementById('noRefundCheck');
-    if (noRefund && !noRefund.checked) {
-        e.preventDefault();
-        
-        // Show informative warning message
-        const noRefundError = document.getElementById('noRefundError');
-        if (noRefundError) {
-            noRefundError.style.display = 'flex';
-            noRefundError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        
-        // Visually highlight the checkbox and label
-        const noRefundLabel = document.getElementById('noRefundLabel');
-        if (noRefundLabel) {
-            noRefundLabel.style.borderColor = '#fb566b'; // Warning red
-            noRefundLabel.style.background = 'rgba(251,86,107,.15)';
-            
-            // Trigger shake animation
-            noRefundLabel.classList.remove('shake-animation');
-            void noRefundLabel.offsetWidth; // trigger reflow
-            noRefundLabel.classList.add('shake-animation');
-        }
-        return;
-    }
-
     if (!selectedConsoleType) { e.preventDefault(); alert('Please select a console type.'); return; }
     if (!selectedMode)        { e.preventDefault(); alert('Please select a rental mode.'); return; }
     if (selectedMode === 'hourly' && !selectedDuration) { e.preventDefault(); alert('Please select a duration.'); return; }
@@ -4049,13 +3952,6 @@ function submitUserReschedule(e) {
         <h3><i class="fas fa-exclamation-triangle" style="color:#fb566b;"></i> Cancel Reservation</h3>
         <div class="ur-modal-body">
             <p>Are you sure you want to cancel this reservation?</p>
-            <div class="ur-alert">
-                <i class="fas fa-info-circle"></i>
-                <div>
-                    <strong>Important:</strong> As per our No-Refund Policy, reservation fees are non-refundable. 
-                    Cancelling a reservation will result in the forfeiture of your fee.
-                </div>
-            </div>
             <form id="userCancelForm" onsubmit="submitUserCancel(event)">
                 <input type="hidden" id="cancelResId">
                 <label style="display:block;margin-bottom:8px;font-weight:600;color:#ddd;font-size:12px;">Reason for Cancellation</label>
