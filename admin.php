@@ -44,218 +44,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Please select a console and rental mode.';
             $messageType = 'error';
         } elseif ($rental_mode === 'unlimited' && (!isset($_POST['unlimited_tendered']) || (float)$_POST['unlimited_tendered'] < $unlim_rate)) {
-            $message = 'Payment of â‚±' . number_format($unlim_rate, 2) . ' is required upfront for Unlimited sessions. Please ensure sufficient amount is tendered.';
+            $message = 'Payment of ₱' . number_format($unlim_rate, 2) . ' is required upfront for Unlimited sessions. Please ensure sufficient amount is tendered.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && (!$planned_minutes || $planned_minutes <= 0)) {
             $message = 'Please select a duration for the hourly session.';
             $messageType = 'error';
         } elseif ($rental_mode === 'hourly' && $planned_minutes > getPricingRules()['max_hourly_minutes']) {
             $pr = getPricingRules();
-            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat â‚±' . getSetting('unlimited_rate') . ') for longer sessions.';
+            $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
-            $skip_start_session = false;
-            if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] === '1') {
-                $cm1 = $_POST['controller_rental_mode_1'] ?? 'hourly';
-                $cm2 = $_POST['controller_rental_mode_2'] ?? 'hourly';
-                foreach (['m1' => $cm1, 'm2' => $cm2] as $k => $cm) {
-                    if (!in_array($cm, ['hourly', 'open_time'], true)) {
-                        $message = 'Invalid controller rental mode.';
-                        $messageType = 'error';
-                        $skip_start_session = true;
-                        break;
-                    }
-                }
-                if (!$skip_start_session) {
-                    $ctrl_1_mins_chk = (int)($_POST['controller_rental_minutes'] ?? 0);
-                    $ctrl_2_mins_chk = (int)($_POST['controller_rental_minutes_2'] ?? 0);
-                    $r1_chk = (int)($_POST['rented_controller_id'] ?? 0);
-                    $r2_chk = (int)($_POST['rented_controller_id_2'] ?? 0);
-                    $cc_chk = (int)($_POST['controller_count'] ?? 1);
-                    $admin_ctrl_cap = 720;
-                    /* Hourly: cap controller add-on at the selected console duration (paid slot in the picker), not longer. */
-                    $max_controller_minutes = ($rental_mode === 'hourly')
-                        ? (int)$planned_minutes
-                        : $admin_ctrl_cap;
-                    if ($r1_chk > 0 && $cm1 !== 'open_time') {
-                        if ($ctrl_1_mins_chk <= 0) {
-                            $message = 'Controller 1: choose a duration (or set rental mode to Open Time).';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        } elseif ($ctrl_1_mins_chk > $max_controller_minutes) {
-                            $message = ($rental_mode === 'hourly')
-                                ? 'Controller 1 rental cannot exceed the selected session duration.'
-                                : 'Controller 1 rental cannot exceed 12 hours.';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        }
-                    }
-                    if (!$skip_start_session && $cc_chk > 1 && $r2_chk > 0 && $cm2 !== 'open_time') {
-                        if ($ctrl_2_mins_chk <= 0) {
-                            $message = 'Controller 2: choose a duration (or set rental mode to Open Time).';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        } elseif ($ctrl_2_mins_chk > $max_controller_minutes) {
-                            $message = ($rental_mode === 'hourly')
-                                ? 'Controller 2 rental cannot exceed the selected session duration.'
-                                : 'Controller 2 rental cannot exceed 12 hours.';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        }
-                    }
-                }
-            }
             if (!$skip_start_session) {
-            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
-      if ($result['success']) {
-        $controller_upfront_addon = 0.0;
+                $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
+                if ($result['success']) {
+                    $controller_upfront_addon = 0.0;
 
-        // â”€â”€ Persist controller rental fee to additional_requests (always, â”€â”€â”€â”€â”€â”€
-        // â”€â”€ regardless of whether upfront was collected). endSession()    â”€â”€â”€â”€â”€â”€
-        // â”€â”€ and the End Session modal both read from this table.          â”€â”€â”€â”€â”€â”€
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
-            $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
-            $rented_2    = (int)($_POST['rented_controller_id_2'] ?? 0);
-            $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
-            $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
-            $cm1         = $_POST['controller_rental_mode_1'] ?? 'hourly';
-            $cm2         = $_POST['controller_rental_mode_2'] ?? 'hourly';
+                    if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] === '1') {
+                        $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
+                        $rented_2    = (int)($_POST['rented_controller_id_2'] ?? 0);
+                        $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
 
-            $ids      = [];
-            $ot_ids   = [];
-            $fix_meta = [];
-            $fix_sum  = 0.0;
+                        $ids = [];
+                        if ($rented_1 > 0) $ids[] = $rented_1;
+                        if ($ctrl_count > 1 && $rented_2 > 0) $ids[] = $rented_2;
 
-            $accum_controller_line = static function (mysqli $conn, int $cid, int $mins, string $cm) use (&$ids, &$ot_ids, &$fix_meta, &$fix_sum): void {
-                if ($cid <= 0 || !in_array($cm, ['hourly', 'open_time'], true)) {
-                    return;
+                        if (!empty($ids)) {
+                            // Controllers are now exclusively Open Time (billed at end of session)
+                            $desc = 'Controller rental (IDs: ' . implode(', ', $ids) . ') [OT_IDS:' . implode(',', $ids) . ']';
+                            $arStmt = $conn->prepare(
+                                "INSERT INTO additional_requests (session_id, request_type, description, extra_cost, status)
+                                 VALUES (?, 'controller_rental', ?, 0.00, 'approved')"
+                            );
+                            $arStmt->bind_param('is', $result['session_id'], $desc);
+                            $arStmt->execute();
+
+                            foreach ($ids as $cid) {
+                                $ctrlUpd = $conn->prepare("UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'");
+                                $ctrlUpd->bind_param('i', $cid);
+                                $ctrlUpd->execute();
+                            }
+                        }
+                    }
+
+                    if ($rental_mode === 'unlimited') {
+                        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
+                        $upfront_cost      = $unlim_rate;
+                        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+                            $upfront_cost += $controller_upfront_addon;
+                        }
+                        $tendered          = (float)$_POST['unlimited_tendered'];
+
+                        recordTransaction(
+                            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
+                            $tendered,
+                            0,
+                            null
+                        );
+                        $cost = number_format($upfront_cost, 2);
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+
+                    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
+                        $pr           = getPricingRules();
+                        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
+                        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+                            $upfront_cost += $controller_upfront_addon;
+                        }
+                        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
+                        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
+
+                        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
+
+                        recordTransaction(
+                            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
+                            $tendered,
+                            $shortfall,
+                            $shortfall ? 'Short payment at session start - short by ₱' . number_format($shortfall, 2) : null
+                        );
+                        $cost      = number_format($upfront_cost, 2);
+                        if ($shortfall !== null && $shortfall > 0) {
+                            $tendFmt  = number_format($tendered, 2);
+                            $shortFmt = number_format($shortfall, 2);
+                            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
+                                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
+                            $messageType = 'warning';
+                        } else {
+                            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+                        }
+
+                    } else {
+                        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+                    }
+
+                    // Activity Log
+                    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
+                    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
+                    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
+                    logActivity($user['user_id'], "Start Session", $logDet);
+
+                    if (!$messageType) $messageType = 'success';
+                } else {
+                    $message = 'Could not start session: ' . $result['message'];
+                    $messageType = 'error';
                 }
-                $ids[] = $cid;
-                if ($cm === 'open_time') {
-                    $ot_ids[] = $cid;
-
-                    return;
-                }
-                $st = $conn->prepare('SELECT hourly_rate FROM controllers WHERE controller_id = ?');
-                $st->bind_param('i', $cid);
-                $st->execute();
-                $rw = $st->get_result()->fetch_assoc();
-                if (!$rw) {
-                    return;
-                }
-                $rate = (float) $rw['hourly_rate'];
-                $amt  = round($rate * ($mins / 60), 2);
-                $fix_sum += $amt;
-                $fix_meta[] = $cid . ':' . number_format($amt, 2, '.', '');
-            };
-
-            if ($rented_1 > 0) {
-                $accum_controller_line($conn, $rented_1, $ctrl_1_mins, $cm1);
-            }
-            if ($ctrl_count > 1 && $rented_2 > 0) {
-                $accum_controller_line($conn, $rented_2, $ctrl_2_mins, $cm2);
-            }
-
-            $insert_ar = false;
-            $desc      = '';
-            $ctrl_fee  = round($fix_sum, 2);
-            $controller_upfront_addon = $ctrl_fee;
-            if (!empty($ids)) {
-                $insert_ar = true;
-                $desc = 'Controller rental (IDs: ' . implode(', ', $ids) . ')';
-                if (!empty($ot_ids)) {
-                    $desc .= ' [OT_IDS:' . implode(',', $ot_ids) . ']';
-                }
-                if (!empty($fix_meta)) {
-                    $desc .= ' [FIX:' . implode('|', $fix_meta) . ']';
-                }
-            }
-
-            if ($insert_ar) {
-                $arStmt = $conn->prepare(
-                    "INSERT INTO additional_requests
-                        (session_id, request_type, description, extra_cost, status)
-                     VALUES (?, 'controller_rental', ?, ?, 'approved')"
-                );
-                $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrl_fee);
-                $arStmt->execute();
-
-                foreach ($ids as $cid) {
-                    $ctrlUpd = $conn->prepare(
-                        "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
-                    );
-                    $ctrlUpd->bind_param('i', $cid);
-                    $ctrlUpd->execute();
-                }
-            }
-        }
-
-    if ($rental_mode === 'unlimited') {
-        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
-        $upfront_cost      = $unlim_rate;
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $upfront_cost += $controller_upfront_addon;
-        }
-        $tendered          = (float)$_POST['unlimited_tendered'];
-
-        recordTransaction(
-            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
-            $tendered,
-            0,
-            null
-        );
-        $cost = number_format($upfront_cost, 2);
-        $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
-
-    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
-        $pr           = getPricingRules();
-        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
-        // Add controller rental fee to upfront total if checked (fixed-rate controllers only; Open Time billed at end)
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $upfront_cost += $controller_upfront_addon;
-        }
-        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
-        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
-
-        // Amount actually collected - if customer paid less, record only what they gave
-        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
-
-        recordTransaction(
-            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
-            $tendered,
-            $shortfall,
-            $shortfall ? 'Short payment at session start - short by â‚±' . number_format($shortfall, 2) : null
-        );
-        $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
-        $cost      = number_format($upfront_cost, 2);
-        if ($shortfall !== null && $shortfall > 0) {
-            $tendFmt  = number_format($tendered, 2);
-            $shortFmt = number_format($shortfall, 2);
-            $message  = "Session #" . $result['session_id'] . " started. â‚±{$tendFmt} collected upfront via "
-                      . ucfirst($start_payment_method) . " (short by â‚±{$shortFmt}).";
-            $messageType = 'warning';
-        } else {
-            $message = "Session #" . $result['session_id'] . " started. â‚±{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
-        }
-
-    } else {
-        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
-    }
-
-    // Activity Log
-    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
-    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
-    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
-    logActivity($user['user_id'], "Start Session", $logDet);
-
-    if (!$messageType) $messageType = 'success';
-}
-
-  else {
-                $message = 'Could not start session: ' . $result['message'];
-                $messageType = 'error';
-            }
             }
         }
     }
@@ -299,8 +189,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Short payment - record only what was tendered
                         $actualCollected = $tendered_amount;
                         $shortfall       = round($remaining - $tendered_amount, 2);
-                        $paymentNote     = 'Short payment - collected â‚±' . number_format($tendered_amount, 2)
-                                         . ', short by â‚±' . number_format($shortfall, 2);
+                        $paymentNote     = 'Short payment - collected ₱' . number_format($tendered_amount, 2)
+                                         . ', short by ₱' . number_format($shortfall, 2);
                     } else {
                         $paymentNote = 'Balance payment collected at session end';
                     }
@@ -320,19 +210,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($shortfall !== null && $shortfall > 0) {
                     $shortFmt    = number_format($shortfall, 2);
                     $tenderedFmt = number_format($tendered_amount, 2);
-                    $message     = "Session ended. Total: â‚±{$total}. Collected â‚±{$tenderedFmt} - still â‚±{$shortFmt} outstanding.";
+                    $message     = "Session ended. Total: ₱{$total}. Collected ₱{$tenderedFmt} - still ₱{$shortFmt} outstanding.";
                     $messageType = 'warning';
                 } elseif ($remaining > 0) {
                     $due     = number_format($remaining, 2);
-                    $message = "Session ended. Duration: {$mins} min. Total: â‚±{$total} (prepaid â‚±{$paid} + collected â‚±{$due}).";
+                    $message = "Session ended. Duration: {$mins} min. Total: ₱{$total} (prepaid ₱{$paid} + collected ₱{$due}).";
                     $messageType = 'success';
                 } else {
-                    $message     = "Session ended. Duration: {$mins} min. Total: â‚±{$total}. Fully paid upfront - no extra charge.";
+                    $message     = "Session ended. Duration: {$mins} min. Total: ₱{$total}. Fully paid upfront - no extra charge.";
                     $messageType = 'success';
                 }
 
                 // Activity Log
-                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: â‚±{$total}.";
+                $logDet = "Ended Session #{$session_id}. Console: " . ($sess_row['unit_number'] ?? 'Unknown') . ". Duration: {$mins} min. Total Cost: ₱{$total}.";
                 logActivity($user['user_id'], "End Session", $logDet);
             } else {
                 $message     = 'Could not end session: ' . $result['message'];
@@ -706,7 +596,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // SAVE SETTINGS â€” owner only
+    // SAVE SETTINGS —” owner only
     elseif ($action === 'save_settings') {
         if ($user['role'] !== 'owner') {
             $message = 'Access denied. Only the owner can change settings.';
@@ -916,7 +806,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ? round($balanceDue - $tendered, 2) : null;
 
         if (!$session_id || $balanceDue <= 0) {
-            $message = 'Invalid payment - balance must be greater than â‚±0.';
+            $message = 'Invalid payment - balance must be greater than ₱0.';
             $messageType = 'error';
         } else {
             $stmt = $conn->prepare("SELECT user_id FROM gaming_sessions WHERE session_id = ? AND status IN ('active','completed')");
@@ -928,23 +818,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $session_id, $sess_row['user_id'], $actualCollected, $payment_method,
                     $user['user_id'], $tendered, $shortfall,
                     $shortfall
-                        ? 'Partial payment - collected â‚±' . number_format($actualCollected, 2)
-                          . ', short by â‚±' . number_format($shortfall, 2)
-                          . ' of â‚±' . number_format($balanceDue, 2) . ' balance'
+                        ? 'Partial payment - collected ₱' . number_format($actualCollected, 2)
+                          . ', short by ₱' . number_format($shortfall, 2)
+                          . ' of ₱' . number_format($balanceDue, 2) . ' balance'
                         : 'Balance payment collected'
                 );
                 if ($shortfall !== null && $shortfall > 0) {
-                    $message = 'Collected â‚±' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
-                             . '. Still short by â‚±' . number_format($shortfall, 2) . '.';
+                    $message = 'Collected ₱' . number_format($actualCollected, 2) . ' via ' . ucfirst($payment_method)
+                             . '. Still short by ₱' . number_format($shortfall, 2) . '.';
                     $messageType = 'warning';
                 } else {
-                    $message = 'Payment of â‚±' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
+                    $message = 'Payment of ₱' . number_format($actualCollected, 2) . ' recorded via ' . ucfirst($payment_method) . '.';
                     $messageType = 'success';
                 }
 
                 // Activity Log
-                $payNote = "Recorded payment of â‚±" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
-                if ($shortfall) $payNote .= ". Short by â‚±" . number_format($shortfall, 2);
+                $payNote = "Recorded payment of ₱" . number_format($actualCollected, 2) . " via " . ucfirst($payment_method) . " for Session #{$session_id}";
+                if ($shortfall) $payNote .= ". Short by ₱" . number_format($shortfall, 2);
                 logActivity($user['user_id'], "Record Payment", $payNote);
             } else {
                 $message = 'Session not found or already ended.';
@@ -961,7 +851,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'error';
     }
 
-    // PROCESS REFUND for cancelled reservations is handled at lines 266â€“306 above.
+    // PROCESS REFUND for cancelled reservations is handled at lines 266—“306 above.
 
     // NOTE: Session extension is handled exclusively through ajax/extend_session.php
     // which calls extendSession() - applying bonus minutes and recording a transaction.
@@ -1300,56 +1190,6 @@ $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === '
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
 
-// â”€â”€ Controller Rental status per active console â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Maps console_id => [ qty => int, total_cost => float, session_id => int ]
-// Rows tagged [ENDED] are excluded â€” they represent returned controllers.
-$ctrlRentalByConsole = [];
-$crQ = $conn->query(
-    "SELECT gs.console_id,
-            gs.session_id,
-            GROUP_CONCAT(ar.description SEPARATOR '||') AS desc_list,
-            SUM(ar.extra_cost)       AS total_cost,
-            MIN(ar.created_at)       AS rented_since
-       FROM gaming_sessions gs
-       JOIN additional_requests ar
-         ON ar.session_id = gs.session_id
-        AND ar.request_type = 'controller_rental'
-        AND ar.status = 'approved'
-        AND ar.description NOT LIKE '%[ENDED]%'
-      WHERE gs.status IN ('active','paused')
-      GROUP BY gs.console_id, gs.session_id"
-);
-if ($crQ) {
-    while ($row = $crQ->fetch_assoc()) {
-        $qty = 0;
-        $max_mins = 0;
-        $descs = explode('||', $row['desc_list']);
-        foreach ($descs as $d) {
-            if (preg_match('/ID(?:s)?:\s*([\d, ]+)/', $d, $m)) {
-                $qty += count(explode(',', $m[1]));
-            } else {
-                $qty += 1;
-            }
-            if (preg_match('/\[Mins:\s*([\d, ]+)\]/', $d, $m2)) {
-                $minsRaw = explode(',', $m2[1]);
-                foreach ($minsRaw as $minRaw) {
-                    $mVal = (int)trim($minRaw);
-                    if ($mVal > $max_mins) $max_mins = $mVal;
-                }
-            }
-        }
-        // Skip if no active controllers remain (all ended on this session)
-        if ($qty <= 0) continue;
-        $ctrlRentalByConsole[(int)$row['console_id']] = [
-            'qty'         => $qty,
-            'max_mins'    => $max_mins,
-            'total_cost'  => (float)$row['total_cost'],
-            'session_id'  => (int)$row['session_id'],
-            'rented_since'=> $row['rented_since'],
-        ];
-    }
-}
-
 // â”€â”€ Controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $allControllers      = [];
 $archivedControllers = [];
@@ -1495,13 +1335,13 @@ foreach ($recentSessions as $sess) {
     if ($sess['status'] === 'active') {
         // For hourly sessions: show in Pending if not fully paid.
         // computeHourlySessionBaseCost() reverses the free-bonus so 4hr+1hr-free
-        // sessions correctly report â‚±320 base (not â‚±400).
-        // Include sessions with â‚±0 upfront (need to collect full amount at end).
+        // sessions correctly report ₱320 base (not ₱400).
+        // Include sessions with ₱0 upfront (need to collect full amount at end).
         if ($sess['rental_mode'] === 'hourly' && !empty($sess['planned_minutes'])) {
             $baseCost = computeHourlySessionBaseCost((int)$sess['planned_minutes']);
             $extras   = (float)($sess['approved_extras'] ?? 0);
             if ($paidSoFar >= $baseCost + $extras - 0.01) {
-                continue; // Fully paid â€” not a pending balance
+                continue; // Fully paid —” not a pending balance
             }
         } elseif ($sess['rental_mode'] === 'unlimited') {
             continue; // Unlimited: flat rate already handled, skip
@@ -2575,7 +2415,7 @@ function restrictStartSessionDuration() {
     }
 }
 
-/** Paid minutes to total play (paid + bonus) â€” mirrors PHP paidToTotalMinutes; requires global PRICING. */
+/** Paid minutes to total play (paid + bonus) —” mirrors PHP paidToTotalMinutes; requires global PRICING. */
 function jsPaidToTotalMinutes(paid) {
     if (typeof PRICING === 'undefined') return paid;
     const p = parseInt(paid, 10) || 0;
@@ -2590,7 +2430,7 @@ function jsPaidToTotalMinutes(paid) {
 var ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI = 720;
 
 /**
- * Same bonus/bracket timing as console open-time (_timedCost): use controller â‚±/hr on paid blocks
+ * Same bonus/bracket timing as console open-time (_timedCost): use controller ₱/hr on paid blocks
  * and scale tier/bracket peso amounts vs the selected console reference rate.
  */
 function _controllerOpenTimeFee(totalMin, controllerHourlyRate) {
@@ -2620,207 +2460,7 @@ function _controllerOpenTimeFee(totalMin, controllerHourlyRate) {
     return cost;
 }
 
-/** Rental mode for a specific controller add-on (independent of console session mode). */
-function getControllerRentalMode(ctrl) {
-    const sel = document.getElementById('adminCtrlModeSelect' + ctrl);
-    return sel ? (sel.value || 'hourly') : 'hourly';
-}
 
-/** Show/hide duration per controller: Open Time (controller) = no duration picker. */
-function refreshAdminCtrlRentalModeUi() {
-    const group = document.getElementById('controllerRentalGroup');
-    const togOn = !!document.getElementById('controllerRentalToggle')?.checked;
-    let anyOt = false;
-    [1, 2].forEach(function (ctrl) {
-        const wrap = document.getElementById('adminCtrlDurWrap' + ctrl);
-        const cm = getControllerRentalMode(ctrl);
-        if (cm === 'open_time') anyOt = true;
-        if (wrap) {
-            wrap.style.display = cm === 'open_time' ? 'none' : '';
-        }
-        if (cm === 'open_time') {
-            const s = document.getElementById('adminCtrlDurationSelect' + ctrl);
-            if (s) s.value = '0';
-        }
-        if (typeof _adminCtrlCostPreview === 'function') {
-            _adminCtrlCostPreview(ctrl, parseInt(document.getElementById('adminCtrlDurationSelect' + ctrl)?.value || '0', 10) || 0);
-        }
-    });
-    const runNote = document.getElementById('adminCtrlOpenTimeRunClockNote');
-    if (runNote) {
-        runNote.style.display = (anyOt && togOn && group && group.style.display !== 'none') ? 'block' : 'none';
-    }
-    if (typeof recalcAdminControllerFee === 'function') recalcAdminControllerFee();
-}
-
-function onAdminCtrlRentalModeChange(ctrl) {
-    refreshAdminCtrlRentalModeUi();
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
-}
-
-/** Sync controller rental mode to console mode: Unlimited console â†’ hourly add-on (+ 12h default elsewhere); OT â†’ OT. */
-function syncControllerRentalModesFromSession() {
-    const m = document.getElementById('rentalModeSelect')?.value || 'hourly';
-    ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(function (id) {
-        const s = document.getElementById(id);
-        if (!s) return;
-        if (m === 'open_time') {
-            s.value = 'open_time';
-        } else {
-            s.value = 'hourly';
-        }
-    });
-}
-
-/** Unlimited console sessions: preset nonâ€“Open-Time controller durations to 12h (until staff changes). */
-function applyTwelveHourForUnlimitedConsoleSession(force) {
-    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
-    const tog      = document.getElementById('controllerRentalToggle');
-    if (sessMode !== 'unlimited' || !tog?.checked) {
-        return;
-    }
-    const cap   = ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
-    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10);
-    let did     = false;
-    [1, 2].forEach(function (ctrl) {
-        if (ctrl === 2 && count < 2) return;
-        if (getControllerRentalMode(ctrl) === 'open_time') return;
-        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-        if (!sel) return;
-        const cur = parseInt(sel.value, 10) || 0;
-        if (!force && cur > 0) return;
-        const opt = sel.querySelector('option[value="' + cap + '"]');
-        if (!opt || opt.disabled) return;
-        sel.value = String(cap);
-        did = true;
-        if (typeof _adminCtrlCostPreview === 'function') {
-            _adminCtrlCostPreview(ctrl, cap);
-        }
-    });
-    if (did && typeof recalcAdminControllerFee === 'function') {
-        recalcAdminControllerFee();
-    }
-}
-
-/** Max controller rental minutes (hourly: same as selected console duration/paid slot; unlimited/open_time: 12h cap). */
-function getStartSessionMaxControllerMinutes() {
-    const modeEl = document.getElementById('rentalModeSelect');
-    if (!modeEl || typeof PRICING === 'undefined') return 0;
-    if (modeEl.value === 'hourly') {
-        const sel = document.getElementById('durationSelect');
-        if (!sel || !sel.value) return 0;
-        const paid = parseInt(sel.value, 10);
-        return isNaN(paid) || paid <= 0 ? 0 : paid;
-    }
-    if (modeEl.value === 'unlimited' || modeEl.value === 'open_time') {
-        return ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
-    }
-    return 0;
-}
-
-function applyAdminCtrlDurationSelectCaps(maxMins) {
-    let changed = false;
-    [1, 2].forEach(function (ctrl) {
-        if (getControllerRentalMode(ctrl) === 'open_time') return;
-        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-        if (!sel) return;
-        Array.from(sel.options).forEach(function (opt) {
-            const v = parseInt(opt.value, 10) || 0;
-            if (v === 0) {
-                opt.disabled = false;
-                return;
-            }
-            opt.disabled = (maxMins <= 0 && v > 0) || (maxMins > 0 && v > maxMins);
-        });
-        const cur = parseInt(sel.value, 10) || 0;
-        if ((maxMins <= 0 && cur > 0) || (maxMins > 0 && cur > maxMins)) {
-            sel.value = '0';
-            changed = true;
-            if (typeof _adminCtrlCostPreview === 'function') {
-                _adminCtrlCostPreview(ctrl, 0);
-            }
-        }
-    });
-    if (changed && typeof recalcAdminControllerFee === 'function') {
-        recalcAdminControllerFee();
-    }
-}
-
-let _syncAdminControllerDurationCapsBusy = false;
-function syncAdminControllerDurationCaps() {
-    if (_syncAdminControllerDurationCapsBusy) {
-        return;
-    }
-    _syncAdminControllerDurationCapsBusy = true;
-    try {
-        refreshAdminCtrlRentalModeUi();
-        const max = getStartSessionMaxControllerMinutes();
-        applyAdminCtrlDurationSelectCaps(max);
-
-    const hint = document.getElementById('ctrlDurationCapHint');
-    const mode = document.getElementById('rentalModeSelect')?.value || '';
-    const ctrlGroup = document.getElementById('controllerRentalGroup');
-    if (hint && ctrlGroup && ctrlGroup.style.display !== 'none') {
-        const togChecked = !!document.getElementById('controllerRentalToggle')?.checked;
-        if (mode === 'unlimited' && togChecked) {
-            const capH = Math.floor(ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60);
-            hint.textContent = `Unlimited console: hourly controller add-ons default to ${capH} hours (adjust as needed); charged at controller rate, separate from flat console unlimited fee.`;
-            hint.style.display = 'block';
-        } else if (mode === 'hourly' && togChecked) {
-            hint.textContent = 'Controller rental cannot exceed the selected session duration (same as the Duration field above). Longer options are disabled.';
-            hint.style.display = 'block';
-        } else {
-            hint.style.display = 'none';
-        }
-    }
-    applyTwelveHourForUnlimitedConsoleSession(false);
-    } finally {
-        _syncAdminControllerDurationCapsBusy = false;
-    }
-}
-
-/** Start Session: blocking message if controller rentals exceed rental window (empty if OK). */
-function getStartSessionControllerDurationError() {
-    const toggle = document.getElementById('controllerRentalToggle');
-    if (!toggle || !toggle.checked) return '';
-
-    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
-        ? getStartSessionMaxControllerMinutes() : 0;
-    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
-    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10) || 1;
-    const r1 = parseInt(document.getElementById('controllerSelect')?.value || '0', 10) || 0;
-    const r2 = parseInt(document.getElementById('controllerSelect2')?.value || '0', 10) || 0;
-    const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || '0', 10) || 0;
-    const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || '0', 10) || 0;
-    const cm1 = getControllerRentalMode(1);
-    const cm2 = getControllerRentalMode(2);
-
-    if (sessMode === 'hourly' && maxCm <= 0) {
-        if (r1 > 0 && cm1 !== 'open_time' && mins1 > 0) {
-            return 'Select a session duration before choosing controller rental length.';
-        }
-        if (count > 1 && r2 > 0 && cm2 !== 'open_time' && mins2 > 0) {
-            return 'Select a session duration before choosing controller rental length.';
-        }
-    }
-    if (r1 > 0 && cm1 !== 'open_time') {
-        if (mins1 <= 0) return 'Select a rental duration for Controller 1 (or set its rental mode to Open Time).';
-        if (mins1 > maxCm) {
-            return sessMode === 'unlimited'
-                ? ('Controller 1 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
-                : 'Controller 1 rental cannot exceed the selected session duration.';
-        }
-    }
-    if (count > 1 && r2 > 0 && cm2 !== 'open_time') {
-        if (mins2 <= 0) return 'Select a rental duration for Controller 2 (or set its rental mode to Open Time).';
-        if (mins2 > maxCm) {
-            return sessMode === 'unlimited'
-                ? ('Controller 2 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
-                : 'Controller 2 rental cannot exceed the selected session duration.';
-        }
-    }
-    return '';
-}
 
 /* â”€â”€ Controller Rental: Xbox-only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Hides/shows the controller rental checkbox depending on the selected
@@ -2868,21 +2508,21 @@ function onConsoleChange() {
         
         // Populate specific controller select
         if (cSelect) {
-            cSelect.innerHTML = '<option value="" disabled selected>â€” Select Controller 1 â€”</option>';
+            cSelect.innerHTML = '<option value="" disabled selected>—” Select Controller 1 —”</option>';
             const cSelect2 = document.getElementById('controllerSelect2');
-            if (cSelect2) cSelect2.innerHTML = '<option value="" disabled selected>â€” Select Controller 2 â€”</option>';
+            if (cSelect2) cSelect2.innerHTML = '<option value="" disabled selected>—” Select Controller 2 —”</option>';
             ctrlList.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.id;
                 opt.dataset.rate = c.rate;
-                opt.textContent = `${c.unit} (+â‚±${c.rate}/hr)`;
+                opt.textContent = `${c.unit} (+₱${c.rate}/hr)`;
                 cSelect.appendChild(opt);
                 
                 if (cSelect2) {
                     const opt2 = document.createElement('option');
                     opt2.value = c.id;
                     opt2.dataset.rate = c.rate;
-                    opt2.textContent = `${c.unit} (+â‚±${c.rate}/hr)`;
+                    opt2.textContent = `${c.unit} (+₱${c.rate}/hr)`;
                     cSelect2.appendChild(opt2);
                 }
             });
@@ -2898,7 +2538,6 @@ function onConsoleChange() {
 
     // Refresh duration option labels to reflect this console's per-type rate
     if (typeof _refreshDurationLabels === 'function') _refreshDurationLabels();
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
 }
 
 function onControllerToggle() {
@@ -2914,32 +2553,14 @@ function onControllerToggle() {
             if (qtyWrap)  qtyWrap.style.display  = 'block';
             if (countSel) countSel.disabled = false;
             if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
-            if (typeof syncControllerRentalModesFromSession === 'function') syncControllerRentalModesFromSession();
         } else {
             container.style.display = 'none';
             if (qtyWrap)  qtyWrap.style.display  = 'none';
             if (countSel) countSel.disabled = true;
 
-            // Reset both controllers
-            ['controllerSelect','controllerSelect2'].forEach(id => {
-                const s = document.getElementById(id); if (s) s.value = '';
-            });
-            ['adminCtrlDurationSelect1', 'adminCtrlDurationSelect2'].forEach(id => {
-                const i = document.getElementById(id);
-                if (i) i.value = '0';
-            });
-            ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(id => {
-                const m = document.getElementById(id);
-                if (m) m.value = 'hourly';
-            });
-            ['adminCtrlCostPreview1','adminCtrlCostPreview2'].forEach(id => {
-                const d = document.getElementById(id); if (d) d.style.display = 'none';
-            });
-        }
-        if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
-        if (toggle.checked && document.getElementById('rentalModeSelect')?.value === 'unlimited'
-            && typeof applyTwelveHourForUnlimitedConsoleSession === 'function') {
-            applyTwelveHourForUnlimitedConsoleSession(true);
+            // Reset controller selections
+            const s1 = document.getElementById('controllerSelect'); if (s1) s1.value = '';
+            const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
         }
         recalcAdminControllerFee();
     }
@@ -2950,81 +2571,13 @@ function onAdminControllerToggle() {
     const ctrl2    = document.getElementById('adminCtrl2Block');
     if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
     
-    // If ctrl2 hidden, clear its values
     if (countSel?.value !== '2') {
         const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
-        const d2 = document.getElementById('adminCtrlDurationSelect2');
-        if (d2) d2.value = '0';
-        const p2 = document.getElementById('adminCtrlCostPreview2'); if (p2) p2.style.display = 'none';
     }
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
     recalcAdminControllerFee();
 }
 
-function getControllerFeeByMins(mins) {
-    if (mins <= 0) return 0;
-    // Rule: 5-34m = 10, 35-64m = 20, etc. (increment by 10 for every additional 30-minute block)
-    return Math.floor((mins + 25) / 30) * 10;
-}
 
-function _adminCtrlCostPreview(ctrl, mins) {
-    const selId = ctrl === 1 ? 'controllerSelect' : 'controllerSelect2';
-    const prevId = `adminCtrlCostPreview${ctrl}`;
-    const sel = document.getElementById(selId);
-    const prev = document.getElementById(prevId);
-    if (!prev) return;
-    
-    const rate = (sel && sel.selectedIndex > 0)
-        ? parseFloat(sel.options[sel.selectedIndex].dataset.rate || 0) : 0;
-    const h = Math.floor(mins/60), r = mins%60;
-    const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
-    
-    if (getControllerRentalMode(ctrl) === 'open_time') {
-        if (rate > 0) {
-            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(225,225,245,.92);">Open Time controller: charged at session end for full elapsed time (&#8369;${Math.round(rate)}/hr), same timing structure as console open time.</span>`;
-            prev.style.display = 'block';
-        } else {
-            prev.style.display = 'none';
-        }
-        return;
-    }
-    if (rate > 0 && mins > 0) {
-        const fee = getControllerFeeByMins(mins);
-        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${Math.round(rate)}/hr rule &times; ${lbl} = <strong>&#8369;${Math.round(fee)}</strong>`;
-        prev.style.display = 'block';
-    } else if (mins > 0) {
-        prev.innerHTML = `<i class="fas fa-clock" style="margin-right:4px;"></i>Select a unit above to see cost.`;
-        prev.style.display = 'block';
-    } else {
-        prev.style.display = 'none';
-    }
-}
-
-function onAdminCtrlDurationChange(ctrl) {
-    if (getControllerRentalMode(ctrl) === 'open_time') return;
-    const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-    if (!sel) return;
-    let mins = parseInt(sel.value, 10) || 0;
-    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
-        ? getStartSessionMaxControllerMinutes() : 0;
-    if ((maxCm <= 0 && mins > 0) || (maxCm > 0 && mins > maxCm)) {
-        if (typeof showInlineToast === 'function') {
-            if (maxCm <= 0 && mins > 0) {
-                showInlineToast('Select an hourly duration before choosing controller rental length.', 'error');
-            } else {
-                const mode = document.getElementById('rentalModeSelect')?.value || '';
-                const msg = (mode === 'unlimited')
-                    ? ('Controller rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours for this mode.')
-                    : 'Controller rental cannot exceed the selected session duration.';
-                showInlineToast(msg, 'error');
-            }
-        }
-        sel.value = '0';
-        mins = 0;
-    }
-    _adminCtrlCostPreview(ctrl, mins);
-    recalcAdminControllerFee();
-}
 
 function onControllerSelectChange() {
     onAdminCtrl1Change();
@@ -3032,15 +2585,11 @@ function onControllerSelectChange() {
 }
 
 function onAdminCtrl1Change() {
-    const mins = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
-    _adminCtrlCostPreview(1, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
 }
 
 function onAdminCtrl2Change() {
-    const mins = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
-    _adminCtrlCostPreview(2, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
 }
@@ -3067,43 +2616,24 @@ function recalcAdminControllerFee() {
     const toggle    = document.getElementById('controllerRentalToggle');
     const feeInput  = document.getElementById('controllerFeeAmt');
     const rateDisp  = document.getElementById('ctrlRateDisplay');
-    const countSel  = document.getElementById('adminControllerCount');
     
-    let totalFee = 0;
-    let rate1 = 0;
-    
-    if (toggle?.checked) {
-        const count = countSel ? parseInt(countSel.value) : 1;
-        const sel1 = document.getElementById('controllerSelect');
-        const sel2 = document.getElementById('controllerSelect2');
-        const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
-        const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
-        const cm1 = getControllerRentalMode(1);
-        const cm2 = getControllerRentalMode(2);
-
-        if (sel1 && sel1.selectedIndex > 0) {
-            rate1 = parseFloat(sel1.options[sel1.selectedIndex].dataset.rate) || 0;
-            if (cm1 !== 'open_time' && mins1 > 0) {
-                totalFee += getControllerFeeByMins(mins1);
-            }
-        }
-        if (count > 1 && sel2 && sel2.selectedIndex > 0) {
-            const rate2 = parseFloat(sel2.options[sel2.selectedIndex].dataset.rate) || 0;
-            if (cm2 !== 'open_time' && mins2 > 0) {
-                totalFee += getControllerFeeByMins(mins2);
-            }
-        }
-    }
-    
-    if (feeInput) feeInput.value = Math.round(totalFee);
+    // Controller rentals are now exclusively Open Time.
+    // Upfront fee is always 0.
+    if (feeInput) feeInput.value = 0;
     
     if (rateDisp) {
-        rateDisp.innerHTML = rate1 > 0 ? `+&#8369;${Math.round(rate1)}/hr` : '';
+        if (toggle?.checked) {
+            const sel1 = document.getElementById('controllerSelect');
+            const rate = (sel1 && sel1.selectedIndex > 0) 
+                ? (sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
+            rateDisp.textContent = rate > 0 ? `(₱${Math.round(rate)}/hr Open Time)` : '';
+        } else {
+            rateDisp.textContent = '';
+        }
     }
-    
-    if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-    if (typeof _syncStartBtn === 'function') _syncStartBtn();
+    updateSessionPreview();
 }
+
 
 /**
  * Recompute cost labels in any duration dropdown using a given hourly rate.
@@ -3204,14 +2734,14 @@ function calcChange(tenderedId, displayId, costHolderId) {
         disp.style.background = 'rgba(32,200,161,.15)';
         disp.style.border     = '1px solid rgba(32,200,161,.3)';
         disp.style.color      = '#20c8a1';
-        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>â‚±${change.toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-coins"></i> Change: <strong>₱${change.toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'none';
         if (payShortNotice) payShortNotice.style.display = 'none';
     } else {
         disp.style.background = 'rgba(251,86,107,.15)';
         disp.style.border     = '1px solid rgba(251,86,107,.3)';
         disp.style.color      = '#fb566b';
-        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient - short by <strong>â‚±${Math.abs(change).toFixed(2)}</strong>`;
+        disp.innerHTML        = `<i class="fas fa-exclamation-circle"></i> Insufficient - short by <strong>₱${Math.abs(change).toFixed(2)}</strong>`;
         if (endShortNotice) endShortNotice.style.display = 'block';
         if (payShortNotice) payShortNotice.style.display = 'block';
     }
@@ -3331,7 +2861,7 @@ function updateSessionPreview() {
     if (costHolder) costHolder.textContent = cost.toFixed(2);
 
     document.getElementById('previewEndTime').textContent = endStr;
-    document.getElementById('previewCost').textContent    = 'â‚±' + cost.toFixed(2);
+    document.getElementById('previewCost').textContent    = '₱' + cost.toFixed(2);
     document.getElementById('previewOvertime').style.display = 'block';
     preview.style.display = 'block';
     if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
@@ -3436,7 +2966,7 @@ function _clearStartShortError() {
 }
 
 /**
- * _syncStartBtn â€” called live on every input, cost change, or mode change.
+ * _syncStartBtn —” called live on every input, cost change, or mode change.
  * Disables the Start button if the tendered amount is empty or below the session cost.
  */
 function _syncStartBtn() {
@@ -3513,7 +3043,7 @@ document.querySelectorAll('.modal').forEach(m => {
  * _bracketCost / _timedCost are unchanged in shape - only their constants move.
  */
 const PRICING = <?= json_encode(getPricingRules()) ?>;
-// Available controllers for the rental dropdown â€” populated from DB on page load
+// Available controllers for the rental dropdown —” populated from DB on page load
 const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
 
 /**
@@ -3531,30 +3061,41 @@ function getConsoleRate() {
         || PRICING.hourly_rate;
 }
 
-
-/**
- * New 15-minute interval pricing formula:
- * - 1-4 mins: Free (₱0)
- * - 5+ mins: Billing starts in 15-minute intervals (unit_cost = rate / 4)
- * - Formula: Math.ceil((totalMin - 4) / 15) * unit_cost
- */
+function _bracketCost(partialMin) {
+    if (partialMin <= 0) return 0;
+    const rate  = getConsoleRate();
+    const tiers = PRICING.pricing_tiers || [];
+    for (let i = 0; i < tiers.length; i++) {
+        if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
+            return tiers[i].charge;
+        }
+    }
+    return rate;
+}
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
-    const rate = getConsoleRate();
-    if (totalMin <= 4) return 0;
-
-    const unitRate  = rate / 4.0;
-    const intervals = Math.ceil((totalMin - 4.0) / 15.0);
-
-    return intervals * unitRate;
+    const bp       = PRICING.bonus_paid_minutes;  // e.g. 120
+    const bf       = PRICING.bonus_free_minutes;  // e.g. 30
+    const rate     = getConsoleRate();            // per-type rate from console_types
+    const cyclePay = bp / 60 * rate;
+    const cycleLen = bp + bf;
+    const full     = Math.floor(totalMin / cycleLen);
+    const rem      = totalMin % cycleLen;
+    let cost       = full * cyclePay;
+    if (rem > bp) {
+        cost += cyclePay;  // inside the free window - charge the full paid block
+    } else {
+        cost += Math.floor(rem / 60) * rate + _bracketCost(rem % 60);
+    }
+    return cost;
 }
 function _hourlyCost(duration, planned) {
     const overtime = duration - planned;
     if (overtime <= 0) {
-        // Early or exact end — bill only actual elapsed time
+        // Early or exact end —” bill only actual elapsed time
         return duration <= 0 ? 0 : _timedCost(duration);
     }
-    // Overtime — base (planned cost) + overtime intervals
+    // Overtime —” base (planned cost) + overtime brackets
     const base = planned <= 30 ? PRICING.session_min_charge : _timedCost(planned);
     return base + _timedCost(overtime);
 }
@@ -3564,9 +3105,9 @@ let _endModalTimer = null;   // holds the live-update interval
 // Stores refund-modal args when the admin triggers "Refund & End" from the early-end warning
 let _pendingRefundArgs = null;
 
-/* ── Session-end audio alert (Web Audio API - no file needed) ──────────
+/* â”€â”€ Session-end audio alert (Web Audio API - no file needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Plays a short 3-beep chime when the admin confirms ending a session.
-Uses the browser's built-in synthesis - works offline, no CDN required.
+Uses the browser—™s built-in synthesis - works offline, no CDN required.
 */
 function playSessionEndSound() {
     try {
@@ -3619,12 +3160,12 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
         const h = Math.floor(currentMins / 60), m = currentMins % 60;
         document.getElementById('ebd-time-label').textContent = h ? `${h}h ${m}m` : `${m}m`;
-        document.getElementById('ebd-gross-cost').textContent = 'â‚±' + grossTimeCost.toFixed(2);
+        document.getElementById('ebd-gross-cost').textContent = '₱' + grossTimeCost.toFixed(2);
         
         const extrasRow = document.getElementById('ebd-extras-row');
         if (extras > 0) {
             extrasRow.style.display = 'flex';
-            document.getElementById('ebd-extras-cost').textContent = 'â‚±' + extras.toFixed(2);
+            document.getElementById('ebd-extras-cost').textContent = '₱' + extras.toFixed(2);
         } else {
             extrasRow.style.display = 'none';
         }
@@ -3635,7 +3176,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const pureUpfront = Math.max(0, upfrontPaid - reservationDownpayment);
         if (pureUpfront > 0) {
             upfrontRow.style.display = 'flex';
-            document.getElementById('ebd-upfront-paid').textContent = '-â‚±' + pureUpfront.toFixed(2);
+            document.getElementById('ebd-upfront-paid').textContent = '-₱' + pureUpfront.toFixed(2);
         } else {
             upfrontRow.style.display = 'none';
         }
@@ -3643,12 +3184,12 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
         const resRow = document.getElementById('ebd-res-row');
         if (reservationDownpayment > 0) {
             resRow.style.display = 'flex';
-            document.getElementById('ebd-res-credit').textContent = '-â‚±' + reservationDownpayment.toFixed(2);
+            document.getElementById('ebd-res-credit').textContent = '-₱' + reservationDownpayment.toFixed(2);
         } else {
             resRow.style.display = 'none';
         }
 
-        document.getElementById('ebd-final-due').textContent = 'â‚±' + Math.max(0, finalDue).toFixed(2);
+        document.getElementById('ebd-final-due').textContent = '₱' + Math.max(0, finalDue).toFixed(2);
     }
     sourceReservationId    = sourceReservationId    || 0;
 
@@ -3792,7 +3333,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
 
             // Sync cost holder + big display
             if (remaining > 0) {
-                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: â‚±' + upfrontPaid.toFixed(2) + ')' : ''}`);
+                setAmountDue(remaining, `${String(h ? h + 'h ' : '')}${String(m).padStart(2,'0')}:${String(secs).padStart(2,'0')} elapsed${upfrontPaid > 0 ? ' (Prepaid: ₱' + upfrontPaid.toFixed(2) + ')' : ''}`);
             } else {
                 hideAmountDue();
                 costHolder.value = '0';
@@ -3818,7 +3359,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
             cost = base + _timedCost(overtime) + extras;
         } else {
-            // Early or exact end â€” charge only actual consumed time
+            // Early or exact end —” charge only actual consumed time
             cost = (minutes <= 0 ? 0 : _timedCost(minutes)) + extras;
         }
 
@@ -3837,13 +3378,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                 const base = upfrontPaid > 0
                     ? upfrontPaid
                     : (plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes));
-                setAmountDue(remaining, `Total base + overtime: â‚±${cost.toFixed(2)} - Prepaid: â‚±${upfrontPaid.toFixed(2)}`);
-                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (â‚±${base.toFixed(2)}).<br>`
-                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: â‚±${remaining.toFixed(2)}.</span>`;
+                setAmountDue(remaining, `Total base + overtime: ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-clock"></i> Booked: <strong>${bookedStr}</strong> (₱${base.toFixed(2)}).<br>`
+                                 + `<span style="color:#fb566b">Overtime: +${overtime} min. Total remaining due: ₱${remaining.toFixed(2)}.</span>`;
             } else {
-                // Early end â€” collect actual time cost only
-                setAmountDue(remaining, `Actual time used: ${minutes}m â†’ â‚±${cost.toFixed(2)} - Prepaid: â‚±${upfrontPaid.toFixed(2)}`);
-                noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end â€” charged for <strong>${minutes} min</strong> used. Collect <strong>â‚±${remaining.toFixed(2)}</strong> now.`;
+                // Early end —” collect actual time cost only
+                setAmountDue(remaining, `Actual time used: ${minutes}m â†’ ₱${cost.toFixed(2)} - Prepaid: ₱${upfrontPaid.toFixed(2)}`);
+                noteEl.innerHTML = `<i class="fas fa-coins"></i> Early end —” charged for <strong>${minutes} min</strong> used. Collect <strong>₱${remaining.toFixed(2)}</strong> now.`;
             }
             
             // Update breakdown
@@ -3853,13 +3394,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             payGroup.style.display    = 'block';
             prepaidNote.style.display = 'none';
             payLabel.textContent      = 'Payment Method';
-            confirmLbl.textContent    = `Confirm End & Collect â‚±${remaining.toFixed(2)}`;
+            confirmLbl.textContent    = `Confirm End & Collect ₱${remaining.toFixed(2)}`;
         } else {
-            // Session fully paid (upfront â‰¥ actual cost)
+            // Session fully paid (upfront ≥ actual cost)
             hideAmountDue();
             costHolder.value = '0';
             titleEl.innerHTML = '<i class="fas fa-stop-circle" style="color:#fb566b;margin-right:8px"></i>End Session - Paid in Full';
-            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost â‚±${cost.toFixed(2)} already paid. No additional charge.`;
+            noteEl.innerHTML  = `<i class="fas fa-check-circle" style="color:#20c8a1"></i> Total cost ₱${cost.toFixed(2)} already paid. No additional charge.`;
             payGroup.style.display    = 'none';
             prepaidNote.style.display = 'block';
             confirmLbl.textContent    = 'Confirm End (No Additional Charge)';
@@ -3920,7 +3461,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             // Build header row
             let html = '<div style="font-weight:700;color:#8aa4e8;font-size:13px;margin-bottom:10px;">'
                      + '<i class="fas fa-gamepad" style="margin-right:6px;"></i> Controller add-on'
-                     + '<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px;">Return individual controllers early â€” fee prorated to elapsed time.</span>'
+                     + '<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px;">Return individual controllers early —” fee prorated to elapsed time.</span>'
                      + '</div>';
 
             // Per-controller rows
@@ -3942,7 +3483,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                       + '    <i class="fas fa-gamepad" style="color:#8aa4e8;font-size:14px;flex-shrink:0;"></i>'
                       + '    <div style="flex:1;min-width:0;">'
                       + '      <div style="font-weight:700;color:#f0f0f0;font-size:13px;">' + cr.label + '</div>'
-                      + '      <div style="font-size:11px;color:#20c8a1;margin-top:2px;font-weight:600;">Actual fee: â‚±' + fee + ' <span style="color:#666;font-weight:400;">(Used ' + durStr + ')</span></div>'
+                      + '      <div style="font-size:11px;color:#20c8a1;margin-top:2px;font-weight:600;">Actual fee: ₱' + fee + ' <span style="color:#666;font-weight:400;">(Used ' + durStr + ')</span></div>'
                       + '    </div>'
                       + '    <button type="button" class="btn-sec btn-sm ctrl-single-prepare-btn" '
                       + '       data-cid="' + cr.controller_id + '" '
@@ -3962,7 +3503,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                       + '     </div>'
                       + '     <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">'
                       + '        <button type="button" class="ctrl-single-cancel-btn" data-cid="' + cr.controller_id + '" style="background:none; border:none; color:#fb566b; font-size:11px; cursor:pointer; padding:0;">Cancel</button>'
-                      + '        <button type="button" class="btn-prim btn-sm ctrl-single-confirm-btn" data-cid="' + cr.controller_id + '" data-fee="' + fee + '" style="font-size:11px; padding:5px 15px;">Confirm End Â· â‚±' + fee + '</button>'
+                      + '        <button type="button" class="btn-prim btn-sm ctrl-single-confirm-btn" data-cid="' + cr.controller_id + '" data-fee="' + fee + '" style="font-size:11px; padding:5px 15px;">Confirm End · ₱' + fee + '</button>'
                       + '     </div>'
                       + '  </div>'
                       + '</div>';
@@ -4042,13 +3583,13 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                                 }, 1500);
                             } else {
                                 btn.disabled = false;
-                                btn.innerHTML = 'Confirm End Â· â‚±' + fee;
+                                btn.innerHTML = 'Confirm End · ₱' + fee;
                                 alert(data.message || 'Failed.');
                             }
                         })
                         .catch(function() {
                             btn.disabled = false;
-                            btn.innerHTML = 'Confirm End Â· â‚±' + fee;
+                            btn.innerHTML = 'Confirm End · ₱' + fee;
                             alert('Network error.');
                         });
                 });
@@ -4080,8 +3621,8 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                     set('ecs-console', unitNumber);
                     set('ecs-rented', items.length === 1 ? items[0].rentedStr : 'Multiple');
                     set('ecs-ended', endedStr);
-                    set('ecs-duration', items.length === 1 ? items[0].durStr : 'â€”');
-                    set('ecs-total-fee', 'â‚±' + totalFee);
+                    set('ecs-duration', items.length === 1 ? items[0].durStr : '—”');
+                    set('ecs-total-fee', '₱' + totalFee);
                     
                     // Show per-controller breakdown
                     const breakdown = document.getElementById('ecs-breakdown');
@@ -4091,7 +3632,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                         breakdownList.innerHTML = items.map(function(it) {
                             return '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">' +
                                    '  <span style="color:#aaa;"><i class="fas fa-gamepad" style="font-size:10px;margin-right:5px;"></i>' + it.label + ' <span style="color:#666;">(' + it.durStr + ')</span></span>' +
-                                   '  <span style="color:#fff; font-weight:600;">â‚±' + it.fee + '</span>' +
+                                   '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
                                    '</div>';
                         }).join('');
                     }
@@ -4100,7 +3641,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                     const confirmBtn = document.getElementById('ecsConfirmBtn');
                     if (confirmBtn) {
                         confirmBtn.disabled = false;
-                        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End All Â· â‚±' + totalFee;
+                        confirmBtn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm End All · ₱' + totalFee;
                         confirmBtn.onclick = function() {
                             confirmEndControllerRental(sessionId, totalFee);
                         };
@@ -4160,7 +3701,7 @@ function gspotEndControllerRentalEarly(sid, items) {
     set('ecs-rented', rentedStr);
     set('ecs-ended', endedStr);
     set('ecs-duration', durStr);
-    set('ecs-total-fee', 'â‚±' + totalFee);
+    set('ecs-total-fee', '₱' + totalFee);
 
     // Breakdown display
     const breakdown = document.getElementById('ecs-breakdown');
@@ -4171,7 +3712,7 @@ function gspotEndControllerRentalEarly(sid, items) {
             breakdownList.innerHTML = items.map(function(it) {
                 return '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
                        '  <span style="color:#aaa;">' + it.label + '</span>' +
-                       '  <span style="color:#fff; font-weight:600;">â‚±' + it.fee + '</span>' +
+                       '  <span style="color:#fff; font-weight:600;">₱' + it.fee + '</span>' +
                        '</div>';
             }).join('');
         } else if (!items && qty > 1) {
@@ -4181,7 +3722,7 @@ function gspotEndControllerRentalEarly(sid, items) {
                 breakdownList.innerHTML += 
                     '<div style="display:flex; justify-content:space-between; font-size:12px;">' +
                     '  <span style="color:#aaa;">Controller ' + (i+1) + '</span>' +
-                    '  <span style="color:#fff; font-weight:600;">â‚±' + feePerCtrl + '</span>' +
+                    '  <span style="color:#fff; font-weight:600;">₱' + feePerCtrl + '</span>' +
                     '</div>';
             }
         } else {
@@ -4290,10 +3831,10 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
             elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             const timeCost  = _timedCost(minutes);
             const totalCost = timeCost + extras;
-            costEl.textContent  = 'â‚±' + totalCost.toFixed(2);
+            costEl.textContent  = '₱' + totalCost.toFixed(2);
             const due = Math.max(0, totalCost - upfrontPaid);
             let sublabel = upfrontPaid > 0
-                ? 'Running cost â‚±' + totalCost.toFixed(2) + ' - Already paid â‚±' + upfrontPaid.toFixed(2)
+                ? 'Running cost ₱' + totalCost.toFixed(2) + ' - Already paid ₱' + upfrontPaid.toFixed(2)
                 : 'Cost accumulating - pay at any time';
             setPayDue(due, sublabel);
         };
@@ -4310,35 +3851,35 @@ function _renderPayModal(sessionId, customerName, unitNumber, mode, startTs, pla
         const due       = Math.max(0, totalCost - upfrontPaid);
         const h = Math.floor(minutes / 60), m = minutes % 60;
         elapsedEl.textContent = (h ? h + 'h ' : '') + String(m).padStart(2,'0') + 'm';
-        costEl.textContent    = 'â‚±' + totalCost.toFixed(2);
+        costEl.textContent    = '₱' + totalCost.toFixed(2);
         const overtime  = Math.max(0, minutes - plannedMinutes);
         const ph = Math.floor(plannedMinutes / 60), pm = plannedMinutes % 60;
         const bookedStr = ph ? (pm ? ph + 'h ' + pm + 'm' : ph + 'h') : pm + 'm';
         let sublabel;
         if (overtime > 0) {
             const baseCost = plannedMinutes <= 30 ? PRICING.session_min_charge : _timedCost(plannedMinutes);
-            sublabel = 'Booked ' + bookedStr + ' (â‚±' + baseCost.toFixed(0) + ') + ' + overtime + 'min overtime';
+            sublabel = 'Booked ' + bookedStr + ' (₱' + baseCost.toFixed(0) + ') + ' + overtime + 'min overtime';
         } else {
-            sublabel = 'Actual time used: ' + minutes + 'min â†’ â‚±' + timeCost.toFixed(2);
+            sublabel = 'Actual time used: ' + minutes + 'min â†’ ₱' + timeCost.toFixed(2);
         }
-        if (upfrontPaid > 0) sublabel += ' - Prepaid â‚±' + upfrontPaid.toFixed(2);
+        if (upfrontPaid > 0) sublabel += ' - Prepaid ₱' + upfrontPaid.toFixed(2);
         if (extras > 0) {
             const itemNames = (extraItems || []).map(function(i){ return i.description; }).join(', ');
-            sublabel += ' - +â‚±' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
+            sublabel += ' - +₱' + extras.toFixed(2) + (itemNames ? ' (' + itemNames + ')' : ' extras');
         }
         setPayDue(due, sublabel);
 
     /* â”€â”€ Unlimited: flat rate already paid; show extras if any â”€â”€ */
     } else if (mode === 'unlimited') {
         costPanel.style.display = 'none';
-        dueBigEl.textContent = extras > 0 ? 'â‚±' + extras.toFixed(2) : 'â‚±0.00';
+        dueBigEl.textContent = extras > 0 ? '₱' + extras.toFixed(2) : '₱0.00';
         dueBigEl.style.color = extras > 0 ? '#20c8a1' : '#888';
         dueLblEl.textContent = extras > 0
             ? 'Flat rate collected - extras outstanding'
             : 'Unlimited session - flat rate already collected at start';
         amtHidden.value = extras > 0 ? extras.toFixed(2) : '0';
         if (extras > 0) {
-            confirmLbl.textContent = 'Collect â‚±' + extras.toFixed(2) + ' Balance';
+            confirmLbl.textContent = 'Collect ₱' + extras.toFixed(2) + ' Balance';
             confirmBtn.disabled    = false;
             confirmBtn.style.opacity = '1';
         } else {
@@ -4401,7 +3942,7 @@ function openRefundModal(sessionId, customerName, unitNumber, upfrontPaid, reser
     document.getElementById('refundSessionSummary').textContent = isRes
         ? 'Reservation #' + reservationId + ' - ' + customerName
         : 'Session #'     + sessionId     + ' - ' + customerName + ' on ' + unitNumber;
-    document.getElementById('refundPaidSoFar').textContent = 'â‚±' + paid;
+    document.getElementById('refundPaidSoFar').textContent = '₱' + paid;
 
     // Amount input - locked + pre-filled for reservation
     const amtInput = document.getElementById('refundAmount');
@@ -4447,9 +3988,9 @@ function _submitRefundAjax() {
     if (isEarlyEnd) action_type = 'early_end';
 
     // Standard/manual refunds require a positive amount.
-    // early_end with â‚±0 is allowed - the session ends with no refund transaction.
+    // early_end with ₱0 is allowed - the session ends with no refund transaction.
     if (action_type !== 'reservation' && action_type !== 'early_end' && refundAmt <= 0) {
-        _showRefundError('Please enter a refund amount greater than â‚±0.');
+        _showRefundError('Please enter a refund amount greater than ₱0.');
         return;
     }
 
@@ -4462,7 +4003,7 @@ function _submitRefundAjax() {
     gspotConfirm(confirmMsg, function () {
         const btn = document.getElementById('refundConfirmBtn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processingâ€¦';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing—¦';
 
         const body = new URLSearchParams({
             session_id:     sessionId     || '0',
@@ -4539,7 +4080,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ Live Session Timers ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬ÃƒÂ¢â€ÂÃ¢â€šÂ¬
+// ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ Live Session Timers ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬ÃƒÂ¢—ÂÃ¢—šÂ¬
 const STALE_THRESHOLD = 24 * 60 * 60; // 24 hours in seconds
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -4625,12 +4166,12 @@ function playWarningBeep() {
 
 /* â”€â”€ SESSION ENDING ALARM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Fires at 15 s remaining for any hourly session.
-   â€¢ Covers the full screen (backdrop blocks all interaction)
-   â€¢ Cannot be dismissed by clicking outside or pressing Escape
-   â€¢ Auto-navigates the admin to the Sessions tab
-   â€¢ Offers two actions: Extend Session or End Session Now
-   â€¢ Countdown inside the modal ticks down every second
-   â€¢ Auto-dismissed when the session crosses into overtime              */
+   —¢ Covers the full screen (backdrop blocks all interaction)
+   —¢ Cannot be dismissed by clicking outside or pressing Escape
+   —¢ Auto-navigates the admin to the Sessions tab
+   —¢ Offers two actions: Extend Session or End Session Now
+   —¢ Countdown inside the modal ticks down every second
+   —¢ Auto-dismissed when the session crosses into overtime              */
 var sessionEndingAlerts = {}; // key: el.dataset.start â†’ modal element
 
 function showSessionEndingAlert(el, remaining) {
@@ -4837,10 +4378,10 @@ function updateTimers() {
         const now     = new Date();
         const elapsed = Math.floor((now - start) / 1000); // seconds
 
-        // Stale session guard (>24h open â€”  likely test/orphan data)
+        // Stale session guard (>24h open —”  likely test/orphan data)
         if (elapsed > STALE_THRESHOLD) {
             el.classList.add('stale');
-            el.textContent = `âš ï¸ ${Math.floor(elapsed / 86400)}d old â€”  end session`;
+            el.textContent = `âš ï¸ ${Math.floor(elapsed / 86400)}d old —”  end session`;
             return;
         }
 
@@ -4863,7 +4404,7 @@ function updateTimers() {
                     showSessionEndingAlert(el, remaining);
                 }
 
-                // Colour shift: amber when â‰¤ 60 s, red when â‰¤ 15 s, green otherwise
+                // Colour shift: amber when ≤ 60 s, red when ≤ 15 s, green otherwise
                 el.style.color = remaining <= 15 ? '#fb566b'
                                : remaining <= 60  ? '#f1a83c'
                                : '#20c8a1';
@@ -4930,7 +4471,7 @@ function renderCharts() {
         type: 'bar',
         data: {
             labels: revLabels,
-            datasets: [{ label: 'Revenue (â‚±)', data: revData,
+            datasets: [{ label: 'Revenue (₱)', data: revData,
                 backgroundColor: 'rgba(32,200,161,.5)', borderColor: '#20c8a1',
                 borderWidth: 2, borderRadius: 6 }]
         },
@@ -4981,7 +4522,7 @@ function renderCharts() {
                                     const value = data.datasets[0].data[i];
                                     const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
                                     return {
-                                        text: `${label} â€” ${value} (${percentage}%)`,
+                                        text: `${label} —” ${value} (${percentage}%)`,
                                         fillStyle: data.datasets[0].backgroundColor[i],
                                         strokeStyle: data.datasets[0].borderColor,
                                         fontColor: '#fff',
@@ -5094,7 +4635,7 @@ function _addNotifItems(newItems) {
             '<div style="font-weight:600;font-size:13px;color:#f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
             (r.customer_name || 'A customer') + '</div>' +
             '<div style="font-size:11px;color:#888;margin-top:1px;">' +
-            (r.console_type || '') + ' Â· ' + mode + (dateStr ? ' Â· ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
+            (r.console_type || '') + ' · ' + mode + (dateStr ? ' · ' + dateStr : '') + (timeStr ? ' ' + timeStr : '') +
             '</div></div>' +
             '<span style="background:rgba(241,168,60,.15);color:#f1a83c;border:1px solid rgba(241,168,60,.3);' +
             'border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;">Pending</span>' +
@@ -5186,7 +4727,7 @@ function _addNotifItems(newItems) {
 // â”€â”€ Unlimited Session Auto-Termination at 12:00 AM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Monitors the clock every 30 s. When midnight (00:00 - 00:10) is detected,
 // calls ajax/auto_end_unlimited.php once to close all active Unlimited sessions.
-// Strictly Unlimited only â€” Hourly and Open Time sessions are unaffected.
+// Strictly Unlimited only —” Hourly and Open Time sessions are unaffected.
 (function () {
     var _midnightJobFired = false;   // prevent double-firing within the same midnight window
     var POLL_MS = 30000;             // check every 30 seconds
@@ -5196,20 +4737,20 @@ function _addNotifItems(newItems) {
         var h   = now.getHours();
         var m   = now.getMinutes();
 
-        // Trigger window: 00:00 â€“ 00:10 (covers late tab wake-ups)
+        // Trigger window: 00:00 —“ 00:10 (covers late tab wake-ups)
         if (h !== 0 || m > 10) {
-            // Outside the midnight window â€” reset the flag so next midnight fires again
+            // Outside the midnight window —” reset the flag so next midnight fires again
             if (_midnightJobFired && (h !== 0 || m > 10)) {
                 _midnightJobFired = false;
             }
             return;
         }
 
-        // Already fired this midnight window â€” skip
+        // Already fired this midnight window —” skip
         if (_midnightJobFired) return;
         _midnightJobFired = true;
 
-        console.log('[GSpot] Midnight detected â€” triggering auto-end for Unlimited sessionsâ€¦');
+        console.log('[GSpot] Midnight detected —” triggering auto-end for Unlimited sessions—¦');
 
         fetch('ajax/auto_end_unlimited.php', { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
@@ -5227,7 +4768,7 @@ function _addNotifItems(newItems) {
                     var h = Math.floor(s.duration_minutes / 60);
                     var m = s.duration_minutes % 60;
                     var dur = (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
-                    return 'â€¢ ' + s.customer + ' (' + s.unit + ') â€” ' + dur + ' â€” â‚±' + parseFloat(s.total_cost).toFixed(2);
+                    return '—¢ ' + s.customer + ' (' + s.unit + ') —” ' + dur + ' —” ₱' + parseFloat(s.total_cost).toFixed(2);
                 }).join('\n');
 
                 var toastMsg = count + ' Unlimited session' + (count > 1 ? 's' : '') +
@@ -5239,7 +4780,7 @@ function _addNotifItems(newItems) {
                 if (window.showToast) {
                     window.showToast(
                         count + ' Unlimited session' + (count > 1 ? 's' : '') +
-                        ' auto-ended at 12:00 AM â€” â‚±400.00 flat rate applied.',
+                        ' auto-ended at 12:00 AM —” ₱400.00 flat rate applied.',
                         'success'
                     );
                 } else {
@@ -5260,10 +4801,10 @@ function _addNotifItems(newItems) {
                         '<i class="fas fa-moon" style="color:#20c8a1;"></i></div>' +
                         '<div>' +
                         '<div style="font-weight:700;color:#20c8a1;margin-bottom:3px;">' +
-                        'Shop Closing â€” Unlimited Sessions Ended</div>' +
+                        'Shop Closing —” Unlimited Sessions Ended</div>' +
                         '<div style="color:#aaa;font-size:12px;">' +
                         count + ' session' + (count > 1 ? 's' : '') +
-                        ' ended at 12:00 AM Â· â‚±400.00 flat rate applied each</div>' +
+                        ' ended at 12:00 AM · ₱400.00 flat rate applied each</div>' +
                         '</div>' +
                         '<button onclick="this.parentElement.parentElement.remove()" ' +
                         'style="background:none;border:none;color:#555;font-size:16px;' +

@@ -1951,8 +1951,40 @@ if (!empty($_GET['console'])) {
                         <div class="rs-row"><span class="rs-label">Reservation Fee</span><span class="rs-value" id="s-dp">—</span></div>
                     </div>
 
+                    <!-- ── Terms & Conditions Checkbox ────────────────────── -->
+                    <div id="termsCheckWrap" style="
+                        margin-bottom: 16px;
+                        padding: 16px 18px;
+                        background: rgba(32,200,161,.05);
+                        border: 1px solid rgba(32,200,161,.15);
+                        border-radius: 14px;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 12px;">
+                        <input type="checkbox" id="agreeTerms" name="agree_terms" value="1"
+                               style="margin-top:3px;width:17px;height:17px;accent-color:#20c8a1;flex-shrink:0;cursor:pointer;"
+                               onchange="onAgreeTermsChange()">
+                        <label for="agreeTerms" style="cursor:pointer;font-size:13px;color:#aaa;line-height:1.55;margin:0;">
+                            I have read and agree to the
+                            <a href="terms.php#sec-reservations" target="_blank" rel="noopener noreferrer"
+                               style="color:#20c8a1;font-weight:700;text-decoration:underline;text-underline-offset:2px;
+                                      text-decoration-color:rgba(32,200,161,.4);transition:color .2s,text-decoration-color .2s;"
+                               onmouseover="this.style.color='#17a887';this.style.textDecorationColor='rgba(23,168,135,.8)'"
+                               onmouseout="this.style.color='#20c8a1';this.style.textDecorationColor='rgba(32,200,161,.4)'">
+                                Terms and Conditions
+                            </a>
+                            of Good Spot Gaming Hub. I understand that the reservation fee is
+                            <strong style="color:#fff;">non-refundable</strong> once payment is confirmed,
+                            and that failure to show up at the reserved time will result in forfeiture of the fee.
+                        </label>
+                    </div>
+                    <div id="termsError" style="display:none;color:#fb566b;font-size:12px;font-weight:600;margin-bottom:12px;padding:10px 14px;background:rgba(251,86,107,.08);border:1px solid rgba(251,86,107,.25);border-radius:10px;">
+                        <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>
+                        Please agree to the Terms and Conditions before proceeding.
+                    </div>
+
                     <!-- This single button is the last action for BOTH paths (PayMongo & screenshot) -->
-                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn">
+                    <button type="submit" class="btn-prim res-submit-btn" id="submitBtn" disabled style="opacity:.5;cursor:not-allowed;">
                         <i class="fas fa-mobile-alt" id="submitBtnIcon"></i>
                         <span id="submitBtnLabel">Confirm &amp; Pay via GCash</span>
                         <i class="fas fa-arrow-right" style="font-size:13px;opacity:.7;"></i>
@@ -2510,7 +2542,12 @@ function updateDurationLabels() {
            value or the 4h-paid tier disappears (240+60 bonus = 300). Only enforce closing time. */
         if (total > maxMinsUntilMidnight) continue;
 
-        let cost = paid <= 30 ? PRICING.session_min_charge : _timedCost(paid);
+        // Cost = ₱50 for ≤30 min, otherwise straight hourly rate × paid hours.
+        // This mirrors exactly what PHP getHourlyDurationOptions() computes on the backend.
+        // NOTE: _timedCost() is for open-time elapsed billing and must NOT be used here —
+        // it treats its argument as total elapsed minutes (paid + free bonus) which causes
+        // it to absorb the bonus cycle length and report a lower price than is correct.
+        let cost = paid <= 30 ? PRICING.session_min_charge : (paid / 60 * rate);
         
         const fmtMin = (m) => {
             let h = Math.floor(m / 60); let r = m % 60;
@@ -3205,7 +3242,7 @@ function recalcFee() {
         baseCost = unlimitedRate;
     } else if (selectedMode === 'hourly') {
         if (!selectedDuration) return; // not ready
-        baseCost = selectedDuration <= 30 ? PRICING.session_min_charge : _timedCost(selectedDuration);
+        baseCost = selectedDuration <= 30 ? PRICING.session_min_charge : (selectedDuration / 60 * getConsoleRate());
     } else {
         return;
     }
@@ -4043,6 +4080,46 @@ function submitUserReschedule(e) {
 </div>
 
 <script>
+// ── Terms & Conditions checkbox handler ────────────────────────────────────
+function onAgreeTermsChange() {
+    const cb  = document.getElementById('agreeTerms');
+    const btn = document.getElementById('submitBtn');
+    const err = document.getElementById('termsError');
+    const wrap = document.getElementById('termsCheckWrap');
+
+    if (!cb || !btn) return;
+
+    if (cb.checked) {
+        btn.disabled = false;
+        btn.style.opacity  = '1';
+        btn.style.cursor   = 'pointer';
+        if (err)  err.style.display  = 'none';
+        if (wrap) wrap.style.borderColor = 'rgba(32,200,161,.4)';
+    } else {
+        btn.disabled = true;
+        btn.style.opacity  = '.5';
+        btn.style.cursor   = 'not-allowed';
+        if (wrap) wrap.style.borderColor = 'rgba(32,200,161,.15)';
+    }
+}
+
+// Guard: prevent submit if checkbox is somehow unticked (keyboard/script bypass)
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('reserveForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const cb  = document.getElementById('agreeTerms');
+            const err = document.getElementById('termsError');
+            if (cb && !cb.checked) {
+                e.preventDefault();
+                if (err) err.style.display = 'block';
+                cb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+        });
+    }
+});
+
 // Restore UI state from preserved hidden input values on page load (e.g. after validation error)
 document.addEventListener('DOMContentLoaded', function() {
     const preservedType = document.getElementById('hiddenConsoleType').value;
