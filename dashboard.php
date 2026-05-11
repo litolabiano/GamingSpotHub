@@ -26,8 +26,9 @@ $sessionHistory = getUserSessionHistory($user_id, 50);
 $myReservations = getMyReservations($user_id);
 
 // Build sets of rescheduled reservations
-$userRescheduledIds = [];
-$allRescheduledIds = [];
+// $userRescheduleCount[reservation_id] = number of customer-initiated reschedules
+$userRescheduleCount = [];
+$allRescheduledIds   = [];
 if (!empty($myReservations)) {
     $rStmt = $conn->prepare(
         "SELECT reservation_id, rescheduled_by FROM reservation_reschedules
@@ -38,7 +39,8 @@ if (!empty($myReservations)) {
     foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
         $allRescheduledIds[$row['reservation_id']] = true;
         if ((int)$row['rescheduled_by'] === (int)$user_id) {
-            $userRescheduledIds[$row['reservation_id']] = true;
+            $rid_key = $row['reservation_id'];
+            $userRescheduleCount[$rid_key] = ($userRescheduleCount[$rid_key] ?? 0) + 1;
         }
     }
 }
@@ -2319,7 +2321,8 @@ function fmtMins(int $m): string {
                     $rTime = substr($r['reserved_time'], 0, 5);
                     $rConsole = htmlspecialchars($r['console_type']);
                     $rConsoleId = (int)($r['console_id'] ?? 0);
-                    $alreadyResched = !empty($userRescheduledIds[$rid]);
+                    // Disable reschedule button after 2 customer-initiated reschedules
+                    $alreadyResched = ($userRescheduleCount[$rid] ?? 0) >= 2;
                     $modeLabel = match($r['rental_mode']) { 'open_time'=>'Open Time','unlimited'=>'Unlimited', default=>'Hourly'.($r['planned_minutes']?' ('.($r['planned_minutes']/60).'h)':'') };
                     // Determine display date
                     if ($pendingAdminResched) {
@@ -4101,12 +4104,17 @@ document.getElementById('reqExtModal').addEventListener('click', function(e) {
             <div style="background:rgba(32,200,161,.1);border:1px solid rgba(32,200,161,.3);color:#20c8a1;padding:12px;border-radius:8px;font-size:12px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
                 <i class="fas fa-check-circle" style="margin-top:2px;"></i>
                 <div>
-                    <strong>One-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>once</strong> per reservation.
+                    <strong>Two-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>twice</strong> per reservation.
                 </div>
             </div>
             
             <form id="userRescheduleForm" onsubmit="submitUserReschedule(event)">
                 <input type="hidden" id="reschedResId">
+                <input type="hidden" id="reschedOrigDate">
+                <input type="hidden" id="reschedOrigTime">
+                <input type="hidden" id="reschedOrigConsoleId">
+                <input type="hidden" id="reschedOrigCtrl1">
+                <input type="hidden" id="reschedOrigCtrl2">
                 
                 <div style="margin-bottom:12px;">
                     <label style="display:block;font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;font-weight:700;">Console Unit</label>
@@ -4280,6 +4288,13 @@ function openUserRescheduleModal(id, date, time, consoleType, consoleId, withCtr
     currentReschedWithCtrl = withCtrl;
     currentReschedCtrl1 = ctrl1;
     currentReschedCtrl2 = ctrl2;
+
+    // Store originals for same-as-current check
+    document.getElementById('reschedOrigDate').value      = date;
+    document.getElementById('reschedOrigTime').value      = time.length === 5 ? time : time.substr(0,5);
+    document.getElementById('reschedOrigConsoleId').value = consoleId || '';
+    document.getElementById('reschedOrigCtrl1').value     = ctrl1 || '';
+    document.getElementById('reschedOrigCtrl2').value     = ctrl2 || '';
     
     const selC = document.getElementById('reschedConsole');
     if (consoleId) {
@@ -4346,6 +4361,19 @@ function submitUserReschedule(e) {
 
     if (c1Val && c2Val && c1Val === c2Val) {
         err.textContent = 'Please select two different controller units.';
+        err.style.display = 'block';
+        return;
+    }
+
+    // ── Same-as-current check ──
+    const origDate      = document.getElementById('reschedOrigDate').value;
+    const origTime      = document.getElementById('reschedOrigTime').value;
+    const origConsoleId = document.getElementById('reschedOrigConsoleId').value;
+    const origCtrl1     = document.getElementById('reschedOrigCtrl1').value;
+    const origCtrl2     = document.getElementById('reschedOrigCtrl2').value;
+    if (date === origDate && time === origTime && String(consoleId) === String(origConsoleId)
+        && String(c1Val || '') === String(origCtrl1) && String(c2Val || '') === String(origCtrl2)) {
+        err.textContent = 'New schedule/console cannot be the same as the current reservation.';
         err.style.display = 'block';
         return;
     }

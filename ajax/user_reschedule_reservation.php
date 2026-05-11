@@ -9,7 +9,8 @@
  * Business rules:
  *  - Only the owner of the reservation may reschedule it.
  *  - Reservation must be pending or confirmed.
- *  - One reschedule per reservation — tracked via reservation_reschedules (rescheduled_by = user_id).
+ *  - Two reschedules per reservation — tracked via reservation_reschedules (rescheduled_by = user_id).
+ *    Admin-initiated reschedules do NOT count against the customer's limit.
  *  - New date: today → +1 month (same window as original booking).
  *  - New time: 12:00–23:00, must be at least 1 hour from now.
  *  - Availability (slot conflict) check runs on the new date/time.
@@ -99,20 +100,31 @@ if (!in_array($res['status'], ['pending', 'reserved'])) {
     exit;
 }
 
-// ── One-reschedule-per-reservation guard ──────────────────────────────────────
-// A customer-initiated reschedule is logged with rescheduled_by = uid (the customer).
-// Staff reschedules use the staff's user_id (which differs from the reservation's user_id).
-// We detect "already rescheduled by the customer" by checking if any row for this
-// reservation_id was created by the customer themselves.
+// ── Two-reschedule-per-reservation guard ─────────────────────────────────────
+// Customers may reschedule up to 2 times. Only customer-initiated rows (rescheduled_by = uid)
+// count against this limit. Admin-initiated reschedules do NOT consume the customer's quota.
+// Also block if there is already a pending customer request (status = 'pending').
 $chk = $conn->prepare(
+    "SELECT COUNT(*) AS cnt FROM reservation_reschedules
+      WHERE reservation_id = ? AND rescheduled_by = ? AND status != 'rejected'"
+);
+$chk->bind_param('ii', $res_id, $uid);
+$chk->execute();
+$chkRow = $chk->get_result()->fetch_assoc();
+if ((int)$chkRow['cnt'] >= 2) {
+    echo json_encode(['success' => false, 'message' => 'You have already used both reschedules for this reservation. No further reschedules are permitted.']);
+    exit;
+}
+// Also block a second simultaneous pending request
+$pendChk = $conn->prepare(
     "SELECT reschedule_id FROM reservation_reschedules
-      WHERE reservation_id = ? AND status != 'rejected'
+      WHERE reservation_id = ? AND rescheduled_by = ? AND status = 'pending'
       LIMIT 1"
 );
-$chk->bind_param('i', $res_id);
-$chk->execute();
-if ($chk->get_result()->num_rows > 0) {
-    echo json_encode(['success' => false, 'message' => 'This reservation has already been rescheduled or has a pending request. Only one reschedule is permitted per reservation.']);
+$pendChk->bind_param('ii', $res_id, $uid);
+$pendChk->execute();
+if ($pendChk->get_result()->num_rows > 0) {
+    echo json_encode(['success' => false, 'message' => 'You already have a pending reschedule request for this reservation. Please wait for admin approval before submitting another.']);
     exit;
 }
 

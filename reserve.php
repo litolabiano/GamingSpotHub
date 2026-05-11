@@ -534,18 +534,20 @@ if (!empty($_SESSION['reserve_success'])) {
 // ── My reservations + active check ───────────────────────────────────────────
 $myReservations = getMyReservations($user['user_id']);
 
-// Build a set of reservation_ids that the customer has already self-rescheduled once
-$rescheduledIds = [];
+// Build a count map of how many times the customer has self-rescheduled each reservation
+// Reschedule button is disabled after 2 customer-initiated reschedules
+$rescheduledIds = []; // [reservation_id => count]
 if (!empty($myReservations)) {
     $uid_r = (int)$user['user_id'];
     $rStmt = $conn->prepare(
-        "SELECT DISTINCT reservation_id FROM reservation_reschedules
+        "SELECT reservation_id FROM reservation_reschedules
           WHERE user_id = ? AND rescheduled_by = ?"
     );
     $rStmt->bind_param('ii', $uid_r, $uid_r);
     $rStmt->execute();
     foreach ($rStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-        $rescheduledIds[$row['reservation_id']] = true;
+        $rid_key = $row['reservation_id'];
+        $rescheduledIds[$rid_key] = ($rescheduledIds[$rid_key] ?? 0) + 1;
     }
 }
 
@@ -2098,7 +2100,7 @@ if (!empty($_GET['console'])) {
                             <tbody>
                             <?php foreach ($myReservations as $r):
                                 $isActive     = in_array($r['status'], ['pending','reserved']);
-                                $alreadyResched = !empty($rescheduledIds[$r['reservation_id']]);
+                                $alreadyResched = ($rescheduledIds[$r['reservation_id']] ?? 0) >= 2;
                                 $rid          = (int)$r['reservation_id'];
                                 $rDate        = htmlspecialchars($r['reserved_date']);
                                 $rTime        = substr($r['reserved_time'], 0, 5);
@@ -2125,7 +2127,7 @@ if (!empty($_GET['console'])) {
                                     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                                         <?php if ($alreadyResched): ?>
                                             <button class="res-action-btn res-action-resched" disabled
-                                                title="You have already used your one-time reschedule for this reservation."
+                                                title="You have already used your two reschedules for this reservation."
                                                 style="opacity:.45;cursor:not-allowed;">
                                                 <i class="fas fa-calendar-alt"></i> Rescheduled
                                             </button>
@@ -3844,7 +3846,12 @@ function openUserRescheduleModal(id, date, time, consoleType) {
     document.getElementById('reschedResId').value = id;
     document.getElementById('reschedConsoleLbl').textContent = consoleType;
     document.getElementById('reschedDate').value = date;
-    
+
+    // Store originals for same-as-current check
+    document.getElementById('reschedOrigDate').value       = date;
+    document.getElementById('reschedOrigTime').value       = time.length === 5 ? time : time.substr(0,5);
+    document.getElementById('reschedOrigConsole').value    = consoleType;
+
     // Build time slots for the currently selected date
     buildReschedTimeSelect();
     
@@ -3853,7 +3860,6 @@ function openUserRescheduleModal(id, date, time, consoleType) {
     if (cSel) cSel.value = consoleType;
 
     // Set the previous time if still valid
-
     const sel = document.getElementById('reschedTime');
     const tVal = time.length === 5 ? time : time.substr(0,5);
     for(let i=0; i<sel.options.length; i++){
@@ -3943,6 +3949,16 @@ function submitUserReschedule(e) {
         return;
     }
 
+    // ── Same-as-current check ──
+    const origDate    = document.getElementById('reschedOrigDate').value;
+    const origTime    = document.getElementById('reschedOrigTime').value;
+    const origConsole = document.getElementById('reschedOrigConsole').value;
+    if (date === origDate && time === origTime && type === origConsole) {
+        err.textContent = 'New schedule/console cannot be the same as the current reservation.';
+        err.style.display = 'block';
+        return;
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     err.style.display = 'none';
@@ -4026,11 +4042,14 @@ function submitUserReschedule(e) {
             <div class="ur-alert" style="background:rgba(32,200,161,.1); border-color:rgba(32,200,161,.3); color:#20c8a1;">
                 <i class="fas fa-check-circle"></i>
                 <div>
-                    <strong>One-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>once</strong> per reservation.
+                    <strong>Two-Time Reschedule:</strong> You may change the date and time of this reservation without losing your fee. This can only be done <strong>twice</strong> per reservation.
                 </div>
             </div>
             <form id="userRescheduleForm" onsubmit="submitUserReschedule(event)">
                 <input type="hidden" id="reschedResId">
+                <input type="hidden" id="reschedOrigDate">
+                <input type="hidden" id="reschedOrigTime">
+                <input type="hidden" id="reschedOrigConsole">
                 
 
 
