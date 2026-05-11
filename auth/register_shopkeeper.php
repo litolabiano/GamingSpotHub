@@ -12,20 +12,19 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = trim($_POST['full_name'] ?? '');
     $email     = trim($_POST['email'] ?? '');
-    $phone     = preg_replace('/\D/', '', trim($_POST['phone'] ?? ''));
+    $phone     = trim($_POST['phone'] ?? '');
     $password  = $_POST['password'] ?? '';
     $confirm   = $_POST['confirm_password'] ?? '';
 
     $agreed = isset($_POST['agree_terms']);
 
-    if (empty($full_name) || empty($email) || empty($password) || empty($confirm)) {
+    if (empty($full_name) || empty($email) || empty($phone) || empty($password) || empty($confirm)) {
         $error = 'Please fill in all required fields.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
-    } elseif (!preg_match('/^09\d{9}$/', $phone)) {
-        $error = 'Phone number must be exactly 11 digits and start with 09 (e.g. 09171234567).';
+    } elseif (!preg_match('/^(09|\+639)\d{9}$/', $phone)) {
+        $error = 'Please enter a valid Philippine mobile number (e.g., 09123456789 or +639123456789).';
     } elseif (strlen($password) < 8) {
         $error = 'Password must be at least 8 characters long.';
     } elseif ($password !== $confirm) {
@@ -212,14 +211,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
                         <div class="form-group">
-                            <label for="phone">Phone Number <span style="color:var(--sk-accent);opacity:0.6;font-size:11px;">(11 digits starting with 09)</span></label>
+                            <label for="phone">Phone Number <span style="color:var(--sk-accent);">*</span></label>
                             <div class="input-wrapper">
                                 <i class="fas fa-phone"></i>
                                 <input type="tel" class="form-control" id="phone" name="phone" 
                                     placeholder="09171234567" value="<?= htmlspecialchars($phone ?? '') ?>" 
-                                    required pattern="09[0-9]{9}" maxlength="11"
-                                    oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                                    required>
                             </div>
+                            <div class="field-info" style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:4px;padding-left:2px;">
+                                Format: 09XXXXXXXXX or +639XXXXXXXXX
+                            </div>
+                            <div id="phoneError" class="inline-error" style="color: #fb566b; font-size: 12px; margin-top: 4px; display: none;"></div>
                         </div>
 
                         <div class="form-group">
@@ -269,6 +271,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script>
         const agreeChk = document.getElementById('agree_terms');
         const submitBtn = document.getElementById('submitBtn');
+
+        document.getElementById('registerForm')?.addEventListener('submit', function(e) {
+            const phoneInput = document.getElementById('phone');
+            const phoneError = document.getElementById('phoneError');
+            const phoneVal = phoneInput.value.trim();
+            const phoneRegex = /^(09|\+639)\d{9}$/;
+
+            if (!phoneVal) {
+                phoneError.textContent = 'Contact number is required.';
+                phoneError.style.display = 'block';
+                e.preventDefault();
+                return false;
+            }
+
+            if (!phoneRegex.test(phoneVal)) {
+                phoneError.textContent = 'Invalid Philippine mobile format.';
+                phoneError.style.display = 'block';
+                e.preventDefault();
+                return false;
+            }
+
+            phoneError.style.display = 'none';
+
+            if (!agreeChk?.checked) return false;
+            submitBtn.disabled = true;
+        });
+
         agreeChk?.addEventListener('change', function () {
             submitBtn.disabled = !this.checked;
         });

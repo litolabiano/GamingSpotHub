@@ -30,13 +30,17 @@ if (empty($full_name)) {
     exit;
 }
 
-// Phone: digits only, 10-11 digits (PH format), optional field
-if ($phone !== '') {
-    if (!preg_match('/^\d{10,11}$/', $phone)) {
-        $response['message'] = 'Phone number must contain digits only (10–11 digits, e.g. 09171234567).';
-        echo json_encode($response);
-        exit;
-    }
+// Phone: digits only, 10-11 digits (PH format), REQUIRED
+if (empty($phone)) {
+    $response['message'] = 'Phone number is required.';
+    echo json_encode($response);
+    exit;
+}
+
+if (!preg_match('/^(09|\+639)\d{9}$/', $phone)) {
+    $response['message'] = 'Please enter a valid Philippine mobile number (e.g., 09123456789 or +639123456789).';
+    echo json_encode($response);
+    exit;
 }
 
 if (empty($current_pass)) {

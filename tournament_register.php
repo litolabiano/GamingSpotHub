@@ -142,6 +142,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $contact       = trim($_POST['contact_number'] ?? '');
         $notes         = trim($_POST['notes'] ?? '');
 
+        if (empty($contact)) {
+            $message = 'Contact number is required.';
+            $messageType = 'error';
+        } elseif (!preg_match('/^(09|\+639)\d{9}$/', $contact)) {
+            $message = 'Please enter a valid Philippine mobile number (e.g., 09123456789 or +639123456789).';
+            $messageType = 'error';
+        } else {
+
         // 1. Validate tournament
         $tStmt = $conn->prepare("SELECT * FROM tournaments WHERE tournament_id = ? AND status = 'scheduled'");
         $tStmt->bind_param('i', $tournament_id);
@@ -215,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     }
+}
 }
 
 if (!empty($_SESSION['reg_success'])) {
@@ -621,7 +630,8 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
 
                     <div class="form-group">
                         <label>Contact Number *</label>
-                        <input type="tel" name="contact_number" class="form-control" placeholder="09171234567" required pattern="[0-9]{10,11}">
+                        <input type="tel" name="contact_number" class="form-control" placeholder="09171234567" required>
+                        <div style="font-size:10px; color:var(--text-dim); margin-top:4px;">Format: 09XXXXXXXXX or +639XXXXXXXXX</div>
                     </div>
 
                     <div class="form-group" style="margin-bottom:10px;">
@@ -676,5 +686,7 @@ $pageTitle = "Tournament Registration - GamingSpotHub";
             }
         }
     </script>
+    
 </body>
 </html>
+    
