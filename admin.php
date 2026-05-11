@@ -54,208 +54,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Hourly sessions are capped at ' . ($pr['max_hourly_minutes'] / 60) . ' hours. Use Unlimited mode (flat ₱' . getSetting('unlimited_rate') . ') for longer sessions.';
             $messageType = 'error';
         } else {
-            $skip_start_session = false;
-            if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] === '1') {
-                $cm1 = $_POST['controller_rental_mode_1'] ?? 'hourly';
-                $cm2 = $_POST['controller_rental_mode_2'] ?? 'hourly';
-                foreach (['m1' => $cm1, 'm2' => $cm2] as $k => $cm) {
-                    if (!in_array($cm, ['hourly', 'open_time'], true)) {
-                        $message = 'Invalid controller rental mode.';
-                        $messageType = 'error';
-                        $skip_start_session = true;
-                        break;
-                    }
-                }
-                if (!$skip_start_session) {
-                    $ctrl_1_mins_chk = (int)($_POST['controller_rental_minutes'] ?? 0);
-                    $ctrl_2_mins_chk = (int)($_POST['controller_rental_minutes_2'] ?? 0);
-                    $r1_chk = (int)($_POST['rented_controller_id'] ?? 0);
-                    $r2_chk = (int)($_POST['rented_controller_id_2'] ?? 0);
-                    $cc_chk = (int)($_POST['controller_count'] ?? 1);
-                    $admin_ctrl_cap = 720;
-                    /* Hourly: cap controller add-on at the selected console duration (paid slot in the picker), not longer. */
-                    $max_controller_minutes = ($rental_mode === 'hourly')
-                        ? (int)$planned_minutes
-                        : $admin_ctrl_cap;
-                    if ($r1_chk > 0 && $cm1 !== 'open_time') {
-                        if ($ctrl_1_mins_chk <= 0) {
-                            $message = 'Controller 1: choose a duration (or set rental mode to Open Time).';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        } elseif ($ctrl_1_mins_chk > $max_controller_minutes) {
-                            $message = ($rental_mode === 'hourly')
-                                ? 'Controller 1 rental cannot exceed the selected session duration.'
-                                : 'Controller 1 rental cannot exceed 12 hours.';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        }
-                    }
-                    if (!$skip_start_session && $cc_chk > 1 && $r2_chk > 0 && $cm2 !== 'open_time') {
-                        if ($ctrl_2_mins_chk <= 0) {
-                            $message = 'Controller 2: choose a duration (or set rental mode to Open Time).';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        } elseif ($ctrl_2_mins_chk > $max_controller_minutes) {
-                            $message = ($rental_mode === 'hourly')
-                                ? 'Controller 2 rental cannot exceed the selected session duration.'
-                                : 'Controller 2 rental cannot exceed 12 hours.';
-                            $messageType = 'error';
-                            $skip_start_session = true;
-                        }
-                    }
-                }
-            }
             if (!$skip_start_session) {
-            $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
-      if ($result['success']) {
-        $controller_upfront_addon = 0.0;
+                $result = startSession($user_id, $console_id, $rental_mode, $user['user_id'], $planned_minutes);
+                if ($result['success']) {
+                    $controller_upfront_addon = 0.0;
 
-        // â”€â”€ Persist controller rental fee to additional_requests (always, â”€â”€â”€â”€â”€â”€
-        // â”€â”€ regardless of whether upfront was collected). endSession()    â”€â”€â”€â”€â”€â”€
-        // â”€â”€ and the End Session modal both read from this table.          â”€â”€â”€â”€â”€â”€
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
-            $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
-            $rented_2    = (int)($_POST['rented_controller_id_2'] ?? 0);
-            $ctrl_1_mins = (int)($_POST['controller_rental_minutes'] ?? 0);
-            $ctrl_2_mins = (int)($_POST['controller_rental_minutes_2'] ?? 0);
-            $cm1         = $_POST['controller_rental_mode_1'] ?? 'hourly';
-            $cm2         = $_POST['controller_rental_mode_2'] ?? 'hourly';
+                    if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] === '1') {
+                        $rented_1    = (int)($_POST['rented_controller_id'] ?? 0);
+                        $rented_2    = (int)($_POST['rented_controller_id_2'] ?? 0);
+                        $ctrl_count  = (int)($_POST['controller_count'] ?? 1);
 
-            $ids      = [];
-            $ot_ids   = [];
-            $fix_meta = [];
-            $fix_sum  = 0.0;
+                        $ids = [];
+                        if ($rented_1 > 0) $ids[] = $rented_1;
+                        if ($ctrl_count > 1 && $rented_2 > 0) $ids[] = $rented_2;
 
-            $accum_controller_line = static function (mysqli $conn, int $cid, int $mins, string $cm) use (&$ids, &$ot_ids, &$fix_meta, &$fix_sum): void {
-                if ($cid <= 0 || !in_array($cm, ['hourly', 'open_time'], true)) {
-                    return;
+                        if (!empty($ids)) {
+                            // Controllers are now exclusively Open Time (billed at end of session)
+                            $desc = 'Controller rental (IDs: ' . implode(', ', $ids) . ') [OT_IDS:' . implode(',', $ids) . ']';
+                            $arStmt = $conn->prepare(
+                                "INSERT INTO additional_requests (session_id, request_type, description, extra_cost, status)
+                                 VALUES (?, 'controller_rental', ?, 0.00, 'approved')"
+                            );
+                            $arStmt->bind_param('is', $result['session_id'], $desc);
+                            $arStmt->execute();
+
+                            foreach ($ids as $cid) {
+                                $ctrlUpd = $conn->prepare("UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'");
+                                $ctrlUpd->bind_param('i', $cid);
+                                $ctrlUpd->execute();
+                            }
+                        }
+                    }
+
+                    if ($rental_mode === 'unlimited') {
+                        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
+                        $upfront_cost      = $unlim_rate;
+                        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+                            $upfront_cost += $controller_upfront_addon;
+                        }
+                        $tendered          = (float)$_POST['unlimited_tendered'];
+
+                        recordTransaction(
+                            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
+                            $tendered,
+                            0,
+                            null
+                        );
+                        $cost = number_format($upfront_cost, 2);
+                        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
+
+                    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
+                        $pr           = getPricingRules();
+                        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
+                        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
+                            $upfront_cost += $controller_upfront_addon;
+                        }
+                        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
+                        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
+
+                        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
+
+                        recordTransaction(
+                            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
+                            $tendered,
+                            $shortfall,
+                            $shortfall ? 'Short payment at session start - short by ₱' . number_format($shortfall, 2) : null
+                        );
+                        $cost      = number_format($upfront_cost, 2);
+                        if ($shortfall !== null && $shortfall > 0) {
+                            $tendFmt  = number_format($tendered, 2);
+                            $shortFmt = number_format($shortfall, 2);
+                            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
+                                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
+                            $messageType = 'warning';
+                        } else {
+                            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
+                        }
+
+                    } else {
+                        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
+                    }
+
+                    // Activity Log
+                    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
+                    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
+                    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
+                    logActivity($user['user_id'], "Start Session", $logDet);
+
+                    if (!$messageType) $messageType = 'success';
+                } else {
+                    $message = 'Could not start session: ' . $result['message'];
+                    $messageType = 'error';
                 }
-                $ids[] = $cid;
-                if ($cm === 'open_time') {
-                    $ot_ids[] = $cid;
-
-                    return;
-                }
-                $st = $conn->prepare('SELECT hourly_rate FROM controllers WHERE controller_id = ?');
-                $st->bind_param('i', $cid);
-                $st->execute();
-                $rw = $st->get_result()->fetch_assoc();
-                if (!$rw) {
-                    return;
-                }
-                $rate = (float) $rw['hourly_rate'];
-                $amt  = round($rate * ($mins / 60), 2);
-                $fix_sum += $amt;
-                $fix_meta[] = $cid . ':' . number_format($amt, 2, '.', '');
-            };
-
-            if ($rented_1 > 0) {
-                $accum_controller_line($conn, $rented_1, $ctrl_1_mins, $cm1);
-            }
-            if ($ctrl_count > 1 && $rented_2 > 0) {
-                $accum_controller_line($conn, $rented_2, $ctrl_2_mins, $cm2);
-            }
-
-            $insert_ar = false;
-            $desc      = '';
-            $ctrl_fee  = round($fix_sum, 2);
-            $controller_upfront_addon = $ctrl_fee;
-            if (!empty($ids)) {
-                $insert_ar = true;
-                $desc = 'Controller rental (IDs: ' . implode(', ', $ids) . ')';
-                if (!empty($ot_ids)) {
-                    $desc .= ' [OT_IDS:' . implode(',', $ot_ids) . ']';
-                }
-                if (!empty($fix_meta)) {
-                    $desc .= ' [FIX:' . implode('|', $fix_meta) . ']';
-                }
-            }
-
-            if ($insert_ar) {
-                $arStmt = $conn->prepare(
-                    "INSERT INTO additional_requests
-                        (session_id, request_type, description, extra_cost, status)
-                     VALUES (?, 'controller_rental', ?, ?, 'approved')"
-                );
-                $arStmt->bind_param('isd', $result['session_id'], $desc, $ctrl_fee);
-                $arStmt->execute();
-
-                foreach ($ids as $cid) {
-                    $ctrlUpd = $conn->prepare(
-                        "UPDATE controllers SET status = 'in_use' WHERE controller_id = ? AND status = 'available'"
-                    );
-                    $ctrlUpd->bind_param('i', $cid);
-                    $ctrlUpd->execute();
-                }
-            }
-        }
-
-    if ($rental_mode === 'unlimited') {
-        $unlimited_payment = $_POST['unlimited_payment_method'] ?? 'cash';
-        $upfront_cost      = $unlim_rate;
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $upfront_cost += $controller_upfront_addon;
-        }
-        $tendered          = (float)$_POST['unlimited_tendered'];
-
-        recordTransaction(
-            $result['session_id'], $user_id, $upfront_cost, $unlimited_payment, $user['user_id'],
-            $tendered,
-            0,
-            null
-        );
-        $cost = number_format($upfront_cost, 2);
-        $message = "Session #" . $result['session_id'] . " started. ₱{$cost} flat rate collected via " . ucfirst($unlimited_payment) . ".";
-
-    } elseif ($rental_mode === 'hourly' && isset($_POST['collect_upfront']) && $planned_minutes) {
-        $pr           = getPricingRules();
-        $upfront_cost = computeHourlySessionBaseCost(paidToTotalMinutes($planned_minutes));
-        // Add controller rental fee to upfront total if checked (fixed-rate controllers only; Open Time billed at end)
-        if (!empty($_POST['controller_rental']) && $_POST['controller_rental'] == '1') {
-            $upfront_cost += $controller_upfront_addon;
-        }
-        $tendered     = isset($_POST['start_tendered']) ? (float)$_POST['start_tendered'] : null;
-        $shortfall    = ($tendered !== null && $tendered < $upfront_cost) ? $upfront_cost - $tendered : null;
-
-        // Amount actually collected - if customer paid less, record only what they gave
-        $actualCollected = ($tendered !== null) ? min((float)$tendered, $upfront_cost) : $upfront_cost;
-
-        recordTransaction(
-            $result['session_id'], $user_id, $actualCollected, $start_payment_method, $user['user_id'],
-            $tendered,
-            $shortfall,
-            $shortfall ? 'Short payment at session start - short by ₱' . number_format($shortfall, 2) : null
-        );
-        $collected = ($tendered !== null) ? min($tendered, $upfront_cost) : $upfront_cost;
-        $cost      = number_format($upfront_cost, 2);
-        if ($shortfall !== null && $shortfall > 0) {
-            $tendFmt  = number_format($tendered, 2);
-            $shortFmt = number_format($shortfall, 2);
-            $message  = "Session #" . $result['session_id'] . " started. ₱{$tendFmt} collected upfront via "
-                      . ucfirst($start_payment_method) . " (short by ₱{$shortFmt}).";
-            $messageType = 'warning';
-        } else {
-            $message = "Session #" . $result['session_id'] . " started. ₱{$cost} collected upfront via " . ucfirst($start_payment_method) . ".";
-        }
-
-    } else {
-        $message = 'Session #' . $result['session_id'] . ' started. Payment will be collected at the end.';
-    }
-
-    // Activity Log
-    $custLabel = $user_id > 0 ? ("User #" . $user_id) : "Walk-in";
-    $logDet = "Started Session #{$result['session_id']} for {$custLabel}. Console: " . ($_POST['unit_number'] ?? 'Unknown') . ". Mode: " . ucfirst($rental_mode);
-    if ($rental_mode === 'hourly') $logDet .= " ({$planned_minutes} min)";
-    logActivity($user['user_id'], "Start Session", $logDet);
-
-    if (!$messageType) $messageType = 'success';
-}
-
-  else {
-                $message = 'Could not start session: ' . $result['message'];
-                $messageType = 'error';
-            }
             }
         }
     }
@@ -1299,56 +1189,6 @@ $archivedConsoles = getConsoles('archived');
 $availableCount  = count(array_filter($allConsoles, fn($c) => $c['status'] === 'available'));
 $inUseCount      = count(array_filter($allConsoles, fn($c) => $c['status'] === 'in_use'));
 $maintenanceCount= count(array_filter($allConsoles, fn($c) => $c['status'] === 'maintenance'));
-
-// â”€â”€ Controller Rental status per active console â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Maps console_id => [ qty => int, total_cost => float, session_id => int ]
-// Rows tagged [ENDED] are excluded —” they represent returned controllers.
-$ctrlRentalByConsole = [];
-$crQ = $conn->query(
-    "SELECT gs.console_id,
-            gs.session_id,
-            GROUP_CONCAT(ar.description SEPARATOR '||') AS desc_list,
-            SUM(ar.extra_cost)       AS total_cost,
-            MIN(ar.created_at)       AS rented_since
-       FROM gaming_sessions gs
-       JOIN additional_requests ar
-         ON ar.session_id = gs.session_id
-        AND ar.request_type = 'controller_rental'
-        AND ar.status = 'approved'
-        AND ar.description NOT LIKE '%[ENDED]%'
-      WHERE gs.status IN ('active','paused')
-      GROUP BY gs.console_id, gs.session_id"
-);
-if ($crQ) {
-    while ($row = $crQ->fetch_assoc()) {
-        $qty = 0;
-        $max_mins = 0;
-        $descs = explode('||', $row['desc_list']);
-        foreach ($descs as $d) {
-            if (preg_match('/ID(?:s)?:\s*([\d, ]+)/', $d, $m)) {
-                $qty += count(explode(',', $m[1]));
-            } else {
-                $qty += 1;
-            }
-            if (preg_match('/\[Mins:\s*([\d, ]+)\]/', $d, $m2)) {
-                $minsRaw = explode(',', $m2[1]);
-                foreach ($minsRaw as $minRaw) {
-                    $mVal = (int)trim($minRaw);
-                    if ($mVal > $max_mins) $max_mins = $mVal;
-                }
-            }
-        }
-        // Skip if no active controllers remain (all ended on this session)
-        if ($qty <= 0) continue;
-        $ctrlRentalByConsole[(int)$row['console_id']] = [
-            'qty'         => $qty,
-            'max_mins'    => $max_mins,
-            'total_cost'  => (float)$row['total_cost'],
-            'session_id'  => (int)$row['session_id'],
-            'rented_since'=> $row['rented_since'],
-        ];
-    }
-}
 
 // â”€â”€ Controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $allControllers      = [];
@@ -2620,207 +2460,7 @@ function _controllerOpenTimeFee(totalMin, controllerHourlyRate) {
     return cost;
 }
 
-/** Rental mode for a specific controller add-on (independent of console session mode). */
-function getControllerRentalMode(ctrl) {
-    const sel = document.getElementById('adminCtrlModeSelect' + ctrl);
-    return sel ? (sel.value || 'hourly') : 'hourly';
-}
 
-/** Show/hide duration per controller: Open Time (controller) = no duration picker. */
-function refreshAdminCtrlRentalModeUi() {
-    const group = document.getElementById('controllerRentalGroup');
-    const togOn = !!document.getElementById('controllerRentalToggle')?.checked;
-    let anyOt = false;
-    [1, 2].forEach(function (ctrl) {
-        const wrap = document.getElementById('adminCtrlDurWrap' + ctrl);
-        const cm = getControllerRentalMode(ctrl);
-        if (cm === 'open_time') anyOt = true;
-        if (wrap) {
-            wrap.style.display = cm === 'open_time' ? 'none' : '';
-        }
-        if (cm === 'open_time') {
-            const s = document.getElementById('adminCtrlDurationSelect' + ctrl);
-            if (s) s.value = '0';
-        }
-        if (typeof _adminCtrlCostPreview === 'function') {
-            _adminCtrlCostPreview(ctrl, parseInt(document.getElementById('adminCtrlDurationSelect' + ctrl)?.value || '0', 10) || 0);
-        }
-    });
-    const runNote = document.getElementById('adminCtrlOpenTimeRunClockNote');
-    if (runNote) {
-        runNote.style.display = (anyOt && togOn && group && group.style.display !== 'none') ? 'block' : 'none';
-    }
-    if (typeof recalcAdminControllerFee === 'function') recalcAdminControllerFee();
-}
-
-function onAdminCtrlRentalModeChange(ctrl) {
-    refreshAdminCtrlRentalModeUi();
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
-}
-
-/** Sync controller rental mode to console mode: Unlimited console â†’ hourly add-on (+ 12h default elsewhere); OT â†’ OT. */
-function syncControllerRentalModesFromSession() {
-    const m = document.getElementById('rentalModeSelect')?.value || 'hourly';
-    ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(function (id) {
-        const s = document.getElementById(id);
-        if (!s) return;
-        if (m === 'open_time') {
-            s.value = 'open_time';
-        } else {
-            s.value = 'hourly';
-        }
-    });
-}
-
-/** Unlimited console sessions: preset non—“Open-Time controller durations to 12h (until staff changes). */
-function applyTwelveHourForUnlimitedConsoleSession(force) {
-    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
-    const tog      = document.getElementById('controllerRentalToggle');
-    if (sessMode !== 'unlimited' || !tog?.checked) {
-        return;
-    }
-    const cap   = ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
-    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10);
-    let did     = false;
-    [1, 2].forEach(function (ctrl) {
-        if (ctrl === 2 && count < 2) return;
-        if (getControllerRentalMode(ctrl) === 'open_time') return;
-        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-        if (!sel) return;
-        const cur = parseInt(sel.value, 10) || 0;
-        if (!force && cur > 0) return;
-        const opt = sel.querySelector('option[value="' + cap + '"]');
-        if (!opt || opt.disabled) return;
-        sel.value = String(cap);
-        did = true;
-        if (typeof _adminCtrlCostPreview === 'function') {
-            _adminCtrlCostPreview(ctrl, cap);
-        }
-    });
-    if (did && typeof recalcAdminControllerFee === 'function') {
-        recalcAdminControllerFee();
-    }
-}
-
-/** Max controller rental minutes (hourly: same as selected console duration/paid slot; unlimited/open_time: 12h cap). */
-function getStartSessionMaxControllerMinutes() {
-    const modeEl = document.getElementById('rentalModeSelect');
-    if (!modeEl || typeof PRICING === 'undefined') return 0;
-    if (modeEl.value === 'hourly') {
-        const sel = document.getElementById('durationSelect');
-        if (!sel || !sel.value) return 0;
-        const paid = parseInt(sel.value, 10);
-        return isNaN(paid) || paid <= 0 ? 0 : paid;
-    }
-    if (modeEl.value === 'unlimited' || modeEl.value === 'open_time') {
-        return ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI;
-    }
-    return 0;
-}
-
-function applyAdminCtrlDurationSelectCaps(maxMins) {
-    let changed = false;
-    [1, 2].forEach(function (ctrl) {
-        if (getControllerRentalMode(ctrl) === 'open_time') return;
-        const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-        if (!sel) return;
-        Array.from(sel.options).forEach(function (opt) {
-            const v = parseInt(opt.value, 10) || 0;
-            if (v === 0) {
-                opt.disabled = false;
-                return;
-            }
-            opt.disabled = (maxMins <= 0 && v > 0) || (maxMins > 0 && v > maxMins);
-        });
-        const cur = parseInt(sel.value, 10) || 0;
-        if ((maxMins <= 0 && cur > 0) || (maxMins > 0 && cur > maxMins)) {
-            sel.value = '0';
-            changed = true;
-            if (typeof _adminCtrlCostPreview === 'function') {
-                _adminCtrlCostPreview(ctrl, 0);
-            }
-        }
-    });
-    if (changed && typeof recalcAdminControllerFee === 'function') {
-        recalcAdminControllerFee();
-    }
-}
-
-let _syncAdminControllerDurationCapsBusy = false;
-function syncAdminControllerDurationCaps() {
-    if (_syncAdminControllerDurationCapsBusy) {
-        return;
-    }
-    _syncAdminControllerDurationCapsBusy = true;
-    try {
-        refreshAdminCtrlRentalModeUi();
-        const max = getStartSessionMaxControllerMinutes();
-        applyAdminCtrlDurationSelectCaps(max);
-
-    const hint = document.getElementById('ctrlDurationCapHint');
-    const mode = document.getElementById('rentalModeSelect')?.value || '';
-    const ctrlGroup = document.getElementById('controllerRentalGroup');
-    if (hint && ctrlGroup && ctrlGroup.style.display !== 'none') {
-        const togChecked = !!document.getElementById('controllerRentalToggle')?.checked;
-        if (mode === 'unlimited' && togChecked) {
-            const capH = Math.floor(ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60);
-            hint.textContent = `Unlimited console: hourly controller add-ons default to ${capH} hours (adjust as needed); charged at controller rate, separate from flat console unlimited fee.`;
-            hint.style.display = 'block';
-        } else if (mode === 'hourly' && togChecked) {
-            hint.textContent = 'Controller rental cannot exceed the selected session duration (same as the Duration field above). Longer options are disabled.';
-            hint.style.display = 'block';
-        } else {
-            hint.style.display = 'none';
-        }
-    }
-    applyTwelveHourForUnlimitedConsoleSession(false);
-    } finally {
-        _syncAdminControllerDurationCapsBusy = false;
-    }
-}
-
-/** Start Session: blocking message if controller rentals exceed rental window (empty if OK). */
-function getStartSessionControllerDurationError() {
-    const toggle = document.getElementById('controllerRentalToggle');
-    if (!toggle || !toggle.checked) return '';
-
-    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
-        ? getStartSessionMaxControllerMinutes() : 0;
-    const sessMode = document.getElementById('rentalModeSelect')?.value || '';
-    const count = parseInt(document.getElementById('adminControllerCount')?.value || '1', 10) || 1;
-    const r1 = parseInt(document.getElementById('controllerSelect')?.value || '0', 10) || 0;
-    const r2 = parseInt(document.getElementById('controllerSelect2')?.value || '0', 10) || 0;
-    const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || '0', 10) || 0;
-    const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || '0', 10) || 0;
-    const cm1 = getControllerRentalMode(1);
-    const cm2 = getControllerRentalMode(2);
-
-    if (sessMode === 'hourly' && maxCm <= 0) {
-        if (r1 > 0 && cm1 !== 'open_time' && mins1 > 0) {
-            return 'Select a session duration before choosing controller rental length.';
-        }
-        if (count > 1 && r2 > 0 && cm2 !== 'open_time' && mins2 > 0) {
-            return 'Select a session duration before choosing controller rental length.';
-        }
-    }
-    if (r1 > 0 && cm1 !== 'open_time') {
-        if (mins1 <= 0) return 'Select a rental duration for Controller 1 (or set its rental mode to Open Time).';
-        if (mins1 > maxCm) {
-            return sessMode === 'unlimited'
-                ? ('Controller 1 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
-                : 'Controller 1 rental cannot exceed the selected session duration.';
-        }
-    }
-    if (count > 1 && r2 > 0 && cm2 !== 'open_time') {
-        if (mins2 <= 0) return 'Select a rental duration for Controller 2 (or set its rental mode to Open Time).';
-        if (mins2 > maxCm) {
-            return sessMode === 'unlimited'
-                ? ('Controller 2 rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours.')
-                : 'Controller 2 rental cannot exceed the selected session duration.';
-        }
-    }
-    return '';
-}
 
 /* â”€â”€ Controller Rental: Xbox-only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Hides/shows the controller rental checkbox depending on the selected
@@ -2898,7 +2538,6 @@ function onConsoleChange() {
 
     // Refresh duration option labels to reflect this console's per-type rate
     if (typeof _refreshDurationLabels === 'function') _refreshDurationLabels();
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
 }
 
 function onControllerToggle() {
@@ -2914,32 +2553,14 @@ function onControllerToggle() {
             if (qtyWrap)  qtyWrap.style.display  = 'block';
             if (countSel) countSel.disabled = false;
             if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
-            if (typeof syncControllerRentalModesFromSession === 'function') syncControllerRentalModesFromSession();
         } else {
             container.style.display = 'none';
             if (qtyWrap)  qtyWrap.style.display  = 'none';
             if (countSel) countSel.disabled = true;
 
-            // Reset both controllers
-            ['controllerSelect','controllerSelect2'].forEach(id => {
-                const s = document.getElementById(id); if (s) s.value = '';
-            });
-            ['adminCtrlDurationSelect1', 'adminCtrlDurationSelect2'].forEach(id => {
-                const i = document.getElementById(id);
-                if (i) i.value = '0';
-            });
-            ['adminCtrlModeSelect1', 'adminCtrlModeSelect2'].forEach(id => {
-                const m = document.getElementById(id);
-                if (m) m.value = 'hourly';
-            });
-            ['adminCtrlCostPreview1','adminCtrlCostPreview2'].forEach(id => {
-                const d = document.getElementById(id); if (d) d.style.display = 'none';
-            });
-        }
-        if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
-        if (toggle.checked && document.getElementById('rentalModeSelect')?.value === 'unlimited'
-            && typeof applyTwelveHourForUnlimitedConsoleSession === 'function') {
-            applyTwelveHourForUnlimitedConsoleSession(true);
+            // Reset controller selections
+            const s1 = document.getElementById('controllerSelect'); if (s1) s1.value = '';
+            const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
         }
         recalcAdminControllerFee();
     }
@@ -2950,81 +2571,13 @@ function onAdminControllerToggle() {
     const ctrl2    = document.getElementById('adminCtrl2Block');
     if (ctrl2) ctrl2.style.display = countSel?.value === '2' ? 'block' : 'none';
     
-    // If ctrl2 hidden, clear its values
     if (countSel?.value !== '2') {
         const s2 = document.getElementById('controllerSelect2'); if (s2) s2.value = '';
-        const d2 = document.getElementById('adminCtrlDurationSelect2');
-        if (d2) d2.value = '0';
-        const p2 = document.getElementById('adminCtrlCostPreview2'); if (p2) p2.style.display = 'none';
     }
-    if (typeof syncAdminControllerDurationCaps === 'function') syncAdminControllerDurationCaps();
     recalcAdminControllerFee();
 }
 
-function getControllerFeeByMins(mins) {
-    if (mins <= 0) return 0;
-    // Rule: 5-34m = 10, 35-64m = 20, etc. (increment by 10 for every additional 30-minute block)
-    return Math.floor((mins + 25) / 30) * 10;
-}
 
-function _adminCtrlCostPreview(ctrl, mins) {
-    const selId = ctrl === 1 ? 'controllerSelect' : 'controllerSelect2';
-    const prevId = `adminCtrlCostPreview${ctrl}`;
-    const sel = document.getElementById(selId);
-    const prev = document.getElementById(prevId);
-    if (!prev) return;
-    
-    const rate = (sel && sel.selectedIndex > 0)
-        ? parseFloat(sel.options[sel.selectedIndex].dataset.rate || 0) : 0;
-    const h = Math.floor(mins/60), r = mins%60;
-    const lbl = h&&r ? `${h}h ${r}m` : h ? (h===1?'1 hr':`${h} hrs`) : `${mins} min`;
-    
-    if (getControllerRentalMode(ctrl) === 'open_time') {
-        if (rate > 0) {
-            prev.innerHTML = `<i class="fas fa-hourglass-end" style="margin-right:4px;color:#f1a83c;"></i><span style="color:rgba(225,225,245,.92);">Open Time controller: charged at session end for full elapsed time (&#8369;${Math.round(rate)}/hr), same timing structure as console open time.</span>`;
-            prev.style.display = 'block';
-        } else {
-            prev.style.display = 'none';
-        }
-        return;
-    }
-    if (rate > 0 && mins > 0) {
-        const fee = getControllerFeeByMins(mins);
-        prev.innerHTML = `<i class="fas fa-calculator" style="margin-right:4px;"></i>&#8369;${Math.round(rate)}/hr rule &times; ${lbl} = <strong>&#8369;${Math.round(fee)}</strong>`;
-        prev.style.display = 'block';
-    } else if (mins > 0) {
-        prev.innerHTML = `<i class="fas fa-clock" style="margin-right:4px;"></i>Select a unit above to see cost.`;
-        prev.style.display = 'block';
-    } else {
-        prev.style.display = 'none';
-    }
-}
-
-function onAdminCtrlDurationChange(ctrl) {
-    if (getControllerRentalMode(ctrl) === 'open_time') return;
-    const sel = document.getElementById('adminCtrlDurationSelect' + ctrl);
-    if (!sel) return;
-    let mins = parseInt(sel.value, 10) || 0;
-    const maxCm = typeof getStartSessionMaxControllerMinutes === 'function'
-        ? getStartSessionMaxControllerMinutes() : 0;
-    if ((maxCm <= 0 && mins > 0) || (maxCm > 0 && mins > maxCm)) {
-        if (typeof showInlineToast === 'function') {
-            if (maxCm <= 0 && mins > 0) {
-                showInlineToast('Select an hourly duration before choosing controller rental length.', 'error');
-            } else {
-                const mode = document.getElementById('rentalModeSelect')?.value || '';
-                const msg = (mode === 'unlimited')
-                    ? ('Controller rental cannot exceed ' + (ADMIN_CTRL_MAX_MINS_OPEN_OR_UNLI / 60) + ' hours for this mode.')
-                    : 'Controller rental cannot exceed the selected session duration.';
-                showInlineToast(msg, 'error');
-            }
-        }
-        sel.value = '0';
-        mins = 0;
-    }
-    _adminCtrlCostPreview(ctrl, mins);
-    recalcAdminControllerFee();
-}
 
 function onControllerSelectChange() {
     onAdminCtrl1Change();
@@ -3032,15 +2585,11 @@ function onControllerSelectChange() {
 }
 
 function onAdminCtrl1Change() {
-    const mins = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
-    _adminCtrlCostPreview(1, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
 }
 
 function onAdminCtrl2Change() {
-    const mins = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
-    _adminCtrlCostPreview(2, mins);
     syncAdminControllerDropdowns();
     recalcAdminControllerFee();
 }
@@ -3067,43 +2616,24 @@ function recalcAdminControllerFee() {
     const toggle    = document.getElementById('controllerRentalToggle');
     const feeInput  = document.getElementById('controllerFeeAmt');
     const rateDisp  = document.getElementById('ctrlRateDisplay');
-    const countSel  = document.getElementById('adminControllerCount');
     
-    let totalFee = 0;
-    let rate1 = 0;
-    
-    if (toggle?.checked) {
-        const count = countSel ? parseInt(countSel.value) : 1;
-        const sel1 = document.getElementById('controllerSelect');
-        const sel2 = document.getElementById('controllerSelect2');
-        const mins1 = parseInt(document.getElementById('adminCtrlDurationSelect1')?.value || 0);
-        const mins2 = parseInt(document.getElementById('adminCtrlDurationSelect2')?.value || 0);
-        const cm1 = getControllerRentalMode(1);
-        const cm2 = getControllerRentalMode(2);
-
-        if (sel1 && sel1.selectedIndex > 0) {
-            rate1 = parseFloat(sel1.options[sel1.selectedIndex].dataset.rate) || 0;
-            if (cm1 !== 'open_time' && mins1 > 0) {
-                totalFee += getControllerFeeByMins(mins1);
-            }
-        }
-        if (count > 1 && sel2 && sel2.selectedIndex > 0) {
-            const rate2 = parseFloat(sel2.options[sel2.selectedIndex].dataset.rate) || 0;
-            if (cm2 !== 'open_time' && mins2 > 0) {
-                totalFee += getControllerFeeByMins(mins2);
-            }
-        }
-    }
-    
-    if (feeInput) feeInput.value = Math.round(totalFee);
+    // Controller rentals are now exclusively Open Time.
+    // Upfront fee is always 0.
+    if (feeInput) feeInput.value = 0;
     
     if (rateDisp) {
-        rateDisp.innerHTML = rate1 > 0 ? `+&#8369;${Math.round(rate1)}/hr` : '';
+        if (toggle?.checked) {
+            const sel1 = document.getElementById('controllerSelect');
+            const rate = (sel1 && sel1.selectedIndex > 0) 
+                ? (sel1.options[sel1.selectedIndex].dataset.rate || 0) : 0;
+            rateDisp.textContent = rate > 0 ? `(₱${Math.round(rate)}/hr Open Time)` : '';
+        } else {
+            rateDisp.textContent = '';
+        }
     }
-    
-    if (typeof recalcSessionPreview === 'function') recalcSessionPreview();
-    if (typeof _syncStartBtn === 'function') _syncStartBtn();
+    updateSessionPreview();
 }
+
 
 /**
  * Recompute cost labels in any duration dropdown using a given hourly rate.

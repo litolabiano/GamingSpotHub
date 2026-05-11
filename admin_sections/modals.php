@@ -594,96 +594,30 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
             <!-- Two-column grid: ctrl 1 | ctrl 2 -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid rgba(95,133,218,.1);">
 
-                <div id="adminCtrlOpenTimeRunClockNote" style="display:none;grid-column:1/-1;padding:12px 18px;background:rgba(95,133,218,.09);border-bottom:1px solid rgba(95,133,218,.1);font-size:12px;color:rgba(215,220,245,.95);line-height:1.5;">
-                    <i class="fas fa-clock" style="color:#5f85da;margin-right:8px;"></i>
-                    <strong>Open Time (controller)</strong> — For any controller set to <em>Open Time</em>, there is no duration pick: cost uses the same open-time structure as the console, run for the full session, priced at that controller’s hourly rate when you end the session.
-                </div>
-
                 <!-- Controller 1 -->
                 <div id="adminCtrl1Block" style="padding:16px 18px;border-right:1px solid rgba(95,133,218,.1);">
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#5f85da;margin-bottom:10px;">
-                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Controller 1
+                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Select Controller 1
                     </div>
                     <select name="rented_controller_id" id="controllerSelect"
-                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;margin-bottom:12px;"
+                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;"
                             onchange="onControllerSelectChange()">
                         <!-- Populated by onConsoleChange() -->
                     </select>
-                    <div class="admin-ctrl-mode-wrap">
-                        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
-                            <i class="fas fa-sliders-h" style="margin-right:3px;"></i> Rental mode
-                        </div>
-                        <select name="controller_rental_mode_1" id="adminCtrlModeSelect1" class="admin-ctrl-dur-select"
-                                onchange="onAdminCtrlRentalModeChange(1)" style="margin-bottom:12px;">
-                            <option value="hourly">Hourly (set duration)</option>
-                            <option value="open_time">Open Time (session clock)</option>
-                        </select>
-                    </div>
-                    <div id="adminCtrlDurWrap1" class="admin-ctrl-dur-wrap">
-                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
-                        <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
-                    </div>
-                    <?php
-                    $admin_ctrl_duration_opts = [];
-                    for ($__m = 30; $__m <= 720; $__m += 30) {
-                        $admin_ctrl_duration_opts[] = $__m;
-                    }
-                    $admin_ctrl_dur_lbl = function (int $mins): string {
-                        $h = intdiv($mins, 60);
-                        $r = $mins % 60;
-                        if ($h > 0 && $r > 0) {
-                            return "{$h}h {$r}m";
-                        }
-                        if ($h > 0) {
-                            return $h === 1 ? '1 hr' : "{$h} hrs";
-                        }
-                        return "{$mins} min";
-                    };
-                    ?>
-                    <select name="controller_rental_minutes" id="adminCtrlDurationSelect1" class="admin-ctrl-dur-select"
-                            onchange="onAdminCtrlDurationChange(1)">
-                        <option value="0">— Select duration —</option>
-                        <?php foreach ($admin_ctrl_duration_opts as $mins): ?>
-                        <option value="<?= $mins ?>"><?= $admin_ctrl_dur_lbl($mins) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    </div>
-                    <div id="adminCtrlCostPreview1" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
+                    <input type="hidden" name="controller_rental_mode_1" value="open_time">
                 </div>
 
                 <!-- Controller 2 (hidden by default) -->
                 <div id="adminCtrl2Block" style="display:none;padding:16px 18px;">
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#5f85da;margin-bottom:10px;">
-                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Controller 2
+                        <i class="fas fa-gamepad" style="margin-right:4px;"></i> Select Controller 2
                     </div>
                     <select name="rented_controller_id_2" id="controllerSelect2"
-                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;margin-bottom:12px;"
+                            style="width:100%;background:rgba(10,33,81,.6);border:1px solid rgba(95,133,218,.25);color:#e8eaf6;padding:8px 10px;border-radius:8px;font-size:13px;outline:none;"
                             onchange="onControllerSelectChange()">
                         <!-- Populated by onConsoleChange() -->
                     </select>
-                    <div class="admin-ctrl-mode-wrap">
-                        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
-                            <i class="fas fa-sliders-h" style="margin-right:3px;"></i> Rental mode
-                        </div>
-                        <select name="controller_rental_mode_2" id="adminCtrlModeSelect2" class="admin-ctrl-dur-select"
-                                onchange="onAdminCtrlRentalModeChange(2)" style="margin-bottom:12px;">
-                            <option value="hourly">Hourly (set duration)</option>
-                            <option value="open_time">Open Time (session clock)</option>
-                        </select>
-                    </div>
-                    <div id="adminCtrlDurWrap2" class="admin-ctrl-dur-wrap">
-                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
-                        <i class="fas fa-clock" style="margin-right:3px;"></i> Duration
-                    </div>
-                    <select name="controller_rental_minutes_2" id="adminCtrlDurationSelect2" class="admin-ctrl-dur-select"
-                            onchange="onAdminCtrlDurationChange(2)">
-                        <option value="0">— Select duration —</option>
-                        <?php foreach ($admin_ctrl_duration_opts as $mins): ?>
-                        <option value="<?= $mins ?>"><?= $admin_ctrl_dur_lbl($mins) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    </div>
-                    <div id="adminCtrlCostPreview2" style="display:none;margin-top:8px;font-size:12px;color:#f1a83c;font-weight:700;"></div>
+                    <input type="hidden" name="controller_rental_mode_2" value="open_time">
                 </div>
 
             </div><!-- /grid -->
@@ -1123,283 +1057,7 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
     </div>
 </div>
 
-<!-- ── EXTEND CONTROLLER MODAL ────────────────────────────────────────── -->
-<div class="modal" id="extendControllerModal">
-    <div class="modal-content" style="max-width:440px;">
-        <div class="modal-header">
-            <h3 class="modal-title">
-                <i class="fas fa-gamepad" style="color:#20c8a1;margin-right:8px"></i>Extend Controller Rental
-            </h3>
-            <button class="modal-close" onclick="closeModal('extendController')">&times;</button>
-        </div>
 
-        <!-- Rental Info -->
-        <div style="background:rgba(32,200,161,.08); border:1px solid rgba(32,200,161,.2); border-radius:10px; padding:14px; margin-bottom:20px; font-size:14px;">
-            <div id="extCtrlSummary" style="font-weight:700; color:#eee; margin-bottom:4px;">—</div>
-            <div style="font-size:13px; color:#888;">
-                Current duration: <strong id="extCtrlCurrentDuration" style="color:#20c8a1;">—</strong>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label style="margin-bottom:12px; display:block; font-size:13px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.5px;">Select Additional Time</label>
-            <div id="extCtrlDurationPicker" class="duration-button-grid">
-                <!-- Buttons injected by calculateAvailableControllerExtensions() -->
-            </div>
-        </div>
-
-        <!-- Confirmation Preview -->
-        <div id="extCtrlConfirmSection" style="display:none; margin-top:20px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:16px;">
-            <div style="font-size:13px; color:#888; margin-bottom:10px;">Extension Details:</div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
-                <span style="color:#aaa;">Additional Time:</span>
-                <strong id="extCtrlAddMinutes" style="color:#20c8a1;">—</strong>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
-                <span style="color:#aaa;">New End Time:</span>
-                <strong id="extCtrlNewEndTime" style="color:#20c8a1;">—</strong>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:14px;">
-                <span style="color:#aaa;">Additional Fee:</span>
-                <strong id="extCtrlAddFee" style="color:#f1e1aa;">—</strong>
-            </div>
-            
-            <input type="hidden" id="extCtrlCsrf" value="<?= csrfToken() ?>">
-            
-            <button type="button" class="btn-prim btn-full" onclick="submitExtendController()" style="height:46px; font-weight:700;">
-                Confirm Extension
-            </button>
-        </div>
-
-        <div id="extCtrlError" style="display:none; margin-top:15px; background:rgba(251,86,107,.1); border:1px solid rgba(251,86,107,.2); border-radius:8px; padding:10px; color:#fb566b; font-size:13px; text-align:center;">
-            <i class="fas fa-exclamation-circle"></i> <span id="extCtrlErrorText"></span>
-        </div>
-    </div>
-</div>
-
-<style>
-/* Grid for duration buttons */
-.duration-button-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-}
-.duration-btn {
-    background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 8px;
-    padding: 10px;
-    color: #eee;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .2s;
-    text-align: center;
-}
-.duration-btn:hover:not(:disabled) {
-    background: rgba(32,200,161,.1);
-    border-color: rgba(32,200,161,.3);
-    color: #20c8a1;
-}
-.duration-btn.selected {
-    background: #20c8a1;
-    border-color: #20c8a1;
-    color: #08101c;
-}
-.duration-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-    text-decoration: line-through;
-}
-</style>
-
-<script>
-/**
- * ── EXTEND CONTROLLER RENTAL ──────────────────────────────────────────────
- */
-function openExtendControllerModal(sessionId, customerLabel, unitNumber, currentMins, endsTs, qty) {
-    const modal = document.getElementById('extendControllerModal');
-    if (!modal) return;
-
-    // Reset state
-    document.getElementById('extCtrlSummary').textContent = `Session #${sessionId} — ${customerLabel} (Console ${unitNumber})`;
-    
-    const h = Math.floor(currentMins / 60), m = currentMins % 60;
-    document.getElementById('extCtrlCurrentDuration').textContent = 
-        currentMins ? ((h ? h+'h ' : '') + (m ? m+'m' : '')) : '—';
-
-    document.getElementById('extCtrlConfirmSection').style.display = 'none';
-    document.getElementById('extCtrlError').style.display = 'none';
-
-    // Store state
-    modal.dataset.sessionId = sessionId;
-    modal.dataset.currentMins = currentMins;
-    modal.dataset.endsTs = endsTs || 0;
-    modal.dataset.qty = qty || 1;
-
-    calculateAvailableControllerExtensions();
-    openModal('extendController');
-}
-
-function calculateAvailableControllerExtensions() {
-    const picker = document.getElementById('extCtrlDurationPicker');
-    const modal = document.getElementById('extendControllerModal');
-    if (!picker || !modal) return;
-    picker.innerHTML = '';
-    
-    const options = [
-        { label: '30 min', mins: 30 }, { label: '1 hr', mins: 60 },
-        { label: '1h 30m', mins: 90 }, { label: '2 hrs', mins: 120 },
-        { label: '2h 30m', mins: 150 }, { label: '3 hrs', mins: 180 },
-        { label: '3h 30m', mins: 210 }, { label: '4 hrs', mins: 240 },
-        { label: '4h 30m', mins: 270 }, { label: '5 hrs', mins: 300 }
-    ];
-
-    const now = new Date();
-    const midnight = new Date();
-    midnight.setHours(24, 0, 0, 0); // Midnight tonight
-    
-    // Calculate the start of the extension
-    const endsTs = parseInt(modal.dataset.endsTs) || 0;
-    const currentEnd = endsTs ? new Date(endsTs * 1000) : now;
-    
-    // The extension effectively starts at the LATER of 'now' or the 'current end time'
-    const extensionStart = new Date(Math.max(now.getTime(), currentEnd.getTime()));
-    
-    // Max allowable additional minutes before hitting midnight
-    const maxPossibleMins = Math.floor((midnight.getTime() - extensionStart.getTime()) / 60000);
-
-    let availableCount = 0;
-    options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'duration-btn';
-        const qty = parseInt(modal.dataset.qty) || 1;
-        const price = (opt.mins / 30) * 10 * qty;
-        btn.textContent = `${opt.label} — ₱${Math.round(price)}`;
-        
-        if (opt.mins > maxPossibleMins) {
-            btn.disabled = true;
-            btn.title = "Exceeds 12:00 AM closing time";
-        } else {
-            availableCount++;
-            btn.onclick = () => {
-                document.querySelectorAll('#extCtrlDurationPicker .duration-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                
-                document.getElementById('extCtrlConfirmSection').style.display = 'block';
-                document.getElementById('extCtrlAddMinutes').textContent = `+ ${opt.label}`;
-                
-                // Show the end time relative to the extension start
-                const newEnd = new Date(extensionStart.getTime() + opt.mins * 60000);
-                document.getElementById('extCtrlNewEndTime').textContent = newEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('extCtrlAddFee').textContent = `₱${Math.round(price)}`;
-                
-                modal.dataset.selectedMins = opt.mins;
-                modal.dataset.calculatedEnd = newEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            };
-        }
-        picker.appendChild(btn);
-    });
-
-    if (availableCount === 0) {
-        const msg = document.createElement('div');
-        msg.style.cssText = 'grid-column: 1/-1; padding:12px; background:rgba(241,168,60,.1); border:1px solid rgba(241,168,60,.2); border-radius:8px; color:#f1a83c; font-size:12px; text-align:center;';
-        msg.innerHTML = '<i class="fas fa-calendar-times"></i> No extensions available — would exceed 12:00 AM.';
-        picker.appendChild(msg);
-    }
-}
-
-let _extCtrlInFlight = false;
-function submitExtendController() {
-    if (_extCtrlInFlight) return;
-
-    const modal = document.getElementById('extendControllerModal');
-    const sessionId = modal.dataset.sessionId;
-    const additionalMins = modal.dataset.selectedMins;
-    const csrf = document.getElementById('extCtrlCsrf').value;
-    const btn = document.querySelector('#extCtrlConfirmSection button');
-    
-    if (!sessionId || !additionalMins) return;
-
-    _extCtrlInFlight = true;
-    btn.disabled = true;
-    const originalText = btn.textContent;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-    const fd = new FormData();
-    fd.append('session_id', sessionId);
-    fd.append('additional_minutes', additionalMins);
-    fd.append('csrf_token', csrf);
-
-    fetch('ajax/extend_controller_rental.php', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            // Success feedback
-            const addTimeStr = document.getElementById('extCtrlAddMinutes').textContent.replace('+ ', '');
-            const endTimeStr = data.new_ends_at_str || modal.dataset.calculatedEnd || 'the updated time';
-            
-            const msg = `Success! Rental extended by ${addTimeStr}. New end time: ${endTimeStr}.`;
-            if (typeof showAdminToast === 'function') {
-                showAdminToast(msg, 'success');
-            } else if (typeof showInlineToast === 'function') {
-                showInlineToast(msg, 'success');
-            } else {
-                alert(msg);
-            }
-
-            closeModal('extendController');
-
-            // 1. Surgical UI update for immediate effect
-            const sid = sessionId;
-            const durEl = document.getElementById(`cr-dur-${sid}`);
-            const endsEl = document.getElementById(`cr-ends-display-${sid}`);
-            const feeEl = document.getElementById(`cr-fee-${sid}`);
-            const extBtn = document.querySelector(`button[onclick*="openExtendControllerModal(${sid},"]`);
-
-            if (durEl) durEl.textContent = data.new_dur_str;
-            if (endsEl) {
-                const badge = endsEl.querySelector('span');
-                if (badge && badge.textContent.includes('OVERDUE')) badge.remove();
-                endsEl.childNodes[0].textContent = ' ' + data.new_ends_at_str + ' ';
-                endsEl.style.color = '#20c8a1'; 
-            }
-            if (feeEl) feeEl.textContent = '₱' + data.new_total_cost_fmt;
-
-            // Update the button onclick so subsequent opens use correct base
-            if (extBtn) {
-                const oldOnclick = extBtn.getAttribute('onclick');
-                // Pattern: openExtendControllerModal(ID, 'Name', 'Console', OLD_MINS, OLD_TS, QTY)
-                const updatedOnclick = oldOnclick.replace(/, (\d+), (\d+|null), (\d+)\)$/, `, ${data.new_total_mins}, ${data.new_ends_ts}, $3)`);
-                extBtn.setAttribute('onclick', updatedOnclick);
-            }
-
-            // 2. Full section refresh in background
-            if (typeof window.gspotRefreshSection === 'function') {
-                window.gspotRefreshSection('sessions');
-            }
-            
-            _extCtrlInFlight = false;
-        } else {
-            _extCtrlInFlight = false;
-            const errorDiv = document.getElementById('extCtrlError');
-            document.getElementById('extCtrlErrorText').textContent = data.message;
-            errorDiv.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        btn.disabled = false;
-        btn.textContent = originalText;
-    })
-    .finally(() => {
-        _extCtrlInFlight = false;
-    });
-}
-</script>
 
 <script>
 /* ── Extend Session Modal ──────────────────────────────────────────── */
