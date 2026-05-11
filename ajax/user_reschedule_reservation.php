@@ -100,6 +100,30 @@ if (!in_array($res['status'], ['pending', 'reserved'])) {
     exit;
 }
 
+// ── Same-as-current check ─────────────────────────────────────────────────────
+// Reject if the new schedule and console are identical to the current reservation.
+$cur_date     = $res['reserved_date'];
+$cur_time     = substr($res['reserved_time'], 0, 5); // trim seconds (HH:MM)
+$cur_cons_id  = (int)($res['console_id'] ?? 0);
+$cur_ctrl_1   = (int)($res['controller_id'] ?? 0);
+$cur_ctrl_2   = (int)($res['controller_id_2'] ?? 0);
+
+$new_time_norm = substr($new_time, 0, 5);
+$new_cons_norm = (int)($new_console_id ?? 0);
+$new_c1_norm   = (int)($new_ctrl_1_id ?? 0);
+$new_c2_norm   = (int)($new_ctrl_2_id ?? 0);
+
+if (
+    $new_date      === $cur_date      &&
+    $new_time_norm === $cur_time      &&
+    $new_cons_norm === $cur_cons_id   &&
+    $new_c1_norm   === $cur_ctrl_1    &&
+    $new_c2_norm   === $cur_ctrl_2
+) {
+    echo json_encode(['success' => false, 'message' => '✕ New schedule/console cannot be the same as the current reservation.']);
+    exit;
+}
+
 // ── Two-reschedule-per-reservation guard ─────────────────────────────────────
 // Customers may reschedule up to 2 times. Only customer-initiated rows (rescheduled_by = uid)
 // count against this limit. Admin-initiated reschedules do NOT consume the customer's quota.
