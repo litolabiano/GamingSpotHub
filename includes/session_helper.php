@@ -5,6 +5,16 @@
  * Centralized session management, authentication, and CSRF protection.
  */
 
+// ── Character encoding — MUST be first, before any output ────────────────────
+// Explicitly declare UTF-8 in the HTTP response so the browser never falls
+// back to ISO-8859-1 (which would render ₱ as ₱).
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
+}
+// Ensure all mb_* functions use UTF-8 by default.
+mb_internal_encoding('UTF-8');
+// ─────────────────────────────────────────────────────────────────────────────
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

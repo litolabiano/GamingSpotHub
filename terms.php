@@ -178,13 +178,13 @@
                     <ul>
                         <li>Reservations can be made through the User reservation page (<code>reserve.php</code>) by selecting a console type, preferred unit, date, time, session mode, and duration.</li>
                         <li>The availability of console units is dynamic based on the selected date and time — only units currently available for that specific slot will be shown.</li>
-                        <li>A **reservation fee** must be paid via GCash through PayMongo before a reservation is confirmed.</li>
-                        <li>The reservation fee is calculated as a **₱20.00 base fee** plus **5% of the total session cost**.</li>
-                        <li>Once payment is completed, the reservation status is immediately set to **'Reserved'**. No further admin approval is required.</li>
-                        <li>The reservation fee is **strictly non-refundable** under any circumstances, including cancellations and no-shows.</li>
-                        <li>Reservations are only permitted within the shop's operating hours: **12:00 PM to 12:00 AM**.</li>
-                        <li>Reservations can be made up to **1 month in advance** from the current date.</li>
-                        <li>Users must arrive at the shop on their reserved date and time, as the session will **auto-start** at the scheduled time.</li>
+                        <li>A reservation fee must be paid via GCash through PayMongo before a reservation is confirmed.</li>
+                        <li>The reservation fee is calculated as a <strong>₱20.00 base fee plus 5% of the total session cost</strong>.</li>
+                        <li>Once payment is completed, the reservation status is immediately set to <strong>'Reserved'</strong>. No further admin approval is required.</li>
+                        <li>The reservation fee is <strong style="color:#c21c02;">strictly non-refundable</strong> under any circumstances, including cancellations and no-shows.</li>
+                        <li>Reservations are only permitted within the shop's operating hours: 12:00 PM to 12:00 AM.</li>
+                        <li>Reservations can be made up to 1 month in advance from the current date.</li>
+                        <li>Users must arrive at the shop on their reserved date and time, as the session will auto-start at the scheduled time.</li>
                         <li>Users are responsible for arriving on time; late arrivals will not result in any extension of the reserved session time.</li>
                         <li>Users must agree to these Terms and Conditions by checking the required checkbox before completing the reservation payment.</li>
                     </ul>

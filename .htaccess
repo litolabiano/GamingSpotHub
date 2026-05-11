@@ -1,0 +1,15 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Good Spot Gaming Hub — Apache Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Character Encoding ────────────────────────────────────────────────────────
+# Force UTF-8 for ALL responses so that multi-byte characters (e.g. ₱ U+20B1)
+# are rendered correctly instead of appearing as garbled Latin-1 sequences
+# (e.g. â‚±).  This sets both the HTTP Content-Type header AND the default
+# charset Apache uses when PHP does not explicitly send one.
+AddDefaultCharset UTF-8
+
+# Also ensure PHP files are served as UTF-8 HTML
+<FilesMatch "\.php$">
+    AddCharset UTF-8 .php
+</FilesMatch>
