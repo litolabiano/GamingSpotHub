@@ -104,9 +104,9 @@
                 <!-- Admin Filter -->
                 <select class="asb-select" id="logAdminFilter" style="width:160px;">
                     <option value="">All</option>
-                    <option value="role:owner">Admins</option>
+                    <option value="role:owner">Owner</option>
                     <option value="role:shopkeeper">Shopkeepers</option>
-                    <option value="role:customer">Users</option>
+                    <option value="role:customer">Customers</option>
                     
                     <?php
                     // Fetch all users who have performed an action
@@ -125,9 +125,9 @@
                     }
                     
                     $roleLabels = [
-                        'owner' => ['label' => 'ADMINS', 'display' => 'Admin'],
-                        'shopkeeper' => ['label' => 'SHOPKEEPERS', 'display' => 'Shopkeeper'],
-                        'customer' => ['label' => 'USERS', 'display' => 'User']
+                        'owner' => ['label' => 'Owners', 'display' => 'Owner'],
+                        'shopkeeper' => ['label' => 'Shopkeepers', 'display' => 'Shopkeeper'],
+                        'customer' => ['label' => 'Customer', 'display' => 'Customer']
                     ];
                     
                     foreach ($groups as $role => $users):
