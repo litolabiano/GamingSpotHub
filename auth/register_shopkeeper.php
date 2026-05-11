@@ -12,6 +12,7 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $full_name = trim($_POST['full_name'] ?? '');
     $email     = trim($_POST['email'] ?? '');
     $phone     = trim($_POST['phone'] ?? '');
     $password  = $_POST['password'] ?? '';
@@ -19,18 +20,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $agreed = isset($_POST['agree_terms']);
 
-    if (empty($full_name) || empty($email) || empty($phone) || empty($password) || empty($confirm)) {
-        $error = 'Please fill in all required fields.';
+    if (empty($full_name)) {
+        $error = 'Full Name is required.';
+    } elseif (empty($email)) {
+        $error = 'Work Email Address is required.';
+    } elseif (empty($phone)) {
+        $error = 'Phone Number is required.';
+    } elseif (empty($password)) {
+        $error = 'Password is required.';
+    } elseif (empty($confirm)) {
+        $error = 'Please confirm your password.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } elseif (!preg_match('/^(09|\+639)\d{9}$/', $phone)) {
-        $error = 'Please enter a valid Philippine mobile number (e.g., 09123456789 or +639123456789).';
+        $error = 'Invalid Phone Number format. Use 09XXXXXXXXX or +639XXXXXXXXX.';
     } elseif (strlen($password) < 8) {
         $error = 'Password must be at least 8 characters long.';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
     } elseif (!$agreed) {
-        $error = 'You must agree to the Staff Terms and Conditions to create the account.';
+        $error = 'You must agree to the Staff Terms and Conditions.';
     } else {
         $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
@@ -272,6 +281,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         const agreeChk = document.getElementById('agree_terms');
         const submitBtn = document.getElementById('submitBtn');
 
+        document.addEventListener('DOMContentLoaded', function() {
+            if (agreeChk) submitBtn.disabled = !agreeChk.checked;
+        });
+
         document.getElementById('registerForm')?.addEventListener('submit', function(e) {
             const phoneInput = document.getElementById('phone');
             const phoneError = document.getElementById('phoneError');
@@ -294,8 +307,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             phoneError.style.display = 'none';
 
-            if (!agreeChk?.checked) return false;
+            if (!agreeChk || !agreeChk.checked) {
+                e.preventDefault();
+                return false;
+            }
+            
             submitBtn.disabled = true;
+            const btnText = submitBtn.querySelector('.btn-text');
+            if (btnText) btnText.textContent = 'Creating Account...';
         });
 
         agreeChk?.addEventListener('change', function () {
