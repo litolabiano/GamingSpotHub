@@ -1976,10 +1976,7 @@ function fmtMins(int $m): string {
                         Extension request for <strong>+<?= $pendingExtension['extra_minutes'] ?> min</strong> is <strong>pending staff approval</strong>
                     </div>
                     <?php else: ?>
-                    <button class="cd-btn cd-btn-blue" id="reqExtBtn" onclick="openReqExtModal()">
-                        <i class="fas fa-clock"></i> Request More Time
-                    </button>
-                    <span style="font-size:12px;color:var(--muted);">Ask staff to approve extra gaming time</span>
+                 
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
