@@ -18,7 +18,6 @@ $name       = trim($_POST['console_name'] ?? '');
 $type_id    = (int)($_POST['console_type_id'] ?? 0);
 $unit       = trim($_POST['unit_number'] ?? '');
 $ctrl_count = (int)($_POST['controller_count'] ?? 2);
-$rate       = !empty($_POST['hourly_rate']) ? (float)$_POST['hourly_rate'] : null;
 
 if (!$console_id || !$name || !$type_id || !$unit) {
     echo json_encode(['success' => false, 'message' => 'All required fields must be filled.']);
@@ -36,9 +35,9 @@ if ($dup->get_result()->num_rows > 0) {
 
 // 2. Perform update
 $stmt = $conn->prepare(
-    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ?, hourly_rate = ? WHERE console_id = ?"
+    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ? WHERE console_id = ?"
 );
-$stmt->bind_param('sisidi', $name, $type_id, $unit, $ctrl_count, $rate, $console_id);
+$stmt->bind_param('sisii', $name, $type_id, $unit, $ctrl_count, $console_id);
 
 if ($stmt->execute()) {
     // Log activity
@@ -46,7 +45,7 @@ if ($stmt->execute()) {
     
     // Fetch fresh data for UI update (join with types for type name)
     $fresh = $conn->prepare(
-        "SELECT c.*, ct.type_name AS console_type, COALESCE(c.hourly_rate, ct.hourly_rate) AS effective_rate 
+        "SELECT c.*, ct.type_name AS console_type, ct.hourly_rate AS effective_rate 
          FROM consoles c 
          LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id 
          WHERE c.console_id = ?"

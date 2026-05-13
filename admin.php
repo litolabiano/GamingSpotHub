@@ -262,8 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $controller_count = (int)($_POST['controller_count'] ?? 2);
-                $hourly_rate = !empty($_POST['hourly_rate']) ? (float)$_POST['hourly_rate'] : null;
-                if (addConsole($name, $type_id, $unit_number, $controller_count, $hourly_rate)) {
+                if (addConsole($name, $type_id, $unit_number, $controller_count)) {
                     $message = 'Console added successfully.';
                     $messageType = 'success';
                     
@@ -297,12 +296,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             } else {
                 $controller_count = (int)($_POST['controller_count'] ?? 2);
-                $hourly_rate = !empty($_POST['hourly_rate']) ? (float)$_POST['hourly_rate'] : null;
 
                 $stmt = $conn->prepare(
-                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ?, hourly_rate = ? WHERE console_id = ?"
+                    "UPDATE consoles SET console_name = ?, console_type_id = ?, unit_number = ?, controller_count = ? WHERE console_id = ?"
                 );
-                $stmt->bind_param('sisidi', $name, $type_id, $unit, $controller_count, $hourly_rate, $console_id);
+                $stmt->bind_param('sisii', $name, $type_id, $unit, $controller_count, $console_id);
                 if ($stmt->execute()) {
                     $message     = 'Console updated successfully.';
                     $messageType = 'success';
@@ -1224,7 +1222,7 @@ unset($_res, $_avRes);
 
 // Sessions: active/live first (sorted by urgency - closest booked end time), then completed newest-first
 $stmt = $conn->prepare(
-    "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, c.unit_number, ct.type_name AS console_type,
+    "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, c.unit_number, ct.type_name AS console_type, COALESCE(gs.hourly_rate, ct.hourly_rate) AS hourly_rate,
             gs.source_reservation_id,
             COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
             COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,
@@ -3050,12 +3048,16 @@ const _availableControllers = <?= json_encode($availableControllers ?? []) ?>;
  * Return the hourly rate for the currently selected console in the
  * Start Session modal, falling back to the global PRICING default.
  */
+var _currentSessionRate = null;
+
 function getConsoleRate() {
+    if (_currentSessionRate !== null) return _currentSessionRate;
+    
     const sel = document.getElementById('consoleSelect');
     const opt = sel && sel.options[sel.selectedIndex];
     const rate = opt ? parseFloat(opt.dataset.rate || 0) : 0;
     if (rate > 0) return rate;
-    // Fallback: look up by type name in PRICING.console_rates_by_name
+
     const type = opt ? (opt.dataset.type || '') : '';
     return (PRICING.console_rates_by_name && PRICING.console_rates_by_name[type])
         || PRICING.hourly_rate;
@@ -3063,14 +3065,14 @@ function getConsoleRate() {
 
 function _bracketCost(partialMin) {
     if (partialMin <= 0) return 0;
-    const rate  = getConsoleRate();
-    const tiers = PRICING.pricing_tiers || [];
-    for (let i = 0; i < tiers.length; i++) {
-        if (partialMin >= tiers[i].min && partialMin <= tiers[i].max) {
-            return tiers[i].charge;
-        }
-    }
-    return rate;
+    const rate = getConsoleRate();
+    
+    // Formula: 1-4 mins = ₱0 grace period
+    if (partialMin < 5) return 0;
+    
+    // Bracket width: 15 min = 25% of hourly_rate
+    const bracket = Math.min(Math.ceil((partialMin - 4) / 15), 4);
+    return Math.round(bracket * (rate / 4));
 }
 function _timedCost(totalMin) {
     if (totalMin <= 0) return 0;
@@ -3127,7 +3129,8 @@ function playSessionEndSound() {
     } catch(e) { /* AudioContext unavailable - silently ignore */ }
 }
 
-function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, sourceReservationId) {
+function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, sourceReservationId, consoleHourlyRate) {
+    _currentSessionRate = parseFloat(consoleHourlyRate) || null;
     upfrontPaid           = upfrontPaid           || 0;
     reservationDownpayment = reservationDownpayment || 0;
     sourceReservationId   = sourceReservationId   || 0;
@@ -3139,15 +3142,15 @@ function openEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
         .then(function(ex){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
                 plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate,
-                ex.extras || 0, ex.items || [], sourceReservationId, ex);
+                ex.extras || 0, ex.items || [], sourceReservationId, ex, consoleHourlyRate);
         })
         .catch(function(){
             _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs,
-                plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, 0, [], sourceReservationId, {});
+                plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, 0, [], sourceReservationId, {}, consoleHourlyRate);
         });
 }
 
-function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, extras, extraItems, sourceReservationId, extrasData) {
+function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, startTs, plannedMinutes, upfrontPaid, reservationDownpayment, unlimitedRate, extras, extraItems, sourceReservationId, extrasData, consoleHourlyRate) {
     extras                 = extras                 || 0;
     extrasData             = extrasData             || {};
     reservationDownpayment = reservationDownpayment || 0;
@@ -3446,7 +3449,8 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
             upfrontPaid: upfrontPaid,
             reservationDownpayment: reservationDownpayment,
             unlimitedRate: unlimitedRate,
-            sourceReservationId: sourceReservationId
+            sourceReservationId: sourceReservationId,
+            hourlyRate: consoleHourlyRate
         });
     }
 
@@ -3578,7 +3582,7 @@ function _renderEndSessionModal(sessionId, customerName, unitNumber, mode, start
                                         ctx.sessionId, ctx.customerName, ctx.unitNumber,
                                         ctx.mode, ctx.startTs, ctx.plannedMinutes,
                                         ctx.upfrontPaid, ctx.reservationDownpayment,
-                                        ctx.unlimitedRate, ctx.sourceReservationId
+                                        ctx.unlimitedRate, ctx.sourceReservationId, ctx.hourlyRate
                                     );
                                 }, 1500);
                             } else {
@@ -4197,6 +4201,7 @@ function showSessionEndingAlert(el, remaining) {
     var upfrontPaid  = parseFloat(el.dataset.upfrontPaid  || 0);
     var unlimRate    = parseFloat(el.dataset.unlimitedRate || 300);
     var bookedMin    = parseInt(el.dataset.bookedMinutes   || 0);
+    var hourlyRate   = parseFloat(el.dataset.hourlyRate    || 0);
 
     // â”€â”€ Navigate to Sessions tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     var sessNavEl = document.querySelector('.nav-item[onclick*="\'sessions\'"]');
@@ -4291,7 +4296,7 @@ function showSessionEndingAlert(el, remaining) {
     // Extend button â†’ open extend modal, close siren
     document.getElementById('gspotSirenExtendBtn').addEventListener('click', function() {
         _closeSirenModal(key);
-        openExtendModal(sessionId, customer, unit, bookedMin, mode);
+        openExtendModal(sessionId, customer, unit, bookedMin, mode, hourlyRate);
     });
 
     // End Now button â†’ open end session modal, close siren
@@ -4299,7 +4304,7 @@ function showSessionEndingAlert(el, remaining) {
         _closeSirenModal(key);
         // Open the modal in locked mode (prevent outside-click close)
         _sirenTriggeredEnd = true;
-        openEndSessionModal(sessionId, customer, unit, mode, startTs, bookedMin, upfrontPaid, unlimRate);
+        openEndSessionModal(sessionId, customer, unit, mode, startTs, bookedMin, upfrontPaid, 0, unlimRate, 0, hourlyRate);
     });
 }
 

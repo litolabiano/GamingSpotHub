@@ -145,22 +145,20 @@ function paidToTotalMinutes(int $paid_minutes, ?array $rules = null): int {
  *      planned=150 (2 paid hrs + 30 free min) → paid=120 → ₱160
  *      planned=30  (30 min, no bonus)          → session_min_charge
  */
-function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null): float {
+function computeHourlySessionBaseCost(int $total_minutes, ?array $rules = null, $rateOverride = null): float {
     $rules = $rules ?? getPricingRules();
+    $rate  = ($rateOverride !== null) ? (float)$rateOverride : $rules['hourly_rate'];
     if ($total_minutes <= 0) return 0.0;
     if ($total_minutes <= 30) return $rules['session_min_charge'];
 
     $bp = $rules['bonus_paid_minutes'];  // e.g. 120
     $bf = $rules['bonus_free_minutes'];  // e.g. 30
 
-    // Walk down from total_minutes to find the paid_minutes p such that
-    // paidToTotalMinutes(p) === total_minutes.
     for ($p = $total_minutes; $p >= 0; $p--) {
         if ($p + (int)floor($p / $bp) * $bf === $total_minutes) {
-            // Apply the new pricing structure: ₱50 for first 30m, straight hourly rate thereafter
             if ($p <= 0) return 0.0;
             if ($p <= 30) return (float)$rules['session_min_charge'];
-            return (float)round($p / 60 * $rules['hourly_rate'], 2);
+            return (float)round($p / 60 * $rate, 2);
         }
     }
     // Fallback: no bonus found — treat all minutes as paid (shouldn't happen)
@@ -212,7 +210,7 @@ function getHourlyDurationOptions(?array $rules = null): array {
  */
 function getConsoles($status = null, $type = null) {
     global $conn;
-    $sql = "SELECT c.*, ct.type_name AS console_type, COALESCE(c.hourly_rate, ct.hourly_rate) AS hourly_rate
+    $sql = "SELECT c.*, ct.type_name AS console_type, ct.hourly_rate AS hourly_rate
             FROM consoles c 
             LEFT JOIN console_types ct ON c.console_type_id = ct.console_type_id 
             WHERE 1=1";
@@ -264,11 +262,11 @@ function updateConsoleStatus($console_id, $status) {
  * Add a new console to the database.
  * $type_id is the console_types.type_id FK.
  */
-function addConsole($name, $type_id, $unit_number, $controller_count = 2, $hourly_rate = null) {
+function addConsole($name, $type_id, $unit_number, $controller_count = 2) {
     global $conn;
     try {
-        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, controller_count, hourly_rate, status) VALUES (?, ?, ?, ?, ?, 'available')");
-        $stmt->bind_param("sisid", $name, $type_id, $unit_number, $controller_count, $hourly_rate);
+        $stmt = $conn->prepare("INSERT INTO consoles (console_name, console_type_id, unit_number, controller_count, status) VALUES (?, ?, ?, ?, 'available')");
+        $stmt->bind_param("sisi", $name, $type_id, $unit_number, $controller_count);
         return $stmt->execute();
     } catch (mysqli_sql_exception $e) {
         return false;
@@ -823,6 +821,28 @@ function denyExtension($extension_id, $denied_by, $note = null) {
 }
 
 
+<<<<<<< Updated upstream
+=======
+ *
+ * Brackets: 1–4 min = ₱0 (grace), 5–19 min = ₱20,
+ *           20–34 min = ₱40, 35–49 min = ₱60, 50–59 min = ₱80.
+ */
+function computePartialPeriodCost($minutes, $rate = null) {
+    if ($minutes <= 0) return 0;
+    if ($rate === null) {
+        $rules = getPricingRules();
+        $rate  = $rules['hourly_rate'];
+    }
+    
+    // Formula: 1-4 mins = ₱0 grace period
+    if ($minutes < 5) return 0;
+    
+    // Bracket width: 15 min = 25% of hourly_rate
+    // 5-19 min = 1 bracket, 20-34 = 2, 35-49 = 3, 50-64 = 4
+    $bracket = min(ceil(($minutes - 4) / 15), 4);
+    return (float) round($bracket * ($rate / 4));
+}
+>>>>>>> Stashed changes
 
 /**
  * Staff: end ONE specific controller's rental early on an active session.
@@ -1057,13 +1077,37 @@ function endSingleControllerEarly(int $session_id, int $controller_id, int $staf
  * - 5+ mins: Billing starts in 15-minute intervals (unit_cost = rate / 4)
  * - Formula: ceil((minutes - 4) / 15) * unit_cost
  */
+<<<<<<< Updated upstream
 function computeTimedCost(int $minutes, float $rate = null): float {
+=======
+function computeTimedCost(int $minutes, $rateOverride = null): float {
+>>>>>>> Stashed changes
     $minutes = max(0, $minutes);
     if ($minutes <= 0) return 0.0;
 
+<<<<<<< Updated upstream
     if ($rate === null) {
         $rules = getPricingRules();
         $rate  = (float) $rules['hourly_rate'];
+=======
+    $rules    = getPricingRules();
+    $bp       = $rules['bonus_paid_minutes'];   // e.g. 120
+    $bf       = $rules['bonus_free_minutes'];   // e.g. 30
+    $rate     = ($rateOverride !== null) ? (float)$rateOverride : $rules['hourly_rate'];
+    $cyclePay = $bp / 60 * $rate;              // e.g. ₱160 per cycle
+    $cycleLen = $bp + $bf;                     // e.g. 150 total min/cycle
+
+    $fullCycles = (int) floor($minutes / $cycleLen);
+    $cost       = $fullCycles * $cyclePay;
+    $remainder  = $minutes % $cycleLen;
+
+    if ($remainder > $bp) {
+        // Inside the free window — charge the full paid block
+        $cost += $cyclePay;
+    } else {
+        // Inside the paid window — hourly bracket billing
+        $cost += (int) floor($remainder / 60) * $rate + computePartialPeriodCost($remainder % 60, $rate);
+>>>>>>> Stashed changes
     }
 
     if ($minutes <= 4) return 0.0;
@@ -1360,11 +1404,19 @@ function endControllerRentalEarly(int $session_id, int $staff_user_id): array {
  * Compute the cost for an INITIAL session start (incorporates the ₱50 min charge).
  * Applies the ₱10 surcharge over the standard ₱80/hr (₱40/30m) rate for the first 30m.
  */
+<<<<<<< Updated upstream
 function computeInitialSessionCost(int $total_minutes, float $rate = null): float {
     if ($total_minutes <= 0) return 0.0;
     $rules = getPricingRules();
     $standardCost = computeTimedCost($total_minutes, $rate);
     // Ensure it's at least the session_min_charge if configured
+=======
+function computeInitialSessionCost(int $total_minutes, $rateOverride = null): float {
+    if ($total_minutes <= 0) return 0.0;
+    $rules = getPricingRules();
+    $standardCost = computeTimedCost($total_minutes, $rateOverride);
+    // We ensure it's at least the session_min_charge (₱50), but don't arbitrarily add ₱10 for > 30 min
+>>>>>>> Stashed changes
     return (float) max($rules['session_min_charge'], $standardCost);
 }
 
@@ -1385,7 +1437,11 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
                 $overtime = $duration_minutes - $planned_minutes;
 
                 if ($overtime <= 0) {
+<<<<<<< Updated upstream
                     // Ended on time or early — charge for ACTUAL time used
+=======
+                    // Ended on time or early — charge for ACTUAL time used, not planned duration.
+>>>>>>> Stashed changes
                     return computeTimedCost($duration_minutes, $hourly_rate);
                 }
 
@@ -1412,7 +1468,7 @@ function computeRentalFee($rental_mode, $duration_minutes, $hourly_rate, $unlimi
  */
 function getActiveSessions() {
     global $conn;
-    $sql = "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, ct.type_name AS console_type, c.unit_number,
+    $sql = "SELECT gs.*, u.full_name AS customer_name, u.email AS customer_email, c.console_name, ct.type_name AS console_type, COALESCE(gs.hourly_rate, ct.hourly_rate) AS hourly_rate, c.unit_number,
                    gs.source_reservation_id,
                    COALESCE(r.downpayment_amount, 0) AS reservation_downpayment,
                    COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.session_id = gs.session_id AND t.amount > 0), 0) AS upfront_paid,

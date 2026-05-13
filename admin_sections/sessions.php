@@ -268,7 +268,18 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                         Ended
                                     </span>
                                 <?php else: ?>
-                                    <span class="session-timer" data-start="<?= $ps['start_time'] ?>" style="color:#f1e1aa;font-family:monospace;">
+                                    <span class="session-timer" 
+                                          data-start="<?= $ps['start_time'] ?>"
+                                          data-session-id="<?= $ps['session_id'] ?>"
+                                          data-customer="<?= sessionCustomerLabel($ps, true) ?>"
+                                          data-unit="<?= htmlspecialchars(addslashes($ps['unit_number'])) ?>"
+                                          data-mode="<?= $ps['rental_mode'] ?>"
+                                          data-start-ts="<?= $psStart ?>"
+                                          data-upfront-paid="<?= $psPaid ?>"
+                                          data-unlimited-rate="<?= (float)($settings['unlimited_rate'] ?? 300) ?>"
+                                          data-booked-minutes="<?= $bookedMinutes ?>"
+                                          data-hourly-rate="<?= (float)$ps['hourly_rate'] ?>"
+                                          style="color:#f1e1aa;font-family:monospace;">
                                         <?= ($psH ? $psH . 'h ' : '') . str_pad($psM, 2, '0', STR_PAD_LEFT) . 'm' ?>
                                     </span>
                                 <?php endif; ?>
@@ -385,7 +396,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                         data-duration="<?= $durationV ?>"
                         data-cost="<?= $costVal ?>"
                         data-status="<?= $isLive ?>"
-                        data-source-res-id="<?= $sess['source_reservation_id'] ?? 0 ?>">
+                        data-source-res-id="<?= $sess['source_reservation_id'] ?? 0 ?>"
+                        data-hourly-rate="<?= (float)$sess['hourly_rate'] ?>">
                         <td data-label="#">#<?= $sess['session_id'] ?></td>
                         <td data-label="Customer"><?= sessionCustomerLabel($sess) ?></td>
                         <td data-label="Console" class="console-cell" data-session-id="<?= $sess['session_id'] ?>">
@@ -472,7 +484,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                             <?= (float)($sess['upfront_paid'] ?? 0) ?>,
                             <?= (float)($sess['reservation_downpayment'] ?? 0) ?>,
                             <?= (float)($settings['unlimited_rate'] ?? 300) ?>,
-                            <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
+                            <?= (int)($sess['source_reservation_id'] ?? 0) ?>,
+                            <?= (float)$sess['hourly_rate'] ?>)">
                                         <i class="fas fa-stop"></i> End
                                     </button>
 
@@ -485,7 +498,8 @@ function sessionCustomerLabel(array $sess, bool $forJs = false): string {
                                 '<?= sessionCustomerLabel($sess, true) ?>',
                                 '<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>',
                                 <?= $bookedMinutes ?>,
-                                '<?= $sess['rental_mode'] ?>'
+                                '<?= $sess['rental_mode'] ?>',
+                                <?= (float)$sess['hourly_rate'] ?>
                             )">
                                         <i class="fas fa-clock"></i> Extend
                                     </button>

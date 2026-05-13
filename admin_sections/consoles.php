@@ -127,7 +127,7 @@
                 <div class="console-actions">
                     <!-- Row 1: Edit (always full width) -->
                     <div class="console-edit-row">
-                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= (int)($con['controller_count'] ?? 2) ?>, <?= (float)$con['hourly_rate'] ?>)" class="btn-sec btn-sm">
+                        <button onclick="openEditConsoleModal(<?= $con['console_id'] ?>, '<?= htmlspecialchars($con['console_name'], ENT_QUOTES) ?>', <?= (int)$con['console_type_id'] ?>, '<?= htmlspecialchars($con['unit_number'], ENT_QUOTES) ?>', <?= (int)($con['controller_count'] ?? 2) ?>)" class="btn-sec btn-sm">
                             <i class="fas fa-edit"></i> Edit Console
                         </button>
 
@@ -498,10 +498,6 @@
                     <input type="text" name="unit_number" class="form-control" required maxlength="20" placeholder="e.g. PS5-01">
                 </div>
                 <div class="form-group">
-                    <label>Custom Hourly Rate (₱) <span style="color:#888;font-size:11px;">(Optional override)</span></label>
-                    <input type="number" name="hourly_rate" class="form-control" min="0" step="0.01" placeholder="Leave empty for type default">
-                </div>
-                <div class="form-group">
                     <label>Default Controllers Included</label>
                     <input type="number" name="controller_count" class="form-control" required min="0" max="4" value="2">
                 </div>
@@ -545,11 +541,6 @@
                     <label>Unit Number <span style="color:#888;font-size:11px;">(Must be unique)</span></label>
                     <input type="text" name="unit_number" id="editConsoleUnit"
                            class="form-control" required maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label>Custom Hourly Rate (₱) <span style="color:#888;font-size:11px;">(Optional override)</span></label>
-                    <input type="number" name="hourly_rate" id="editConsoleRate"
-                           class="form-control" min="0" step="0.01" placeholder="Leave empty for type default">
                 </div>
                 <div class="form-group">
                     <label>Default Controllers Included</label>
@@ -603,13 +594,12 @@
 </div>
 
 <script>
-function openEditConsoleModal(id, name, type, unit, controllerCount, hourlyRate) {
+function openEditConsoleModal(id, name, type, unit, controllerCount) {
     document.getElementById('editConsoleId').value   = id;
     document.getElementById('editConsoleName').value = name;
     document.getElementById('editConsoleType').value = type;
     document.getElementById('editConsoleUnit').value = unit;
     document.getElementById('editConsoleControllers').value = controllerCount;
-    document.getElementById('editConsoleRate').value = hourlyRate || '';
     
     // Reset button state
     const subBtn = document.querySelector('#editConsoleForm button[type=submit]');
@@ -695,7 +685,7 @@ function updateConsoleCardUI(data) {
     // Update the Edit button's onclick to reflect new values
     const editBtn = card.querySelector('.console-edit-row button');
     if (editBtn) {
-        editBtn.setAttribute('onclick', `openEditConsoleModal(${data.console_id}, '${data.console_name.replace(/'/g, "\\'")}', ${data.console_type_id}, '${data.unit_number.replace(/'/g, "\\'")}', ${data.controller_count}, ${data.effective_rate})`);
+        editBtn.setAttribute('onclick', `openEditConsoleModal(${data.console_id}, '${data.console_name.replace(/'/g, "\\'")}', ${data.console_type_id}, '${data.unit_number.replace(/'/g, "\\'")}', ${data.controller_count})`);
     }
 }
 

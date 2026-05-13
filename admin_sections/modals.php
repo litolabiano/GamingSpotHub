@@ -1023,12 +1023,12 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
                 <select name="extra_minutes" id="extendMinutes" required onchange="updateExtendCost()">
                     <option value="" disabled selected>— Select additional time —</option>
                     <option value="15">+ 15 minutes</option>
-                    <option value="30">+ 30 minutes — ₱50</option>
-                    <option value="60">+ 1 hour — ₱80</option>
-                    <option value="90">+ 1h 30m — ₱120</option>
-                    <option value="120">+ 2 hours — ₱160</option>
-                    <option value="180">+ 3 hours — ₱240</option>
-                    <option value="240">+ 4 hours — ₱320</option>
+                    <option value="30">+ 30 minutes</option>
+                    <option value="60">+ 1 hour</option>
+                    <option value="90">+ 1h 30m</option>
+                    <option value="120">+ 2 hours</option>
+                    <option value="180">+ 3 hours</option>
+                    <option value="240">+ 4 hours</option>
                 </select>
             </div>
 
@@ -1061,7 +1061,8 @@ const CTRL_LIST_BY_TYPE = <?= $ctrlAvailListJson ?>;
 
 <script>
 /* ── Extend Session Modal ──────────────────────────────────────────── */
-function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, rentalMode) {
+function openExtendModal(sessionId, customerName, unitNumber, bookedMinutes, rentalMode, hourlyRate) {
+    _currentSessionRate = parseFloat(hourlyRate) || null;
     document.getElementById('extendSessionId').value   = sessionId;
     document.getElementById('extendSessionMode').value = rentalMode || 'hourly';
     document.getElementById('extendSessionSummary').textContent =
@@ -1175,7 +1176,7 @@ function updateExtendCost() {
                     if(payFlds) payFlds.style.display  = 'none';
                     holder.value = '0';
                 } else {
-                    // Hourly: straight ₱80/hr
+                    // Hourly: straight dynamic rate/hr
                     const cost = computeExtCost(mins);
                     costEl.textContent = '₱' + cost;
                     freeNote.style.display = 'none';
@@ -1196,10 +1197,11 @@ function updateExtendCost() {
         });
 }
 
-// JS mirror of extension pricing: straight ₱80/hr, no session-start minimum
+// JS mirror of extension pricing: straight proportional rate/hr, no session-start minimum
 function computeExtCost(mins) {
-    // ₱80/hr straight — 30 min = ₱40, 60 min = ₱80, etc.
-    return Math.round((mins / 60) * 80);
+    const rate = getConsoleRate();
+    // straight proportional billing for extensions: (mins / 60) * rate
+    return Math.round((mins / 60) * rate);
 }
 
 /* ── Tendered field lock/unlock helpers ──────────────────────────────── */
@@ -2541,7 +2543,7 @@ function confirmEndControllerRental(sid, finalFee) {
                             ctx.sessionId, ctx.customerName, ctx.unitNumber,
                             ctx.mode, ctx.startTs, ctx.plannedMinutes,
                             ctx.upfrontPaid, ctx.reservationDownpayment,
-                            ctx.unlimitedRate, ctx.sourceReservationId
+                            ctx.unlimitedRate, ctx.sourceReservationId, ctx.hourlyRate
                         );
                     }, 800);
                 }

@@ -105,7 +105,8 @@
                     data-unlimited-rate="<?= (float)($settings['unlimited_rate'] ?? 300) ?>"
                     data-booked-minutes="<?= (int)($sess['planned_minutes'] ?? 0) ?>"
                     data-customer="<?= htmlspecialchars(addslashes($sess['customer_name'])) ?>"
-                    data-unit="<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>">—</span></td>
+                    data-unit="<?= htmlspecialchars(addslashes($sess['unit_number'])) ?>"
+                    data-hourly-rate="<?= (float)$sess['hourly_rate'] ?>">—</span></td>
                 <td data-label="Actions">
                     <button class="btn-dang btn-sm" title="End & Collect Payment"
                         onclick="openEndSessionModal(
@@ -118,7 +119,8 @@
                         <?= (float)($sess['upfront_paid'] ?? 0) ?>,
                         <?= (float)($sess['reservation_downpayment'] ?? 0) ?>,
                         <?= (float)($settings['unlimited_rate'] ?? 300) ?>,
-                        <?= (int)($sess['source_reservation_id'] ?? 0) ?>)">
+                        <?= (int)($sess['source_reservation_id'] ?? 0) ?>,
+                        <?= (float)$sess['hourly_rate'] ?>)">
                         <i class="fas fa-stop-circle"></i> End &amp; Pay
                     </button>
 
